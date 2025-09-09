@@ -15,9 +15,10 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { ClientService, ClientWithAccess } from '@/lib/clientService';
 import { UserService } from '@/lib/userService';
+import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { KOLService } from '@/lib/kolService';
 import { CampaignService } from '@/lib/campaignService';
 
@@ -29,6 +30,8 @@ type ClientWithStatus = ClientWithAccess & {
 export default function ClientsPage() {
   const { user, userProfile } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const partnerIdParam = searchParams.get('partnerId');
   const [clients, setClients] = useState<ClientWithAccess[]>([]);
   const [clientsWithStatus, setClientsWithStatus] = useState<ClientWithStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +44,8 @@ export default function ClientsPage() {
   const [isStartClientOpen, setIsStartClientOpen] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [allClients, setAllClients] = useState<ClientWithAccess[]>([]);
+  const [allPartners, setAllPartners] = useState<any[]>([]);
+  const [filteredPartnerName, setFilteredPartnerName] = useState<string | null>(null);
   // New client form state
   const [newClient, setNewClient] = useState({
     name: '',
@@ -50,6 +55,8 @@ export default function ClientsPage() {
     source: 'Inbound',
     onboarding_call_held: false,
     onboarding_call_date: undefined as Date | undefined,
+    is_whitelisted: false,
+    whitelist_partner_id: null as string | null,
   });
   // Start client form state
   const [startClientForm, setStartClientForm] = useState({
@@ -130,7 +137,33 @@ export default function ClientsPage() {
     if (userProfile?.role === 'admin') {
       UserService.getAllUsers().then(setAllUsers);
     }
+    fetchPartners();
   }, [user?.id, userProfile?.role]);
+
+  // Handle partner filtering
+  useEffect(() => {
+    if (partnerIdParam) {
+      const partner = allPartners.find(p => p.id === partnerIdParam);
+      setFilteredPartnerName(partner?.name || null);
+    } else {
+      setFilteredPartnerName(null);
+    }
+  }, [partnerIdParam, allPartners]);
+  const fetchPartners = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('partners')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setAllPartners(data || []);
+    } catch (err) {
+      console.error('Error fetching partners:', err);
+    }
+  };
+
   const fetchClients = async () => {
     if (!user?.id || !userProfile?.role) return;
     try {
@@ -140,6 +173,7 @@ export default function ClientsPage() {
         userProfile.role as 'admin' | 'member' | 'client',
         user.id
       );
+
       setClients(fetchedClients);
       // Fetch campaigns for all clients and compute status breakdown
       const clientIds = fetchedClients.map(c => c.id);
@@ -165,11 +199,18 @@ export default function ClientsPage() {
       setLoading(false);
     }
   };
-  const filteredClients = clients.filter(client =>
-    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (client.location && client.location.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredClients = clientsWithStatus.filter(client => {
+    const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (client.location && client.location.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    let matchesPartner = true;
+    if (partnerIdParam) {
+      matchesPartner = client.is_whitelisted === true && client.whitelist_partner_id === partnerIdParam;
+    }
+    
+    return matchesSearch && matchesPartner;
+  });
   const handleEditClient = (client: ClientWithAccess) => {
     setEditingClient(client);
     setNewClient({
@@ -180,6 +221,8 @@ export default function ClientsPage() {
       source: client.source || 'Inbound',
       onboarding_call_held: client.onboarding_call_held || false,
       onboarding_call_date: client.onboarding_call_date ? new Date(client.onboarding_call_date) : undefined,
+      is_whitelisted: client.is_whitelisted || false,
+      whitelist_partner_id: client.whitelist_partner_id,
     });
     setIsEditMode(true);
     setIsNewClientOpen(true);
@@ -188,15 +231,17 @@ export default function ClientsPage() {
     setIsNewClientOpen(false);
     setIsEditMode(false);
     setEditingClient(null);
-    setNewClient({ 
-      name: '', 
-      email: '', 
-      location: '', 
-      is_active: true, 
-      source: 'Inbound',
-      onboarding_call_held: false,
-      onboarding_call_date: undefined,
-    });
+          setNewClient({
+        name: '',
+        email: '',
+        location: '',
+        is_active: true,
+        source: 'Inbound',
+        onboarding_call_held: false,
+        onboarding_call_date: undefined,
+        is_whitelisted: false,
+        whitelist_partner_id: null,
+      });
   };
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,6 +254,8 @@ export default function ClientsPage() {
           email: newClient.email.trim(),
           location: newClient.location.trim() || undefined,
           is_active: newClient.is_active,
+          is_whitelisted: newClient.is_whitelisted,
+          whitelist_partner_id: newClient.whitelist_partner_id,
         });
       } else {
         await ClientService.createClient(
@@ -217,7 +264,9 @@ export default function ClientsPage() {
           newClient.location.trim() || undefined,
           newClient.source,
           newClient.onboarding_call_held,
-          newClient.onboarding_call_date ? newClient.onboarding_call_date.toISOString().split('T')[0] : null
+          newClient.onboarding_call_date ? newClient.onboarding_call_date.toISOString().split('T')[0] : null,
+          newClient.is_whitelisted,
+          newClient.whitelist_partner_id
         );
       }
       handleCloseClientModal();
@@ -421,8 +470,20 @@ export default function ClientsPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Clients</h2>
+            <h2 className="text-2xl font-bold text-gray-900">
+              {filteredPartnerName ? `Clients - ${filteredPartnerName}` : 'Clients'}
+            </h2>
             <p className="text-gray-600">Manage your client relationships</p>
+            {filteredPartnerName && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => router.push('/clients')}
+                className="text-sm mt-2"
+              >
+                Clear Filter
+              </Button>
+            )}
           </div>
           {userProfile?.role === 'admin' && (
             <div className="flex space-x-3">
@@ -1128,6 +1189,37 @@ export default function ClientsPage() {
                           </SelectContent>
                         </Select>
                       </div>
+                      <div className="grid gap-2">
+                        <Label>Whitelist Status</Label>
+                        <div className="flex items-center space-x-4">
+                          <Checkbox
+                            id="is_whitelisted"
+                            checked={newClient.is_whitelisted}
+                            onCheckedChange={(checked) => setNewClient({ ...newClient, is_whitelisted: !!checked })}
+                          />
+                          <Label htmlFor="is_whitelisted" className="text-sm">Whitelist this client</Label>
+                        </div>
+                        {newClient.is_whitelisted && (
+                          <div className="grid gap-2 mt-2">
+                            <Label htmlFor="whitelist_partner">Whitelist for Partner</Label>
+                            <Select 
+                              value={newClient.whitelist_partner_id || ""} 
+                              onValueChange={(value) => setNewClient({ ...newClient, whitelist_partner_id: value || null })}
+                            >
+                              <SelectTrigger className="auth-input">
+                                <SelectValue placeholder="Select partner" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {allPartners.map((partner) => (
+                                  <SelectItem key={partner.id} value={partner.id}>
+                                    {partner.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <DialogFooter>
                       <Button type="button" variant="outline" onClick={handleCloseClientModal}>
@@ -1150,10 +1242,15 @@ export default function ClientsPage() {
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {clientsWithStatus.length === 0 ? (
+          {filteredClients.length === 0 ? (
             <div className="col-span-full text-center py-8">
-              <p className="text-gray-600">{searchTerm ? 'No clients found matching your search.' : 'No clients found.'}</p>
-              {userProfile?.role === 'admin' && !searchTerm && (
+              <p className="text-gray-600">
+                {searchTerm || filteredPartnerName 
+                  ? 'No clients found matching your search.' 
+                  : 'No clients found.'
+                }
+              </p>
+              {userProfile?.role === 'admin' && !searchTerm && !filteredPartnerName && (
                 <Button className="mt-4 hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={() => { setIsEditMode(false); setIsNewClientOpen(true); }}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Your First Client
@@ -1161,7 +1258,7 @@ export default function ClientsPage() {
               )}
             </div>
           ) : (
-            clientsWithStatus.map((client) => {
+            filteredClients.map((client) => {
               const clientWithStatus = client as ClientWithStatus;
               return (
                 <Card key={client.id} className="transition-shadow group">
@@ -1180,9 +1277,17 @@ export default function ClientsPage() {
                           </Button>
                         )}
                       </div>
-                      <Badge variant={client.is_active ? 'default' : 'secondary'} className="text-xs" style={client.is_active ? { backgroundColor: '#3e8692', color: 'white', borderColor: '#3e8692' } : {}}>
-                        {client.is_active ? 'active' : 'inactive'}
-                      </Badge>
+                      <div className="flex gap-2">
+                        <Badge variant={client.is_active ? 'default' : 'secondary'} className="text-xs" style={client.is_active ? { backgroundColor: '#3e8692', color: 'white', borderColor: '#3e8692' } : {}}>
+                          {client.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                        {client.is_whitelisted && (
+                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 hover:bg-green-100 hover:text-green-800 cursor-default pointer-events-none">
+                            <Building2 className="h-3 w-3 mr-1" />
+                            {client.whitelist_partner_name || 'Unknown Partner'}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center text-sm text-gray-600">

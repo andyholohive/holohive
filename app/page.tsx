@@ -2,12 +2,14 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
-export default function HomeRedirect() {
+export default function Home() {
   const router = useRouter();
+
   useEffect(() => {
-    router.replace('/clients');
+    // Redirect to campaigns page
+    router.push('/campaigns');
   }, [router]);
-  return <ProtectedRoute><div className="h-screen flex items-center justify-center text-lg">Redirecting...</div></ProtectedRoute>;
+
+  return null;
 }

@@ -1,0 +1,1559 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import { createClient } from '@supabase/supabase-js';
+import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users, BarChart3, Table as TableIcon, CreditCard, CheckCircle, Globe, Flag, FileText } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabasePublic = createClient(supabaseUrl, supabaseAnonKey);
+
+type Campaign = {
+  id: string;
+  name: string;
+  status: string;
+  total_budget: number;
+  start_date: string;
+  end_date: string;
+  description: string | null;
+  region: string | null;
+  created_at: string;
+  client_id: string;
+  client_name?: string | null;
+  budget_allocations?: { id: string; region: string; allocated_budget: number }[];
+};
+
+type CampaignKOL = {
+  id: string;
+  hh_status: string | null;
+  client_status: string | null;
+  allocated_budget: number | null;
+  budget_type: string | null;
+  master_kol: {
+    id: string;
+    name: string;
+    link: string | null;
+    followers: number | null;
+    platform: string[] | null;
+    region: string | null;
+    content_type: string[] | null;
+  };
+};
+
+type ContentItem = {
+  id: string;
+  campaign_kols_id: string;
+  platform: string | null;
+  type: string | null;
+  status: string | null;
+  activation_date: string | null;
+  content_link: string | null;
+  impressions: number | null;
+  likes: number | null;
+  retweets: number | null;
+  comments: number | null;
+  bookmarks: number | null;
+};
+
+const formatDate = (dateString: string) =>
+  new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+const formatCurrency = (amount: number | null | undefined) => {
+  if (!amount) return '$0';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+};
+
+const formatFollowers = (followers: number | null): string => {
+  if (!followers) return '0';
+  if (followers >= 1000000) return `${(followers / 1000000).toFixed(1)}M`;
+  if (followers >= 1000) return `${(followers / 1000).toFixed(1)}K`;
+  return followers.toString();
+};
+
+const getRegionIcon = (region: string) => {
+  const regionMap: { [key: string]: { flag: string } } = {
+    Vietnam: { flag: '🇻🇳' },
+    Turkey: { flag: '🇹🇷' },
+    SEA: { flag: '🌏' },
+    Philippines: { flag: '🇵🇭' },
+    Korea: { flag: '🇰🇷' },
+    Global: { flag: '🌍' },
+    China: { flag: '🇨🇳' },
+    Brazil: { flag: '🇧🇷' },
+  };
+  return regionMap[region] || { flag: '🏳️' };
+};
+
+const getPlatformIcon = (platform: string) => {
+  switch (platform) {
+    case 'X':
+      return <span className="font-bold text-black text-sm">𝕏</span>;
+    case 'Telegram':
+      return (
+        <svg className="h-4 w-4 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+        </svg>
+      );
+    default:
+      return null;
+  }
+};
+
+const getContentTypeColor = (type: string) => {
+  const colorMap: { [key: string]: string } = {
+    Post: 'bg-blue-100 text-blue-800',
+    Video: 'bg-red-100 text-red-800',
+    Article: 'bg-green-100 text-green-800',
+    AMA: 'bg-purple-100 text-purple-800',
+    Ambassadorship: 'bg-orange-100 text-orange-800',
+    Alpha: 'bg-yellow-100 text-yellow-800',
+  };
+  return colorMap[type] || 'bg-gray-100 text-gray-800';
+};
+
+const getStatusColor = (status: string) => {
+  const s = (status || '').toLowerCase();
+  switch (s) {
+    case 'curated':
+      return 'bg-blue-100 text-blue-800';
+    case 'interested':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'onboarded':
+      return 'bg-green-100 text-green-800';
+    case 'concluded':
+      return 'bg-gray-100 text-gray-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+};
+
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'Active':
+      return 'bg-green-100 text-green-800';
+    case 'Planning':
+      return 'bg-blue-100 text-blue-800';
+    case 'Paused':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'Completed':
+      return 'bg-gray-100 text-gray-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+};
+
+export default function PublicCampaignPage({ params }: { params: { id: string } }) {
+  const campaignId = params.id;
+  const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [kols, setKols] = useState<CampaignKOL[]>([]);
+  const [contents, setContents] = useState<ContentItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [kolViewMode, setKolViewMode] = useState<'overview' | 'table' | 'cards'>('overview');
+  const [contentViewMode, setContentViewMode] = useState<'table' | 'overview'>('overview');
+  const [email, setEmail] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [clientEmail, setClientEmail] = useState<string | null>(null);
+  const [loadingClientEmail, setLoadingClientEmail] = useState(true);
+  
+  // Cache key for this specific campaign
+  const cacheKey = `campaign_auth_${campaignId}`;
+  const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+  useEffect(() => {
+    fetchClientEmail();
+  }, [campaignId]);
+
+  useEffect(() => {
+    if (clientEmail) {
+      checkCachedAuth();
+    }
+  }, [clientEmail]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchData();
+    }
+  }, [campaignId, isAuthenticated]);
+
+  // Check if user is already authenticated via cache
+  const checkCachedAuth = () => {
+    if (!clientEmail) return;
+    
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const { email: cachedEmail, timestamp } = JSON.parse(cached);
+        const now = Date.now();
+        
+        // Check if cache is still valid (within 24 hours)
+        if (now - timestamp < CACHE_DURATION) {
+          // Verify the cached email still matches the current client email
+          if (cachedEmail && cachedEmail.toLowerCase() === clientEmail.toLowerCase()) {
+            setEmail(cachedEmail);
+            setIsAuthenticated(true);
+            return;
+          }
+        }
+        
+        // Cache expired or invalid, remove it
+        localStorage.removeItem(cacheKey);
+      }
+    } catch (error) {
+      console.error('Error checking cached auth:', error);
+      localStorage.removeItem(cacheKey);
+    }
+  };
+
+  // Save authentication to cache
+  const saveAuthToCache = (email: string, clientEmail: string) => {
+    try {
+      const authData = {
+        email,
+        clientEmail,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(cacheKey, JSON.stringify(authData));
+    } catch (error) {
+      console.error('Error saving auth to cache:', error);
+    }
+  };
+
+  async function fetchClientEmail() {
+    try {
+      setLoadingClientEmail(true);
+      setError(null);
+      
+      const { data: campaignData, error: campaignError } = await supabasePublic
+        .from('campaigns')
+        .select('client_id')
+        .eq('id', campaignId)
+        .single();
+      
+      if (campaignError) {
+        console.error('Campaign fetch error:', campaignError);
+        throw new Error('Campaign not found or access denied');
+      }
+      
+      if (!campaignData?.client_id) {
+        throw new Error('Campaign has no associated client');
+      }
+      
+      const { data: clientData, error: clientError } = await supabasePublic
+        .from('clients')
+        .select('email')
+        .eq('id', campaignData.client_id)
+        .single();
+      
+      if (clientError) {
+        console.error('Client fetch error:', clientError);
+        throw new Error('Client information not found');
+      }
+      
+      if (!clientData?.email) {
+        throw new Error('Client has no email address configured');
+      }
+      
+      setClientEmail(clientData.email);
+    } catch (e: any) {
+      console.error('Error fetching client email:', e);
+      setError(e.message || 'Failed to load campaign access information');
+      setClientEmail(null);
+    } finally {
+      setLoadingClientEmail(false);
+    }
+  }
+
+  // Fetch client email directly (returns the email instead of only setting state)
+  async function getClientEmail(): Promise<string | null> {
+    try {
+      const { data: campaignData, error: campaignError } = await supabasePublic
+        .from('campaigns')
+        .select('client_id')
+        .eq('id', campaignId)
+        .single();
+      if (campaignError || !campaignData?.client_id) return null;
+
+      const { data: clientData, error: clientError } = await supabasePublic
+        .from('clients')
+        .select('email')
+        .eq('id', campaignData.client_id)
+        .single();
+      if (clientError || !clientData?.email) return null;
+
+      return clientData.email as string;
+    } catch {
+      return null;
+    }
+  }
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailError('');
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+
+    // Ensure we have the authorized client email; fetch on demand if needed
+    const authorizedEmail = clientEmail || (await getClientEmail());
+    if (!authorizedEmail) {
+      setEmailError('Unable to verify authorized email right now. Please try again.');
+      return;
+    }
+
+    if (email.toLowerCase() !== authorizedEmail.toLowerCase()) {
+      setEmailError('This email address is not authorized to access this campaign');
+      return;
+    }
+
+    // Save authentication to cache and proceed
+    saveAuthToCache(email, authorizedEmail);
+    setIsAuthenticated(true);
+  };
+
+  async function fetchData() {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Campaign
+      const { data: campaignData, error: campaignError } = await supabasePublic
+        .from('campaigns')
+        .select(`*, clients!campaigns_client_id_fkey(name), campaign_budget_allocations(*)`)
+        .eq('id', campaignId)
+        .single();
+      
+      if (campaignError) {
+        console.error('Campaign fetch error:', campaignError);
+        // Only throw if it's a real error, not just no data found
+        if (campaignError.code === 'PGRST116') {
+          setError('Campaign not found');
+        } else {
+          setError(`Failed to load campaign: ${campaignError.message}`);
+        }
+        return;
+      }
+
+      if (!campaignData) {
+        setError('Campaign not found');
+        return;
+      }
+
+      const normalizedCampaign: Campaign = {
+        id: campaignData.id,
+        name: campaignData.name,
+        status: campaignData.status,
+        total_budget: campaignData.total_budget,
+        start_date: campaignData.start_date,
+        end_date: campaignData.end_date,
+        description: campaignData.description,
+        region: campaignData.region,
+        created_at: campaignData.created_at,
+        client_id: campaignData.client_id,
+        client_name: (campaignData.clients as any)?.name || null,
+        budget_allocations: (campaignData.campaign_budget_allocations || []).map((b: any) => ({ id: b.id, region: b.region, allocated_budget: b.allocated_budget })),
+      };
+      setCampaign(normalizedCampaign);
+
+      // KOLs - don't fail the whole page if this fails
+      try {
+        const { data: kolData, error: kolError } = await supabasePublic
+          .from('campaign_kols')
+          .select(`id, hh_status, client_status, allocated_budget, budget_type, master_kol:master_kols(id, name, link, followers, platform, region, content_type)`) 
+          .eq('campaign_id', campaignId)
+          .order('created_at', { ascending: false });
+        
+        if (kolError) {
+          console.warn('KOLs fetch error:', kolError);
+          setKols([]);
+        } else {
+          setKols((kolData as any) || []);
+        }
+      } catch (kolErr) {
+        console.warn('KOLs fetch failed:', kolErr);
+        setKols([]);
+      }
+
+      // Contents - don't fail the whole page if this fails
+      try {
+        const { data: contentData, error: contentError } = await supabasePublic
+          .from('contents')
+          .select('*, campaign_kol:campaign_kols(master_kol:master_kols(id, name, link))')
+          .eq('campaign_id', campaignId)
+          .order('created_at', { ascending: false });
+        
+        if (contentError) {
+          console.warn('Contents fetch error:', contentError);
+          setContents([]);
+        } else {
+          setContents((contentData as any) || []);
+        }
+      } catch (contentErr) {
+        console.warn('Contents fetch failed:', contentErr);
+        setContents([]);
+      }
+    } catch (e: any) {
+      console.error('Unexpected error loading public campaign:', e);
+      setError('An unexpected error occurred while loading the campaign');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Email authentication gate
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+          <div className="text-center mb-8">
+            <div className="bg-[#3e8692] rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <Megaphone className="h-8 w-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Campaign Access</h1>
+            <p className="text-gray-600">
+              {loadingClientEmail ? 
+                'Loading campaign access information...' :
+                'Please enter the authorized email address to view this campaign'
+              }
+            </p>
+          </div>
+          
+          {loadingClientEmail ? (
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e8692] mx-auto mb-4"></div>
+              <p className="text-gray-600">Verifying campaign access...</p>
+            </div>
+          ) : (
+            <form onSubmit={handleEmailSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  Authorized Email Address
+                </label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter the authorized email address"
+                  className="w-full auth-input"
+                  required
+                />
+                {emailError && (
+                  <p className="mt-2 text-sm text-red-600">{emailError}</p>
+                )}
+              </div>
+              
+              <Button
+                type="submit"
+                className="w-full bg-[#3e8692] hover:bg-[#2d6470] text-white"
+              >
+                Access Campaign
+              </Button>
+            </form>
+          )}
+          
+          <div className="mt-6 text-center">
+            <p className="text-xs text-gray-500">
+              By accessing this campaign, you agree to our terms of service.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading campaign...</p>
+          <p className="text-gray-400 text-sm mt-2">Campaign ID: {campaignId}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !campaign) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center space-x-4">
+              <Image src="/images/logo.png" alt="KOL Campaign Manager Logo" width={40} height={40} className="rounded-lg" />
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">KOL Campaign Manager</h1>
+                <p className="text-sm text-gray-600">Shared Campaign</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-lg shadow-sm border p-8 text-center">
+            <Megaphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Campaign Not Found</h2>
+            <p className="text-gray-600 mb-4">This campaign doesn't exist or is not publicly accessible.</p>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 text-left">
+                <p className="text-red-600 text-sm font-medium">Error Details:</p>
+                <p className="text-red-600 text-sm mt-1">{error}</p>
+                <p className="text-gray-500 text-xs mt-2">Campaign ID: {campaignId}</p>
+              </div>
+            )}
+            <p className="text-gray-400 text-sm mt-2">Campaign ID: {campaignId}</p>
+            <div className="mt-6">
+              <Button 
+                onClick={() => {
+                  setError(null);
+                  fetchData();
+                }}
+                className="bg-[#3e8692] hover:bg-[#2d6470] text-white"
+              >
+                Try Again
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center space-x-4">
+            <Image src="/images/logo.png" alt="KOL Campaign Manager Logo" width={40} height={40} className="rounded-lg" />
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">KOL Campaign Manager</h1>
+              <p className="text-sm text-gray-600">Shared Campaign</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Title */}
+        <div className="flex items-center space-x-4 mb-6">
+          <div className="bg-gray-100 p-2 rounded-lg">
+            <Megaphone className="h-6 w-6 text-gray-600" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">{campaign.name}</h2>
+            <p className="text-gray-600">Shared Campaign</p>
+          </div>
+          <div className="ml-auto">
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(campaign.status)}`}>
+              {campaign.status}
+            </span>
+          </div>
+        </div>
+
+        {/* Information + Metrics */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-3">
+              <div className="flex items-center text-sm text-gray-600">
+                <Building2 className="h-4 w-4 mr-2 text-gray-500" />
+                <span className="text-gray-700">{campaign.client_name || 'Unknown Client'}</span>
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <Users className="h-4 w-4 mr-2 text-gray-500" />
+                <span className="text-gray-700">{kols.length} KOL{kols.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <DollarSign className="h-4 w-4 mr-2 text-gray-500" />
+                <span className="text-gray-700">{formatCurrency(campaign.total_budget)}</span>
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <CalendarIcon className="h-4 w-4 mr-2 text-gray-500" />
+                <span className="text-gray-700">{formatDate(campaign.start_date)} - {formatDate(campaign.end_date)}</span>
+              </div>
+              {campaign.description && (
+                <div className="text-sm text-gray-700">
+                  <span className="font-medium">Description: </span>
+                  <span>{campaign.description}</span>
+                </div>
+              )}
+            </div>
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-gray-900">Metrics</h3>
+              <div className="flex flex-wrap gap-2">
+                {(campaign.budget_allocations || []).map((alloc) => (
+                  <span key={alloc.id} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
+                    {alloc.region === 'apac' ? 'APAC' : alloc.region === 'global' ? 'Global' : alloc.region}: {formatCurrency(alloc.allocated_budget)}
+                  </span>
+                ))}
+                {(!campaign.budget_allocations || campaign.budget_allocations.length === 0) && (
+                  <span className="text-sm text-gray-500">No budget allocations.</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs for KOLs and Contents */}
+        <Tabs defaultValue="kols" className="bg-white rounded-lg shadow-sm border">
+          <div className="px-6 pt-4">
+            <TabsList>
+              <TabsTrigger value="kols">KOLs</TabsTrigger>
+              <TabsTrigger value="contents">Contents</TabsTrigger>
+            </TabsList>
+          </div>
+          <div className="px-6 pb-4">
+            <TabsContent value="kols">
+              <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
+                <CardHeader className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gray-100 p-2 rounded-lg">
+                      <Users className="h-5 w-5 text-gray-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">KOLs</h2>
+                      <p className="text-sm text-gray-500">Key Opinion Leaders and their performance</p>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="pt-6">
+                  {/* View Toggle */}
+                  <div className="mb-4">
+                    <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+                      <div
+                        onClick={() => setKolViewMode('overview')}
+                        className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'overview' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                      >
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        Overview
+                      </div>
+                      <div
+                        onClick={() => setKolViewMode('table')}
+                        className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'table' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                      >
+                        <TableIcon className="h-4 w-4 mr-2" />
+                        Table
+                      </div>
+                      <div
+                        onClick={() => setKolViewMode('cards')}
+                        className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'cards' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                      >
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Cards
+                      </div>
+                    </div>
+                  </div>
+
+                {/* Overview View */}
+                {kolViewMode === 'overview' && (
+                  <div className="space-y-6">
+                    {/* Overview Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {/* Total KOLs in Campaign */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <Users className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {kols.length}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Total KOLs in Campaign</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Average Followers per KOL */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <BarChart3 className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                              if (kols.length > 0) {
+                                const totalFollowers = kols.reduce((sum, kol) => sum + (kol.master_kol.followers || 0), 0);
+                                const average = Math.round(totalFollowers / kols.length);
+                                return formatFollowers(average);
+                              }
+                              return '0';
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Average Followers per KOL</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Distribution of KOLs by Platform */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <Globe className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                              const platforms = new Set();
+                              kols.forEach(kol => {
+                                if (kol.master_kol.platform) {
+                                  kol.master_kol.platform.forEach((p: string) => platforms.add(p));
+                                }
+                              });
+                              return platforms.size;
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Unique Platforms</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* KOLs by Region */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <Flag className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                              const regions = new Set();
+                              kols.forEach(kol => {
+                                if (kol.master_kol.region) {
+                                  regions.add(kol.master_kol.region);
+                                }
+                              });
+                              return regions.size;
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Regions Represented</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Charts Section */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Platform Distribution Chart */}
+                      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h3 className="text-xl font-bold text-gray-900">Distribution of KOLs by Platform</h3>
+                            <p className="text-sm text-gray-500 mt-1">Breakdown of KOLs by social platform</p>
+                          </div>
+                        </div>
+                        <div className="h-96">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart 
+                              data={(() => {
+                                const platformCounts: { [key: string]: number } = {};
+                                kols.forEach(kol => {
+                                  if (kol.master_kol.platform) {
+                                    kol.master_kol.platform.forEach((platform: string) => {
+                                      platformCounts[platform] = (platformCounts[platform] || 0) + 1;
+                                    });
+                                  }
+                                });
+                                return Object.entries(platformCounts).map(([platform, count]) => ({
+                                  platform,
+                                  count
+                                }));
+                              })()}
+                              margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                              <XAxis 
+                                dataKey="platform" 
+                                axisLine={false}
+                                tickLine={false}
+                                tick={({ x, y, payload }) => (
+                                  <g transform={`translate(${x},${y})`}>
+                                    {payload.value === 'X' ? (
+                                      <text x={0} y={0} dy={16} textAnchor="middle" fill="#000000" fontSize={14} fontWeight="bold">
+                                        𝕏
+                                      </text>
+                                    ) : payload.value === 'Telegram' ? (
+                                      <g>
+                                        <svg x={-8} y={0} width={16} height={16} viewBox="0 0 24 24" fill="#0088cc">
+                                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                                        </svg>
+                                      </g>
+                                    ) : (
+                                      <text x={0} y={0} dy={16} textAnchor="middle" fill="#64748b" fontSize={12}>
+                                        {payload.value}
+                                      </text>
+                                    )}
+                                  </g>
+                                )}
+                              />
+                              <YAxis 
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 12, fill: '#64748b' }}
+                              />
+                              <Tooltip 
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '12px',
+                                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                                  fontSize: '14px',
+                                  padding: '12px 16px',
+                                  fontWeight: '500'
+                                }}
+                                formatter={(value: number) => [value, 'KOLs']}
+                                labelFormatter={(label: string) => `Platform: ${label}`}
+                                labelStyle={{
+                                  color: '#374151',
+                                  fontWeight: '600',
+                                  marginBottom: '4px'
+                                }}
+                              />
+                              <Bar 
+                                dataKey="count" 
+                                radius={[8, 8, 0, 0]}
+                              >
+                                {(() => {
+                                  const platformCounts: { [key: string]: number } = {};
+                                  kols.forEach(kol => {
+                                    if (kol.master_kol.platform) {
+                                      kol.master_kol.platform.forEach((platform: string) => {
+                                        platformCounts[platform] = (platformCounts[platform] || 0) + 1;
+                                      });
+                                    }
+                                  });
+                                  return Object.entries(platformCounts).map(([platform, count], index) => {
+                                    let color = '#3e8692'; // Default teal
+                                    if (platform === 'X') color = '#000000'; // Black for X
+                                    else if (platform === 'Telegram') color = '#0088cc'; // Telegram blue
+                                    
+                                    return (
+                                      <Cell key={`cell-${index}`} fill={color} />
+                                    );
+                                  });
+                                })()}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      {/* Region Distribution Chart */}
+                      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h3 className="text-xl font-bold text-gray-900">KOLs by Region</h3>
+                            <p className="text-sm text-gray-500 mt-1">Geographic distribution of KOLs</p>
+                          </div>
+                        </div>
+                        <div className="h-96">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart 
+                              data={(() => {
+                                const regionCounts: { [key: string]: number } = {};
+                                kols.forEach(kol => {
+                                  if (kol.master_kol.region) {
+                                    regionCounts[kol.master_kol.region] = (regionCounts[kol.master_kol.region] || 0) + 1;
+                                  }
+                                });
+                                return Object.entries(regionCounts).map(([region, count]) => ({
+                                  region,
+                                  count
+                                }));
+                              })()}
+                              margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                              <XAxis 
+                                dataKey="region" 
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                              />
+                              <YAxis 
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 12, fill: '#64748b' }}
+                              />
+                              <Tooltip 
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '12px',
+                                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                                  fontSize: '14px',
+                                  padding: '12px 16px',
+                                  fontWeight: '500'
+                                }}
+                                formatter={(value: number) => [value, 'KOLs']}
+                                labelFormatter={(label: string) => `Region: ${label}`}
+                                labelStyle={{
+                                  color: '#374151',
+                                  fontWeight: '600',
+                                  marginBottom: '4px'
+                                }}
+                              />
+                              <Bar 
+                                dataKey="count" 
+                                radius={[8, 8, 0, 0]}
+                              >
+                                {(() => {
+                                  const regionCounts: { [key: string]: number } = {};
+                                  kols.forEach(kol => {
+                                    if (kol.master_kol.region) {
+                                      regionCounts[kol.master_kol.region] = (regionCounts[kol.master_kol.region] || 0) + 1;
+                                    }
+                                  });
+                                  return Object.entries(regionCounts).map(([region, count], index) => {
+                                    let color = '#3e8692'; // Default teal
+                                    if (region === 'China') color = '#de2910'; // Chinese red
+                                    else if (region === 'Korea') color = '#cd2e3a'; // Korean red
+                                    else if (region === 'Vietnam') color = '#da251d'; // Vietnamese red
+                                    else if (region === 'Turkey') color = '#e30a17'; // Turkish red
+                                    else if (region === 'Philippines') color = '#0038a8'; // Philippine blue
+                                    else if (region === 'Brazil') color = '#009c3b'; // Brazilian green
+                                    else if (region === 'Global') color = '#1e40af'; // Global blue
+                                    else if (region === 'SEA') color = '#059669'; // Southeast Asia green
+                                    
+                                    return (
+                                      <Cell key={`cell-${region}`} fill={color} />
+                                    );
+                                  });
+                                })()}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Table View */}
+                {kolViewMode === 'table' && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">#</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Followers</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Region</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Platform</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content Type</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {kols.map((item, index) => (
+                          <tr key={item.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div>
+                                <div className="font-medium text-gray-900">{item.master_kol.name}</div>
+                                {item.master_kol.link && (
+                                  <a href={item.master_kol.link} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800">View Profile</a>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatFollowers(item.master_kol.followers)}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {item.master_kol.region ? (
+                                <div className="flex items-center space-x-1">
+                                  <span>{getRegionIcon(item.master_kol.region).flag}</span>
+                                  <span>{item.master_kol.region}</span>
+                                </div>
+                              ) : '-'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {Array.isArray(item.master_kol.platform) ? (
+                                <div className="flex gap-1">
+                                  {item.master_kol.platform.map((platform: string, idx: number) => (
+                                    <div key={idx} className="flex items-center justify-center h-5 w-5" title={platform}>
+                                      {getPlatformIcon(platform)}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : '-'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {Array.isArray(item.master_kol.content_type) ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {item.master_kol.content_type.map((type: string, idx: number) => (
+                                    <span key={idx} className={`px-2 py-1 rounded-md text-xs font-medium ${getContentTypeColor(type)}`}>
+                                      {type}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : '-'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              <span className={`px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(item.hh_status || 'curated')}`}>
+                                {item.hh_status || 'Curated'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {kols.length === 0 && (
+                          <tr>
+                            <td className="px-6 py-8 text-center text-gray-500" colSpan={7}>No KOLs in this campaign.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Cards View */}
+                {kolViewMode === 'cards' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {kols.map((item, index) => (
+                      <Card key={item.id} className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-4">
+                          <div className="flex flex-col items-center text-center">
+                            <div className="w-16 h-16 bg-gradient-to-br from-[#3e8692] to-[#2d6470] rounded-full flex items-center justify-center mb-3">
+                              <span className="text-white font-bold text-xl">
+                                {item.master_kol.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="mb-2">
+                              <h3 className="font-semibold text-gray-900 text-lg">{item.master_kol.name}</h3>
+                              <p className="text-sm text-gray-500">{item.master_kol.region || 'No region'}</p>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              {(item.master_kol.platform || []).map((platform: string) => (
+                                <span key={platform} className="flex items-center justify-center h-6 w-6" title={platform}>
+                                  {getPlatformIcon(platform)}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {/* Followers */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Followers</span>
+                            <span className="font-medium text-gray-900">
+                              {item.master_kol.followers ? formatFollowers(item.master_kol.followers) : '-'}
+                            </span>
+                          </div>
+
+                          {/* Status */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Status</span>
+                            <Badge className={getStatusColor(item.hh_status || 'curated')}>
+                              {item.hh_status || 'No status'}
+                            </Badge>
+                          </div>
+
+                          {/* Allocated Budget */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Allocated Budget</span>
+                            <span className="font-medium text-gray-900">
+                              {item.allocated_budget ? `$${item.allocated_budget}` : '-'}
+                            </span>
+                          </div>
+
+                          {/* Budget Type */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Budget Type</span>
+                            <span className="font-medium text-gray-900">
+                              {item.budget_type || '-'}
+                            </span>
+                          </div>
+
+                          {/* Content Types */}
+                          {Array.isArray(item.master_kol.content_type) && item.master_kol.content_type.length > 0 && (
+                            <div>
+                              <span className="text-sm text-gray-600 block mb-2">Content Types</span>
+                              <div className="flex flex-wrap gap-1">
+                                {item.master_kol.content_type.map((type: string, idx: number) => (
+                                  <span key={idx} className={`px-2 py-1 rounded-md text-xs font-medium ${getContentTypeColor(type)}`}>
+                                    {type}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* View Profile Link */}
+                          {item.master_kol.link && (
+                            <div className="pt-2 border-t border-gray-100">
+                              <a 
+                                href={item.master_kol.link} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                              >
+                                View Profile →
+                              </a>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                    {kols.length === 0 && (
+                      <div className="col-span-full text-center py-8 text-gray-500">
+                        No KOLs in this campaign.
+                      </div>
+                    )}
+                  </div>
+                )}
+                </CardContent>
+              </div>
+            </TabsContent>
+            <TabsContent value="contents">
+              <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
+                <CardHeader className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gray-100 p-2 rounded-lg">
+                      <FileText className="h-5 w-5 text-gray-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">Contents</h2>
+                      <p className="text-sm text-gray-500">Campaign content performance and details</p>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="pt-6">
+                  {/* Content View Toggle */}
+                  <div className="mb-4">
+                    <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+                      <div onClick={() => setContentViewMode('overview')} className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${contentViewMode === 'overview' ? 'bg-background text-foreground shadow-sm' : ''}`}>
+                        <BarChart3 className="h-4 w-4 mr-2" /> Overview
+                      </div>
+                      <div onClick={() => setContentViewMode('table')} className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${contentViewMode === 'table' ? 'bg-background text-foreground shadow-sm' : ''}`}>
+                        <TableIcon className="h-4 w-4 mr-2" /> Table
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Table View */}
+                  {contentViewMode === 'table' && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">KOL</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Platform</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activation</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Link</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Impressions</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Likes</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Retweets</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Comments</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bookmarks</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {contents.map((c, index) => (
+                            <tr key={c.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div>
+                                  <div className="font-medium text-gray-900">{c.campaign_kol?.master_kol?.name || '-'}</div>
+                                  {c.campaign_kol?.master_kol?.link && (
+                                    <a 
+                                      href={c.campaign_kol.master_kol.link} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer" 
+                                      className="text-sm text-blue-600 hover:text-blue-800"
+                                    >
+                                      View Profile
+                                    </a>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {c.platform ? (
+                                  <div className="flex gap-1">
+                                    <div className="flex items-center justify-center h-5 w-5" title={c.platform}>
+                                      {getPlatformIcon(c.platform)}
+                                    </div>
+                                  </div>
+                                ) : '-'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {c.type ? (
+                                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${getContentTypeColor(c.type)}`}>
+                                    {c.type}
+                                  </span>
+                                ) : '-'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <span className={`px-2 py-1 rounded-md text-xs font-medium ${(() => {
+                                  const s = (c.status || '').toLowerCase();
+                                  if (['published', 'active', 'live'].includes(s)) return 'bg-green-100 text-green-800';
+                                  if (['scheduled'].includes(s)) return 'bg-blue-100 text-blue-800';
+                                  if (['draft', 'pending'].includes(s)) return 'bg-yellow-100 text-yellow-800';
+                                  if (['failed', 'removed'].includes(s)) return 'bg-red-100 text-red-800';
+                                  return 'bg-gray-100 text-gray-800';
+                                })()}`}>
+                                  {c.status ? c.status.charAt(0).toUpperCase() + c.status.slice(1).toLowerCase() : '-'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.activation_date ? formatDate(c.activation_date) : '-'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                {c.content_link ? (
+                                  <a href={c.content_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">Open</a>
+                                ) : (
+                                  <span className="text-gray-500">-</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.impressions ? formatFollowers(c.impressions) : '-'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.likes ? formatFollowers(c.likes) : '-'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.retweets ? formatFollowers(c.retweets) : '-'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.comments ? formatFollowers(c.comments) : '-'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.bookmarks ? formatFollowers(c.bookmarks) : '-'}</td>
+                            </tr>
+                          ))}
+                          {contents.length === 0 && (
+                            <tr>
+                              <td className="px-6 py-8 text-center text-gray-500" colSpan={12}>No contents for this campaign.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {/* Overview View - Metrics */}
+                  {contentViewMode === 'overview' && (
+                    <div className="space-y-6">
+                      {/* Metrics Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {/* Total Impressions */}
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(() => {
+                                const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                                return totalImpressions.toLocaleString();
+                              })()}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">Total Impressions</p>
+                          </CardContent>
+                        </Card>
+
+                        {/* Total Comments */}
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(() => {
+                                const totalComments = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
+                                return totalComments.toLocaleString();
+                              })()}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">Total Comments</p>
+                          </CardContent>
+                        </Card>
+
+                        {/* Total Retweets */}
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(() => {
+                                const totalRetweets = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
+                                return totalRetweets.toLocaleString();
+                              })()}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">Total Retweets</p>
+                          </CardContent>
+                        </Card>
+
+                        {/* Total Likes */}
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(() => {
+                                const totalLikes = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
+                                return totalLikes.toLocaleString();
+                              })()}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">Total Likes</p>
+                          </CardContent>
+                        </Card>
+
+                        {/* Total Engagements */}
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(() => {
+                                const totalEngagements = contents.reduce((sum, content) => 
+                                  sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
+                                return totalEngagements.toLocaleString();
+                              })()}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">Total Engagements</p>
+                          </CardContent>
+                        </Card>
+
+                        {/* Total Bookmarks */}
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(() => {
+                                const totalBookmarks = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
+                                return totalBookmarks.toLocaleString();
+                              })()}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">Total Bookmarks</p>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      {/* Average Engagement Rate */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader>
+                          <CardTitle className="text-lg font-semibold text-gray-900">Average Engagement Rate</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-3xl font-bold text-gray-900">
+                            {(() => {
+                              const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                              const totalEngagements = contents.reduce((sum, content) => 
+                                sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
+                              const engagementRate = totalImpressions > 0 ? (totalEngagements / totalImpressions) * 100 : 0;
+                              return `${engagementRate.toFixed(2)}%`;
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Engagement Rate = (Likes + Comments + Retweets + Bookmarks) / Impressions</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Charts Section */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Impressions Over Time */}
+                        <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                          <div className="flex items-center justify-between mb-6">
+                            <div>
+                              <h3 className="text-xl font-bold text-gray-900">Impressions Over Time</h3>
+                              <p className="text-sm text-gray-500 mt-1">Impressions trend by activation date</p>
+                            </div>
+                          </div>
+                          <div className="h-96">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart 
+                                data={(() => {
+                                  // Group content by activation date and sum impressions
+                                  const impressionsByDate = contents.reduce((acc, content) => {
+                                    if (content.activation_date) {
+                                      const date = content.activation_date;
+                                      if (!acc[date]) {
+                                        acc[date] = 0;
+                                      }
+                                      acc[date] += content.impressions || 0;
+                                    }
+                                    return acc;
+                                  }, {} as Record<string, number>);
+
+                                  return Object.entries(impressionsByDate)
+                                    .map(([date, impressions]) => ({
+                                      date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                                      impressions
+                                    }))
+                                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                                })()}
+                                margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                <XAxis 
+                                  dataKey="date" 
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                                />
+                                <YAxis 
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tick={{ fontSize: 12, fill: '#64748b' }}
+                                />
+                                <Tooltip 
+                                  contentStyle={{
+                                    backgroundColor: 'white',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                                    fontSize: '14px',
+                                    padding: '12px 16px',
+                                    fontWeight: '500'
+                                  }}
+                                  formatter={(value: number) => [value.toLocaleString(), 'Impressions']}
+                                  labelFormatter={(label: string) => `Date: ${label}`}
+                                  labelStyle={{
+                                    color: '#374151',
+                                    fontWeight: '600',
+                                    marginBottom: '4px'
+                                  }}
+                                />
+                                <Line 
+                                  type="monotone" 
+                                  dataKey="impressions" 
+                                  stroke="#3e8692" 
+                                  strokeWidth={3} 
+                                  dot={{ fill: '#3e8692', strokeWidth: 2, r: 4 }} 
+                                />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+
+                        {/* Impressions by Platform */}
+                        <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                          <div className="flex items-center justify-between mb-6">
+                            <div>
+                              <h3 className="text-xl font-bold text-gray-900">Impressions by Platform</h3>
+                              <p className="text-sm text-gray-500 mt-1">Impressions distribution across platforms</p>
+                            </div>
+                          </div>
+                          <div className="h-96">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={(() => {
+                                    const platformImpressions = contents.reduce((acc, content) => {
+                                      const platform = content.platform || 'Unknown';
+                                      if (!acc[platform]) {
+                                        acc[platform] = 0;
+                                      }
+                                      acc[platform] += content.impressions || 0;
+                                      return acc;
+                                    }, {} as Record<string, number>);
+
+                                    return Object.entries(platformImpressions).map(([platform, impressions]) => ({
+                                      platform,
+                                      impressions
+                                    }));
+                                  })()}
+                                  cx="50%"
+                                  cy="50%"
+                                  outerRadius={120}
+                                  dataKey="impressions"
+                                  label={({ platform, impressions }) => `${platform}: ${impressions.toLocaleString()}`}
+                                >
+                                  {(() => {
+                                    const platformImpressions = contents.reduce((acc, content) => {
+                                      const platform = content.platform || 'Unknown';
+                                      if (!acc[platform]) {
+                                        acc[platform] = 0;
+                                      }
+                                      acc[platform] += content.impressions || 0;
+                                      return acc;
+                                    }, {} as Record<string, number>);
+
+                                    const colors = ['#3e8692', '#2d6470', '#1e4a5a', '#0f2d3a'];
+                                    return Object.entries(platformImpressions).map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                                    ));
+                                  })()}
+                                </Pie>
+                                <Tooltip 
+                                  contentStyle={{
+                                    backgroundColor: 'white',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                                    fontSize: '14px',
+                                    padding: '12px 16px',
+                                    fontWeight: '500'
+                                  }}
+                                  formatter={(value: number, name: string, props: any) => {
+                                    const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                                    const percentage = totalImpressions > 0 ? ((value / totalImpressions) * 100).toFixed(1) : 0;
+                                    return [
+                                      `${value.toLocaleString()} (${percentage}%)`, 
+                                      'Impressions'
+                                    ];
+                                  }}
+                                  labelFormatter={(label: string) => `Platform: ${label}`}
+                                  labelStyle={{
+                                    color: '#374151',
+                                    fontWeight: '600',
+                                    marginBottom: '4px'
+                                  }}
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </div>
+            </TabsContent>
+          </div>
+        </Tabs>
+      </div>
+    </div>
+  );
+}
+
+

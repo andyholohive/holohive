@@ -5,19 +5,21 @@ export interface MasterKOL {
   id: string;
   name: string;
   link: string | null;
-  platform: string[];
+  platform: string[] | null;
   followers: number | null;
-  region: 'Vietnam' | 'Turkey' | 'SEA' | 'Philippines' | 'Korea' | 'Global' | 'China' | 'Brazil' | null;
-  community: boolean;
-  content_type: string[];
-  niche: string[];
-  pricing: '<$200' | '$200-500' | '$500-1K' | '$1K-2K' | '$2K-3K' | '>$3K' | null;
-  tier: 'Tier 1' | 'Tier 2' | 'Tier 3' | 'Tier 4' | null;
+  region: string | null;
+  community: boolean | null;
+  deliverables: string[] | null;
+  creator_type: string[] | null;
+  content_type: string[] | null;
+  niche: string[] | null;
+  pricing: string | null;
+  tier: string | null;
   rating: number | null;
-  group_chat: boolean;
+  group_chat: boolean | null;
   description: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 export interface CreateKOLData {
@@ -27,7 +29,9 @@ export interface CreateKOLData {
   followers?: number;
   region?: MasterKOL['region'];
   community?: boolean;
-  content_type?: string[];
+  deliverables?: string[];
+  creator_type?: MasterKOL['creator_type'];
+  content_type?: MasterKOL['content_type'];
   niche?: string[];
   pricing?: MasterKOL['pricing'];
   tier?: MasterKOL['tier'];
@@ -40,16 +44,18 @@ export interface UpdateKOLData {
   id: string;
   name?: string;
   link?: string | null;
-  platform?: string[];
+  platform?: string[] | null;
   followers?: number | null;
-  region?: MasterKOL['region'];
-  community?: boolean;
-  content_type?: string[];
-  niche?: string[];
-  pricing?: MasterKOL['pricing'];
-  tier?: MasterKOL['tier'];
+  region?: string | null;
+  community?: boolean | null;
+  deliverables?: string[] | null;
+  creator_type?: string[] | null;
+  content_type?: string[] | null;
+  niche?: string[] | null;
+  pricing?: string | null;
+  tier?: string | null;
   rating?: number | null;
-  group_chat?: boolean;
+  group_chat?: boolean | null;
   description?: string | null;
 }
 
@@ -86,13 +92,15 @@ export class KOLService {
           followers: kolData.followers || null,
           region: kolData.region || null,
           community: kolData.community || false,
-          content_type: kolData.content_type || [],
+          deliverables: kolData.deliverables || [],
           niche: kolData.niche || [],
           pricing: kolData.pricing || null,
           tier: kolData.tier || null,
           rating: kolData.rating || null,
           group_chat: kolData.group_chat || false,
-          description: kolData.description || null
+          description: kolData.description || null,
+          creator_type: kolData.creator_type || null,
+          content_type: kolData.content_type || null
         }])
         .select()
         .single();
@@ -166,10 +174,12 @@ export class KOLService {
     return {
       platforms: ['X', 'Telegram'],
       regions: ['Vietnam', 'Turkey', 'SEA', 'Philippines', 'Korea', 'Global', 'China', 'Brazil'],
-      contentTypes: ['Post', 'Video', 'Article', 'AMA', 'Ambassadorship', 'Alpha'],
+      deliverables: ['Post', 'Video', 'Article', 'AMA', 'Ambassadorship', 'Alpha', 'QRT', 'Thread', 'Spaces', 'Newsletter'],
       niches: ['General', 'Gaming', 'Crypto', 'Memecoin', 'NFT', 'Trading', 'AI', 'Research', 'Airdrop', 'Art'],
       pricingTiers: ['<$200', '$200-500', '$500-1K', '$1K-2K', '$2K-3K', '>$3K'],
-      tiers: ['Tier 1', 'Tier 2', 'Tier 3', 'Tier 4']
+      tiers: ['Tier 1', 'Tier 2', 'Tier 3', 'Tier 4'],
+      creatorTypes: ['General', 'Gaming', 'Crypto', 'Memecoin', 'NFT', 'Trading', 'AI', 'Research', 'Airdrop', 'Art', 'Native (Meme/Culture)', 'Drama-Forward', 'Skeptic', 'Educator', 'Bridge Builder', 'Visionary', 'Onboarder'],
+      contentTypes: ['Meme', 'News', 'Trading', 'Deep Dive', 'Meme/Cultural Narrative', 'Drama Queen', 'Sceptics', 'Technical Educator', 'Bridge Builders', 'Visionaries']
     };
   }
 } 

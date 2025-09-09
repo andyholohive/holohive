@@ -4,29 +4,33 @@ export interface CampaignKOL {
   id: string;
   campaign_id: string;
   master_kol_id: string;
-  hh_status: 'Curated' | 'Interested' | 'Onboarded' | 'Concluded';
-  client_status?: 'Rejected' | 'Preferred';
-  notes?: string;
-  created_at?: string;
-  updated_at?: string;
+  hh_status: 'Curated' | 'Interested' | 'Onboarded' | 'Concluded' | null;
+  client_status?: 'Rejected' | 'Preferred' | null;
+  notes?: string | null;
+  allocated_budget?: number | null;
+  budget_type?: 'Token' | 'Fiat' | 'WL' | null;
+  paid?: number | null;
+  wallet?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 }
 
 export interface CampaignKOLWithDetails extends CampaignKOL {
   master_kol: {
     id: string;
     name: string;
-    link?: string;
-    platform?: string[];
-    followers?: number;
-    region?: string;
-    community?: boolean;
-    content_type?: string[];
-    niche?: string[];
-    pricing?: string;
-    tier?: string;
-    rating?: number;
-    group_chat?: boolean;
-    description?: string;
+    link?: string | null;
+    platform?: string[] | null;
+    followers?: number | null;
+    region?: string | null;
+    community?: boolean | null;
+    content_type?: string[] | null;
+    niche?: string[] | null;
+    pricing?: string | null;
+    tier?: string | null;
+    rating?: number | null;
+    group_chat?: boolean | null;
+    description?: string | null;
   };
 }
 
@@ -46,7 +50,7 @@ export class CampaignKOLService {
       throw new Error('Failed to fetch campaign KOLs');
     }
 
-    return data || [];
+    return (data || []) as CampaignKOLWithDetails[];
   }
 
   static async addCampaignKOL(campaignId: string, masterKolId: string, hhStatus: CampaignKOL['hh_status'], notes?: string): Promise<CampaignKOL> {
@@ -66,7 +70,7 @@ export class CampaignKOLService {
       throw new Error('Failed to add campaign KOL');
     }
 
-    return data;
+    return data as CampaignKOL;
   }
 
   static async updateCampaignKOL(id: string, updates: Partial<CampaignKOL>): Promise<CampaignKOL> {
@@ -82,7 +86,7 @@ export class CampaignKOLService {
       throw new Error('Failed to update campaign KOL');
     }
 
-    return data;
+    return data as CampaignKOL;
   }
 
   static async deleteCampaignKOL(id: string): Promise<void> {

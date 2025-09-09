@@ -25,7 +25,7 @@ export class CampaignService {
           .from('campaigns')
           .select(`
             *,
-            clients!inner(name, email),
+            clients!campaigns_client_id_fkey(name, email),
             campaign_budget_allocations(*)
           `)
           .order('created_at', { ascending: false });
@@ -37,7 +37,8 @@ export class CampaignService {
           client_name: (campaign.clients as any)?.name,
           client_email: (campaign.clients as any)?.email,
           budget_allocations: campaign.campaign_budget_allocations || [],
-          total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0
+          total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
+
         })) || [];
       } else {
         // Members can only see campaigns for clients they have access to
@@ -46,7 +47,7 @@ export class CampaignService {
           .select(`
             campaigns!inner(
               *,
-              clients!inner(name, email),
+              clients!campaigns_client_id_fkey(name, email),
               campaign_budget_allocations(*)
             )
           `)
@@ -80,7 +81,7 @@ export class CampaignService {
         .from('campaigns')
         .select(`
           *,
-          clients!inner(name, email),
+          clients!campaigns_client_id_fkey(name, email),
           campaign_budget_allocations(*)
         `)
         .eq('id', campaignId)
@@ -94,7 +95,8 @@ export class CampaignService {
         client_name: (campaign.clients as any)?.name,
         client_email: (campaign.clients as any)?.email,
         budget_allocations: campaign.campaign_budget_allocations || [],
-        total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0
+        total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
+        
       };
     } catch (error) {
       console.error('Error fetching campaign:', error);
@@ -143,7 +145,7 @@ export class CampaignService {
    */
   static async updateCampaign(
     id: string, 
-    updates: Partial<Pick<Campaign, 'name' | 'total_budget' | 'status' | 'start_date' | 'end_date' | 'description' | 'region' | 'intro_call' | 'intro_call_date' | 'manager' | 'call_support' | 'client_choosing_kols' | 'multi_activation' | 'proposal_sent' | 'nda_signed' | 'budget_type'>>
+    updates: Partial<Pick<Campaign, 'name' | 'total_budget' | 'status' | 'start_date' | 'end_date' | 'description' | 'region' | 'intro_call' | 'intro_call_date' | 'manager' | 'call_support' | 'client_choosing_kols' | 'multi_activation' | 'proposal_sent' | 'nda_signed' | 'budget_type' | 'outline'>>
   ): Promise<Campaign> {
     try {
       const { data, error } = await supabase

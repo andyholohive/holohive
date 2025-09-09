@@ -7,6 +7,7 @@ type ClientAccessMember = Database['public']['Tables']['client_access_members'][
 export interface ClientWithAccess extends Client {
   member_count?: number;
   campaign_count?: number;
+  whitelist_partner_name?: string;
 }
 
 export class ClientService {
@@ -24,7 +25,8 @@ export class ClientService {
           .select(`
             *,
             client_access_members(count),
-            campaigns(count)
+            campaigns!campaigns_client_id_fkey(count),
+            whitelist_partner:partners!clients_whitelist_partner_id_fkey(name)
           `)
           .order('created_at', { ascending: false });
 
@@ -33,7 +35,8 @@ export class ClientService {
         return clients?.map(client => ({
           ...client,
           member_count: client.client_access_members?.[0]?.count || 0,
-          campaign_count: (client as any).campaigns?.[0]?.count || 0
+          campaign_count: (client as any).campaigns?.[0]?.count || 0,
+          whitelist_partner_name: (client.whitelist_partner as any)?.name
         })) || [];
       } else {
         // Members can only see clients they have access to
@@ -48,7 +51,8 @@ export class ClientService {
               is_active,
               created_at,
               updated_at,
-              campaigns(count)
+              campaigns!campaigns_client_id_fkey(count),
+              whitelist_partner:partners!clients_whitelist_partner_id_fkey(name)
             )
           `)
           .eq('user_id', userId);
@@ -59,7 +63,8 @@ export class ClientService {
           const client = (access as any).clients;
           return {
             ...client,
-            campaign_count: client.campaigns?.[0]?.count || 0
+            campaign_count: client.campaigns?.[0]?.count || 0,
+            whitelist_partner_name: (client.whitelist_partner as any)?.name
           };
         }).filter(Boolean) || [];
       }
@@ -96,12 +101,14 @@ export class ClientService {
     location?: string,
     source?: string,
     onboarding_call_held?: boolean,
-    onboarding_call_date?: string | null
+    onboarding_call_date?: string | null,
+    is_whitelisted?: boolean,
+    whitelist_partner_id?: string | null
   ): Promise<Client> {
     try {
       const { data, error } = await supabase
         .from('clients')
-        .insert({ name, email, location, source, onboarding_call_held, onboarding_call_date })
+        .insert({ name, email, location, source, onboarding_call_held, onboarding_call_date, is_whitelisted, whitelist_partner_id })
         .select()
         .single();
       if (error) throw error;
@@ -115,7 +122,7 @@ export class ClientService {
   /**
    * Update client
    */
-  static async updateClient(id: string, updates: Partial<Pick<Client, 'name' | 'email' | 'location' | 'is_active'>>): Promise<Client> {
+  static async updateClient(id: string, updates: Partial<Pick<Client, 'name' | 'email' | 'location' | 'is_active' | 'is_whitelisted' | 'whitelist_partner_id'>>): Promise<Client> {
     try {
       const { data, error } = await supabase
         .from('clients')

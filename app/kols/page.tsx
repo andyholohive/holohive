@@ -1,15 +1,17 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag } from "lucide-react";
+import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { KOLService, MasterKOL } from "@/lib/kolService";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +20,8 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function KOLsPage() {
   const { user, userProfile } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [kols, setKols] = useState<MasterKOL[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +30,54 @@ export default function KOLsPage() {
   const [editingValue, setEditingValue] = useState<any>(null);
   const [selectedKOLs, setSelectedKOLs] = useState<string[]>([]);
   const [bulkEdit, setBulkEdit] = useState<Partial<MasterKOL>>({});
+  const [filters, setFilters] = useState({
+    name: '',
+    link: '',
+    platform: [] as string[],
+    followers: '',
+    followersOperator: '>' as '>' | '<',
+    region: [] as string[],
+    creator_type: [] as string[],
+    content_type: [] as string[],
+    deliverables: [] as string[],
+    pricing: [] as string[],
+    rating: '',
+    ratingOperator: '>' as '>' | '<',
+    group_chat: [] as string[],
+    description: ''
+  });
+
+  // Default visible columns
+  const defaultVisibleColumns = {
+    name: true,
+    link: true,
+    platform: true,
+    followers: true,
+    region: true,
+    creator_type: true,
+    content_type: true,
+    deliverables: true,
+    pricing: true,
+    rating: true,
+    group_chat: true,
+    description: true
+  };
+
+  // Initialize visible columns from URL params
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const columnsParam = searchParams.get('columns');
+    if (columnsParam) {
+      try {
+        const parsedColumns = JSON.parse(decodeURIComponent(columnsParam));
+        return { ...defaultVisibleColumns, ...parsedColumns };
+      } catch (e) {
+        console.error('Error parsing columns from URL:', e);
+      }
+    }
+    return defaultVisibleColumns;
+  });
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
+  const [filterSearchTerms, setFilterSearchTerms] = useState<{[key: string]: string}>({});
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isSavingNewKOL, setIsSavingNewKOL] = useState(false);
   // 1. Add state for delete dialog (single KOL)
@@ -37,6 +89,21 @@ export default function KOLsPage() {
 
   const fieldOptions = KOLService.getFieldOptions();
   const { toast } = useToast();
+
+  // Function to update URL with column visibility
+  const updateColumnVisibilityInURL = (newVisibleColumns: typeof defaultVisibleColumns) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const columnsParam = encodeURIComponent(JSON.stringify(newVisibleColumns));
+    params.set('columns', columnsParam);
+    router.replace(`/kols?${params.toString()}`, { scroll: false });
+  };
+
+  // Function to handle column visibility changes
+  const handleColumnVisibilityChange = (columnKey: keyof typeof defaultVisibleColumns, checked: boolean) => {
+    const newVisibleColumns = { ...visibleColumns, [columnKey]: checked };
+    setVisibleColumns(newVisibleColumns);
+    updateColumnVisibilityInURL(newVisibleColumns);
+  };
 
   // Multi-select dropdown component
   const MultiSelect = ({ 
@@ -159,11 +226,38 @@ export default function KOLsPage() {
     }
   };
 
-  const filteredKOLs = kols.filter(kol =>
-    kol.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (kol.region && kol.region.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (Array.isArray(kol.niche) && kol.niche.some(n => n.toLowerCase().includes(searchTerm.toLowerCase())))
-  );
+  // Filter KOLs based on filter state and search term
+  const filteredKOLs = kols.filter(kol => {
+    const matchesSearch = !searchTerm || 
+      kol.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      kol.region?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      kol.creator_type?.some(ct => ct.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      kol.content_type?.some(ct => ct.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      kol.deliverables?.some(d => d.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      kol.platform?.some(p => p.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      kol.description?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesFilters = (
+      (!filters.name || kol.name?.toLowerCase().includes(filters.name.toLowerCase())) &&
+      (!filters.link || kol.link?.toLowerCase().includes(filters.link.toLowerCase())) &&
+      (!filters.platform.length || filters.platform.some(p => kol.platform?.includes(p))) &&
+      (!filters.followers || (filters.followersOperator === '>' ? 
+        (kol.followers && parseInt(kol.followers.toString()) > parseInt(filters.followers)) :
+        (kol.followers && parseInt(kol.followers.toString()) < parseInt(filters.followers)))) &&
+      (!filters.region.length || filters.region.some(r => kol.region === r)) &&
+      (!filters.creator_type.length || filters.creator_type.some(ct => kol.creator_type?.includes(ct))) &&
+      (!filters.content_type.length || filters.content_type.some(ct => kol.content_type?.includes(ct))) &&
+      (!filters.deliverables.length || filters.deliverables.some(d => kol.deliverables?.includes(d))) &&
+      (!filters.pricing.length || filters.pricing.some(p => kol.pricing === p)) &&
+      (!filters.rating || (filters.ratingOperator === '>' ? 
+        (kol.rating && parseInt(kol.rating.toString()) > parseInt(filters.rating)) :
+        (kol.rating && parseInt(kol.rating.toString()) < parseInt(filters.rating)))) &&
+      (!filters.group_chat.length || filters.group_chat.some(gc => kol.group_chat === (gc === 'yes'))) &&
+      (!filters.description || kol.description?.toLowerCase().includes(filters.description.toLowerCase()))
+    );
+
+    return matchesSearch && matchesFilters;
+  });
 
   const handleCellDoubleClick = (kolId: string, field: keyof MasterKOL, currentValue: any) => {
     setEditingCell({ kolId, field });
@@ -265,16 +359,20 @@ export default function KOLsPage() {
     }
   };
 
-  const getContentTypeColor = (type: string) => {
+  const getNewContentTypeColor = (contentType: string) => {
     const colorMap: { [key: string]: string } = {
-      'Post': 'bg-blue-100 text-blue-800',
-      'Video': 'bg-red-100 text-red-800',
-      'Article': 'bg-green-100 text-green-800',
-      'AMA': 'bg-purple-100 text-purple-800',
-      'Ambassadorship': 'bg-orange-100 text-orange-800',
-      'Alpha': 'bg-yellow-100 text-yellow-800'
+      'Meme': 'bg-yellow-100 text-yellow-800',
+      'News': 'bg-blue-100 text-blue-800',
+      'Trading': 'bg-green-100 text-green-800',
+      'Deep Dive': 'bg-purple-100 text-purple-800',
+      'Meme/Cultural Narrative': 'bg-pink-100 text-pink-800',
+      'Drama Queen': 'bg-red-100 text-red-800',
+      'Sceptics': 'bg-orange-100 text-orange-800',
+      'Technical Educator': 'bg-indigo-100 text-indigo-800',
+      'Bridge Builders': 'bg-teal-100 text-teal-800',
+      'Visionaries': 'bg-cyan-100 text-cyan-800'
     };
-    return colorMap[type] || 'bg-gray-100 text-gray-800';
+    return colorMap[contentType] || 'bg-gray-100 text-gray-800';
   };
 
   const getNicheColor = (niche: string) => {
@@ -307,12 +405,46 @@ export default function KOLsPage() {
 
   const getTierColor = (tier: string) => {
     const colorMap: { [key: string]: string } = {
-      'Tier 1': 'bg-emerald-100 text-emerald-800',
-      'Tier 2': 'bg-blue-100 text-blue-800',
-      'Tier 3': 'bg-amber-100 text-amber-800',
-      'Tier 4': 'bg-red-100 text-red-800'
+      'Tier 1': 'bg-red-100 text-red-800',
+      'Tier 2': 'bg-orange-100 text-orange-800',
+      'Tier 3': 'bg-yellow-100 text-yellow-800',
+      'Tier 4': 'bg-green-100 text-green-800'
     };
     return colorMap[tier] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getCreatorTypeColor = (creatorType: string) => {
+    const colorMap: { [key: string]: string } = {
+      'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
+      'Drama-Forward': 'bg-red-100 text-red-800',
+      'Skeptic': 'bg-orange-100 text-orange-800',
+      'Educator': 'bg-blue-100 text-blue-800',
+      'Bridge Builder': 'bg-green-100 text-green-800',
+      'Visionary': 'bg-indigo-100 text-indigo-800',
+      'Onboarder': 'bg-teal-100 text-teal-800',
+      'General': 'bg-gray-100 text-gray-800',
+      'Gaming': 'bg-pink-100 text-pink-800',
+      'Crypto': 'bg-yellow-100 text-yellow-800',
+      'Memecoin': 'bg-orange-100 text-orange-800',
+      'NFT': 'bg-purple-100 text-purple-800',
+      'Trading': 'bg-green-100 text-green-800',
+      'AI': 'bg-blue-100 text-blue-800',
+      'Research': 'bg-indigo-100 text-indigo-800',
+      'Airdrop': 'bg-teal-100 text-teal-800',
+      'Art': 'bg-pink-100 text-pink-800'
+    };
+    return colorMap[creatorType] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getActiveFilterCount = (filterKey: string) => {
+    const filter = filters[filterKey as keyof typeof filters];
+    if (Array.isArray(filter)) {
+      return filter.length;
+    }
+    if (typeof filter === 'string' && filter !== '' && filter !== 'all') {
+      return 1;
+    }
+    return 0;
   };
 
   const KOLTableSkeleton = () => (
@@ -321,19 +453,18 @@ export default function KOLsPage() {
         <TableHeader>
           <TableRow className="bg-gray-50 border-b border-gray-200">
             <TableHead className="bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
-            <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Name</TableHead>
-            <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Link</TableHead>
-            <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Platform</TableHead>
-            <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Followers</TableHead>
-            <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Region</TableHead>
-            <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Community</TableHead>
-            <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Content Type</TableHead>
-            <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Niche</TableHead>
-            <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Pricing</TableHead>
-            <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Tier</TableHead>
-            <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Rating</TableHead>
-            <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Group Chat</TableHead>
-            <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Description</TableHead>
+            {visibleColumns.name && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Name</TableHead>}
+            {visibleColumns.link && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Link</TableHead>}
+            {visibleColumns.platform && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Platform</TableHead>}
+            {visibleColumns.followers && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Followers</TableHead>}
+            {visibleColumns.region && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Region</TableHead>}
+            {visibleColumns.creator_type && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Creator Type</TableHead>}
+            {visibleColumns.content_type && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Content Type</TableHead>}
+            {visibleColumns.deliverables && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Deliverables</TableHead>}
+            {visibleColumns.pricing && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>}
+            {visibleColumns.rating && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Rating</TableHead>}
+            {visibleColumns.group_chat && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Group Chat</TableHead>}
+            {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Description</TableHead>}
             <TableHead className="bg-gray-50 whitespace-nowrap">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -341,19 +472,18 @@ export default function KOLsPage() {
           {Array.from({ length: 8 }).map((_, index) => (
             <TableRow key={index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b border-gray-200`}>
               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center w-12`}><Skeleton className="h-4 w-6 mx-auto" /></TableCell>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><Skeleton className="h-4 w-full" /></TableCell>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><div className="flex flex-nowrap gap-1 items-center w-full"><Skeleton className="h-5 w-5 rounded-full" /><Skeleton className="h-5 w-5 rounded-full" /></div></TableCell>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-28`}><div className="flex items-center gap-1 w-full"><Skeleton className="h-4 w-4 rounded" /><Skeleton className="h-4 w-20" /></div></TableCell>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-20 rounded-md" /></div></TableCell>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-18 rounded-md" /><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-14 rounded-md" /></div></TableCell>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-16`}><Skeleton className="h-4 w-full" /></TableCell>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><div className="flex items-center space-x-1 w-full">{[1, 2, 3, 4, 5].map(star => (<Skeleton key={star} className="h-3 w-3 rounded" />))}</div></TableCell>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>
+              {visibleColumns.name && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.link && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.platform && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><div className="flex flex-nowrap gap-1 items-center w-full"><Skeleton className="h-5 w-5 rounded-full" /><Skeleton className="h-5 w-5 rounded-full" /></div></TableCell>}
+              {visibleColumns.followers && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.region && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-28`}><div className="flex items-center gap-1 w-full"><Skeleton className="h-4 w-4 rounded" /><Skeleton className="h-4 w-20" /></div></TableCell>}
+              {visibleColumns.creator_type && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
+              {visibleColumns.content_type && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-20 rounded-md" /></div></TableCell>}
+              {visibleColumns.deliverables && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-18 rounded-md" /><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-14 rounded-md" /></div></TableCell>}
+              {visibleColumns.pricing && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.rating && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><div className="flex items-center space-x-1 w-full">{[1, 2, 3, 4, 5].map(star => (<Skeleton key={star} className="h-3 w-3 rounded" />))}</div></TableCell>}
+              {visibleColumns.group_chat && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
+              {visibleColumns.description && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden w-16`}><div className="flex space-x-1 w-full"><Skeleton className="h-8 w-8 rounded" /><Skeleton className="h-8 w-8 rounded" /></div></TableCell>
             </TableRow>
           ))}
@@ -416,7 +546,28 @@ export default function KOLsPage() {
           break;
         case 'rating':
           return (
-            <div className="flex items-center space-x-1">
+            <div 
+              className="flex items-center space-x-1"
+              onDoubleClick={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const kolToUpdate = kols.find(k => k.id === kolId);
+                if (kolToUpdate) {
+                  const updatedKOL = { ...kolToUpdate, [field]: 0 };
+                  setKols(prevKols => 
+                    prevKols.map(k => k.id === kolId ? updatedKOL : k)
+                  );
+                  try {
+                    await KOLService.updateKOL(updatedKOL);
+                  } catch (error) {
+                    console.error('Error updating rating:', error);
+                    setKols(prevKols => 
+                      prevKols.map(k => k.id === kolId ? kolToUpdate : k)
+                    );
+                  }
+                }
+              }}
+            >
               {[1, 2, 3, 4, 5].map(star => (
                 <Star
                   key={star}
@@ -449,7 +600,8 @@ export default function KOLsPage() {
         case 'select':
           const options = field === 'region' ? (fieldOptions?.regions || []) :
                          field === 'pricing' ? (fieldOptions?.pricingTiers || []) :
-                         field === 'tier' ? (fieldOptions?.tiers || []) : [];
+                         field === 'tier' ? (fieldOptions?.tiers || []) :
+                         field === 'creator_type' ? (fieldOptions?.creatorTypes || []) : [];
           const getSelectStyling = () => {
             if (field === 'pricing' && value) {
               return `${getPricingColor(value)} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center`;
@@ -457,11 +609,86 @@ export default function KOLsPage() {
             if (field === 'tier' && value) {
               return `${getTierColor(value)} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center`;
             }
+            if (field === 'creator_type' && value) {
+              return `${getCreatorTypeColor(value)} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center`;
+            }
             if (field === 'region' && value) {
               return `px-2 py-1 text-xs font-medium inline-flex items-center`;
             }
             return 'px-2 py-1 text-xs font-medium inline-flex items-center';
           };
+
+          // Handle region and pricing as single-select MultiSelect
+          if (field === 'region' || field === 'pricing') {
+            const fieldKey = field as 'region' | 'pricing';
+            return (
+              <MultiSelect
+                options={options}
+                selected={value ? [value] : []}
+                onSelectedChange={async (selected) => {
+                  // For single-select behavior, always take the last selected item
+                  const newValue = selected.length > 0 ? selected[selected.length - 1] : null;
+                  const kolToUpdate = kols.find(k => k.id === kolId);
+                  if (kolToUpdate) {
+                    const updatedKOL = { ...kolToUpdate, [fieldKey]: newValue };
+                    setKols(prevKols => 
+                      prevKols.map(k => k.id === kolId ? updatedKOL : k)
+                    );
+                    try {
+                      await KOLService.updateKOL(updatedKOL);
+                    } catch (error) {
+                      console.error('Error updating field:', error);
+                      setKols(prevKols => 
+                        prevKols.map(k => k.id === kolId ? kolToUpdate : k)
+                      );
+                    }
+                  }
+                }}
+                renderOption={(option) => {
+                  if (fieldKey === 'region') {
+                    return (
+                      <div className="flex items-center space-x-2">
+                        <span>{getRegionIcon(option).flag}</span>
+                        <span>{option}</span>
+                      </div>
+                    );
+                  } else if (fieldKey === 'pricing') {
+                    return (
+                      <span className={`px-2 py-1 rounded-md text-xs font-medium ${getPricingColor(option)}`}>
+                        {option}
+                      </span>
+                    );
+                  }
+                  return option;
+                }}
+                triggerContent={
+                  <div className="w-full flex items-center h-7 min-h-[28px]">
+                    {value ? (
+                      fieldKey === 'region' ? (
+                        <div className="flex items-center space-x-1">
+                          <span>{getRegionIcon(value).flag}</span>
+                          <span className="text-xs font-semibold text-black">{value}</span>
+                        </div>
+                      ) : fieldKey === 'pricing' ? (
+                        <span className={`px-2 py-1 rounded-md text-xs font-medium ${getPricingColor(value)}`}>
+                          {value}
+                        </span>
+                      ) : (
+                        <span className="text-xs font-semibold text-black">{value}</span>
+                      )
+                    ) : (
+                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                    )}
+                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                }
+              />
+            );
+          }
+
+          // Handle other select fields with original Select component
           return (
             <Select 
               value={value || ''} 
@@ -488,19 +715,19 @@ export default function KOLsPage() {
                 style={{ outline: 'none', boxShadow: 'none' }}
               >
                 <SelectValue>
-                  {field === 'region' && value && (
+                  {(field as string) === 'region' && value && (
                     <div className="flex items-center space-x-1">
                       <span>{getRegionIcon(value).flag}</span>
                       <span>{value}</span>
                     </div>
                   )}
-                  {field !== 'region' && value}
+                  {(field as string) !== 'region' && value}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {options.map(option => (
                   <SelectItem key={option} value={option}>
-                    {field === 'region' ? (
+                    {(field as string) === 'region' ? (
                       <div className="flex items-center space-x-2">
                         <span>{getRegionIcon(option).flag}</span>
                         <span>{option}</span>
@@ -512,19 +739,44 @@ export default function KOLsPage() {
             </Select>
           );
         case 'multiselect':
-          const multiOptions = field === 'platform' ? (fieldOptions?.platforms || []) :
-                              field === 'content_type' ? (fieldOptions?.contentTypes || []) :
-                              field === 'niche' ? (fieldOptions?.niches || []) : [];
+          const multiOptions = (field as string) === 'platform' ? (fieldOptions?.platforms || []) :
+                              (field as string) === 'deliverables' ? (fieldOptions?.deliverables || []) :
+                              (field as string) === 'niche' ? (fieldOptions?.niches || []) :
+                                                              (field as string) === 'creator_type' ? (fieldOptions?.creatorTypes || []) :
+                                (field as string) === 'content_type' ? (fieldOptions?.contentTypes || []) : [];
           const currentValues = Array.isArray(value) ? value : [];
-          const placeholder = field === 'platform' ? 'Select platforms...' :
-                             field === 'content_type' ? 'Select content types...' :
-                             field === 'niche' ? 'Select niches...' : 'Select options...';
+                      const placeholder = (field as string) === 'platform' ? 'Select platforms...' :
+                              (field as string) === 'deliverables' ? 'Select deliverables...' :
+                              (field as string) === 'niche' ? 'Select niches...' :
+                              (field as string) === 'creator_type' ? 'Select creator types...' :
+                              (field as string) === 'content_type' ? 'Select content types...' : 'Select options...';
           const renderOption = (option: string) => {
-            if (field === 'platform') {
+            if ((field as string) === 'platform') {
               return (
                 <div className="flex items-center justify-center h-5 w-5" title={option}>
                   {getPlatformIcon(option)}
                 </div>
+              );
+            }
+            if ((field as string) === 'deliverables') {
+              return (
+                <span className={`px-2 py-1 rounded-md text-xs font-medium ${getNewContentTypeColor(option)}`}>
+                  {option}
+                </span>
+              );
+            }
+            if (field === 'content_type') {
+              return (
+                <span className={`px-2 py-1 rounded-md text-xs font-medium ${getNewContentTypeColor(option)}`}>
+                  {option}
+                </span>
+              );
+            }
+            if (field === 'creator_type') {
+              return (
+                <span className={`px-2 py-1 rounded-md text-xs font-medium ${getCreatorTypeColor(option)}`}>
+                  {option}
+                </span>
               );
             }
             return <span>{option}</span>;
@@ -552,30 +804,31 @@ export default function KOLsPage() {
                   }
                 }}
                 placeholder={placeholder}
-                renderOption={renderOption}
+                className="w-full"
                 triggerContent={
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex gap-1 overflow-x-auto overflow-y-hidden whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] flex-1">
-                      {currentValues.map((item, index) => (
+                  <div className="w-full flex items-center h-7 min-h-[28px]">
+                    {currentValues.length > 0 ? (
+                      <>
+                        {currentValues.map((item, idx) => (
                         <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${
-                          field === 'content_type' ? getContentTypeColor(item) : 
+                            field === 'platform' ? '' :
+                            field === 'deliverables' ? getNewContentTypeColor(item) :
                           field === 'niche' ? getNicheColor(item) : 
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {field === 'platform' ? (
-                            <div className="flex items-center justify-center h-5 w-5" title={item}>
-                              {getPlatformIcon(item)}
-                            </div>
-                          ) : item}
+                            field === 'creator_type' ? getCreatorTypeColor(item) :
+                            field === 'content_type' ? getNewContentTypeColor(item) : 'bg-gray-100 text-gray-800'
+                          } ${field === 'creator_type' || field === 'niche' || field === 'deliverables' || field === 'content_type' ? 'mr-1' : ''}`}>
+                            {field === 'platform' ? getPlatformIcon(item) : item}
                         </span>
                       ))}
-                    </div>
-                    <svg className="h-3 w-3 ml-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      </>
+                    ) : (
+                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                    )}
+                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
                 }
-                className=""
               />
             </div>
           );
@@ -752,13 +1005,36 @@ export default function KOLsPage() {
       </div>
       {/* Bulk action bar below search bar (split into two rows) */}
       <div className="mb-4 mt-6">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-sm font-medium">{selectedKOLs.length} selected:</span>
-        </div>
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+              <span className="text-sm font-semibold text-gray-700">{selectedKOLs.length} KOL{selectedKOLs.length !== 1 ? 's' : ''} selected</span>
+            </div>
+            <div className="h-4 w-px bg-gray-300"></div>
+            <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
+          </div>
+          <div className="mb-4 pb-4 border-b border-gray-200">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-gray-600 border-gray-300 hover:bg-gray-50"
+              onClick={() => {
+                const allIds = filteredKOLs.map(kol => kol.id);
+                if (allIds.every(id => selectedKOLs.includes(id))) {
+                  setSelectedKOLs(prev => prev.filter(id => !allIds.includes(id)));
+                } else {
+                  setSelectedKOLs(prev => Array.from(new Set([...prev, ...allIds])));
+                }
+              }}
+            >
+              {filteredKOLs.length > 0 && filteredKOLs.every(kol => selectedKOLs.includes(kol.id)) ? 'Deselect All' : 'Select All'}
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
           {/* Platform */}
           <div className="min-w-[120px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-500 font-semibold mb-1 self-start">Platform</span>
+            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Platform</span>
             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
               <MultiSelect
                 options={fieldOptions.platforms || []}
@@ -787,22 +1063,60 @@ export default function KOLsPage() {
               />
             </div>
           </div>
-          {/* Content Type */}
-          <div className="min-w-[120px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-500 font-semibold mb-1 self-start">Content Type</span>
+          {/* Region */}
+          <div className="min-w-[100px] flex flex-col items-end justify-end">
+            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Region</span>
             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
               <MultiSelect
-                options={fieldOptions.contentTypes || []}
-                selected={bulkEdit.content_type || []}
-                onSelectedChange={content_type => setBulkEdit(prev => ({ ...prev, content_type }))}
-                placeholder="Content Type"
+                options={fieldOptions.regions || []}
+                selected={bulkEdit.region ? [bulkEdit.region] : []}
+                onSelectedChange={regions => {
+                  // For single-select behavior, always take the last selected item
+                  const newRegion = regions.length > 0 ? regions[regions.length - 1] : null;
+                  setBulkEdit(prev => ({ ...prev, region: newRegion }));
+                }}
+                placeholder="Region"
+                className="w-full"
+                renderOption={(option) => (
+                  <div className="flex items-center space-x-2">
+                    <span>{getRegionIcon(option).flag}</span>
+                    <span>{option}</span>
+                  </div>
+                )}
+                triggerContent={
+                  <div className="w-full flex items-center h-7 min-h-[28px]">
+                    {bulkEdit.region ? (
+                      <div className="flex items-center space-x-1">
+                        <span>{getRegionIcon(bulkEdit.region).flag}</span>
+                        <span className="text-xs font-semibold text-black">{bulkEdit.region}</span>
+                      </div>
+                    ) : (
+                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                    )}
+                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                }
+              />
+            </div>
+          </div>
+          {/* Creator Type */}
+          <div className="min-w-[120px] flex flex-col items-end justify-end">
+            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Creator Type</span>
+            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+              <MultiSelect
+                options={fieldOptions.creatorTypes || []}
+                selected={bulkEdit.creator_type || []}
+                onSelectedChange={creator_type => setBulkEdit(prev => ({ ...prev, creator_type }))}
+                placeholder="Creator Type"
                 className="w-full"
                 triggerContent={
                   <div className="w-full flex items-center h-7 min-h-[28px]">
-                    {bulkEdit.content_type && bulkEdit.content_type.length > 0 ? (
+                    {bulkEdit.creator_type && bulkEdit.creator_type.length > 0 ? (
                       <>
-                        {bulkEdit.content_type.map((item, idx) => (
-                          <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getContentTypeColor ? getContentTypeColor(item) : 'bg-gray-100 text-gray-800'}`}>{item}</span>
+                        {bulkEdit.creator_type.map((item, idx) => (
+                          <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getCreatorTypeColor(item)} mr-1`}>{item}</span>
                         ))}
                       </>
                     ) : (
@@ -816,22 +1130,51 @@ export default function KOLsPage() {
               />
             </div>
           </div>
-          {/* Niche */}
+          {/* Content Type */}
           <div className="min-w-[120px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-500 font-semibold mb-1 self-start">Niche</span>
+            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Content Type</span>
             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
               <MultiSelect
-                options={fieldOptions.niches || []}
-                selected={bulkEdit.niche || []}
-                onSelectedChange={niche => setBulkEdit(prev => ({ ...prev, niche }))}
-                placeholder="Niche"
+                options={fieldOptions.contentTypes || []}
+                selected={bulkEdit.content_type || []}
+                onSelectedChange={content_type => setBulkEdit(prev => ({ ...prev, content_type }))}
+                placeholder="Content Type"
                 className="w-full"
                 triggerContent={
                   <div className="w-full flex items-center h-7 min-h-[28px]">
-                    {bulkEdit.niche && bulkEdit.niche.length > 0 ? (
+                    {bulkEdit.content_type && bulkEdit.content_type.length > 0 ? (
                       <>
-                        {bulkEdit.niche.map((item, idx) => (
-                          <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getNicheColor ? getNicheColor(item) : 'bg-gray-100 text-gray-800'}`}>{item}</span>
+                        {bulkEdit.content_type.map((item, idx) => (
+                          <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getNewContentTypeColor(item)} mr-1`}>{item}</span>
+                        ))}
+                      </>
+                    ) : (
+                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                    )}
+                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                }
+              />
+            </div>
+          </div>
+          {/* Deliverables */}
+          <div className="min-w-[120px] flex flex-col items-end justify-end">
+            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Deliverables</span>
+            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+              <MultiSelect
+                options={fieldOptions.deliverables || []}
+                selected={bulkEdit.deliverables || []}
+                onSelectedChange={deliverables => setBulkEdit(prev => ({ ...prev, deliverables }))}
+                placeholder="Deliverables"
+                className="w-full"
+                triggerContent={
+                  <div className="w-full flex items-center h-7 min-h-[28px]">
+                    {bulkEdit.deliverables && bulkEdit.deliverables.length > 0 ? (
+                      <>
+                        {bulkEdit.deliverables.map((item, idx) => (
+                          <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getNewContentTypeColor(item)} mr-1`}>{item}</span>
                         ))}
                       </>
                     ) : (
@@ -847,57 +1190,43 @@ export default function KOLsPage() {
           </div>
           {/* Pricing */}
           <div className="min-w-[100px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-500 font-semibold mb-1 self-start">Pricing</span>
-            <Select value={bulkEdit.pricing || ''} onValueChange={pricing => setBulkEdit(prev => ({ ...prev, pricing: pricing as MasterKOL['pricing'] }))}>
-              <SelectTrigger
-                className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.pricing ? getPricingColor(bulkEdit.pricing) : ''}`}
-                style={{ outline: 'none', boxShadow: 'none' }}
-              >
-                <SelectValue placeholder="Select" />
-              </SelectTrigger>
-              <SelectContent>
-                {(fieldOptions.pricingTiers || []).map(tier => (
-                  <SelectItem key={tier} value={tier}>{tier}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Pricing</span>
+            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+              <MultiSelect
+                options={fieldOptions.pricingTiers || []}
+                selected={bulkEdit.pricing ? [bulkEdit.pricing] : []}
+                onSelectedChange={pricingTiers => {
+                  // For single-select behavior, always take the last selected item
+                  const newPricing = pricingTiers.length > 0 ? pricingTiers[pricingTiers.length - 1] : null;
+                  setBulkEdit(prev => ({ ...prev, pricing: newPricing }));
+                }}
+                placeholder="Pricing"
+                className="w-full"
+                renderOption={(option) => (
+                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${getPricingColor(option)}`}>
+                    {option}
+                  </span>
+                )}
+                triggerContent={
+                  <div className="w-full flex items-center h-7 min-h-[28px]">
+                    {bulkEdit.pricing ? (
+                      <span className={`px-2 py-1 rounded-md text-xs font-medium ${getPricingColor(bulkEdit.pricing)}`}>
+                        {bulkEdit.pricing}
+                      </span>
+                    ) : (
+                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                    )}
+                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
           </div>
-          {/* Tier */}
-          <div className="min-w-[80px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-500 font-semibold mb-1 self-start">Tier</span>
-            <Select value={bulkEdit.tier || ''} onValueChange={tier => setBulkEdit(prev => ({ ...prev, tier: tier as MasterKOL['tier'] }))}>
-              <SelectTrigger
-                className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.tier ? getTierColor(bulkEdit.tier) : ''}`}
-                style={{ outline: 'none', boxShadow: 'none' }}
-              >
-                <SelectValue placeholder="Select" />
-              </SelectTrigger>
-              <SelectContent>
-                {(fieldOptions.tiers || []).map(tier => (
-                  <SelectItem key={tier} value={tier}>{tier}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                }
+              />
           </div>
-          {/* Community */}
-          <div className="min-w-[80px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-500 font-semibold mb-1 self-start">Community</span>
-            <Select value={bulkEdit.community === true ? 'yes' : bulkEdit.community === false ? 'no' : ''} onValueChange={v => setBulkEdit(prev => ({ ...prev, community: v === 'yes' }))}>
-              <SelectTrigger
-                className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.community !== undefined ? (bulkEdit.community ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') : ''}`}
-                style={{ outline: 'none', boxShadow: 'none' }}
-              >
-                <span>{bulkEdit.community === true ? 'Yes' : bulkEdit.community === false ? 'No' : 'Select'}</span>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="yes">Yes</SelectItem>
-                <SelectItem value="no">No</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
           {/* Group Chat */}
           <div className="min-w-[100px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-500 font-semibold mb-1 self-start">Group Chat</span>
+            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Group Chat</span>
             <Select value={bulkEdit.group_chat === true ? 'yes' : bulkEdit.group_chat === false ? 'no' : ''} onValueChange={v => setBulkEdit(prev => ({ ...prev, group_chat: v === 'yes' }))}>
               <SelectTrigger
                 className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.group_chat !== undefined ? (bulkEdit.group_chat ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') : ''}`}
@@ -911,75 +1240,86 @@ export default function KOLsPage() {
               </SelectContent>
             </Select>
           </div>
-          {/* Region */}
-          <div className="min-w-[100px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-500 font-semibold mb-1 self-start">Region</span>
-            <Select value={bulkEdit.region || ''} onValueChange={region => setBulkEdit(prev => ({ ...prev, region: region as MasterKOL['region'] }))}>
-              <SelectTrigger
-                className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.region ? '' : ''}`}
-                style={{ outline: 'none', boxShadow: 'none' }}
+        </div>
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className="flex gap-3">
+              <Button
+                size="sm"
+                className="bg-[#3e8692] hover:bg-[#2d6b75] text-white border-0 shadow-sm"
+                disabled={selectedKOLs.length === 0}
+                onClick={async () => {
+                  if (selectedKOLs.length === 0) return;
+                  const updates = { ...bulkEdit };
+                  setKols(prev => prev.map(kol => selectedKOLs.includes(kol.id) ? { ...kol, ...updates } : kol));
+                  await Promise.all(selectedKOLs.map(kolId => {
+                    const { id, ...fields } = { ...kols.find(k => k.id === kolId), ...updates };
+                    return KOLService.updateKOL({ id: kolId, ...fields });
+                  }));
+                  setBulkEdit({});
+                  setSelectedKOLs([]);
+                }}
               >
-                {bulkEdit.region ? (
-                  <div className="flex items-center space-x-1">
-                    <span>{getRegionIcon(bulkEdit.region).flag}</span>
-                    <span className="text-xs font-semibold text-black">{bulkEdit.region}</span>
-                  </div>
-                ) : (
-                  <span className="text-xs font-semibold text-black">Select</span>
-                )}
-              </SelectTrigger>
-              <SelectContent>
-                {(fieldOptions.regions || []).map(region => (
-                  <SelectItem key={region} value={region}>{region}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                Apply
+              </Button>
+              <Button
+                size="sm"
+                className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm"
+                disabled={selectedKOLs.length === 0 || isBulkDeleting}
+                onClick={() => setShowBulkDeleteDialog(true)}
+              >
+                Delete
+              </Button>
+            </div>
+            <div className="text-xs text-gray-500 font-medium">
+              {selectedKOLs.length > 0 && `${selectedKOLs.length} item${selectedKOLs.length !== 1 ? 's' : ''} selected`}
+            </div>
           </div>
         </div>
-        <div className="mt-2 flex gap-2">
-          <Button
-            size="sm"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-            disabled={selectedKOLs.length === 0}
-            onClick={async () => {
-              if (selectedKOLs.length === 0) return;
-              const updates = { ...bulkEdit };
-              setKols(prev => prev.map(kol => selectedKOLs.includes(kol.id) ? { ...kol, ...updates } : kol));
-              await Promise.all(selectedKOLs.map(kolId => {
-                const { id, ...fields } = { ...kols.find(k => k.id === kolId), ...updates };
-                return KOLService.updateKOL({ id: kolId, ...fields });
-              }));
-              setBulkEdit({});
-              setSelectedKOLs([]);
-            }}
-          >
-            Apply
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            disabled={selectedKOLs.length === 0 || isBulkDeleting}
-            onClick={() => setShowBulkDeleteDialog(true)}
-          >
-            Delete
-          </Button>
         </div>
-        <div className="mt-6 mb-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              const allIds = filteredKOLs.map(kol => kol.id);
-              if (allIds.every(id => selectedKOLs.includes(id))) {
-                setSelectedKOLs(prev => prev.filter(id => !allIds.includes(id)));
-              } else {
-                setSelectedKOLs(prev => Array.from(new Set([...prev, ...allIds])));
-              }
-            }}
-          >
-            {filteredKOLs.length > 0 && filteredKOLs.every(kol => selectedKOLs.includes(kol.id)) ? 'Deselect All' : 'Select All'}
-          </Button>
-        </div>
+      </div>
+      {/* Column visibility dropdown */}
+      <div className="mb-4">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Column Visibility
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto min-w-80" align="start" side="top">
+            <div className="space-y-3">
+              <h4 className="font-medium text-sm">Toggle Columns</h4>
+              <div className="grid grid-cols-2 gap-3">
+                {Object.entries({
+                  name: 'Name',
+                  link: 'Link',
+                  platform: 'Platform',
+                  followers: 'Followers',
+                  region: 'Region',
+                  creator_type: 'Creator Type',
+                  content_type: 'Content Type',
+                  deliverables: 'Deliverables',
+                  pricing: 'Pricing',
+                  rating: 'Rating',
+                  group_chat: 'Group Chat',
+                  description: 'Description'
+                }).map(([key, label]) => (
+                  <label key={key} className="flex items-center justify-between cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors">
+                    <span className="text-sm font-medium mr-4">{label}</span>
+                    <Switch
+                      checked={visibleColumns[key as keyof typeof visibleColumns]}
+                      onCheckedChange={(checked) => {
+                        handleColumnVisibilityChange(key as keyof typeof defaultVisibleColumns, checked);
+                      }}
+                      className="data-[state=checked]:bg-[#3e8692] data-[state=unchecked]:bg-gray-200"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
       <div className="border rounded-lg overflow-auto">
         <Table className="min-w-full" style={{ 
@@ -989,21 +1329,20 @@ export default function KOLsPage() {
         }} suppressHydrationWarning>
           <TableHeader>
             <TableRow className="bg-gray-50 border-b border-gray-200">
-              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap w-12 select-none">#</TableHead>
-              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Name</TableHead>
-              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Link</TableHead>
-              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Platform</TableHead>
-              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Followers</TableHead>
-              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Region</TableHead>
-              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Community</TableHead>
-              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content Type</TableHead>
-              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Niche</TableHead>
-              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>
-              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Tier</TableHead>
-              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Rating</TableHead>
-              <TableHead className="relative bg-gray-50 border-r border-gray-200 whitespace-nowrap select-none">Group Chat</TableHead>
-              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Description</TableHead>
-              <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
+              <TableHead className="bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
+              {visibleColumns.name && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Name</TableHead>}
+              {visibleColumns.link && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Link</TableHead>}
+              {visibleColumns.platform && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Platform</TableHead>}
+              {visibleColumns.followers && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Followers</TableHead>}
+              {visibleColumns.region && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Region</TableHead>}
+              {visibleColumns.creator_type && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Creator Type</TableHead>}
+              {visibleColumns.content_type && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Content Type</TableHead>}
+              {visibleColumns.deliverables && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Deliverables</TableHead>}
+              {visibleColumns.pricing && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>}
+              {visibleColumns.rating && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Rating</TableHead>}
+              {visibleColumns.group_chat && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Group Chat</TableHead>}
+              {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Description</TableHead>}
+              <TableHead className="bg-gray-50 whitespace-nowrap">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody className="bg-white">
@@ -1046,47 +1385,66 @@ export default function KOLsPage() {
                       )}
                     </div>
                   </TableCell>
+                  {visibleColumns.name && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                    <div className="truncate">{renderEditableCell(kol.name, 'name', kol.id)}</div>
+                      <div className="truncate">{renderEditableCell(kol.name, 'name', kol.id, 'text')}</div>
                   </TableCell>
+                  )}
+                  {visibleColumns.link && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                    <div className="truncate">{renderEditableCell(kol.link, 'link', kol.id)}</div>
+                      <div className="truncate">{renderEditableCell(kol.link, 'link', kol.id, 'text')}</div>
                   </TableCell>
+                  )}
+                  {visibleColumns.platform && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                     <div className="truncate">{renderEditableCell(kol.platform, 'platform', kol.id, 'multiselect')}</div>
                   </TableCell>
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden group`} style={{}}>
-                    <div className="truncate flex items-center">
-                      {renderEditableCell(kol.followers, 'followers', kol.id, 'number')}
-                    </div>
+                  )}
+                  {visibleColumns.followers && (
+                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                      <div className="truncate">{renderEditableCell(kol.followers, 'followers', kol.id, 'number')}</div>
                   </TableCell>
+                  )}
+                  {visibleColumns.region && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                     <div className="truncate">{renderEditableCell(kol.region, 'region', kol.id, 'select')}</div>
                   </TableCell>
+                  )}
+                  {visibleColumns.creator_type && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                    <div className="truncate">{renderEditableCell(kol.community, 'community', kol.id, 'boolean')}</div>
+                      <div className="truncate">{renderEditableCell(kol.creator_type, 'creator_type', kol.id, 'multiselect')}</div>
                   </TableCell>
+                  )}
+                  {visibleColumns.content_type && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                     <div className="truncate">{renderEditableCell(kol.content_type, 'content_type', kol.id, 'multiselect')}</div>
                   </TableCell>
+                  )}
+                  {visibleColumns.deliverables && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                    <div className="truncate">{renderEditableCell(kol.niche, 'niche', kol.id, 'multiselect')}</div>
+                      <div className="truncate">{renderEditableCell(kol.deliverables, 'deliverables', kol.id, 'multiselect')}</div>
                   </TableCell>
+                  )}
+                  {visibleColumns.pricing && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                     <div className="truncate">{renderEditableCell(kol.pricing, 'pricing', kol.id, 'select')}</div>
                   </TableCell>
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                    <div className="truncate">{renderEditableCell(kol.tier, 'tier', kol.id, 'select')}</div>
-                  </TableCell>
+                  )}
+                  {visibleColumns.rating && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                     <div className="truncate">{renderEditableCell(kol.rating, 'rating', kol.id, 'rating')}</div>
                   </TableCell>
+                  )}
+                  {visibleColumns.group_chat && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                     <div className="truncate">{renderEditableCell(kol.group_chat, 'group_chat', kol.id, 'boolean')}</div>
                   </TableCell>
+                  )}
+                  {visibleColumns.description && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                    <div className="truncate">{renderEditableCell(kol.description, 'description', kol.id)}</div>
+                      <div className="truncate">{renderEditableCell(kol.description, 'description', kol.id, 'text')}</div>
                   </TableCell>
+                  )}
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
                     <div className="flex space-x-1">
                       <Button size="sm" variant="outline" onClick={() => handleDelete(kol.id)}>
@@ -1105,7 +1463,10 @@ export default function KOLsPage() {
           <Crown className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <p className="text-gray-600 mb-2">No KOLs found</p>
           <p className="text-sm text-gray-500">
-            {searchTerm ? 'Try adjusting your search terms.' : 'Start by adding your first KOL.'}
+            {searchTerm || Object.values(filters).some(value => 
+              (typeof value === 'string' && value !== '') || 
+              (Array.isArray(value) && value.length > 0)
+            ) ? 'Could not find KOLs with selected filters.' : 'Start by adding your first KOL.'}
           </p>
         </div>
       )}

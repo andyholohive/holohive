@@ -10,13 +10,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2 } from "lucide-react";
+import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ClientService, ClientWithAccess } from "@/lib/clientService";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
+import { CampaignTemplateService, CampaignTemplateWithDetails } from "@/lib/campaignTemplateService";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from "@/lib/supabase";
+import { CampaignKOLService } from "@/lib/campaignKolService";
 
 export default function CampaignsPage() {
   const { user, userProfile } = useAuth();
@@ -29,13 +32,22 @@ export default function CampaignsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isNewCampaignOpen, setIsNewCampaignOpen] = useState(false);
   const [isSubmittingCampaign, setIsSubmittingCampaign] = useState(false);
+  const [isShareCampaignOpen, setIsShareCampaignOpen] = useState(false);
+  const [sharingCampaign, setSharingCampaign] = useState<CampaignWithDetails | null>(null);
   const [availableClients, setAvailableClients] = useState<ClientWithAccess[]>([]);
+  const [availableTemplates, setAvailableTemplates] = useState<CampaignTemplateWithDetails[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("none");
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [availableLists, setAvailableLists] = useState<{ id: string; name: string }[]>([]);
+  const [selectedListId, setSelectedListId] = useState<string>("");
+  const [listKOLs, setListKOLs] = useState<{ master_kol_id: string; name: string; followers: number | null; region: string | null; platform: string[] | null }[]>([]);
+  const [selectedKolIds, setSelectedKolIds] = useState<Set<string>>(new Set());
   // In newCampaign state, add region, clientChoosingKols, multiActivation, intro_call, intro_call_date, budgetAllocations
   const [newCampaign, setNewCampaign] = useState({
     client_id: "",
     name: "",
     total_budget: "",
-    status: "Planning" as const,
+    status: "Planning" as "Planning" | "Active" | "Paused" | "Completed",
     start_date: "",
     end_date: "",
     description: "",
@@ -56,6 +68,8 @@ export default function CampaignsPage() {
   useEffect(() => {
     if (isNewCampaignOpen && user?.id && userProfile?.role) {
       fetchAvailableClients();
+      fetchAvailableTemplates();
+      fetchAvailableLists();
     }
   }, [isNewCampaignOpen, user?.id, userProfile?.role]);
 
@@ -75,6 +89,60 @@ export default function CampaignsPage() {
       setAvailableClients(clients);
     } catch (err) {
       console.error("Error fetching clients:", err);
+    }
+  };
+
+  const fetchAvailableTemplates = async () => {
+    try {
+      setIsLoadingTemplates(true);
+      const templates = await CampaignTemplateService.getTemplatesForUser(
+        userProfile!.role as 'admin' | 'member' | 'client',
+        user!.id
+      );
+      setAvailableTemplates(templates);
+    } catch (err) {
+      console.error("Error fetching templates:", err);
+    } finally {
+      setIsLoadingTemplates(false);
+    }
+  };
+
+  const fetchAvailableLists = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('lists')
+        .select('id, name')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setAvailableLists((data || []) as { id: string; name: string }[]);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error fetching lists:', err);
+    }
+  };
+
+  const fetchListKOLs = async (listId: string) => {
+    setListKOLs([]);
+    setSelectedKolIds(new Set());
+    if (!listId) return;
+    try {
+      const { data, error } = await supabase
+        .from('list_kols')
+        .select('master_kol:master_kols(id, name, followers, region, platform)')
+        .eq('list_id', listId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      const mapped = (data || []).map((row: any) => ({
+        master_kol_id: row.master_kol.id as string,
+        name: row.master_kol.name as string,
+        followers: row.master_kol.followers as number | null,
+        region: row.master_kol.region as string | null,
+        platform: row.master_kol.platform as string[] | null,
+      }));
+      setListKOLs(mapped);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error fetching list KOLs:', err);
     }
   };
 
@@ -101,7 +169,7 @@ export default function CampaignsPage() {
         client_id: "",
         name: "",
         total_budget: "",
-        status: "Planning" as const,
+        status: "Planning" as "Planning" | "Active" | "Paused" | "Completed",
         start_date: "",
         end_date: "",
         description: "",
@@ -122,6 +190,12 @@ export default function CampaignsPage() {
             CampaignService.addBudgetAllocation(campaign.id, alloc.region, parseFloat(alloc.amount))
           )
       );
+      if (selectedKolIds.size > 0) {
+        const ids = Array.from(selectedKolIds);
+        await Promise.all(ids.map((masterKolId) =>
+          CampaignKOLService.addCampaignKOL(campaign.id, masterKolId, 'Curated')
+        ));
+      }
     } catch (err) {
       console.error("Error creating campaign:", err);
     } finally {
@@ -173,6 +247,31 @@ export default function CampaignsPage() {
     return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
   };
 
+  const applyTemplate = (templateId: string) => {
+    const template = availableTemplates.find(t => t.id === templateId);
+    if (!template) return;
+
+    setNewCampaign({
+      ...newCampaign,
+      total_budget: template.total_budget.toString(),
+      status: (template.status as "Planning" | "Active" | "Paused" | "Completed") || "Planning",
+      region: template.region || "apac",
+      clientChoosingKols: template.client_choosing_kols || false,
+      multiActivation: template.multi_activation || false,
+      intro_call: template.intro_call || false,
+      intro_call_date: template.intro_call_date || undefined,
+      budgetAllocations: template.budget_allocations?.map(alloc => ({
+        region: alloc.region,
+        amount: alloc.allocated_budget.toString()
+      })) || []
+    });
+  };
+
+  const handleShareCampaign = (campaign: CampaignWithDetails) => {
+    setSharingCampaign(campaign);
+    setIsShareCampaignOpen(true);
+  };
+
   const getStatusVariant = (status: string) => {
     switch (status) {
       case "Active": return "default";
@@ -184,7 +283,7 @@ export default function CampaignsPage() {
   };
 
   const CampaignCardSkeleton = () => (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="hover:shadow-md transition-shadow h-full flex flex-col">
       <CardHeader className="pb-4">
         <div className="mb-3">
           <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
@@ -210,7 +309,7 @@ export default function CampaignsPage() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-4 border-t border-gray-100">
+      <CardContent className="pt-4 border-t border-gray-100 flex flex-col flex-1">
         <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
           <Skeleton className="h-4 w-24" />
           <Skeleton className="h-6 w-12 rounded-md" />
@@ -223,7 +322,8 @@ export default function CampaignsPage() {
             <Skeleton className="h-5 w-18 rounded-md" />
           </div>
         </div>
-        <Skeleton className="h-8 w-full rounded" />
+        <Skeleton className="h-8 w-full rounded mt-auto" />
+        <Skeleton className="h-8 w-full rounded mt-2" />
       </CardContent>
     </Card>
   );
@@ -253,7 +353,7 @@ export default function CampaignsPage() {
             />
           </div>
         </div>
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, index) => (
             <CampaignCardSkeleton key={index} />
           ))}
@@ -324,6 +424,41 @@ export default function CampaignsPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  {/* Campaign Template section hidden for now */}
+                  {/* <div className="grid gap-2">
+                    <Label htmlFor="template">Campaign Template (Optional)</Label>
+                    <Select 
+                      value={selectedTemplate} 
+                      onValueChange={(value) => {
+                        setSelectedTemplate(value);
+                        if (value && value !== "none") {
+                          applyTemplate(value);
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="auth-input">
+                        <SelectValue placeholder={isLoadingTemplates ? "Loading templates..." : "Select a template to pre-fill form"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No template</SelectItem>
+                        {availableTemplates.map((template) => (
+                          <SelectItem key={template.id} value={template.id}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{template.name}</span>
+                              <span className="text-xs text-gray-500">
+                                ${template.total_budget.toLocaleString()} • {template.region} • {template.usage_count || 0} uses
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedTemplate && selectedTemplate !== "none" && (
+                      <div className="text-xs text-gray-600 mt-1">
+                        Template applied! You can modify any fields below.
+                      </div>
+                    )}
+                  </div> */}
                   <div className="grid gap-2">
                     <Label htmlFor="campaign-name">Campaign Name</Label>
                     <Input
@@ -444,6 +579,80 @@ export default function CampaignsPage() {
                         <SelectItem value="global">Global</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="load-from-list">Load KOLs from Existing List (Optional)</Label>
+                    <Select 
+                      value={selectedListId} 
+                      onValueChange={(value) => { 
+                        setSelectedListId(value); 
+                        fetchListKOLs(value);
+                      }}
+                    >
+                      <SelectTrigger className="auth-input">
+                        <SelectValue placeholder="Select a list" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableLists.map((l) => (
+                          <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedListId && (
+                      <div className="border rounded-md p-2 max-h-56 overflow-y-auto">
+                        {listKOLs.length === 0 ? (
+                          <div className="text-xs text-gray-500 px-1 py-2">No KOLs in this list.</div>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center pb-2 border-b">
+                              <span className="text-sm font-medium text-gray-700">
+                                {selectedKolIds.size} of {listKOLs.length} selected
+                              </span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const allSelected = selectedKolIds.size === listKOLs.length;
+                                  if (allSelected) {
+                                    setSelectedKolIds(new Set());
+                                  } else {
+                                    setSelectedKolIds(new Set(listKOLs.map(k => k.master_kol_id)));
+                                  }
+                                }}
+                                className="h-7 px-2 text-xs"
+                              >
+                                {selectedKolIds.size === listKOLs.length ? 'Deselect All' : 'Select All'}
+                              </Button>
+                            </div>
+                            {listKOLs.map((k) => {
+                              const checked = selectedKolIds.has(k.master_kol_id);
+                              return (
+                                <label key={k.master_kol_id} className="flex items-start gap-2 text-sm">
+                                  <Checkbox 
+                                    checked={checked}
+                                    onCheckedChange={(val) => {
+                                      setSelectedKolIds(prev => {
+                                        const next = new Set(prev);
+                                        if (val) next.add(k.master_kol_id); else next.delete(k.master_kol_id);
+                                        return next;
+                                      });
+                                    }}
+                                  />
+                                  <div className="flex-1">
+                                    <div className="font-medium text-gray-900">{k.name}</div>
+                                    <div className="text-xs text-gray-600">
+                                      {k.followers ? `${k.followers.toLocaleString()} followers` : '-'}
+                                      {k.region ? ` • ${k.region}` : ''}
+                                    </div>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -633,7 +842,7 @@ export default function CampaignsPage() {
           />
         </div>
       </div>
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredCampaigns.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-600">
@@ -654,7 +863,7 @@ export default function CampaignsPage() {
           </div>
         ) : (
           filteredCampaigns.map((campaign) => (
-            <Card key={campaign.id} className="transition-shadow group">
+            <Card key={campaign.id} className="transition-shadow group h-full flex flex-col">
               <CardHeader className="pb-4">
                 <div className="mb-3">
                   <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
@@ -688,7 +897,7 @@ export default function CampaignsPage() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="pt-4 border-t border-gray-100">
+              <CardContent className="pt-4 border-t border-gray-100 flex flex-col flex-1">
                 <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
                   <span>Budget Utilized</span>
                   <span className="bg-gray-100 px-2 py-1 rounded-md text-gray-600 font-medium">
@@ -704,7 +913,7 @@ export default function CampaignsPage() {
                           key={allocation.id}
                           className="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-700"
                         >
-                          {allocation.region}: {CampaignService.formatCurrency(allocation.allocated_budget)}
+                          {allocation.region === 'apac' ? 'APAC' : allocation.region === 'global' ? 'Global' : allocation.region}: {CampaignService.formatCurrency(allocation.allocated_budget)}
                         </span>
                       ))}
                     </div>
@@ -713,16 +922,87 @@ export default function CampaignsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full"
+                  className="w-full mt-auto"
                   onClick={() => router.push(`/campaigns/${campaign.id}`)}
                 >
                   View Campaign
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2"
+                  onClick={() => handleShareCampaign(campaign)}
+                >
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share Campaign
                 </Button>
               </CardContent>
             </Card>
           ))
         )}
       </div>
+
+      {/* Share Campaign Dialog */}
+      <Dialog open={isShareCampaignOpen} onOpenChange={setIsShareCampaignOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Campaign: {sharingCampaign?.name}</DialogTitle>
+            <DialogDescription>
+              Share this campaign by copying the link below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Campaign Details</Label>
+              <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                <div className="flex justify-between mb-2">
+                  <span className="font-medium">Client:</span>
+                  <span>{sharingCampaign?.client_name || 'Unknown'}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="font-medium">Budget:</span>
+                  <span>{CampaignService.formatCurrency(sharingCampaign?.total_budget || 0)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="font-medium">Dates:</span>
+                  <span>{sharingCampaign ? new Date(sharingCampaign.start_date).toLocaleDateString() : ''} - {sharingCampaign ? new Date(sharingCampaign.end_date).toLocaleDateString() : ''}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Status:</span>
+                  <span>{sharingCampaign?.status}</span>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="share-campaign-link">Share Link</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="share-campaign-link"
+                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/public/campaigns/${sharingCampaign?.id}`}
+                  readOnly
+                  className="flex-1 auth-input"
+                />
+                <Button
+                  variant="outline"
+                  className="h-10"
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && sharingCampaign?.id) {
+                      navigator.clipboard.writeText(`${window.location.origin}/public/campaigns/${sharingCampaign.id}`);
+                    }
+                  }}
+                >
+                  Copy
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsShareCampaignOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

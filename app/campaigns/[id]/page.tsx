@@ -12,12 +12,13 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 // import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport } from "lucide-react";
+import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, BarChart3, Table as TableIcon, Edit, CreditCard } from "lucide-react";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserService } from "@/lib/userService";
 import { KOLService } from "@/lib/kolService";
 import { CampaignKOLService, CampaignKOLWithDetails } from "@/lib/campaignKolService";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
@@ -54,6 +55,34 @@ const CampaignDetailsPage = () => {
   // Track allocation edits
   const [allocations, setAllocations] = useState<any[]>([]);
   const [deletedAllocIds, setDeletedAllocIds] = useState<string[]>([]);
+  
+  // KOLs view toggle state
+  const [kolViewMode, setKolViewMode] = useState<'overview' | 'table' | 'graph'>('overview');
+  
+  // Payments view toggle state
+  const [paymentViewMode, setPaymentViewMode] = useState<'table' | 'graph'>('table');
+
+  // Information tab toggle state
+  const [informationViewMode, setInformationViewMode] = useState<'overview' | 'metrics'>('overview');
+
+  // Payments state
+  const [payments, setPayments] = useState<any[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const [isEditingPayment, setIsEditingPayment] = useState(false);
+  const [editingPayment, setEditingPayment] = useState<any>(null);
+  const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
+  const [bulkPaymentMethod, setBulkPaymentMethod] = useState('');
+  const [paymentsSearchTerm, setPaymentsSearchTerm] = useState('');
+  const [newPaymentData, setNewPaymentData] = useState({
+    campaign_kol_id: '',
+    amount: 0,
+    payment_date: '',
+    payment_method: 'Token',
+    content_id: 'none',
+    transaction_id: '',
+    notes: ''
+  });
 
   // Column resize state for KOLs table
   // Remove columnWidths, isResizing, resizingColumn
@@ -127,6 +156,8 @@ const CampaignDetailsPage = () => {
     if (campaign) {
       fetchCampaignKOLs();
       fetchAvailableKOLs();
+      fetchCampaignUpdates();
+      fetchPayments();
     }
   }, [campaign]);
 
@@ -135,7 +166,13 @@ const CampaignDetailsPage = () => {
     try {
       setLoadingKOLs(true);
       const kols = await CampaignKOLService.getCampaignKOLs(campaign.id);
+      // If payments are loaded, map paid from sums; else set directly
+      if (payments && payments.length > 0) {
+        const sums = computePaymentSums(payments);
+        setCampaignKOLs(kols.map(k => ({ ...k, paid: sums[k.id] || 0 })));
+      } else {
       setCampaignKOLs(kols);
+      }
     } catch (error) {
       console.error('Error fetching campaign KOLs:', error);
     } finally {
@@ -150,6 +187,26 @@ const CampaignDetailsPage = () => {
       setAvailableKOLs(kols);
     } catch (error) {
       console.error('Error fetching available KOLs:', error);
+    }
+  };
+
+  const fetchCampaignUpdates = async () => {
+    if (!campaign) return;
+    try {
+      setLoadingUpdates(true);
+      const { data, error } = await supabase
+        .from('campaign_updates')
+        .select('*')
+        .eq('campaign_id', campaign.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setCampaignUpdates(data || []);
+    } catch (error) {
+      console.error('Error fetching campaign updates:', error);
+      setCampaignUpdates([]);
+    } finally {
+      setLoadingUpdates(false);
     }
   };
 
@@ -270,6 +327,7 @@ const CampaignDetailsPage = () => {
         proposal_sent: form.proposal_sent,
         nda_signed: form.nda_signed,
         budget_type: form.budget_type,
+        outline: form.outline,
       });
       // Handle allocations
       // Delete marked allocations
@@ -323,18 +381,344 @@ const CampaignDetailsPage = () => {
   // Remove all style={{ width: ... }}, minWidth, maxWidth from TableHead and TableCell
   // Set tableLayout to 'auto' or remove it from <Table>
 
-  const [editingNotes, setEditingNotes] = useState<{ [kolId: string]: string }>({});
   const [editingNotesId, setEditingNotesId] = useState<string | null>(null);
+  const [editingNotes, setEditingNotes] = useState<{ [key: string]: string }>({});
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+  const [editingBudget, setEditingBudget] = useState<{ [key: string]: string }>({});
+  const [editingWalletId, setEditingWalletId] = useState<string | null>(null);
+  const [editingWallet, setEditingWallet] = useState<{ [key: string]: string }>({});
+  const [editingPaidId, setEditingPaidId] = useState<string | null>(null);
+  const [editingPaid, setEditingPaid] = useState<{ [key: string]: string | number | null }>({});
 
   const handleNotesChange = (kolId: string, value: string) => {
-    setEditingNotes((prev) => ({ ...prev, [kolId]: value }));
+    setEditingNotes(prev => ({ ...prev, [kolId]: value }));
   };
+
+  const handleBudgetChange = (kolId: string, value: string) => {
+    setEditingBudget(prev => ({ ...prev, [kolId]: value }));
+  };
+
+  const handleWalletChange = (kolId: string, value: string) => {
+    setEditingWallet(prev => ({ ...prev, [kolId]: value }));
+  };
+
   const handleNotesSave = async (kolId: string) => {
-    const value = editingNotes[kolId];
-    if (value !== undefined) {
-      await CampaignKOLService.updateCampaignKOL(kolId, { notes: value });
-      setCampaignKOLs(prev => prev.map(kol => kol.id === kolId ? { ...kol, notes: value } : kol));
+    const notes = editingNotes[kolId];
+    try {
+      await CampaignKOLService.updateCampaignKOL(kolId, { notes });
+      setCampaignKOLs(prev => prev.map(kol => kol.id === kolId ? { ...kol, notes } : kol));
       setEditingNotesId(null);
+    } catch (err) {
+      console.error('Error updating notes:', err);
+    }
+  };
+
+  const handleBudgetSave = async (kolId: string) => {
+    const budget = editingBudget[kolId];
+    try {
+      await CampaignKOLService.updateCampaignKOL(kolId, { allocated_budget: budget ? parseFloat(budget) : null });
+      setCampaignKOLs(prev => prev.map(kol => kol.id === kolId ? { ...kol, allocated_budget: budget ? parseFloat(budget) : null } : kol));
+      setEditingBudgetId(null);
+    } catch (err) {
+      console.error('Error updating budget:', err);
+    }
+  };
+
+  const handleWalletSave = async (kolId: string) => {
+    const wallet = editingWallet[kolId];
+    try {
+      await CampaignKOLService.updateCampaignKOL(kolId, { wallet });
+      setCampaignKOLs(prev => prev.map(kol => kol.id === kolId ? { ...kol, wallet } : kol));
+      setEditingWalletId(null);
+    } catch (err) {
+      console.error('Error updating wallet:', err);
+    }
+  };
+
+  const handleUpdateKOLBudgetType = async (kolId: string, budgetType: string) => {
+    try {
+      await CampaignKOLService.updateCampaignKOL(kolId, { budget_type: budgetType as 'Token' | 'Fiat' | 'WL' | null });
+      setCampaignKOLs(prev => prev.map(kol => kol.id === kolId ? { ...kol, budget_type: budgetType as 'Token' | 'Fiat' | 'WL' | null } : kol));
+    } catch (err) {
+      console.error('Error updating budget type:', err);
+    }
+  };
+
+  const handleUpdateKOLPaid = async (kolId: string, paidUsd: number | null) => {
+    try {
+      await CampaignKOLService.updateCampaignKOL(kolId, { paid: paidUsd });
+      setCampaignKOLs(prev => prev.map(kol => kol.id === kolId ? { ...kol, paid: paidUsd } : kol));
+    } catch (err) {
+      console.error('Error updating paid amount:', err);
+    }
+  };
+
+  // Helper: compute sums per campaign_kol_id
+  const computePaymentSums = (items: any[]) => {
+    const sums: Record<string, number> = {};
+    for (const p of items || []) {
+      const key = p.campaign_kol_id;
+      const amt = Number(p.amount) || 0;
+      sums[key] = (sums[key] || 0) + amt;
+    }
+    return sums;
+  };
+
+  // Payment functions
+  const fetchPayments = async () => {
+    if (!id) return;
+    setLoadingPayments(true);
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('campaign_id', id)
+        .order('payment_date', { ascending: false });
+      
+      if (error) throw error;
+      const list = data || [];
+      setPayments(list);
+      // Recompute paid amounts on KOLs from payments
+      const sums = computePaymentSums(list);
+      setCampaignKOLs(prev => prev.map(k => ({ ...k, paid: sums[k.id] || 0 })));
+    } catch (err) {
+      console.error('Error fetching payments:', err);
+      toast({ title: "Error", description: "Failed to fetch payments.", variant: "destructive" });
+    } finally {
+      setLoadingPayments(false);
+    }
+  };
+
+  const handleAddPayment = async () => {
+    if (!id || !newPaymentData.campaign_kol_id || newPaymentData.amount <= 0) {
+      toast({ title: "Error", description: "Please fill in all required fields.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .insert({
+          campaign_id: id,
+          campaign_kol_id: newPaymentData.campaign_kol_id,
+          amount: newPaymentData.amount,
+          payment_date: newPaymentData.payment_date,
+          payment_method: newPaymentData.payment_method,
+          content_id: newPaymentData.content_id === 'none' ? null : newPaymentData.content_id || null,
+          transaction_id: newPaymentData.transaction_id || null,
+          notes: newPaymentData.notes || null
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setPayments(prev => [data, ...prev]);
+      
+      // Update the KOL's paid amount in the campaign_kols table
+      const currentKol = campaignKOLs.find(kol => kol.id === newPaymentData.campaign_kol_id);
+      const currentPaid = currentKol?.paid || 0;
+      const newPaid = currentPaid + newPaymentData.amount;
+      
+      await supabase
+        .from('campaign_kols')
+        .update({ paid: newPaid })
+        .eq('id', newPaymentData.campaign_kol_id);
+
+      setCampaignKOLs(prev => prev.map(kol => 
+        kol.id === newPaymentData.campaign_kol_id ? { ...kol, paid: newPaid } : kol
+      ));
+
+      setNewPaymentData({
+        campaign_kol_id: '',
+        amount: 0,
+        payment_date: '',
+        payment_method: 'Token',
+        content_id: 'none',
+        transaction_id: '',
+        notes: ''
+      });
+      setIsAddingPayment(false);
+      toast({ title: "Success", description: "Payment recorded successfully." });
+    } catch (err) {
+      console.error('Error adding payment:', err);
+      toast({ title: "Error", description: "Failed to record payment.", variant: "destructive" });
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    try {
+      const paymentToDelete = payments.find(p => p.id === paymentId);
+      if (!paymentToDelete) return;
+
+      const { error } = await supabase
+        .from('payments')
+        .delete()
+        .eq('id', paymentId);
+
+      if (error) throw error;
+
+      // Update the KOL's paid amount in the campaign_kols table
+      const currentKol = campaignKOLs.find(kol => kol.id === paymentToDelete.campaign_kol_id);
+      const currentPaid = currentKol?.paid || 0;
+      const newPaid = Math.max(0, currentPaid - paymentToDelete.amount);
+      
+      await supabase
+        .from('campaign_kols')
+        .update({ paid: newPaid })
+        .eq('id', paymentToDelete.campaign_kol_id);
+
+      setCampaignKOLs(prev => prev.map(kol => 
+        kol.id === paymentToDelete.campaign_kol_id ? { ...kol, paid: newPaid } : kol
+      ));
+
+      setPayments(prev => prev.filter(p => p.id !== paymentId));
+      toast({ title: "Success", description: "Payment deleted successfully." });
+    } catch (err) {
+      console.error('Error deleting payment:', err);
+      toast({ title: "Error", description: "Failed to delete payment.", variant: "destructive" });
+    }
+  };
+
+  const handleEditPayment = (payment: any) => {
+    setEditingPayment(payment);
+    setNewPaymentData({
+      campaign_kol_id: payment.campaign_kol_id,
+      amount: payment.amount,
+      payment_date: payment.payment_date,
+      payment_method: payment.payment_method,
+      content_id: payment.content_id || 'none',
+      transaction_id: payment.transaction_id || '',
+      notes: payment.notes || ''
+    });
+    setIsEditingPayment(true);
+  };
+
+  const handleUpdatePayment = async () => {
+    if (!editingPayment) return;
+
+    try {
+      const oldAmount = editingPayment.amount;
+      const newAmount = newPaymentData.amount;
+
+      // Update the payment
+      const { error } = await supabase
+        .from('payments')
+        .update({
+          campaign_kol_id: newPaymentData.campaign_kol_id,
+          amount: newAmount,
+          payment_date: newPaymentData.payment_date,
+          payment_method: newPaymentData.payment_method,
+          content_id: newPaymentData.content_id === 'none' ? null : newPaymentData.content_id,
+          transaction_id: newPaymentData.transaction_id || null,
+          notes: newPaymentData.notes || null
+        })
+        .eq('id', editingPayment.id);
+
+      if (error) throw error;
+
+      // Update the KOL's paid amount in the campaign_kols table
+      const currentKol = campaignKOLs.find(kol => kol.id === newPaymentData.campaign_kol_id);
+      const currentPaid = currentKol?.paid || 0;
+      const newPaid = currentPaid - oldAmount + newAmount;
+      
+      await supabase
+        .from('campaign_kols')
+        .update({ paid: newPaid })
+        .eq('id', newPaymentData.campaign_kol_id);
+
+      // Update local state
+      setCampaignKOLs(prev => prev.map(kol => 
+        kol.id === newPaymentData.campaign_kol_id ? { ...kol, paid: newPaid } : kol
+      ));
+
+      setPayments(prev => prev.map(p => 
+        p.id === editingPayment.id ? {
+          ...p,
+          campaign_kol_id: newPaymentData.campaign_kol_id,
+          amount: newAmount,
+          payment_date: newPaymentData.payment_date,
+          payment_method: newPaymentData.payment_method,
+          content_id: newPaymentData.content_id === 'none' ? null : newPaymentData.content_id,
+          transaction_id: newPaymentData.transaction_id || null,
+          notes: newPaymentData.notes || null
+        } : p
+      ));
+
+      // Reset form
+      setNewPaymentData({
+        campaign_kol_id: '',
+        amount: 0,
+        payment_date: '',
+        payment_method: 'Token',
+        content_id: 'none',
+        transaction_id: '',
+        notes: ''
+      });
+      setIsEditingPayment(false);
+      setEditingPayment(null);
+      toast({ title: "Success", description: "Payment updated successfully." });
+    } catch (err) {
+      console.error('Error updating payment:', err);
+      toast({ title: "Error", description: "Failed to update payment.", variant: "destructive" });
+    }
+  };
+
+  // Bulk payment functions
+  const handleSelectAllPayments = () => {
+    const filteredPayments = payments.filter(payment => {
+      const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
+      const search = paymentsSearchTerm.toLowerCase();
+      return (
+        !search ||
+        (kol?.master_kol?.name?.toLowerCase().includes(search)) ||
+        (payment.payment_method?.toLowerCase().includes(search)) ||
+        (payment.notes?.toLowerCase().includes(search))
+      );
+    });
+    
+    if (filteredPayments.every(payment => selectedPayments.includes(payment.id))) {
+      setSelectedPayments(prev => prev.filter(id => !filteredPayments.some(p => p.id === id)));
+    } else {
+      setSelectedPayments(prev => Array.from(new Set([...prev, ...filteredPayments.map(p => p.id)])));
+    }
+  };
+
+  const handleBulkPaymentMethodChange = async () => {
+    if (selectedPayments.length === 0 || !bulkPaymentMethod) return;
+    
+    try {
+      // Update all selected payments with the new payment method
+      await Promise.all(selectedPayments.map(paymentId => 
+        supabase.from('payments').update({ payment_method: bulkPaymentMethod }).eq('id', paymentId)
+      ));
+
+      // Update local state
+      setPayments(prev => prev.map(payment => 
+        selectedPayments.includes(payment.id) ? { ...payment, payment_method: bulkPaymentMethod } : payment
+      ));
+
+      setSelectedPayments([]);
+      setBulkPaymentMethod('');
+      toast({ title: "Success", description: "Payment methods updated successfully." });
+    } catch (err) {
+      console.error('Error updating payment methods:', err);
+      toast({ title: "Error", description: "Failed to update payment methods.", variant: "destructive" });
+    }
+  };
+
+  const handleBulkDeletePayments = async () => {
+    if (selectedPayments.length === 0) return;
+    
+    try {
+      // Delete all selected payments
+      await Promise.all(selectedPayments.map(paymentId => handleDeletePayment(paymentId)));
+      
+      setSelectedPayments([]);
+      toast({ title: "Success", description: `${selectedPayments.length} payment(s) deleted successfully.` });
+    } catch (err) {
+      console.error('Error deleting payments:', err);
+      toast({ title: "Error", description: "Failed to delete some payments.", variant: "destructive" });
     }
   };
 
@@ -366,6 +750,15 @@ const CampaignDetailsPage = () => {
   const [isAddContentsDialogOpen, setIsAddContentsDialogOpen] = useState(false);
   const { toast } = useToast();
 
+  // Campaign updates state
+  const [isAddUpdateDialogOpen, setIsAddUpdateDialogOpen] = useState(false);
+  const [updateText, setUpdateText] = useState('');
+  const [isAddingUpdate, setIsAddingUpdate] = useState(false);
+  const [campaignUpdates, setCampaignUpdates] = useState<any[]>([]);
+  const [loadingUpdates, setLoadingUpdates] = useState(false);
+  const [currentUpdateIndex, setCurrentUpdateIndex] = useState(0);
+  const [isDeleteUpdateDialogOpen, setIsDeleteUpdateDialogOpen] = useState(false);
+
   // 1. Add state for Add Content form
   const [addContentData, setAddContentData] = useState({
     campaign_kols_id: '',
@@ -378,6 +771,7 @@ const CampaignDetailsPage = () => {
     likes: '',
     retweets: '',
     comments: '',
+    bookmarks: '',
   });
 
   const contentStatusOptions = [
@@ -398,16 +792,16 @@ const CampaignDetailsPage = () => {
   const [contents, setContents] = useState<any[]>([]);
   const [loadingContents, setLoadingContents] = useState(false);
 
-  // 2. Fetch contents for all campaignKOLs when campaignKOLs change
+  // 2. Fetch contents for campaign when campaign changes
   useEffect(() => {
     const fetchContents = async () => {
+      if (!id) return;
       setLoadingContents(true);
       try {
-        // Optionally, you can fetch all contents for the campaign here
-        // or leave as is for initial load only
         const { data, error } = await supabase
           .from('contents')
-          .select('*');
+          .select('*')
+          .eq('campaign_id', id);
         if (error) throw error;
         setContents(data || []);
       } catch (err) {
@@ -418,7 +812,7 @@ const CampaignDetailsPage = () => {
       }
     };
     fetchContents();
-  }, []); // Only on mount
+  }, [id]); // When campaign changes
 
   const [contentsSearchTerm, setContentsSearchTerm] = useState('');
   const [bulkContentStatus, setBulkContentStatus] = useState('');
@@ -493,18 +887,18 @@ const CampaignDetailsPage = () => {
   // 5. Render editable cell
   const renderEditableContentCell = (value: any, field: string, content: any) => {
     const isEditing = editingContentCell?.contentId === content.id && editingContentCell?.field === field;
-    const textFields = ["content_link", "activation_date", "impressions", "likes", "retweets", "comments"];
-    const numberFields = ["impressions", "likes", "retweets", "comments"];
+    const textFields = ["content_link", "activation_date", "impressions", "likes", "retweets", "comments", "bookmarks"];
+    const numberFields = ["impressions", "likes", "retweets", "comments", "bookmarks"];
     const selectFields = ["platform", "type", "status", "campaign_kols_id"];
 
     // Always-editable select fields with requested styling
     if (selectFields.includes(field)) {
-      let options: string[] = [];
+        let options: string[] = [];
       let getColorClass = () => '';
       if (field === 'platform') {
         options = fieldOptions.platforms;
       } else if (field === 'type') {
-        options = fieldOptions.contentTypes;
+        options = fieldOptions.deliverables;
         getColorClass = () => value ? getContentTypeColor(value) : 'bg-gray-100 text-gray-800';
       } else if (field === 'status') {
         options = contentStatusOptions.map(o => o.value);
@@ -512,7 +906,7 @@ const CampaignDetailsPage = () => {
       } else if (field === 'campaign_kols_id') {
         options = campaignKOLs.map(k => k.id);
       }
-      return (
+        return (
         <Select value={value || ''} onValueChange={async v => {
           setEditingContentCell({ contentId: content.id, field });
           setEditingContentValue(v);
@@ -533,24 +927,24 @@ const CampaignDetailsPage = () => {
                 <span className="font-bold">{campaignKOLs.find(k => k.id === value)?.master_kol?.name || value}</span>
               ) : value || '-'}
             </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {options.map(option => (
-              <SelectItem key={option} value={option}>
-                {field === 'platform' ? (
-                  <span className="flex items-center gap-1">{getPlatformIcon(option)}</span>
+            </SelectTrigger>
+            <SelectContent>
+              {options.map(option => (
+                <SelectItem key={option} value={option}>
+                  {field === 'platform' ? (
+                    <span className="flex items-center gap-1">{getPlatformIcon(option)}</span>
                 ) : field === 'type' ? (
                   <span>{option}</span>
                 ) : field === 'status' ? (
                   <span>{contentStatusOptions.find(o => o.value === option)?.label || option}</span>
-                ) : field === 'campaign_kols_id' ? (
+                  ) : field === 'campaign_kols_id' ? (
                   <span className="font-bold">{campaignKOLs.find(k => k.id === option)?.master_kol?.name || option}</span>
-                ) : option}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      );
+                  ) : option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
     }
 
     // Content Link: show as blue link, editable on double-click
@@ -570,24 +964,24 @@ const CampaignDetailsPage = () => {
             autoFocus
           />
         );
-      }
-      return (
-        <div
-          className="cursor-pointer w-full h-full flex items-center px-1 py-1"
+        }
+        return (
+          <div
+            className="cursor-pointer w-full h-full flex items-center px-1 py-1"
           onDoubleClick={() => {
             setEditingContentCell({ contentId: content.id, field });
             setEditingContentValue(value);
           }}
-          title="Double-click to edit"
-        >
+            title="Double-click to edit"
+          >
           {value ? (
             <a href={value} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline" onClick={e => e.stopPropagation()}>
               <span>{value}</span>
             </a>
           ) : '-'}
-        </div>
-      );
-    }
+          </div>
+        );
+      }
 
     // Activation Date: always show as date picker
     if (field === "activation_date") {
@@ -670,6 +1064,8 @@ const CampaignDetailsPage = () => {
   // Add at the top of the component, after other useState declarations:
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [contentToDelete, setContentToDelete] = useState<any | null>(null);
+  const [showPaymentDeleteDialog, setShowPaymentDeleteDialog] = useState(false);
+  const [paymentToDelete, setPaymentToDelete] = useState<any | null>(null);
 
   if (loading) {
     return (
@@ -751,6 +1147,18 @@ const CampaignDetailsPage = () => {
 
   const budgetTypeOptions = ["Token", "Fiat", "WL"];
 
+  const nextUpdate = () => {
+    setCurrentUpdateIndex((prev) => 
+      prev === campaignUpdates.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  const prevUpdate = () => {
+    setCurrentUpdateIndex((prev) => 
+      prev === 0 ? campaignUpdates.length - 1 : prev - 1
+    );
+  };
+
   return (
     <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
       <div className="w-full">
@@ -766,10 +1174,11 @@ const CampaignDetailsPage = () => {
           </div>
           
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+                            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="information">Information</TabsTrigger>
               <TabsTrigger value="kols">KOLs</TabsTrigger>
               <TabsTrigger value="contents">Contents</TabsTrigger>
+                  <TabsTrigger value="payments">Payments</TabsTrigger>
             </TabsList>
             
             <TabsContent value="information" className="mt-4">
@@ -778,7 +1187,12 @@ const CampaignDetailsPage = () => {
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-100 p-2 rounded-lg"><Megaphone className="h-6 w-6 text-gray-600" /></div>
                   {editMode ? (
-                    <Input className="text-2xl font-bold text-gray-900" value={form?.name || ""} onChange={e => handleChange("name", e.target.value)} />
+                      <Input 
+                        className="text-2xl font-bold text-gray-900 auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]" 
+                        style={{ borderColor: '#e5e7eb' }}
+                        value={form?.name || ""} 
+                        onChange={e => handleChange("name", e.target.value)} 
+                      />
                   ) : (
                     <h2 className="text-2xl font-bold text-gray-900">{campaign.name}</h2>
                   )}
@@ -787,8 +1201,291 @@ const CampaignDetailsPage = () => {
                   <Button variant="outline" size="sm" onClick={handleEdit}>Edit</Button>
                 )}
               </CardHeader>
-              <CardContent className="pt-6 space-y-6 flex-1 flex flex-col">
+                <CardContent className="pt-6">
+                  {/* Information Tab Toggle */}
+                  <div className="mb-4">
+                    <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+                      <div
+                        onClick={() => setInformationViewMode('overview')}
+                        className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${informationViewMode === 'overview' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                      >
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        Overview
+                      </div>
+                      <div
+                        onClick={() => setInformationViewMode('metrics')}
+                        className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${informationViewMode === 'metrics' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                      >
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        Metrics
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Overview Tab */}
+                  {informationViewMode === 'overview' && (
+                    <div className="space-y-6">
+                                {!editMode && (
+                  <div className="flex items-center justify-between">
+                    {/* Campaign Updates Carousel */}
+                    <div className="flex-1 max-w-md">
+                      <div className="text-sm font-medium text-gray-700 mb-2">Recent Updates</div>
+                      {loadingUpdates ? (
+                        <div className="flex items-center gap-2">
+                          {/* Left Arrow Skeleton */}
+                          <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse"></div>
+                          
+                          {/* Update Card Skeleton */}
+                          <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg p-3 min-h-[80px]">
+                            <div className="space-y-2">
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-3/4" />
+                              <Skeleton className="h-3 w-1/2" />
+                            </div>
+                          </div>
+                          
+                          {/* Right Arrow Skeleton */}
+                          <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse"></div>
+                        </div>
+                      ) : campaignUpdates.length === 0 ? (
+                        <div className="text-sm text-gray-500 italic">No updates yet</div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            {/* Left Arrow */}
+                            {campaignUpdates.length > 1 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 bg-white hover:bg-gray-50 border border-gray-200 rounded-full flex-shrink-0"
+                                onClick={prevUpdate}
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                              </Button>
+                            )}
+                            
+                            {/* Update Card */}
+                            <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg p-3 min-h-[80px] relative">
+                              <div className="text-sm text-gray-900 mb-1">
+                                {campaignUpdates[currentUpdateIndex]?.update_text}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {campaignUpdates[currentUpdateIndex] && new Date(campaignUpdates[currentUpdateIndex].created_at).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </div>
+                              {/* Delete Button */}
+                              <Dialog open={isDeleteUpdateDialogOpen} onOpenChange={setIsDeleteUpdateDialogOpen}>
+                                <DialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="absolute bottom-2 right-2 h-6 w-6 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-md">
+                                  <DialogHeader>
+                                    <DialogTitle>Confirm Delete</DialogTitle>
+                                  </DialogHeader>
+                                  <div className="text-sm text-gray-600 mt-2 mb-2">
+                                    Are you sure you want to delete this update?
+                                  </div>
+                                  <DialogFooter>
+                                    <Button variant="outline" onClick={() => setIsDeleteUpdateDialogOpen(false)}>Cancel</Button>
+                                    <Button 
+                                      variant="destructive" 
+                                      onClick={async () => {
+                                        try {
+                                          const updateToDelete = campaignUpdates[currentUpdateIndex];
+                                          await supabase
+                                            .from('campaign_updates')
+                                            .delete()
+                                            .eq('id', updateToDelete.id);
+                                          
+                                          toast({
+                                            title: 'Update deleted',
+                                            description: 'Campaign update deleted successfully.',
+                                            duration: 3000,
+                                          });
+                                          
+                                          // Refresh campaign updates
+                                          fetchCampaignUpdates();
+                                          setCurrentUpdateIndex(0);
+                                          setIsDeleteUpdateDialogOpen(false);
+                                        } catch (error) {
+                                          console.error('Error deleting update:', error);
+                                          toast({
+                                            title: 'Error',
+                                            description: 'Failed to delete update.',
+                                            variant: 'destructive',
+                                            duration: 3000,
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      Delete Update
+                                    </Button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                            </div>
+                            
+                            {/* Right Arrow */}
+                            {campaignUpdates.length > 1 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 bg-white hover:bg-gray-50 border border-gray-200 rounded-full flex-shrink-0"
+                                onClick={nextUpdate}
+                              >
+                                <ChevronRight className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          
+                          {/* Dots Indicator */}
+                          {campaignUpdates.length > 1 && (
+                            <div className="flex justify-center mt-2 space-x-1">
+                              {campaignUpdates.map((_, index) => (
+                                <button
+                                  key={index}
+                                  className={`w-2 h-2 rounded-full transition-colors ${
+                                    index === currentUpdateIndex 
+                                      ? 'bg-[#3e8692]' 
+                                      : 'bg-gray-300 hover:bg-gray-400'
+                                  }`}
+                                  onClick={() => setCurrentUpdateIndex(index)}
+                                />
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Update Counter */}
+                          {campaignUpdates.length > 1 && (
+                            <div className="text-xs text-gray-500 text-center mt-1">
+                              {currentUpdateIndex + 1} of {campaignUpdates.length}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {/* Add Update Button */}
+                    <div className="flex-shrink-0">
+                      <Dialog open={isAddUpdateDialogOpen} onOpenChange={setIsAddUpdateDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button size="sm" style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Update
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Add Campaign Update</DialogTitle>
+                          </DialogHeader>
+                          <div className="grid gap-4 py-4">
+                            <div className="grid gap-2">
+                              <Label htmlFor="update-text">Update</Label>
+                              <Textarea
+                                id="update-text"
+                                placeholder="Enter the latest update for this campaign..."
+                                value={updateText}
+                                onChange={(e) => setUpdateText(e.target.value)}
+                                className="auth-input min-h-[120px]"
+                                rows={4}
+                              />
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <Button variant="outline" onClick={() => {
+                              setIsAddUpdateDialogOpen(false);
+                              setUpdateText('');
+                            }}>
+                              Cancel
+                            </Button>
+                            <Button
+                              style={{ backgroundColor: '#3e8692', color: 'white' }}
+                              disabled={!updateText.trim() || isAddingUpdate}
+                              onClick={async () => {
+                                if (!updateText.trim()) return;
+                                
+                                setIsAddingUpdate(true);
+                                try {
+                                  const { error } = await supabase
+                                    .from('campaign_updates')
+                                    .insert({
+                                      campaign_id: campaign.id,
+                                      update_text: updateText.trim()
+                                    });
+                                  
+                                  if (error) {
+                                    console.error('Error adding update:', error);
+                                    toast({
+                                      title: 'Error',
+                                      description: 'Failed to add update.',
+                                      variant: 'destructive',
+                                      duration: 3000,
+                                    });
+                                    return;
+                                  }
+                                  
+                                  toast({
+                                    title: 'Update added',
+                                    description: 'Campaign update added successfully.',
+                                    duration: 3000,
+                                  });
+                                  
+                                  setIsAddUpdateDialogOpen(false);
+                                  setUpdateText('');
+                                  // Refresh campaign updates
+                                  fetchCampaignUpdates();
+                                  setCurrentUpdateIndex(0);
+                                } catch (err) {
+                                  console.error('Unexpected error:', err);
+                                  toast({
+                                    title: 'Error',
+                                    description: 'Failed to add update.',
+                                    variant: 'destructive',
+                                    duration: 3000,
+                                  });
+                                } finally {
+                                  setIsAddingUpdate(false);
+                                }
+                              }}
+                            >
+                              {isAddingUpdate ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                              ) : (
+                                'Add Update'
+                              )}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-4 text-sm flex-1">
+                  <div className="col-span-2">
+                    <div className="text-gray-500 mb-1">Outline</div>
+                    {editMode ? (
+                      <Textarea
+                        value={form?.outline || ""}
+                        onChange={e => handleChange("outline", e.target.value)}
+                        className="auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                        style={{ borderColor: '#e5e7eb' }}
+                        placeholder="Enter campaign outline..."
+                        rows={3}
+                      />
+                    ) : (
+                      <div className="font-medium whitespace-pre-line">{campaign.outline || '-'}</div>
+                    )}
+                  </div>
                   <div>
                     <div className="text-gray-500 mb-1">Start Date</div>
                     {editMode ? (
@@ -852,7 +1549,7 @@ const CampaignDetailsPage = () => {
                     <div className="text-gray-500 mb-1">Region</div>
                     {editMode ? (
                       <Select value={form?.region || ""} onValueChange={value => handleChange("region", value)}>
-                        <SelectTrigger className="w-full focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]" style={{ borderColor: '#e5e7eb' }}>
+                        <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -868,7 +1565,7 @@ const CampaignDetailsPage = () => {
                     <div className="text-gray-500 mb-1">Status</div>
                     {editMode ? (
                       <Select value={form?.status || ""} onValueChange={value => handleChange("status", value)}>
-                        <SelectTrigger className="w-full focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]" style={{ borderColor: '#e5e7eb' }}>
+                        <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -933,7 +1630,7 @@ const CampaignDetailsPage = () => {
                     <div className="text-gray-500 mb-1">Manager</div>
                     {editMode ? (
                       <Select value={form?.manager || ""} onValueChange={value => handleChange("manager", value)}>
-                        <SelectTrigger className="w-full focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]" style={{ borderColor: '#e5e7eb' }}>
+                        <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
                           <SelectValue placeholder="Select manager" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1024,7 +1721,7 @@ const CampaignDetailsPage = () => {
                       <Textarea
                         value={form?.description || ""}
                         onChange={e => handleChange("description", e.target.value)}
-                        className="focus-visible:ring-2 focus-visible:ring-[#3e8692] focus-visible:border-[#3e8692]"
+                        className="auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
                         style={{ borderColor: '#e5e7eb' }}
                       />
                     ) : (
@@ -1041,7 +1738,7 @@ const CampaignDetailsPage = () => {
                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
                         <Input
                           type="number"
-                          className="pl-6 w-full focus-visible:ring-2 focus-visible:ring-[#3e8692] focus-visible:border-[#3e8692] text-sm"
+                          className="pl-6 w-full auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] text-sm"
                           style={{ borderColor: '#e5e7eb' }}
                           value={form?.total_budget || ""}
                           onChange={e => handleChange("total_budget", e.target.value)}
@@ -1067,7 +1764,7 @@ const CampaignDetailsPage = () => {
                             updated[idx].region = value;
                             setAllocations(updated);
                           }}>
-                            <SelectTrigger className="w-32 auth-input">
+                            <SelectTrigger className="w-32 focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
                               <SelectValue placeholder="Select region" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1125,7 +1822,7 @@ const CampaignDetailsPage = () => {
                       <div className="flex flex-wrap gap-2">
                         {campaign.budget_allocations.map((alloc: any) => (
                           <span key={alloc.id} className="text-xs px-3 py-1 rounded-md bg-gray-100 text-gray-700">
-                            {alloc.region}: {CampaignService.formatCurrency(alloc.allocated_budget)}
+                            {alloc.region === 'apac' ? 'APAC' : alloc.region === 'global' ? 'Global' : alloc.region}: {CampaignService.formatCurrency(alloc.allocated_budget)}
                           </span>
                         ))}
                       </div>
@@ -1138,6 +1835,299 @@ const CampaignDetailsPage = () => {
                     <Button variant="outline" onClick={handleCancel} disabled={saving}>Cancel</Button>
                   </div>
                 )}
+                    </div>
+                  )}
+
+                  {/* Metrics Tab */}
+                  {informationViewMode === 'metrics' && (
+                    <div className="space-y-6">
+                      {/* Metrics Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {/* Total Impressions */}
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(() => {
+                                const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                                return totalImpressions.toLocaleString();
+                              })()}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">Total Impressions</p>
+                          </CardContent>
+                        </Card>
+
+                        {/* Total Comments */}
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(() => {
+                                const totalComments = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
+                                return totalComments.toLocaleString();
+                              })()}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">Total Comments</p>
+                          </CardContent>
+                        </Card>
+
+                        {/* Total Retweets */}
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(() => {
+                                const totalRetweets = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
+                                return totalRetweets.toLocaleString();
+                              })()}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">Total Retweets</p>
+                          </CardContent>
+                        </Card>
+
+                        {/* Total Likes */}
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(() => {
+                                const totalLikes = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
+                                return totalLikes.toLocaleString();
+                              })()}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">Total Likes</p>
+                          </CardContent>
+                        </Card>
+
+                        {/* Total Engagements */}
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(() => {
+                                const totalEngagements = contents.reduce((sum, content) => 
+                                  sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
+                                return totalEngagements.toLocaleString();
+                              })()}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">Total Engagements</p>
+                          </CardContent>
+                        </Card>
+
+                        {/* Total Bookmarks */}
+                        <Card className="hover:shadow-lg transition-shadow duration-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                                <BarChart3 className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {(() => {
+                                const totalBookmarks = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
+                                return totalBookmarks.toLocaleString();
+                              })()}
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">Total Bookmarks</p>
+                          </CardContent>
+                        </Card>
+                      </div>
+
+                      {/* Average Engagement Rate */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader>
+                          <CardTitle className="text-lg font-semibold text-gray-900">Average Engagement Rate</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-3xl font-bold text-gray-900">
+                            {(() => {
+                              const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                              const totalEngagements = contents.reduce((sum, content) => 
+                                sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
+                              const engagementRate = totalImpressions > 0 ? (totalEngagements / totalImpressions) * 100 : 0;
+                              return `${engagementRate.toFixed(2)}%`;
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Engagement Rate = (Likes + Comments + Retweets + Bookmarks) / Impressions</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Charts Section */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Impressions Over Time */}
+                        <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                          <div className="flex items-center justify-between mb-6">
+                            <div>
+                              <h3 className="text-xl font-bold text-gray-900">Impressions Over Time</h3>
+                              <p className="text-sm text-gray-500 mt-1">Impressions trend by activation date</p>
+                            </div>
+                          </div>
+                          <div className="h-96">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart 
+                                data={(() => {
+                                  // Group content by activation date and sum impressions
+                                  const impressionsByDate = contents.reduce((acc, content) => {
+                                    if (content.activation_date) {
+                                      const date = content.activation_date;
+                                      if (!acc[date]) {
+                                        acc[date] = 0;
+                                      }
+                                      acc[date] += content.impressions || 0;
+                                    }
+                                    return acc;
+                                  }, {} as Record<string, number>);
+
+                                  return Object.entries(impressionsByDate)
+                                    .map(([date, impressions]) => ({
+                                      date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                                      impressions
+                                    }))
+                                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                                })()}
+                                margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                <XAxis 
+                                  dataKey="date" 
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                                />
+                                <YAxis 
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tick={{ fontSize: 12, fill: '#64748b' }}
+                                />
+                                <Tooltip 
+                                  contentStyle={{
+                                    backgroundColor: 'white',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                    fontSize: '14px'
+                                  }}
+                                  formatter={(value: number) => [value.toLocaleString(), 'Impressions']}
+                                  labelFormatter={(label: string) => `Date: ${label}`}
+                                />
+                                <Line 
+                                  type="monotone" 
+                                  dataKey="impressions" 
+                                  stroke="#3e8692" 
+                                  strokeWidth={3} 
+                                  dot={{ fill: '#3e8692', strokeWidth: 2, r: 4 }} 
+                                />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+
+                        {/* Impressions by Platform */}
+                        <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                          <div className="flex items-center justify-between mb-6">
+                            <div>
+                              <h3 className="text-xl font-bold text-gray-900">Impressions by Platform</h3>
+                              <p className="text-sm text-gray-500 mt-1">Impressions distribution across platforms</p>
+                            </div>
+                          </div>
+                          <div className="h-96">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={(() => {
+                                    const platformImpressions = contents.reduce((acc, content) => {
+                                      const platform = content.platform || 'Unknown';
+                                      if (!acc[platform]) {
+                                        acc[platform] = 0;
+                                      }
+                                      acc[platform] += content.impressions || 0;
+                                      return acc;
+                                    }, {} as Record<string, number>);
+
+                                    return Object.entries(platformImpressions).map(([platform, impressions]) => ({
+                                      platform,
+                                      impressions
+                                    }));
+                                  })()}
+                                  cx="50%"
+                                  cy="50%"
+                                  outerRadius={120}
+                                  dataKey="impressions"
+                                  label={({ platform, impressions }) => `${platform}: ${impressions.toLocaleString()}`}
+                                >
+                                  {(() => {
+                                    const platformImpressions = contents.reduce((acc, content) => {
+                                      const platform = content.platform || 'Unknown';
+                                      if (!acc[platform]) {
+                                        acc[platform] = 0;
+                                      }
+                                      acc[platform] += content.impressions || 0;
+                                      return acc;
+                                    }, {} as Record<string, number>);
+
+                                    const colors = ['#3e8692', '#2d6470', '#1e4a5a', '#0f2d3a'];
+                                    return Object.entries(platformImpressions).map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                                    ));
+                                  })()}
+                                </Pie>
+                                <Tooltip 
+                                  contentStyle={{
+                                    backgroundColor: 'white',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                    fontSize: '14px'
+                                  }}
+                                  formatter={(value: number, name: string, props: any) => {
+                                    const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                                    const percentage = totalImpressions > 0 ? ((value / totalImpressions) * 100).toFixed(1) : 0;
+                                    return [
+                                      `${value.toLocaleString()} (${percentage}%)`, 
+                                      'Impressions'
+                                    ];
+                                  }}
+                                  labelFormatter={(label: string) => `Platform: ${label}`}
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
               </CardContent>
             </div>
           </TabsContent>
@@ -1151,7 +2141,8 @@ const CampaignDetailsPage = () => {
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900">Campaign KOLs</h2>
                 </div>
-                <div className="flex items-center">
+                <div className="flex items-center gap-3">
+                  
                   <Dialog open={isAddKOLsDialogOpen} onOpenChange={setIsAddKOLsDialogOpen}>
                     <DialogTrigger asChild>
                       <Button size="sm" style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
@@ -1175,7 +2166,7 @@ const CampaignDetailsPage = () => {
                            </SelectTrigger>
                            <SelectContent>
                              {CampaignKOLService.getHHStatusOptions().map((status) => (
-                               <SelectItem key={status} value={status}>{status}</SelectItem>
+                               <SelectItem key={status} value={status || ''}>{status}</SelectItem>
                              ))}
                            </SelectContent>
                          </Select>
@@ -1262,7 +2253,7 @@ const CampaignDetailsPage = () => {
                                          <div className="font-medium">{kol.name}</div>
                                          {kol.link && (
                                            <a 
-                                             href={kol.link} 
+                                             href={kol.link || ''} 
                                              target="_blank" 
                                              rel="noopener noreferrer"
                                              className="text-sm text-blue-600 hover:text-blue-800"
@@ -1334,6 +2325,325 @@ const CampaignDetailsPage = () => {
                 </div>
               </CardHeader>
               <CardContent className="pt-6">
+                {/* View Toggle */}
+                <div className="mb-4">
+                  <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+                    <div
+                      onClick={() => setKolViewMode('overview')}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'overview' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                    >
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      Overview
+                    </div>
+                    <div
+                      onClick={() => setKolViewMode('table')}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'table' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                    >
+                      <TableIcon className="h-4 w-4 mr-2" />
+                      Table
+                    </div>
+                    <div
+                      onClick={() => setKolViewMode('graph')}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'graph' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                    >
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Cards
+                    </div>
+                  </div>
+                </div>
+                {/* Overview View */}
+                {kolViewMode === 'overview' && (
+                  <div className="space-y-6">
+                    {/* Overview Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {/* Total KOLs in Campaign */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <Users className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {campaignKOLs.length}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Total KOLs in Campaign</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Average Followers per KOL */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <BarChart3 className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                              if (campaignKOLs.length > 0) {
+                                const totalFollowers = campaignKOLs.reduce((sum, kol) => sum + (kol.master_kol.followers || 0), 0);
+                                const average = Math.round(totalFollowers / campaignKOLs.length);
+                                console.log('Average followers calculation:', {
+                                  totalKOLs: campaignKOLs.length,
+                                  totalFollowers,
+                                  average,
+                                  formatted: KOLService.formatFollowers(average),
+                                  sampleData: campaignKOLs.slice(0, 3).map(kol => ({
+                                    name: kol.master_kol.name,
+                                    followers: kol.master_kol.followers
+                                  }))
+                                });
+                                return KOLService.formatFollowers(average);
+                              }
+                              return '0';
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Average Followers per KOL</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Distribution of KOLs by Platform */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <Globe className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                              const platforms = new Set();
+                              campaignKOLs.forEach(kol => {
+                                if (kol.master_kol.platform) {
+                                  kol.master_kol.platform.forEach((p: string) => platforms.add(p));
+                                }
+                              });
+                              return platforms.size;
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Unique Platforms</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* KOLs by Region */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <Flag className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                              const regions = new Set();
+                              campaignKOLs.forEach(kol => {
+                                if (kol.master_kol.region) {
+                                  regions.add(kol.master_kol.region);
+                                }
+                              });
+                              return regions.size;
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Regions Represented</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Charts Section */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Platform Distribution Chart */}
+                      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h3 className="text-xl font-bold text-gray-900">Distribution of KOLs by Platform</h3>
+                            <p className="text-sm text-gray-500 mt-1">Breakdown of KOLs by social platform</p>
+                          </div>
+                        </div>
+                        <div className="h-96">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart 
+                              data={(() => {
+                                const platformCounts: { [key: string]: number } = {};
+                                campaignKOLs.forEach(kol => {
+                                  if (kol.master_kol.platform) {
+                                    kol.master_kol.platform.forEach((platform: string) => {
+                                      platformCounts[platform] = (platformCounts[platform] || 0) + 1;
+                                    });
+                                  }
+                                });
+                                return Object.entries(platformCounts).map(([platform, count]) => ({
+                                  platform,
+                                  count
+                                }));
+                              })()}
+                              margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                              <XAxis 
+                                dataKey="platform" 
+                                axisLine={false}
+                                tickLine={false}
+                                tick={({ x, y, payload }) => (
+                                  <g transform={`translate(${x},${y})`}>
+                                    {payload.value === 'X' ? (
+                                      <text x={0} y={0} dy={16} textAnchor="middle" fill="#000000" fontSize={14} fontWeight="bold">
+                                        𝕏
+                                      </text>
+                                    ) : payload.value === 'Telegram' ? (
+                                      <g>
+                                        <svg x={-8} y={0} width={16} height={16} viewBox="0 0 24 24" fill="#0088cc">
+                                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                                        </svg>
+                                      </g>
+                                    ) : (
+                                      <text x={0} y={0} dy={16} textAnchor="middle" fill="#64748b" fontSize={12}>
+                                        {payload.value}
+                                      </text>
+                                    )}
+                                  </g>
+                                )}
+                              />
+                              <YAxis 
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 12, fill: '#64748b' }}
+                              />
+                              <Tooltip 
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '12px',
+                                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                  fontSize: '14px'
+                                }}
+                                formatter={(value: number) => [value, 'Count']}
+                                labelFormatter={(label: string) => `Platform: ${label}`}
+                              />
+                              <Bar 
+                                dataKey="count" 
+                                radius={[8, 8, 0, 0]}
+                              >
+                                {(() => {
+                                  const platformCounts: { [key: string]: number } = {};
+                                  campaignKOLs.forEach(kol => {
+                                    if (kol.master_kol.platform) {
+                                      kol.master_kol.platform.forEach((platform: string) => {
+                                        platformCounts[platform] = (platformCounts[platform] || 0) + 1;
+                                      });
+                                    }
+                                  });
+                                  return Object.entries(platformCounts).map(([platform, count], index) => {
+                                    let color = '#3e8692'; // Default teal
+                                    if (platform === 'X') color = '#000000'; // Black for X
+                                    else if (platform === 'Telegram') color = '#0088cc'; // Telegram blue
+                                    
+                                    return (
+                                      <Cell key={`cell-${platform}`} fill={color} />
+                                    );
+                                  });
+                                })()}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      {/* Region Distribution Chart */}
+                      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h3 className="text-xl font-bold text-gray-900">KOLs by Region</h3>
+                            <p className="text-sm text-gray-500 mt-1">Geographic distribution of KOLs</p>
+                          </div>
+                        </div>
+                        <div className="h-96">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart 
+                              data={(() => {
+                                const regionCounts: { [key: string]: number } = {};
+                                campaignKOLs.forEach(kol => {
+                                  if (kol.master_kol.region) {
+                                    regionCounts[kol.master_kol.region] = (regionCounts[kol.master_kol.region] || 0) + 1;
+                                  }
+                                });
+                                return Object.entries(regionCounts).map(([region, count]) => ({
+                                  region,
+                                  count
+                                }));
+                              })()}
+                              margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                              <XAxis 
+                                dataKey="region" 
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                              />
+                              <YAxis 
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 12, fill: '#64748b' }}
+                              />
+                              <Tooltip 
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '12px',
+                                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                  fontSize: '14px'
+                                }}
+                                formatter={(value: number) => [value, 'Count']}
+                                labelFormatter={(label: string) => `Region: ${label}`}
+                              />
+                              <Bar 
+                                dataKey="count" 
+                                radius={[8, 8, 0, 0]}
+                              >
+                                {(() => {
+                                  const regionCounts: { [key: string]: number } = {};
+                                  campaignKOLs.forEach(kol => {
+                                    if (kol.master_kol.region) {
+                                      regionCounts[kol.master_kol.region] = (regionCounts[kol.master_kol.region] || 0) + 1;
+                                    }
+                                  });
+                                  return Object.entries(regionCounts).map(([region, count], index) => {
+                                    let color = '#3e8692'; // Default teal
+                                    if (region === 'China') color = '#de2910'; // Chinese red
+                                    else if (region === 'Korea') color = '#cd2e3a'; // Korean red
+                                    else if (region === 'Vietnam') color = '#da251d'; // Vietnamese red
+                                    else if (region === 'Turkey') color = '#e30a17'; // Turkish red
+                                    else if (region === 'Philippines') color = '#0038a8'; // Philippine blue
+                                    else if (region === 'Brazil') color = '#009c3b'; // Brazilian green
+                                    else if (region === 'Global') color = '#1e40af'; // Global blue
+                                    else if (region === 'SEA') color = '#059669'; // Southeast Asia green
+                                    
+                                    return (
+                                      <Cell key={`cell-${region}`} fill={color} />
+                                    );
+                                  });
+                                })()}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Table View */}
+                {kolViewMode === 'table' && (
+                  <>
                 <div className="flex items-center justify-between mb-2">
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -1345,11 +2655,38 @@ const CampaignDetailsPage = () => {
                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-2 mb-4 mt-6">
-                  <span className="text-sm font-medium">{selectedKOLs.length} selected:</span>
+                <div className="mb-6 mt-6">
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                      <span className="text-sm font-semibold text-gray-700">{selectedKOLs.length} KOL{selectedKOLs.length !== 1 ? 's' : ''} selected</span>
                 </div>
-                <div className="mt-2 mb-4" style={{ maxWidth: 200 }}>
-                  <Select value={bulkStatus} onValueChange={(value: string) => setBulkStatus(value as CampaignKOLWithDetails['hh_status'] | "") }>
+                    <div className="h-4 w-px bg-gray-300"></div>
+                    <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
+                  </div>
+                  <div className="mb-4 pb-4 border-b border-gray-200">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                      onClick={() => {
+                        const allIds = filteredKOLs.map(kol => kol.id);
+                        if (allIds.every(id => selectedKOLs.includes(id))) {
+                          setSelectedKOLs(prev => prev.filter(id => !allIds.includes(id)));
+                        } else {
+                          setSelectedKOLs(prev => Array.from(new Set([...prev, ...allIds])));
+                        }
+                      }}
+                    >
+                      {filteredKOLs.length > 0 && filteredKOLs.every(kol => selectedKOLs.includes(kol.id)) ? 'Deselect All' : 'Select All'}
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <div className="min-w-[120px] flex flex-col items-end justify-end">
+                      <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Status</span>
+                      <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                        <Select value={bulkStatus || ''} onValueChange={(value: string) => setBulkStatus(value as CampaignKOLWithDetails['hh_status'] | "") }>
                     <SelectTrigger 
                       className={`border-none shadow-none bg-transparent w-full h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none ${bulkStatus ? getStatusColor(bulkStatus) : ''}`}
                       style={{ outline: 'none', boxShadow: 'none', minWidth: 90 }}
@@ -1358,15 +2695,19 @@ const CampaignDetailsPage = () => {
                     </SelectTrigger>
                     <SelectContent>
                       {CampaignKOLService.getHHStatusOptions().map((status) => (
-                        <SelectItem key={status} value={status}>{status}</SelectItem>
+                                  <SelectItem key={status} value={status || ''}>{status}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex gap-2 mb-2">
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-3">
                   <Button
                     size="sm"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
+                          className="bg-[#3e8692] hover:bg-[#2d6b75] text-white border-0 shadow-sm"
                     disabled={selectedKOLs.length === 0 || !bulkStatus}
                     onClick={async () => {
                       if (!bulkStatus || selectedKOLs.length === 0) return;
@@ -1379,31 +2720,22 @@ const CampaignDetailsPage = () => {
                   </Button>
                   <Button
                     size="sm"
-                    variant="destructive"
+                          className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm"
                     disabled={selectedKOLs.length === 0}
                     onClick={() => {
                       setKolsToDelete(selectedKOLs);
-                      setShowKOLDeleteDialog(true);
+                                setShowKOLDeleteDialog(true);
                     }}
                   >
                     Delete
                   </Button>
                 </div>
-                <div className="mt-6 mb-6">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const allIds = filteredKOLs.map(kol => kol.id);
-                      if (allIds.every(id => selectedKOLs.includes(id))) {
-                        setSelectedKOLs(prev => prev.filter(id => !allIds.includes(id)));
-                      } else {
-                        setSelectedKOLs(prev => Array.from(new Set([...prev, ...allIds])));
-                      }
-                    }}
-                  >
-                    {filteredKOLs.length > 0 && filteredKOLs.every(kol => selectedKOLs.includes(kol.id)) ? 'Deselect All' : 'Select All'}
-                  </Button>
+                      <div className="text-xs text-gray-500 font-medium">
+                        {selectedKOLs.length > 0 && `${selectedKOLs.length} item${selectedKOLs.length !== 1 ? 's' : ''} selected`}
+                      </div>
+                    </div>
+                  </div>
+                  </div>
                 </div>
                 
                 {loadingKOLs ? (
@@ -1473,6 +2805,10 @@ const CampaignDetailsPage = () => {
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Followers</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Region</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Status</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Budget</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Budget Type</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Paid (USD)</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Wallet</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Notes</TableHead>
                           <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
                         </TableRow>
@@ -1532,18 +2868,18 @@ const CampaignDetailsPage = () => {
                                   ))}
                                 </div>
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden group`}>
-                                <div className="truncate flex items-center">
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                                   {campaignKOL.master_kol.followers ? KOLService.formatFollowers(campaignKOL.master_kol.followers) : '-'}
-                                </div>
                               </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                <div className="flex items-center gap-1">
-                                  <span>{getRegionIcon(campaignKOL.master_kol.region || '').flag}</span>
-                                  <span className="text-xs font-medium">{campaignKOL.master_kol.region || '-'}</span>
+                                    {campaignKOL.master_kol.region ? (
+                                      <div className="flex items-center space-x-1">
+                                        <span>{getRegionIcon(campaignKOL.master_kol.region).flag}</span>
+                                        <span>{campaignKOL.master_kol.region}</span>
                                 </div>
+                                    ) : '-'}
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden align-middle`}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                                 <Select 
                                   value={campaignKOL.hh_status} 
                                   onValueChange={(value) => handleUpdateKOLStatus(campaignKOL.id, value as any)}
@@ -1556,12 +2892,70 @@ const CampaignDetailsPage = () => {
                                   </SelectTrigger>
                                   <SelectContent>
                                     {CampaignKOLService.getHHStatusOptions().map((status) => (
-                                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                                          <SelectItem key={status} value={status || ''}>{status}</SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 align-middle overflow-hidden`} style={{ width: '30%' }}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    {editingBudgetId === campaignKOL.id ? (
+                                      <Input
+                                        type="number"
+                                        value={editingBudget[campaignKOL.id] ?? campaignKOL.allocated_budget ?? ''}
+                                        onChange={e => handleBudgetChange(campaignKOL.id, e.target.value)}
+                                        onBlur={() => handleBudgetSave(campaignKOL.id)}
+                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleBudgetSave(campaignKOL.id); }}}
+                                        className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none min-h-[32px]"
+                                        style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <div className="truncate min-h-[32px] cursor-pointer flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.allocated_budget} onClick={() => { setEditingBudgetId(campaignKOL.id); setEditingBudget((prev) => ({ ...prev, [campaignKOL.id]: campaignKOL.allocated_budget ?? '' })); }}>
+                                        {campaignKOL.allocated_budget ? `$${campaignKOL.allocated_budget}` : <span className="text-gray-400 italic">Click to add</span>}
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <Select 
+                                      value={campaignKOL.budget_type || ''} 
+                                      onValueChange={(value) => handleUpdateKOLBudgetType(campaignKOL.id, value)}
+                                    >
+                                      <SelectTrigger 
+                                        className="border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
+                                        style={{ outline: 'none', boxShadow: 'none', minWidth: 90 }}
+                                      >
+                                        <SelectValue placeholder="Select type" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="Token">Token</SelectItem>
+                                        <SelectItem value="Fiat">Fiat</SelectItem>
+                                        <SelectItem value="WL">WL</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <div className="truncate min-h-[32px] flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.paid?.toString()}>
+                                      {campaignKOL.paid != null ? `$${campaignKOL.paid.toLocaleString()}` : <span className="text-gray-400 italic">No payments</span>}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 align-middle overflow-hidden`} style={{ width: '20%' }}>
+                                    {editingWalletId === campaignKOL.id ? (
+                                      <Input
+                                        value={editingWallet[campaignKOL.id] ?? campaignKOL.wallet ?? ''}
+                                        onChange={e => handleWalletChange(campaignKOL.id, e.target.value)}
+                                        onBlur={() => handleWalletSave(campaignKOL.id)}
+                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleWalletSave(campaignKOL.id); }}}
+                                        className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none min-h-[32px]"
+                                        style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <div className="truncate min-h-[32px] cursor-pointer flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.wallet} onClick={() => { setEditingWalletId(campaignKOL.id); setEditingWallet((prev) => ({ ...prev, [campaignKOL.id]: campaignKOL.wallet ?? '' })); }}>
+                                        {campaignKOL.wallet || <span className="text-gray-400 italic">Click to add</span>}
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 align-middle overflow-hidden`} style={{ width: '20%' }}>
                                 {editingNotesId === campaignKOL.id ? (
                                   <Input
                                     value={editingNotes[campaignKOL.id] ?? campaignKOL.notes ?? ''}
@@ -1573,7 +2967,7 @@ const CampaignDetailsPage = () => {
                                     autoFocus
                                   />
                                 ) : (
-                                  <div className="truncate min-h-[32px] cursor-pointer flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.notes} onClick={() => { setEditingNotesId(campaignKOL.id); setEditingNotes((prev) => ({ ...prev, [campaignKOL.id]: campaignKOL.notes ?? '' })); }}>
+                                      <div className="truncate min-h-[32px] cursor-pointer flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.notes || ''} onClick={() => { setEditingNotesId(campaignKOL.id); setEditingNotes((prev) => ({ ...prev, [campaignKOL.id]: campaignKOL.notes ?? '' })); }}>
                                     {campaignKOL.notes || <span className="text-gray-400 italic">Click to add notes</span>}
                                   </div>
                                 )}
@@ -1585,7 +2979,7 @@ const CampaignDetailsPage = () => {
                                     variant="outline" 
                                     onClick={() => {
                                       setKolsToDelete([campaignKOL.id]);
-                                      setShowKOLDeleteDialog(true);
+                                          setShowKOLDeleteDialog(true);
                                     }}
                                   >
                                     <Trash2 className="h-3 w-3" />
@@ -1597,6 +2991,119 @@ const CampaignDetailsPage = () => {
                         })}
                       </TableBody>
                     </Table>
+                      </div>
+                    )}
+                  </>
+                )}
+                
+                {/* Cards View */}
+                {kolViewMode === 'graph' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {campaignKOLs.map((campaignKOL) => (
+                      <Card key={campaignKOL.id} className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-4">
+                          <div className="flex flex-col items-center text-center">
+                            <div className="w-16 h-16 bg-gradient-to-br from-[#3e8692] to-[#2d6470] rounded-full flex items-center justify-center mb-3">
+                              <span className="text-white font-bold text-xl">
+                                {campaignKOL.master_kol.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="mb-2">
+                              <h3 className="font-semibold text-gray-900 text-lg">{campaignKOL.master_kol.name}</h3>
+                              <p className="text-sm text-gray-500">{campaignKOL.master_kol.region || 'No region'}</p>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              {(campaignKOL.master_kol.platform || []).map((platform: string) => (
+                                <span key={platform} className="flex items-center justify-center h-6 w-6" title={platform}>
+                                  {getPlatformIcon(platform)}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {/* Followers */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Followers</span>
+                            <span className="font-medium text-gray-900">
+                              {campaignKOL.master_kol.followers ? KOLService.formatFollowers(campaignKOL.master_kol.followers) : '-'}
+                            </span>
+                          </div>
+
+                          {/* Status */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Status</span>
+                            <Badge className={getStatusColor(campaignKOL.hh_status)}>
+                              {campaignKOL.hh_status || 'No status'}
+                            </Badge>
+                          </div>
+
+                          {/* Allocated Budget */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Allocated Budget</span>
+                            <span className="font-medium text-gray-900">
+                              {campaignKOL.allocated_budget ? `$${campaignKOL.allocated_budget}` : '-'}
+                            </span>
+                          </div>
+
+                          {/* Budget Type */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Budget Type</span>
+                            <span className="font-medium text-gray-900">
+                              {campaignKOL.budget_type || '-'}
+                            </span>
+                          </div>
+
+                          {/* Paid Amount */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Paid</span>
+                            <span className="font-medium text-gray-900">
+                              {campaignKOL.paid ? `$${campaignKOL.paid}` : '-'}
+                            </span>
+                          </div>
+
+                          {/* Content Count */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-600">Content</span>
+                            <span className="font-medium text-gray-900">
+                              {contents.filter(content => content.campaign_kols_id === campaignKOL.id).length}
+                            </span>
+                          </div>
+
+                          {/* Wallet */}
+                          {campaignKOL.wallet && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-600">Wallet</span>
+                              <span className="font-medium text-gray-900 truncate" title={campaignKOL.wallet}>
+                                {campaignKOL.wallet}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Notes */}
+                          {campaignKOL.notes && (
+                            <div className="pt-2 border-t border-gray-100">
+                              <span className="text-sm text-gray-600">Notes</span>
+                              <p className="text-sm text-gray-900 mt-1 line-clamp-2">{campaignKOL.notes}</p>
+                            </div>
+                          )}
+
+                          {/* Profile Link */}
+                          {campaignKOL.master_kol.link && (
+                            <div className="pt-2 border-t border-gray-100">
+                              <a 
+                                href={campaignKOL.master_kol.link} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 hover:text-blue-800 underline"
+                              >
+                                View Profile →
+                              </a>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 )}
               </CardContent>
@@ -1615,7 +3122,7 @@ const CampaignDetailsPage = () => {
                     <DialogTrigger asChild>
                       <Button size="sm" style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
                         <Plus className="h-4 w-4 mr-2" />
-                        Add Contents
+                        Add Content
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-2xl">
@@ -1712,7 +3219,7 @@ const CampaignDetailsPage = () => {
                                 <SelectValue placeholder="Select Type" />
                               </SelectTrigger>
                               <SelectContent>
-                                {fieldOptions.contentTypes.map(type => (
+                                {fieldOptions.deliverables.map(type => (
                                   <SelectItem key={type} value={type}>{type}</SelectItem>
                                 ))}
                               </SelectContent>
@@ -1769,6 +3276,7 @@ const CampaignDetailsPage = () => {
                             />
                           </div>
                         </div>
+                        <div className="grid grid-cols-2 gap-4">
                         <div className="grid gap-2">
                           <Label>Comments</Label>
                           <Input
@@ -1778,6 +3286,17 @@ const CampaignDetailsPage = () => {
                             onChange={e => setAddContentData(d => ({ ...d, comments: e.target.value }))}
                             className="auth-input"
                           />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label>Bookmarks</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              value={addContentData.bookmarks}
+                              onChange={e => setAddContentData(d => ({ ...d, bookmarks: e.target.value }))}
+                              className="auth-input"
+                            />
+                          </div>
                         </div>
                       </div>
                       <DialogFooter>
@@ -1796,6 +3315,7 @@ const CampaignDetailsPage = () => {
                           onClick={async () => {
                             setIsAddingContent(true);
                             const payload = {
+                              campaign_id: id,
                               campaign_kols_id: addContentData.campaign_kols_id,
                               activation_date: addContentData.activation_date || null,
                               content_link: addContentData.content_link || null,
@@ -1806,6 +3326,7 @@ const CampaignDetailsPage = () => {
                               likes: addContentData.likes ? Number(addContentData.likes) : null,
                               retweets: addContentData.retweets ? Number(addContentData.retweets) : null,
                               comments: addContentData.comments ? Number(addContentData.comments) : null,
+                              bookmarks: addContentData.bookmarks ? Number(addContentData.bookmarks) : null,
                             };
                             console.log('Add Content payload:', payload);
                             try {
@@ -1826,6 +3347,7 @@ const CampaignDetailsPage = () => {
                                 likes: '',
                                 retweets: '',
                                 comments: '',
+                                bookmarks: '',
                               });
                               // Immediately update the table with the new content
                               const arr: any[] = (data ?? []) as any[];
@@ -1847,7 +3369,8 @@ const CampaignDetailsPage = () => {
                                 try {
                                   const { data, error } = await supabase
                                     .from('contents')
-                                    .select('*');
+                                    .select('*')
+                                    .eq('campaign_id', id);
                                   if (error) throw error;
                                   setContents(data || []);
                                 } catch (error) {
@@ -1887,10 +3410,30 @@ const CampaignDetailsPage = () => {
                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-2 mb-4 mt-6">
-                  <span className="text-sm font-medium">{selectedContents.length} selected:</span>
+                <div className="mb-6 mt-6">
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                        <span className="text-sm font-semibold text-gray-700">{selectedContents.length} Content{selectedContents.length !== 1 ? 's' : ''} selected</span>
                 </div>
-                <div className="mt-2 mb-4" style={{ maxWidth: 200 }}>
+                      <div className="h-4 w-px bg-gray-300"></div>
+                      <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
+                    </div>
+                    <div className="mb-4 pb-4 border-b border-gray-200">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                        onClick={handleSelectAllContents}
+                      >
+                        {filteredContents.length > 0 && filteredContents.every(content => selectedContents.includes(content.id)) ? 'Deselect All' : 'Select All'}
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="min-w-[120px] flex flex-col items-end justify-end">
+                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Status</span>
+                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                   <Select value={bulkContentStatus} onValueChange={v => setBulkContentStatus(v)}>
                     <SelectTrigger className={`border-none shadow-none bg-transparent w-full h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none ${bulkContentStatus ? '' : ''}`}
                       style={{ outline: 'none', boxShadow: 'none', minWidth: 90 }}>
@@ -1903,10 +3446,14 @@ const CampaignDetailsPage = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex gap-2 mb-2">
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex gap-3">
                   <Button
                     size="sm"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
+                            className="bg-[#3e8692] hover:bg-[#2d6b75] text-white border-0 shadow-sm"
                     disabled={selectedContents.length === 0 || !bulkContentStatus}
                     onClick={handleBulkStatusChange}
                   >
@@ -1914,21 +3461,19 @@ const CampaignDetailsPage = () => {
                   </Button>
                   <Button
                     size="sm"
-                    variant="destructive"
+                            className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm"
                     disabled={selectedContents.length === 0}
-                    onClick={() => setShowBulkDeleteDialog(true)}
+                            onClick={() => setShowBulkDeleteDialog(true)}
                   >
                     Delete
                   </Button>
                 </div>
-                <div className="mt-6 mb-6">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleSelectAllContents}
-                  >
-                    {filteredContents.length > 0 && filteredContents.every(content => selectedContents.includes(content.id)) ? 'Deselect All' : 'Select All'}
-                  </Button>
+                        <div className="text-xs text-gray-500 font-medium">
+                          {selectedContents.length > 0 && `${selectedContents.length} item${selectedContents.length !== 1 ? 's' : ''} selected`}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 {loadingContents ? (
                   <div className="border rounded-lg overflow-hidden">
@@ -1946,6 +3491,7 @@ const CampaignDetailsPage = () => {
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Likes</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Retweets</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Comments</TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Bookmarks</TableHead>
                           <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1982,6 +3528,7 @@ const CampaignDetailsPage = () => {
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Likes</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Retweets</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Comments</TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Bookmarks</TableHead>
                           <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -2048,6 +3595,9 @@ const CampaignDetailsPage = () => {
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                                 {renderEditableContentCell(content.comments, 'comments', content)}
                               </TableCell>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                {renderEditableContentCell(content.bookmarks, 'bookmarks', content)}
+                              </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
                                 <Button size="sm" variant="outline" onClick={() => { setContentToDelete(content); setShowDeleteDialog(true); }}>
                                   <Trash2 className="h-3 w-3" />
@@ -2058,6 +3608,905 @@ const CampaignDetailsPage = () => {
                         })}
                       </TableBody>
                     </Table>
+                  </div>
+                )}
+              </CardContent>
+            </div>
+          </TabsContent>
+
+          {/* Payments Tab */}
+          <TabsContent value="payments" className="mt-4">
+            <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
+              <CardHeader className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="bg-gray-100 p-2 rounded-lg">
+                    <DollarSign className="h-6 w-6 text-gray-600" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900">Payment Management</h2>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Dialog open={isAddingPayment} onOpenChange={setIsAddingPayment}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Record Payment
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+                      <DialogHeader>
+                        <DialogTitle>Record Payment</DialogTitle>
+                      </DialogHeader>
+                      <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
+                        <div className="grid gap-2">
+                          <Label htmlFor="kol-select">KOL</Label>
+                          <Select
+                            value={newPaymentData.campaign_kol_id}
+                            onValueChange={(value) => setNewPaymentData(prev => ({ ...prev, campaign_kol_id: value }))}
+                          >
+                            <SelectTrigger className="auth-input">
+                              <SelectValue placeholder="Select KOL" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {campaignKOLs.map((kol) => (
+                                <SelectItem key={kol.id} value={kol.id}>
+                                  {kol.master_kol.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="amount">Amount (USD)</Label>
+                          <div className="relative w-full">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                            <Input
+                              id="amount"
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9,]*"
+                              className="auth-input pl-6 w-full"
+                              value={newPaymentData.amount ? Number(newPaymentData.amount).toLocaleString('en-US') : ''}
+                              onChange={(e) => {
+                                const raw = e.target.value.replace(/[^0-9]/g, '');
+                                setNewPaymentData(prev => ({ ...prev, amount: parseFloat(raw) || 0 }));
+                              }}
+                              placeholder="Enter amount"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Payment Date</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                                style={{
+                                  borderColor: "#e5e7eb",
+                                  backgroundColor: "white",
+                                  color: newPaymentData.payment_date ? "#111827" : "#9ca3af"
+                                }}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {newPaymentData.payment_date ? newPaymentData.payment_date : "Select payment date"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="!bg-white border shadow-md w-auto p-0 z-50" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={newPaymentData.payment_date ? new Date(newPaymentData.payment_date) : undefined}
+                                onSelect={date => setNewPaymentData(prev => ({
+                                  ...prev,
+                                  payment_date: date ? formatDateLocal(date) : ''
+                                }))}
+                                initialFocus
+                                classNames={{
+                                  day_selected: "text-white hover:text-white focus:text-white",
+                                }}
+                                modifiersStyles={{
+                                  selected: { backgroundColor: "#3e8692" }
+                                }}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="payment-method">Payment Method</Label>
+                          <Select
+                            value={newPaymentData.payment_method}
+                            onValueChange={(value) => setNewPaymentData(prev => ({ ...prev, payment_method: value }))}
+                          >
+                            <SelectTrigger className="auth-input">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Token">Token</SelectItem>
+                              <SelectItem value="Fiat">Fiat</SelectItem>
+                              <SelectItem value="WL">WL</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="content">Content (Optional)</Label>
+                          <Select
+                            value={newPaymentData.content_id}
+                            onValueChange={(value) => setNewPaymentData(prev => ({ ...prev, content_id: value }))}
+                          >
+                            <SelectTrigger className="auth-input">
+                              <SelectValue placeholder="Select content" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No content linked</SelectItem>
+                              {contents
+                                .filter(content => content.campaign_kols_id === newPaymentData.campaign_kol_id)
+                                .map(content => (
+                                  <SelectItem key={content.id} value={content.id}>
+                                    {content.type || 'Content'} - {content.platform || 'Unknown'} 
+                                    {content.activation_date && ` (${new Date(content.activation_date).toLocaleDateString()})`}
+                                  </SelectItem>
+                                ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="transaction-id">Transaction ID (Optional)</Label>
+                          <Input
+                            id="transaction-id"
+                            value={newPaymentData.transaction_id}
+                            onChange={(e) => setNewPaymentData(prev => ({ ...prev, transaction_id: e.target.value }))}
+                            placeholder="Enter transaction ID"
+                            className="auth-input"
+                          />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="notes">Notes (Optional)</Label>
+                          <Textarea
+                            id="notes"
+                            value={newPaymentData.notes}
+                            onChange={(e) => setNewPaymentData(prev => ({ ...prev, notes: e.target.value }))}
+                            placeholder="Add any notes about this payment"
+                            rows={3}
+                            className="auth-input"
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAddingPayment(false)}>
+                          Cancel
+                        </Button>
+                        <Button 
+                          onClick={handleAddPayment} 
+                          disabled={!newPaymentData.campaign_kol_id || newPaymentData.amount <= 0}
+                          style={{ backgroundColor: '#3e8692', color: 'white' }}
+                          className="hover:opacity-90"
+                        >
+                          Record Payment
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-6">
+                {/* View Toggle */}
+                <div className="mb-4">
+                  <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+                    <div
+                      onClick={() => setPaymentViewMode('table')}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${paymentViewMode === 'table' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                    >
+                      <TableIcon className="h-4 w-4 mr-2" />
+                      Table
+                    </div>
+                    <div
+                      onClick={() => setPaymentViewMode('graph')}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${paymentViewMode === 'graph' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                    >
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      Graph
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Table View */}
+                {paymentViewMode === 'table' && (
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="relative flex-1 max-w-sm">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Search Payments by KOL, method, or notes..."
+                          className="pl-10 auth-input"
+                          value={paymentsSearchTerm}
+                          onChange={e => setPaymentsSearchTerm(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                {/* Bulk Menu */}
+                {selectedPayments.length > 0 && (
+                  <div className="mb-4">
+                    <Card className="border border-gray-200 bg-white">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-medium text-gray-700">
+                              {selectedPayments.length} payments selected
+                            </span>
+                            <span className="text-sm text-gray-500">Bulk Edit Fields</span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSelectAllPayments}
+                            className="h-8 px-3 text-xs"
+                          >
+                            {(() => {
+                              const filteredPayments = payments.filter(payment => {
+                                const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
+                                const search = paymentsSearchTerm.toLowerCase();
+                                return (
+                                  !search ||
+                                  (kol?.master_kol?.name?.toLowerCase().includes(search)) ||
+                                  (payment.payment_method?.toLowerCase().includes(search)) ||
+                                  (payment.notes?.toLowerCase().includes(search))
+                                );
+                              });
+                              const allSelected = filteredPayments.length > 0 && filteredPayments.every(p => selectedPayments.includes(p.id));
+                              return allSelected ? 'Deselect All' : 'Select All';
+                            })()}
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 max-w-xs">
+                            <Select value={bulkPaymentMethod} onValueChange={v => setBulkPaymentMethod(v)}>
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Select payment method" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Token">Token</SelectItem>
+                                <SelectItem value="Fiat">Fiat</SelectItem>
+                                <SelectItem value="WL">WL</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Button
+                            size="sm"
+                            style={{ backgroundColor: '#3e8692', color: 'white' }}
+                            disabled={selectedPayments.length === 0 || !bulkPaymentMethod}
+                            onClick={handleBulkPaymentMethodChange}
+                            className="h-8 px-3 text-xs"
+                          >
+                            Apply
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            disabled={selectedPayments.length === 0}
+                            onClick={handleBulkDeletePayments}
+                            className="h-8 px-3 text-xs"
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+                {loadingPayments ? (
+                  <div className="space-y-4">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="flex items-center space-x-4">
+                        <Skeleton className="h-12 w-12 rounded-full" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-[250px]" />
+                          <Skeleton className="h-4 w-[200px]" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {payments.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <DollarSign className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <p className="text-lg font-medium mb-2">No payments recorded</p>
+                        <p className="text-sm text-gray-400">Payments recorded for this campaign will appear here.</p>
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg overflow-auto" style={{ minHeight: '400px', position: 'relative' }}>
+                        <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+                          <TableHeader>
+                            <TableRow className="bg-gray-50 border-b border-gray-200">
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">KOL</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Amount</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Payment Date</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Method</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Notes</TableHead>
+                              <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody className="bg-white">
+                            {payments
+                              .filter(payment => {
+                                const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
+                                const search = paymentsSearchTerm.toLowerCase();
+                                return (
+                                  !search ||
+                                  (kol?.master_kol?.name?.toLowerCase().includes(search)) ||
+                                  (payment.payment_method?.toLowerCase().includes(search)) ||
+                                  (payment.notes?.toLowerCase().includes(search))
+                                );
+                              })
+                              .map((payment, index) => (
+                              <TableRow key={payment.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
+                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center text-gray-600 group`} style={{ verticalAlign: 'middle' }}>
+                                  <div className="flex items-center justify-center w-full h-full">
+                                    {selectedPayments.includes(payment.id) ? (
+                                      <Checkbox
+                                        checked={true}
+                                        onCheckedChange={checked => {
+                                          setSelectedPayments(prev => checked ? [...prev, payment.id] : prev.filter(id => id !== payment.id));
+                                        }}
+                                        className="mx-auto"
+                                      />
+                                    ) : (
+                                      <>
+                                        <span className="block group-hover:hidden w-full text-center">{index + 1}</span>
+                                        <span className="hidden group-hover:flex w-full justify-center">
+                                          <Checkbox
+                                            checked={selectedPayments.includes(payment.id)}
+                                            onCheckedChange={checked => {
+                                              setSelectedPayments(prev => checked ? [...prev, payment.id] : prev.filter(id => id !== payment.id));
+                                            }}
+                                            className="mx-auto"
+                                          />
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-gray-600`} style={{ verticalAlign: 'middle', fontWeight: 'bold' }}>
+                                  <div className="flex items-center w-full h-full">
+                                    {campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.name || 'Unknown KOL'}
+                                  </div>
+                                </TableCell>
+                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                  ${payment.amount.toLocaleString()}
+                                </TableCell>
+                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                  {new Date(payment.payment_date).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                  {payment.payment_method}
+                                </TableCell>
+                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                  {payment.content_id ? (
+                                    (() => {
+                                      const content = contents.find(c => c.id === payment.content_id);
+                                      return content ? 
+                                        `${content.type || 'Content'} - ${content.platform || 'Unknown'}` : 
+                                        'Content not found';
+                                    })()
+                                  ) : (
+                                    <span className="text-gray-400 italic">No content linked</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                  {payment.notes || '-'}
+                                </TableCell>
+                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
+                                  <div className="flex items-center gap-2">
+                                    <Button size="sm" variant="outline" onClick={() => handleEditPayment(payment)}>
+                                      <Edit className="h-3 w-3" />
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={() => { setPaymentToDelete(payment); setShowPaymentDeleteDialog(true); }}>
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                )}
+                  </>
+                )}
+                
+                {/* Graph View */}
+                {paymentViewMode === 'graph' && (
+                  <div className="space-y-8">
+                    {/* Budget Overview Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total Budget</div>
+                          <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+                        </div>
+                        <div className="text-3xl font-bold text-gray-900 mb-1">
+                          {CampaignService.formatCurrency(campaign.total_budget)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {campaign.budget_allocations && campaign.budget_allocations.length > 0 
+                            ? `${campaign.budget_allocations.length} regions allocated`
+                            : 'Campaign allocation'
+                          }
+                        </div>
+                      </div>
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-shadow duration-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Payments</div>
+                          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                        </div>
+                        <div className="text-3xl font-bold text-blue-900 mb-1">
+                          {CampaignService.formatCurrency(payments.reduce((sum, payment) => sum + (payment.amount || 0), 0))}
+                        </div>
+                        <div className="text-xs text-blue-600">
+                          {((payments.reduce((sum, payment) => sum + (payment.amount || 0), 0) / campaign.total_budget) * 100).toFixed(1)}% of total budget
+                        </div>
+                      </div>
+                      <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-6 rounded-xl border border-emerald-100 shadow-sm hover:shadow-md transition-shadow duration-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="text-sm font-semibold text-emerald-700 uppercase tracking-wide">Remaining</div>
+                          <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                        </div>
+                        <div className="text-3xl font-bold text-emerald-900 mb-1">
+                          {CampaignService.formatCurrency(campaign.total_budget - payments.reduce((sum, payment) => sum + (payment.amount || 0), 0))}
+                        </div>
+                        <div className="text-xs text-emerald-600">
+                          {(((campaign.total_budget - payments.reduce((sum, payment) => sum + (payment.amount || 0), 0)) / campaign.total_budget) * 100).toFixed(1)}% available
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Regional Budget Summary */}
+                    {campaign.budget_allocations && campaign.budget_allocations.length > 0 && (
+                      <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Regional Budget Summary</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {campaign.budget_allocations.map((alloc: any) => {
+                            // Helper function to map regions to APAC/Global
+                            const mapRegionToCategory = (region: string) => {
+                              const apacRegions = ['China', 'Korea', 'Vietnam', 'SEA', 'Philippines', 'apac'];
+                              const globalRegions = ['Global', 'global'];
+                              
+                              if (apacRegions.includes(region)) return 'apac';
+                              if (globalRegions.includes(region)) return 'global';
+                              return region; // Keep other regions as is
+                            };
+                            
+                            const kolsAllocated = campaignKOLs
+                              .filter(kol => mapRegionToCategory(kol.master_kol.region) === alloc.region && kol.allocated_budget)
+                              .reduce((sum, kol) => sum + (kol.allocated_budget || 0), 0);
+                            
+                            const actualPayments = payments
+                              .filter(payment => {
+                                const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
+                                return kol && mapRegionToCategory(kol.master_kol.region) === alloc.region;
+                              })
+                              .reduce((sum, payment) => sum + (payment.amount || 0), 0);
+                            
+                            const remaining = alloc.allocated_budget - actualPayments;
+                            const utilization = (actualPayments / alloc.allocated_budget) * 100;
+                            
+                            return (
+                              <div key={alloc.region} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="text-sm font-semibold text-gray-700">
+                                    {alloc.region === 'apac' ? 'APAC' : alloc.region === 'global' ? 'Global' : alloc.region}
+                                  </div>
+                                  <div className="text-xs text-gray-500">{utilization.toFixed(1)}% used</div>
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-gray-600">Regional Budget:</span>
+                                    <span className="font-medium">{CampaignService.formatCurrency(alloc.allocated_budget)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-gray-600">Actual Payments:</span>
+                                    <span className="font-medium text-blue-600">{CampaignService.formatCurrency(actualPayments)}</span>
+                                  </div>
+                                  <div className="flex justify-between text-xs">
+                                    <span className="text-gray-600">Remaining:</span>
+                                    <span className="font-medium text-emerald-600">{CampaignService.formatCurrency(remaining)}</span>
+                                  </div>
+                                </div>
+                                <div className="mt-3">
+                                  <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div 
+                                      className="bg-[#3e8692] h-2 rounded-full transition-all duration-300" 
+                                      style={{ width: `${Math.min(utilization, 100)}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Budget Overview Chart */}
+                    <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                      <div className="flex items-center justify-between mb-6">
+                        <div>
+                          <h3 className="text-xl font-bold text-gray-900">Budget Overview</h3>
+                          <p className="text-sm text-gray-500 mt-1">Comparison of total budget vs actual payments</p>
+                        </div>
+                        <div className="flex items-center space-x-4 text-xs">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-3 h-3 rounded bg-gray-400"></div>
+                            <span className="text-gray-600 font-medium">Total</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-3 h-3 rounded bg-[#3e8692]"></div>
+                            <span className="text-gray-600 font-medium">Payments</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-3 h-3 rounded bg-emerald-500"></div>
+                            <span className="text-gray-600 font-medium">Remaining</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="h-96">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={[
+                              {
+                                name: 'Budget Breakdown',
+                                total: campaign.total_budget,
+                                allocated: payments.reduce((sum, payment) => sum + (payment.amount || 0), 0),
+                                remaining: campaign.total_budget - payments.reduce((sum, payment) => sum + (payment.amount || 0), 0)
+                              }
+                            ]}
+                            margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
+                            barCategoryGap="40%"
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                            <XAxis 
+                              dataKey="name" 
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fontSize: 14, fill: '#64748b', fontWeight: 500 }}
+                            />
+                            <YAxis 
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fontSize: 12, fill: '#64748b' }}
+                              tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                            />
+                            <Tooltip 
+                              contentStyle={{
+                                backgroundColor: 'white',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '12px',
+                                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                fontSize: '14px'
+                              }}
+                              formatter={(value: number, name: string) => [
+                                `$${value.toLocaleString()}`, 
+                                name === 'total' ? 'Total Budget' : name === 'allocated' ? 'Allocated Budget' : 'Remaining Budget'
+                              ]}
+                              labelFormatter={() => ''}
+                            />
+                            <Bar dataKey="total" fill="#9ca3af" name="total" radius={[8, 8, 8, 8]} />
+                            <Bar dataKey="allocated" fill="#3e8692" name="allocated" radius={[8, 8, 8, 8]} />
+                            <Bar dataKey="remaining" fill="#10b981" name="remaining" radius={[8, 8, 8, 8]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* Regional Budget Allocation */}
+                    {campaign.budget_allocations && campaign.budget_allocations.length > 0 && (
+                      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h3 className="text-xl font-bold text-gray-900">Regional Budget Allocation</h3>
+                            <p className="text-sm text-gray-500 mt-1">Budget distribution across regions</p>
+                          </div>
+                          <div className="flex items-center space-x-4 text-xs">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-3 h-3 rounded bg-gray-400"></div>
+                              <span className="text-gray-600 font-medium">Regional Budget</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-3 h-3 rounded bg-[#3e8692]"></div>
+                              <span className="text-gray-600 font-medium">Payments Made</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-3 h-3 rounded bg-emerald-500"></div>
+                              <span className="text-gray-600 font-medium">Remaining</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="h-96">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={(() => {
+                                // Helper function to map regions to APAC/Global
+                                const mapRegionToCategory = (region: string) => {
+                                  const apacRegions = ['China', 'Korea', 'Vietnam', 'SEA', 'Philippines', 'apac'];
+                                  const globalRegions = ['Global', 'global'];
+                                  
+                                  if (apacRegions.includes(region)) return 'apac';
+                                  if (globalRegions.includes(region)) return 'global';
+                                  return region; // Keep other regions as is
+                                };
+                                
+                                // Get all unique regions from both budget allocations and payments
+                                const budgetRegions = (campaign.budget_allocations || []).map((alloc: any) => alloc.region);
+                                const paymentRegions = payments
+                                  .map(payment => {
+                                    const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
+                                    return mapRegionToCategory(kol?.master_kol.region || '');
+                                  })
+                                  .filter(Boolean);
+                                const allRegions = Array.from(new Set([...budgetRegions, ...paymentRegions]));
+                                
+                                return allRegions.map(region => {
+                                  const budgetAlloc = (campaign.budget_allocations || []).find((alloc: any) => alloc.region === region);
+                                  const regionPayments = payments
+                                    .filter(payment => {
+                                      const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
+                                      const mappedRegion = mapRegionToCategory(kol?.master_kol.region || '');
+                                      return kol && mappedRegion === region;
+                                    })
+                                    .reduce((sum, payment) => sum + (payment.amount || 0), 0);
+                                  
+                                  return {
+                                    region: region,
+                                    allocated: budgetAlloc ? budgetAlloc.allocated_budget : 0,
+                                    payments: regionPayments,
+                                    remaining: (budgetAlloc ? budgetAlloc.allocated_budget : 0) - regionPayments
+                                  };
+                                });
+                              })()}
+                              margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                              <XAxis 
+                                dataKey="region" 
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                                tickFormatter={(value) => value === 'apac' ? 'APAC' : value === 'global' ? 'Global' : value}
+                              />
+                              <YAxis 
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 12, fill: '#64748b' }}
+                                tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                              />
+                              <Tooltip 
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '12px',
+                                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                  fontSize: '14px'
+                                }}
+                                formatter={(value: number, name: string) => [
+                                  `$${value.toLocaleString()}`, 
+                                  name === 'allocated' ? 'Regional Budget' : name === 'payments' ? 'Payments Made' : 'Remaining'
+                                ]}
+                                labelFormatter={(label: string) => {
+                                  return label === 'apac' ? 'APAC' : label === 'global' ? 'Global' : label;
+                                }}
+                              />
+                              <Bar dataKey="allocated" fill="#9ca3af" name="allocated" radius={[8, 8, 8, 8]} />
+                              <Bar dataKey="payments" fill="#3e8692" name="payments" radius={[8, 8, 8, 8]} />
+                              <Bar dataKey="remaining" fill="#10b981" name="remaining" radius={[8, 8, 8, 8]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Payment Charts Row */}
+                    {payments.length > 0 && (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Payment Methods Distribution */}
+                        <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                          <div className="flex items-center justify-between mb-6">
+                            <div>
+                              <h3 className="text-xl font-bold text-gray-900">Payment Methods Distribution</h3>
+                              <p className="text-sm text-gray-500 mt-1">Breakdown of payments by method</p>
+                            </div>
+                            <div className="flex items-center space-x-4 text-xs">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-3 h-3 rounded bg-[#8b5cf6]"></div>
+                                <span className="text-gray-600 font-medium">Token</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-3 h-3 rounded bg-[#f59e0b]"></div>
+                                <span className="text-gray-600 font-medium">Fiat</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-3 h-3 rounded bg-[#10b981]"></div>
+                                <span className="text-gray-600 font-medium">WL</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="h-96">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart
+                                data={(() => {
+                                  // Group payments by payment method and sum amounts
+                                  const paymentMethods = payments.reduce((acc, payment) => {
+                                    const method = payment.payment_method || 'Unknown';
+                                    if (!acc[method]) {
+                                      acc[method] = 0;
+                                    }
+                                    acc[method] += payment.amount || 0;
+                                    return acc;
+                                  }, {} as Record<string, number>);
+
+                                  // Convert to array format for chart
+                                  return Object.entries(paymentMethods).map(([method, amount]) => ({
+                                    method: method,
+                                    amount: amount
+                                  }));
+                                })()}
+                                margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                <XAxis 
+                                  dataKey="method" 
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                                />
+                                <YAxis 
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tick={{ fontSize: 12, fill: '#64748b' }}
+                                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                                />
+                                <Tooltip 
+                                  contentStyle={{
+                                    backgroundColor: 'white',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                    fontSize: '14px'
+                                  }}
+                                  formatter={(value: number) => [`$${value.toLocaleString()}`, 'Total Amount']}
+                                  labelFormatter={(label: string) => label}
+                                />
+                                <Bar 
+                                  dataKey="amount" 
+                                  radius={[8, 8, 0, 0]}
+                                >
+                                  {(() => {
+                                    // Group payments by payment method and sum amounts
+                                    const paymentMethods = payments.reduce((acc, payment) => {
+                                      const method = payment.payment_method || 'Unknown';
+                                      if (!acc[method]) {
+                                        acc[method] = 0;
+                                      }
+                                      acc[method] += payment.amount || 0;
+                                      return acc;
+                                    }, {} as Record<string, number>);
+
+                                    // Convert to array format for chart
+                                    const chartData = Object.entries(paymentMethods).map(([method, amount]) => ({
+                                      method: method,
+                                      amount: amount
+                                    }));
+
+                                    return chartData.map((entry, index) => {
+                                      let color = '#8b5cf6'; // Default purple
+                                      if (entry.method === 'Token') color = '#8b5cf6'; // Purple
+                                      else if (entry.method === 'Fiat') color = '#f59e0b'; // Amber
+                                      else if (entry.method === 'WL') color = '#10b981'; // Emerald
+                                      
+                                      return (
+                                        <Cell key={`cell-${index}`} fill={color} />
+                                      );
+                                    });
+                                  })()}
+                                </Bar>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+
+                        {/* Payment Timeline Chart */}
+                        <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                          <div className="flex items-center justify-between mb-6">
+                            <div>
+                              <h3 className="text-xl font-bold text-gray-900">Payment Timeline</h3>
+                              <p className="text-sm text-gray-500 mt-1">Payment amounts over time by method</p>
+                            </div>
+                            <div className="flex items-center space-x-4 text-xs">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-3 h-3 rounded bg-[#8b5cf6]"></div>
+                                <span className="text-gray-600 font-medium">Token</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-3 h-3 rounded bg-[#f59e0b]"></div>
+                                <span className="text-gray-600 font-medium">Fiat</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <div className="w-3 h-3 rounded bg-[#10b981]"></div>
+                                <span className="text-gray-600 font-medium">WL</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="h-96">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart
+                                data={(() => {
+                                  // Group payments by date and payment method
+                                  const paymentsByDate = payments.reduce((acc, payment) => {
+                                    const date = new Date(payment.payment_date).toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric'
+                                    });
+                                    
+                                    if (!acc[date]) {
+                                      acc[date] = {
+                                        date: date,
+                                        Token: 0,
+                                        Fiat: 0,
+                                        WL: 0
+                                      };
+                                    }
+                                    
+                                    const method = payment.payment_method || 'Token';
+                                    acc[date][method] += payment.amount || 0;
+                                    
+                                    return acc;
+                                  }, {} as Record<string, any>);
+
+                                  // Convert to array and sort by date
+                                  return Object.values(paymentsByDate).sort((a: any, b: any) => {
+                                    const dateA = new Date(a.date);
+                                    const dateB = new Date(b.date);
+                                    return dateA.getTime() - dateB.getTime();
+                                  });
+                                })()}
+                                margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                                <XAxis 
+                                  dataKey="date" 
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                                />
+                                <YAxis 
+                                  axisLine={false}
+                                  tickLine={false}
+                                  tick={{ fontSize: 12, fill: '#64748b' }}
+                                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                                />
+                                <Tooltip 
+                                  contentStyle={{
+                                    backgroundColor: 'white',
+                                    border: '1px solid #e2e8f0',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                    fontSize: '14px'
+                                  }}
+                                  formatter={(value: number, name: string) => [`$${value.toLocaleString()}`, name]}
+                                  labelFormatter={(label: string) => `Payment Date: ${label}`}
+                                />
+                                <Line type="monotone" dataKey="Token" stroke="#8b5cf6" strokeWidth={3} dot={{ fill: '#8b5cf6', strokeWidth: 2, r: 4 }} />
+                                <Line type="monotone" dataKey="Fiat" stroke="#f59e0b" strokeWidth={3} dot={{ fill: '#f59e0b', strokeWidth: 2, r: 4 }} />
+                                <Line type="monotone" dataKey="WL" stroke="#10b981" strokeWidth={3} dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -2104,6 +4553,41 @@ const CampaignDetailsPage = () => {
         </DialogContent>
       </Dialog>
       
+      {/* Payment Delete confirmation dialog */}
+      <Dialog open={showPaymentDeleteDialog} onOpenChange={setShowPaymentDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm text-gray-600 mt-2 mb-2">Are you sure you want to delete this payment?</div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPaymentDeleteDialog(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={async () => {
+              setShowPaymentDeleteDialog(false);
+              if (!paymentToDelete) return;
+              const paymentId = paymentToDelete.id;
+              try {
+                await handleDeletePayment(paymentId);
+                toast({
+                  title: 'Payment deleted',
+                  description: 'Payment deleted successfully.',
+                  variant: 'destructive',
+                  duration: 3000,
+                });
+              } catch (error) {
+                toast({
+                  title: 'Error',
+                  description: 'Failed to delete payment.',
+                  variant: 'destructive',
+                  duration: 3000,
+                });
+              }
+              setPaymentToDelete(null);
+            }}>Delete Payment</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       {/* KOL Delete confirmation dialog */}
       <Dialog open={showKOLDeleteDialog} onOpenChange={setShowKOLDeleteDialog}>
         <DialogContent>
@@ -2122,12 +4606,12 @@ const CampaignDetailsPage = () => {
               try {
                 // Delete all selected KOLs
                 await Promise.all(kolsToDelete.map(kolId => handleDeleteKOL(kolId)));
-                toast({
-                  title: 'KOL(s) deleted',
-                  description: `${kolsToDelete.length} KOL${kolsToDelete.length !== 1 ? 's' : ''} deleted successfully.`,
-                  variant: 'destructive',
-                  duration: 3000,
-                });
+              toast({
+                title: 'KOL(s) deleted',
+                description: `${kolsToDelete.length} KOL${kolsToDelete.length !== 1 ? 's' : ''} deleted successfully.`,
+                variant: 'destructive',
+                duration: 3000,
+              });
                 // Clear selections
                 setSelectedKOLs([]);
                 setKolsToDelete([]);
@@ -2179,6 +4663,164 @@ const CampaignDetailsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Payment Dialog */}
+      <Dialog open={isEditingPayment} onOpenChange={setIsEditingPayment}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Edit Payment</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-kol">KOL</Label>
+              <Select
+                value={newPaymentData.campaign_kol_id}
+                onValueChange={(value) => setNewPaymentData(prev => ({ ...prev, campaign_kol_id: value }))}
+              >
+                <SelectTrigger className="auth-input">
+                  <SelectValue placeholder="Select KOL" />
+                </SelectTrigger>
+                <SelectContent>
+                  {campaignKOLs.map((kol) => (
+                    <SelectItem key={kol.id} value={kol.id}>
+                      {kol.master_kol?.name || 'Unknown KOL'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-amount">Amount (USD)</Label>
+              <div className="relative w-full">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                <Input
+                  id="edit-amount"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9,]*"
+                  className="auth-input pl-6 w-full"
+                  value={newPaymentData.amount ? Number(newPaymentData.amount).toLocaleString('en-US') : ''}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/[^0-9]/g, '');
+                    setNewPaymentData(prev => ({ ...prev, amount: parseFloat(raw) || 0 }));
+                  }}
+                  placeholder="Enter amount"
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Payment Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                    style={{
+                      borderColor: "#e5e7eb",
+                      backgroundColor: "white",
+                      color: newPaymentData.payment_date ? "#111827" : "#9ca3af"
+                    }}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {newPaymentData.payment_date ? newPaymentData.payment_date : "Select payment date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="!bg-white border shadow-md w-auto p-0 z-50" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={newPaymentData.payment_date ? new Date(newPaymentData.payment_date) : undefined}
+                    onSelect={date => setNewPaymentData(prev => ({
+                      ...prev,
+                      payment_date: date ? formatDateLocal(date) : ''
+                    }))}
+                    initialFocus
+                    classNames={{
+                      day_selected: "text-white hover:text-white focus:text-white",
+                    }}
+                    modifiersStyles={{
+                      selected: { backgroundColor: "#3e8692" }
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-payment-method">Payment Method</Label>
+              <Select
+                value={newPaymentData.payment_method}
+                onValueChange={(value) => setNewPaymentData(prev => ({ ...prev, payment_method: value }))}
+              >
+                <SelectTrigger className="auth-input">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Token">Token</SelectItem>
+                  <SelectItem value="Fiat">Fiat</SelectItem>
+                  <SelectItem value="WL">WL</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-content">Content (Optional)</Label>
+              <Select
+                value={newPaymentData.content_id}
+                onValueChange={(value) => setNewPaymentData(prev => ({ ...prev, content_id: value }))}
+              >
+                <SelectTrigger className="auth-input">
+                  <SelectValue placeholder="Select content" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No content linked</SelectItem>
+                  {contents
+                    .filter(content => content.campaign_kols_id === newPaymentData.campaign_kol_id)
+                    .map(content => (
+                      <SelectItem key={content.id} value={content.id}>
+                        {content.type || 'Content'} - {content.platform || 'Unknown'} 
+                        {content.activation_date && ` (${new Date(content.activation_date).toLocaleDateString()})`}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-transaction-id">Transaction ID (Optional)</Label>
+              <Input
+                id="edit-transaction-id"
+                value={newPaymentData.transaction_id}
+                onChange={(e) => setNewPaymentData(prev => ({ ...prev, transaction_id: e.target.value }))}
+                placeholder="Enter transaction ID"
+                className="auth-input"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-notes">Notes (Optional)</Label>
+              <Textarea
+                id="edit-notes"
+                value={newPaymentData.notes}
+                onChange={(e) => setNewPaymentData(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Add any notes about this payment"
+                rows={3}
+                className="auth-input"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditingPayment(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleUpdatePayment} 
+              disabled={!newPaymentData.campaign_kol_id || newPaymentData.amount <= 0}
+              style={{ backgroundColor: '#3e8692', color: 'white' }}
+              className="hover:opacity-90"
+            >
+              Update Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
     </div>
   );
 };
