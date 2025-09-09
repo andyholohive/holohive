@@ -46,7 +46,7 @@ export class MessageTrainingService {
       return [];
     }
 
-    return data || [];
+    return (data as MessageTemplate[]) || [];
   }
 
   // Create a new message template
@@ -67,7 +67,7 @@ export class MessageTrainingService {
       return null;
     }
 
-    return data;
+    return data as MessageTemplate;
   }
 
   // Update message template usage count
@@ -83,7 +83,7 @@ export class MessageTrainingService {
       const { error } = await supabase
         .from('message_templates')
         .update({ 
-          usage_count: template.usage_count + 1,
+          usage_count: (template.usage_count || 0) + 1,
           updated_at: new Date().toISOString()
         })
         .eq('id', templateId);

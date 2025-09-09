@@ -204,80 +204,12 @@ export class AdvancedAIService {
 
   // Automated workflow management
   static async createAutomatedWorkflow(workflow: Omit<AutomatedWorkflow, 'id' | 'successRate'>): Promise<AutomatedWorkflow> {
-    const { data, error } = await supabase
-      .from('automated_workflows')
-      .insert({
-        name: workflow.name,
-        description: workflow.description,
-        triggers: workflow.triggers as any,
-        actions: workflow.actions as any,
-        enabled: workflow.enabled,
-        success_rate: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating workflow:', error);
-      throw error;
-    }
-
-    return {
-      id: data.id,
-      name: data.name,
-      description: data.description || '',
-      triggers: data.triggers as string[],
-      actions: data.actions as unknown as WorkflowAction[],
-      enabled: data.enabled,
-      lastRun: data.last_run || undefined,
-      successRate: data.success_rate
-    };
+    throw new Error('Automated workflows feature is not yet available. Please apply the database migration first.');
   }
 
   static async executeWorkflow(workflowId: string, context: any = {}): Promise<boolean> {
-    try {
-      const { data: workflow } = await supabase
-        .from('automated_workflows')
-        .select('*')
-        .eq('id', workflowId)
-        .single();
-
-      if (!workflow || !workflow.enabled) {
-        return false;
-      }
-
-      let successCount = 0;
-      const actions = workflow.actions as unknown as WorkflowAction[];
-      const totalActions = actions?.length || 0;
-
-      for (const action of actions || []) {
-        try {
-          await this.executeWorkflowAction(action, context);
-          successCount++;
-        } catch (error) {
-          console.error(`Workflow action failed:`, error);
-        }
-      }
-
-      const successRate = (successCount / totalActions) * 100;
-
-      // Update workflow success rate
-      await supabase
-        .from('automated_workflows')
-        .update({
-          success_rate: successRate,
-          last_run: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', workflowId);
-
-      return successCount === totalActions;
-    } catch (error) {
-      console.error('Error executing workflow:', error);
-      return false;
-    }
+    console.warn('Automated workflows feature is not yet available. Please apply the database migration first.');
+    return false;
   }
 
   // Smart campaign suggestions with context

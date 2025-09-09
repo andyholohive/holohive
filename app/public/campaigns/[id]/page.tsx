@@ -1176,10 +1176,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div>
-                                  <div className="font-medium text-gray-900">{c.campaign_kol?.master_kol?.name || '-'}</div>
-                                  {c.campaign_kol?.master_kol?.link && (
+                                  <div className="font-medium text-gray-900">{(c as any).campaign_kol?.master_kol?.name || '-'}</div>
+                                  {(c as any).campaign_kol?.master_kol?.link && (
                                     <a 
-                                      href={c.campaign_kol.master_kol.link} 
+                                      href={(c as any).campaign_kol.master_kol.link} 
                                       target="_blank" 
                                       rel="noopener noreferrer" 
                                       className="text-sm text-blue-600 hover:text-blue-800"
