@@ -195,7 +195,7 @@ export class VectorStore {
       const metadata = this.kolToMetadata(kol);
 
       // Upsert into database
-      const { data, error } = await getSupabaseClient()
+      const { data, error } = await ((getSupabaseClient() as any))
         .from('kol_embeddings')
         .upsert({
           kol_id: kol.id,
@@ -249,7 +249,7 @@ export class VectorStore {
           metadata: this.kolToMetadata(kol),
         }));
 
-        const { error } = await getSupabaseClient()
+        const { error } = await ((getSupabaseClient() as any))
           .from('kol_embeddings')
           .upsert(records, { onConflict: 'kol_id' });
 
@@ -291,7 +291,7 @@ export class VectorStore {
       const queryEmbedding = await this.generateEmbedding(query);
 
       // Search using pgvector function
-      const { data, error } = await getSupabaseClient().rpc('match_kols', {
+      const { data, error } = await ((getSupabaseClient() as any)).rpc('match_kols', {
         query_embedding: `[${queryEmbedding.join(',')}]`,
         match_threshold: threshold,
         match_count: limit,
@@ -345,7 +345,7 @@ export class VectorStore {
         campaign_type: campaign.campaign_type,
       };
 
-      const { data, error } = await getSupabaseClient()
+      const { data, error } = await ((getSupabaseClient() as any))
         .from('campaign_embeddings')
         .upsert({
           campaign_id: campaign.id,
@@ -381,7 +381,7 @@ export class VectorStore {
 
       const queryEmbedding = await this.generateEmbedding(query);
 
-      const { data, error } = await getSupabaseClient().rpc('match_campaigns', {
+      const { data, error } = await ((getSupabaseClient() as any)).rpc('match_campaigns', {
         query_embedding: `[${queryEmbedding.join(',')}]`,
         match_threshold: threshold,
         match_count: limit,
@@ -433,7 +433,7 @@ export class VectorStore {
         company: client.company,
       };
 
-      const { data, error } = await getSupabaseClient()
+      const { data, error } = await ((getSupabaseClient() as any))
         .from('client_embeddings')
         .upsert({
           client_id: client.id,
@@ -469,7 +469,7 @@ export class VectorStore {
 
       const queryEmbedding = await this.generateEmbedding(query);
 
-      const { data, error } = await getSupabaseClient().rpc('match_clients', {
+      const { data, error } = await ((getSupabaseClient() as any)).rpc('match_clients', {
         query_embedding: `[${queryEmbedding.join(',')}]`,
         match_threshold: threshold,
         match_count: limit,
@@ -496,7 +496,7 @@ export class VectorStore {
    * Delete embedding for a KOL
    */
   static async deleteKOLEmbedding(kolId: string): Promise<void> {
-    const { error } = await getSupabaseClient()
+    const { error } = await ((getSupabaseClient() as any))
       .from('kol_embeddings')
       .delete()
       .eq('kol_id', kolId);
@@ -508,7 +508,7 @@ export class VectorStore {
    * Delete embedding for a campaign
    */
   static async deleteCampaignEmbedding(campaignId: string): Promise<void> {
-    const { error } = await getSupabaseClient()
+    const { error } = await ((getSupabaseClient() as any))
       .from('campaign_embeddings')
       .delete()
       .eq('campaign_id', campaignId);
@@ -520,7 +520,7 @@ export class VectorStore {
    * Delete embedding for a client
    */
   static async deleteClientEmbedding(clientId: string): Promise<void> {
-    const { error } = await getSupabaseClient()
+    const { error } = await ((getSupabaseClient() as any))
       .from('client_embeddings')
       .delete()
       .eq('client_id', clientId);
@@ -537,9 +537,9 @@ export class VectorStore {
     clientCount: number;
   }> {
     const [kolResult, campaignResult, clientResult] = await Promise.all([
-      getSupabaseClient().from('kol_embeddings').select('id', { count: 'exact', head: true }),
-      getSupabaseClient().from('campaign_embeddings').select('id', { count: 'exact', head: true }),
-      getSupabaseClient().from('client_embeddings').select('id', { count: 'exact', head: true }),
+      ((getSupabaseClient() as any)).from('kol_embeddings').select('id', { count: 'exact', head: true }),
+      ((getSupabaseClient() as any)).from('campaign_embeddings').select('id', { count: 'exact', head: true }),
+      ((getSupabaseClient() as any)).from('client_embeddings').select('id', { count: 'exact', head: true }),
     ]);
 
     return {
