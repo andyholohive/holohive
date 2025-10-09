@@ -224,11 +224,16 @@ export const createKOLListTool: AgentTool = {
       const { name, search_criteria, limit, threshold, region, platform, description } = createKOLListSchema.parse(params);
       const client = getSupabaseClient(context);
 
+      console.log('[create_kol_list] Starting with params:', { name, search_criteria, limit, threshold, region, platform });
+      console.log('[create_kol_list] Using supabase client:', context.supabaseClient ? 'authenticated' : 'default');
+
       // Search for matching KOLs
       const searchResults = await VectorStore.searchKOLs(search_criteria, {
         limit,
         threshold
       });
+
+      console.log('[create_kol_list] Search results:', searchResults.length, 'KOLs found');
 
       if (searchResults.length === 0) {
         return {
@@ -244,7 +249,12 @@ export const createKOLListTool: AgentTool = {
         .select('*')
         .in('id', kolIds);
 
-      if (kolError) throw kolError;
+      if (kolError) {
+        console.error('[create_kol_list] Error fetching KOLs:', kolError);
+        throw kolError;
+      }
+
+      console.log('[create_kol_list] Fetched', kols?.length, 'KOL details');
 
       // Apply additional filters
       let filteredKOLs = kols || [];
@@ -259,6 +269,8 @@ export const createKOLListTool: AgentTool = {
         );
       }
 
+      console.log('[create_kol_list] Creating list with name:', name);
+
       // Create the list
       const { data: list, error: listError } = await client
         .from('lists')
@@ -270,7 +282,12 @@ export const createKOLListTool: AgentTool = {
         .select()
         .single();
 
-      if (listError) throw listError;
+      if (listError) {
+        console.error('[create_kol_list] Error creating list:', listError);
+        throw new Error(`Failed to create list: ${listError.message || JSON.stringify(listError)}`);
+      }
+
+      console.log('[create_kol_list] List created successfully:', list.id);
 
       // Add KOLs to the list
       const listItems = filteredKOLs.map((kol: any) => {
@@ -282,11 +299,18 @@ export const createKOLListTool: AgentTool = {
         };
       });
 
+      console.log('[create_kol_list] Adding', listItems.length, 'KOLs to list');
+
       const { error: itemsError } = await client
         .from('list_kols')
         .insert(listItems);
 
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error('[create_kol_list] Error adding KOLs to list:', itemsError);
+        throw itemsError;
+      }
+
+      console.log('[create_kol_list] Successfully added KOLs to list');
 
       return {
         success: true,
