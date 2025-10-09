@@ -11,9 +11,10 @@ import { Loader2 } from 'lucide-react'
 
 interface LoginFormProps {
   onToggleMode: () => void
+  onForgotPassword: () => void
 }
 
-export function LoginForm({ onToggleMode }: LoginFormProps) {
+export function LoginForm({ onToggleMode, onForgotPassword }: LoginFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -91,6 +92,17 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Sign In
           </Button>
+          
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              className="text-sm hover:underline"
+              style={{ color: '#3e8692' }}
+            >
+              Forgot your password?
+            </button>
+          </div>
           
           <div className="text-center text-sm text-gray-600">
             Don't have an account?{' '}

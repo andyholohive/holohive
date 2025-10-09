@@ -70,15 +70,21 @@ export function MessageTemplateCard({ template, onUseTemplate, onPreviewTemplate
               {template.name}
             </CardTitle>
             <div className="flex flex-wrap gap-2 mt-2">
-              <Badge className={getCategoryColor(template.category)}>
-                {template.category}
-              </Badge>
-              <Badge className={getToneColor(template.tone)}>
-                {template.tone}
-              </Badge>
-              <Badge className={getAudienceColor(template.target_audience)}>
-                {template.target_audience.toUpperCase()}
-              </Badge>
+              {template.category && (
+                <Badge className={getCategoryColor(template.category)}>
+                  {template.category}
+                </Badge>
+              )}
+              {template.tone && (
+                <Badge className={getToneColor(template.tone)}>
+                  {template.tone}
+                </Badge>
+              )}
+              {template.target_audience && (
+                <Badge className={getAudienceColor(template.target_audience)}>
+                  {template.target_audience.toUpperCase()}
+                </Badge>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-1 text-sm text-gray-500">

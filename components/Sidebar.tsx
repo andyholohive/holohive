@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Bell, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Bell, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 interface SidebarProps {
   children: React.ReactNode;
@@ -58,10 +59,20 @@ export default function Sidebar({ children }: SidebarProps) {
             <Button variant="ghost" size="sm">
               <Bell className="h-4 w-4" />
             </Button>
-            <DropdownMenu>
+              <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-8 w-8 rounded-full" style={{ backgroundColor: '#3e8692', color: 'white' }}>
-                  <span className="text-sm font-medium">{getUserInitials()}</span>
+                <Button
+                  variant="ghost"
+                  className="h-8 w-8 p-0 rounded-full hover:bg-transparent active:bg-transparent focus:bg-transparent focus-visible:ring-0 data-[state=open]:bg-transparent"
+                >
+                  <Avatar className="h-8 w-8">
+                    {userProfile?.profile_photo_url ? (
+                      <AvatarImage src={userProfile.profile_photo_url} alt={userProfile?.name || userProfile?.email || 'User'} />
+                    ) : null}
+                    <AvatarFallback className="bg-gray-200 text-gray-800 text-xs font-semibold">
+                      {getUserInitials()}
+                    </AvatarFallback>
+                  </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -191,18 +202,36 @@ export default function Sidebar({ children }: SidebarProps) {
                     </span>
                   </Button>
                 </Link>
-                {/* Templates tab (disabled) */}
-                <Button
-                  variant="ghost"
-                  className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} opacity-50 cursor-not-allowed`}
-                  title={isSidebarCollapsed ? 'Templates' : undefined}
-                  disabled
-                >
-                  <div className={`flex items-center whitespace-nowrap ${isSidebarCollapsed ? '' : ''}`}>
-                    <MessageSquare className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                    {!isSidebarCollapsed && <span>Templates</span>}
-                  </div>
-                </Button>
+                {/* Templates tab */}
+                <Link href="/templates" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/templates') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/templates') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Templates' : undefined}
+                  >
+                    <span>
+                      <MessageSquare className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Templates'}
+                    </span>
+                  </Button>
+                </Link>
+                {/* Forms tab */}
+                <Link href="/forms" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/forms') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/forms') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Forms' : undefined}
+                  >
+                    <span>
+                      <ClipboardList className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Forms'}
+                    </span>
+                  </Button>
+                </Link>
                 {/* AI Insights tab (disabled) */}
                 <Button
                   variant="ghost"
@@ -215,6 +244,31 @@ export default function Sidebar({ children }: SidebarProps) {
                     {!isSidebarCollapsed && <span>AI Insights</span>}
                   </div>
                 </Button>
+              </div>
+
+              {/* Admin Section */}
+              {!isSidebarCollapsed && (
+                <div className="flex items-center space-x-2">
+                  <Settings className="h-4 w-4 text-gray-400" />
+                  <div className="flex-1 h-px bg-gray-200"></div>
+                </div>
+              )}
+              <div className="space-y-2">
+                {/* Field Options tab */}
+                <Link href="/admin/field-options" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/admin/field-options') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/admin/field-options') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Field Options' : undefined}
+                  >
+                    <span>
+                      <Sliders className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Field Options'}
+                    </span>
+                  </Button>
+                </Link>
               </div>
 
             </nav>

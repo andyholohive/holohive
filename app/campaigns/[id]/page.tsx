@@ -41,6 +41,20 @@ const CampaignDetailsPage = () => {
   const [availableKOLs, setAvailableKOLs] = useState<any[]>([]);
   const [loadingKOLs, setLoadingKOLs] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [kolFilters, setKolFilters] = useState({
+    platform: [] as string[],
+    region: [] as string[],
+    creator_type: [] as string[],
+    content_type: [] as string[],
+    hh_status: [] as string[],
+    budget_type: [] as string[],
+    followers_operator: '' as string,
+    followers_value: '' as string,
+    budget_operator: '' as string,
+    budget_value: '' as string,
+    paid_operator: '' as string,
+    paid_value: '' as string
+  });
   const [isAddingKOLs, setIsAddingKOLs] = useState(false);
   const [newKOLData, setNewKOLData] = useState({
     selectedKOLs: [] as string[],
@@ -114,6 +128,24 @@ const CampaignDetailsPage = () => {
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
           </svg>
         );
+      case 'YouTube':
+        return (
+          <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+        );
+      case 'Facebook':
+        return (
+          <svg className="h-4 w-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+          </svg>
+        );
+      case 'TikTok':
+        return (
+          <svg className="h-4 w-4 text-black" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+          </svg>
+        );
       default:
         return null;
     }
@@ -127,6 +159,17 @@ const CampaignDetailsPage = () => {
       'AMA': 'bg-purple-100 text-purple-800',
       'Ambassadorship': 'bg-orange-100 text-orange-800',
       'Alpha': 'bg-yellow-100 text-yellow-800'
+    };
+    return colorMap[type] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getCreatorTypeColor = (type: string) => {
+    const colorMap: { [key: string]: string } = {
+      'Macro': 'bg-purple-100 text-purple-800',
+      'Micro': 'bg-blue-100 text-blue-800',
+      'Nano': 'bg-green-100 text-green-800',
+      'Celebrity': 'bg-pink-100 text-pink-800',
+      'Mega': 'bg-red-100 text-red-800'
     };
     return colorMap[type] || 'bg-gray-100 text-gray-800';
   };
@@ -255,11 +298,181 @@ const CampaignDetailsPage = () => {
     }
   };
 
-  const filteredKOLs = campaignKOLs.filter(kol =>
-    kol.master_kol.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    kol.hh_status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (kol.notes && kol.notes.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // MultiSelect component
+  const MultiSelect = ({
+    options,
+    selected,
+    onSelectedChange,
+    placeholder = "Select options...",
+    renderOption = (option: string) => option,
+    className = "",
+    triggerContent = null
+  }: {
+    options: string[];
+    selected: string[];
+    onSelectedChange: (selected: string[]) => void;
+    placeholder?: string;
+    renderOption?: (option: string) => React.ReactNode;
+    className?: string;
+    triggerContent?: React.ReactNode;
+  }) => {
+    const [open, setOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const safeOptions = Array.isArray(options) ? options : [];
+    const safeSelected = Array.isArray(selected) ? selected : [];
+
+    const filteredOptions = safeOptions.filter(option =>
+      option.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    try {
+      return (
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            {triggerContent ? (
+              <div className={`cursor-pointer w-full ${className}`}>
+                {triggerContent}
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={open}
+                className={`h-auto border-none shadow-none p-1 bg-transparent hover:bg-transparent text-xs font-medium inline-flex items-center ${className}`}
+              >
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </Button>
+            )}
+          </PopoverTrigger>
+          <PopoverContent className="w-[200px] p-0" align="start">
+            <div className="flex items-center border-b px-3 py-2">
+              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+              <Input
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="border-0 p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
+              />
+            </div>
+            <div className="max-h-[300px] overflow-auto">
+              {filteredOptions.length === 0 ? (
+                <div className="p-2 text-sm text-muted-foreground">No options found.</div>
+              ) : (
+                filteredOptions.map((option) => (
+                  <div
+                    key={option}
+                    className="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                    onClick={() => {
+                      try {
+                        const newSelected = safeSelected.includes(option)
+                          ? safeSelected.filter(item => item !== option)
+                          : [...safeSelected, option];
+                        onSelectedChange(newSelected);
+                      } catch (error) {
+                        console.error('Error in onSelect:', error);
+                      }
+                    }}
+                  >
+                    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                      {safeSelected.includes(option) && (
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m5 12 5 5L20 7" />
+                        </svg>
+                      )}
+                    </span>
+                    <div className="flex items-center space-x-2">
+                      {renderOption(option)}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      );
+    } catch (error) {
+      console.error('MultiSelect render error:', error);
+      return <div className="text-red-500">Error rendering multiselect</div>;
+    }
+  };
+
+  const filteredKOLs = campaignKOLs.filter(kol => {
+    // Search term filter
+    const matchesSearch = !searchTerm || (
+      kol.master_kol.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      kol.hh_status.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (kol.notes && kol.notes.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+
+    // Platform filter
+    const matchesPlatform = kolFilters.platform.length === 0 ||
+      (kol.master_kol.platform && kolFilters.platform.some(p => kol.master_kol.platform.includes(p)));
+
+    // Region filter
+    const matchesRegion = kolFilters.region.length === 0 ||
+      (kol.master_kol.region && kolFilters.region.includes(kol.master_kol.region));
+
+    // Creator Type filter
+    const matchesCreatorType = kolFilters.creator_type.length === 0 ||
+      (kol.master_kol.creator_type && kolFilters.creator_type.some(ct => kol.master_kol.creator_type.includes(ct)));
+
+    // Content Type filter
+    const matchesContentType = kolFilters.content_type.length === 0 ||
+      (kol.master_kol.content_type && kolFilters.content_type.some(ct => kol.master_kol.content_type.includes(ct)));
+
+    // HH Status filter
+    const matchesStatus = kolFilters.hh_status.length === 0 ||
+      (kol.hh_status && kolFilters.hh_status.includes(kol.hh_status));
+
+    // Budget Type filter
+    const matchesBudgetType = kolFilters.budget_type.length === 0 ||
+      (kol.budget_type && kolFilters.budget_type.includes(kol.budget_type));
+
+    // Followers filter
+    const matchesFollowers = !kolFilters.followers_operator || !kolFilters.followers_value || (() => {
+      const followers = kol.master_kol.followers || 0;
+      const value = parseFloat(kolFilters.followers_value);
+      if (isNaN(value)) return true;
+      switch (kolFilters.followers_operator) {
+        case '>': return followers > value;
+        case '<': return followers < value;
+        case '=': return followers === value;
+        default: return true;
+      }
+    })();
+
+    // Budget filter
+    const matchesBudget = !kolFilters.budget_operator || !kolFilters.budget_value || (() => {
+      const budget = kol.allocated_budget || 0;
+      const value = parseFloat(kolFilters.budget_value);
+      if (isNaN(value)) return true;
+      switch (kolFilters.budget_operator) {
+        case '>': return budget > value;
+        case '<': return budget < value;
+        case '=': return budget === value;
+        default: return true;
+      }
+    })();
+
+    // Paid filter
+    const matchesPaid = !kolFilters.paid_operator || !kolFilters.paid_value || (() => {
+      const paid = kol.paid || 0;
+      const value = parseFloat(kolFilters.paid_value);
+      if (isNaN(value)) return true;
+      switch (kolFilters.paid_operator) {
+        case '>': return paid > value;
+        case '<': return paid < value;
+        case '=': return paid === value;
+        default: return true;
+      }
+    })();
+
+    return matchesSearch && matchesPlatform && matchesRegion && matchesCreatorType && matchesContentType &&
+           matchesStatus && matchesBudgetType && matchesFollowers && matchesBudget && matchesPaid;
+  });
   useEffect(() => {
     if (campaign?.budget_allocations) {
       setAllocations(campaign.budget_allocations.map(a => ({ ...a })));
@@ -867,15 +1080,9 @@ const CampaignDetailsPage = () => {
     const { contentId, field } = editingContentCell;
     const contentToUpdate = contents.find(c => c.id === contentId);
     if (!contentToUpdate) return;
-    const updatedContent = { ...contentToUpdate, [field]: editingContentValue };
-    setContents(prev => prev.map(c => c.id === contentId ? updatedContent : c));
-    setEditingContentCell(null);
-    setEditingContentValue(null);
-    try {
-      await supabase.from('contents').update({ [field]: editingContentValue }).eq('id', contentId);
-    } catch (err) {
-      setContents(prev => prev.map(c => c.id === contentId ? contentToUpdate : c));
-    }
+
+    // Use handleContentCellSaveImmediate which already handles both new and existing rows
+    await handleContentCellSaveImmediate(contentToUpdate, field, editingContentValue);
   };
 
   // 4. Handle cancel
@@ -1051,12 +1258,58 @@ const CampaignDetailsPage = () => {
   const handleContentCellSaveImmediate = async (content: any, field: string, newValue: any) => {
     // Update local state
     setContents(prev => prev.map(c => c.id === content.id ? { ...c, [field]: newValue } : c));
-    // Update in database
-    try {
-      await supabase.from('contents').update({ [field]: newValue }).eq('id', content.id);
-    } catch (err) {
-      // Optionally handle error
+
+    // If this is a new row, insert it immediately (even if empty fields exist)
+    if (content.isNew) {
+      const updatedContent = { ...content, [field]: newValue };
+
+      // Insert into database immediately
+      try {
+        const payload = {
+          campaign_id: id,
+          campaign_kols_id: updatedContent.campaign_kols_id || null,
+          activation_date: updatedContent.activation_date || null,
+          content_link: updatedContent.content_link || null,
+          platform: updatedContent.platform || null,
+          type: updatedContent.type || null,
+          status: updatedContent.status || null,
+          impressions: updatedContent.impressions ? Number(updatedContent.impressions) : null,
+          likes: updatedContent.likes ? Number(updatedContent.likes) : null,
+          retweets: updatedContent.retweets ? Number(updatedContent.retweets) : null,
+          comments: updatedContent.comments ? Number(updatedContent.comments) : null,
+          bookmarks: updatedContent.bookmarks ? Number(updatedContent.bookmarks) : null,
+        };
+
+        const { error, data } = await supabase.from('contents').insert(payload).select();
+
+        if (error) {
+          console.error('Error inserting content:', error);
+          return;
+        }
+
+        // Replace the temporary row with the real one from the database
+        if (data && data.length > 0) {
+          const newContent = data[0];
+          const kol = campaignKOLs.find(k => k.id === newContent.campaign_kols_id);
+          const contentWithKol = {
+            ...newContent,
+            master_kol: kol?.master_kol,
+            isNew: false
+          };
+          setContents(prev => prev.map(c => c.id === content.id ? contentWithKol : c));
+        }
+      } catch (err) {
+        console.error('Error saving new content:', err);
+      }
+    } else {
+      // Update existing content in database
+      try {
+        await supabase.from('contents').update({ [field]: newValue }).eq('id', content.id);
+      } catch (err) {
+        console.error('Error updating content:', err);
+      }
     }
+
     setEditingContentCell(null);
     setEditingContentValue(null);
   };
@@ -2737,7 +2990,297 @@ const CampaignDetailsPage = () => {
                   </div>
                   </div>
                 </div>
-                
+
+                {/* Filters Section */}
+                <div className="mb-4">
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                    <div className="flex flex-wrap items-end gap-2">
+                      {/* Platform Filter */}
+                      <div className="min-w-[120px] flex flex-col items-end justify-end">
+                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Platform</span>
+                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                          <MultiSelect
+                            options={['X','Telegram','YouTube','Facebook','TikTok']}
+                            selected={kolFilters.platform}
+                            onSelectedChange={(platform) => setKolFilters(prev => ({ ...prev, platform }))}
+                            className="w-full"
+                            triggerContent={
+                              <div className="w-full flex items-center h-7 min-h-[28px]">
+                                {kolFilters.platform.length > 0 ? (
+                                  <>
+                                    {kolFilters.platform.map(item => (
+                                      <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 flex items-center">
+                                        {getPlatformIcon(item)}
+                                      </span>
+                                    ))}
+                                  </>
+                                ) : (
+                                  <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                )}
+                                <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </div>
+                            }
+                          />
+                        </div>
+                      </div>
+                      {/* Region Filter */}
+                      <div className="min-w-[100px] flex flex-col items-end justify-end">
+                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Region</span>
+                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                          <MultiSelect
+                            options={['Vietnam','Turkey','SEA','Philippines','Korea','Global','China','Brazil']}
+                            selected={kolFilters.region}
+                            onSelectedChange={(region) => setKolFilters(prev => ({ ...prev, region }))}
+                            className="w-full"
+                            renderOption={(option: string) => (
+                              <div className="flex items-center space-x-2">
+                                <span>{getRegionIcon(option).flag}</span>
+                                <span>{option}</span>
+                              </div>
+                            )}
+                            triggerContent={
+                              <div className="w-full flex items-center h-7 min-h-[28px]">
+                                {kolFilters.region.length > 0 ? (
+                                  <>
+                                    {kolFilters.region.map(item => (
+                                      <span key={item} className="text-xs font-semibold text-black flex items-center gap-1 mr-2">
+                                        <span>{getRegionIcon(item).flag}</span>
+                                        <span>{item}</span>
+                                      </span>
+                                    ))}
+                                  </>
+                                ) : (
+                                  <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                )}
+                                <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </div>
+                            }
+                          />
+                        </div>
+                      </div>
+                      {/* Creator Type Filter */}
+                      <div className="min-w-[120px] flex flex-col items-end justify-end">
+                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Creator Type</span>
+                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                          <MultiSelect
+                            options={['Micro Influencer','KOL','Celebrity']}
+                            selected={kolFilters.creator_type}
+                            onSelectedChange={(creator_type) => setKolFilters(prev => ({ ...prev, creator_type }))}
+                            className="w-full"
+                            triggerContent={
+                              <div className="w-full flex items-center h-7 min-h-[28px]">
+                                {kolFilters.creator_type.length > 0 ? (
+                                  <>
+                                    {kolFilters.creator_type.map(item => (
+                                      <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getCreatorTypeColor(item)} mr-1`}>{item}</span>
+                                    ))}
+                                  </>
+                                ) : (
+                                  <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                )}
+                                <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </div>
+                            }
+                          />
+                        </div>
+                      </div>
+                      {/* Content Type Filter */}
+                      <div className="min-w-[120px] flex flex-col items-end justify-end">
+                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Content Type</span>
+                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                          <MultiSelect
+                            options={['Meme','News','Trading','Deep Dive','Meme/Cultural Narrative','Drama Queen','Sceptics','Technical Educator','Bridge Builders','Visionaries']}
+                            selected={kolFilters.content_type}
+                            onSelectedChange={(content_type) => setKolFilters(prev => ({ ...prev, content_type }))}
+                            className="w-full"
+                            triggerContent={
+                              <div className="w-full flex items-center h-7 min-h-[28px]">
+                                {kolFilters.content_type.length > 0 ? (
+                                  <>
+                                    {kolFilters.content_type.map(item => (
+                                      <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getContentTypeColor(item)} mr-1`}>{item}</span>
+                                    ))}
+                                  </>
+                                ) : (
+                                  <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                )}
+                                <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </div>
+                            }
+                          />
+                        </div>
+                      </div>
+                      {/* Status Filter */}
+                      <div className="min-w-[100px] flex flex-col items-end justify-end">
+                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Status</span>
+                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                          <MultiSelect
+                            options={['Curated','Interested','Onboarded','Concluded']}
+                            selected={kolFilters.hh_status}
+                            onSelectedChange={(hh_status) => setKolFilters(prev => ({ ...prev, hh_status }))}
+                            className="w-full"
+                            triggerContent={
+                              <div className="w-full flex items-center h-7 min-h-[28px]">
+                                {kolFilters.hh_status.length > 0 ? (
+                                  <>
+                                    {kolFilters.hh_status.map(item => (
+                                      <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getStatusColor(item as any)} mr-1`}>{item}</span>
+                                    ))}
+                                  </>
+                                ) : (
+                                  <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                )}
+                                <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </div>
+                            }
+                          />
+                        </div>
+                      </div>
+                      {/* Budget Type Filter */}
+                      <div className="min-w-[100px] flex flex-col items-end justify-end">
+                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Budget Type</span>
+                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                          <MultiSelect
+                            options={['Token','Fiat','WL']}
+                            selected={kolFilters.budget_type}
+                            onSelectedChange={(budget_type) => setKolFilters(prev => ({ ...prev, budget_type }))}
+                            className="w-full"
+                            triggerContent={
+                              <div className="w-full flex items-center h-7 min-h-[28px]">
+                                {kolFilters.budget_type.length > 0 ? (
+                                  <>
+                                    {kolFilters.budget_type.map(item => (
+                                      <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 flex-shrink-0 mr-1">{item}</span>
+                                    ))}
+                                  </>
+                                ) : (
+                                  <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                )}
+                                <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </div>
+                            }
+                          />
+                        </div>
+                      </div>
+                      {/* Followers Filter */}
+                      <div className="min-w-[130px] flex flex-col items-end justify-end">
+                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Followers</span>
+                        <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
+                          <Select
+                            value={kolFilters.followers_operator}
+                            onValueChange={(value) => setKolFilters(prev => ({ ...prev, followers_operator: value }))}
+                          >
+                            <SelectTrigger className="border-none shadow-none bg-transparent w-auto h-auto px-1 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none" style={{ outline: 'none', boxShadow: 'none', minWidth: 40 }}>
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value=">">{'>'}</SelectItem>
+                              <SelectItem value="<">{'<'}</SelectItem>
+                              <SelectItem value="=">=</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="number"
+                            value={kolFilters.followers_value}
+                            onChange={(e) => setKolFilters(prev => ({ ...prev, followers_value: e.target.value }))}
+                            className="auth-input h-7 text-xs w-16"
+                          />
+                        </div>
+                      </div>
+                      {/* Budget Filter */}
+                      <div className="min-w-[130px] flex flex-col items-end justify-end">
+                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Budget</span>
+                        <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
+                          <Select
+                            value={kolFilters.budget_operator}
+                            onValueChange={(value) => setKolFilters(prev => ({ ...prev, budget_operator: value }))}
+                          >
+                            <SelectTrigger className="border-none shadow-none bg-transparent w-auto h-auto px-1 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none" style={{ outline: 'none', boxShadow: 'none', minWidth: 40 }}>
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value=">">{'>'}</SelectItem>
+                              <SelectItem value="<">{'<'}</SelectItem>
+                              <SelectItem value="=">=</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="number"
+                            value={kolFilters.budget_value}
+                            onChange={(e) => setKolFilters(prev => ({ ...prev, budget_value: e.target.value }))}
+                            className="auth-input h-7 text-xs w-16"
+                          />
+                        </div>
+                      </div>
+                      {/* Paid Filter */}
+                      <div className="min-w-[130px] flex flex-col items-end justify-end">
+                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Paid (USD)</span>
+                        <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
+                          <Select
+                            value={kolFilters.paid_operator}
+                            onValueChange={(value) => setKolFilters(prev => ({ ...prev, paid_operator: value }))}
+                          >
+                            <SelectTrigger className="border-none shadow-none bg-transparent w-auto h-auto px-1 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none" style={{ outline: 'none', boxShadow: 'none', minWidth: 40 }}>
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value=">">{'>'}</SelectItem>
+                              <SelectItem value="<">{'<'}</SelectItem>
+                              <SelectItem value="=">=</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="number"
+                            value={kolFilters.paid_value}
+                            onChange={(e) => setKolFilters(prev => ({ ...prev, paid_value: e.target.value }))}
+                            className="auth-input h-7 text-xs w-16"
+                          />
+                        </div>
+                      </div>
+                      {/* Reset Filters Button */}
+                      <div className="flex flex-col items-end justify-end">
+                        <span className="text-xs text-transparent mb-1 self-start">Reset</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7"
+                          onClick={() => {
+                            setKolFilters({
+                              platform: [],
+                              region: [],
+                              creator_type: [],
+                              content_type: [],
+                              hh_status: [],
+                              budget_type: [],
+                              followers_operator: '',
+                              followers_value: '',
+                              budget_operator: '',
+                              budget_value: '',
+                              paid_operator: '',
+                              paid_value: ''
+                            });
+                          }}
+                        >
+                          Reset Filters
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {loadingKOLs ? (
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
@@ -2998,8 +3541,299 @@ const CampaignDetailsPage = () => {
                 
                 {/* Cards View */}
                 {kolViewMode === 'graph' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {campaignKOLs.map((campaignKOL) => (
+                  <>
+                    {/* Filters Section */}
+                    <div className="mb-4">
+                      <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                        <div className="flex flex-wrap items-end gap-2">
+                          {/* Platform Filter */}
+                          <div className="min-w-[120px] flex flex-col items-end justify-end">
+                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Platform</span>
+                            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                              <MultiSelect
+                                options={['X','Telegram','YouTube','Facebook','TikTok']}
+                                selected={kolFilters.platform}
+                                onSelectedChange={(platform) => setKolFilters(prev => ({ ...prev, platform }))}
+                                className="w-full"
+                                triggerContent={
+                                  <div className="w-full flex items-center h-7 min-h-[28px]">
+                                    {kolFilters.platform.length > 0 ? (
+                                      <>
+                                        {kolFilters.platform.map(item => (
+                                          <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 flex items-center">
+                                            {getPlatformIcon(item)}
+                                          </span>
+                                        ))}
+                                      </>
+                                    ) : (
+                                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                    )}
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </div>
+                                }
+                              />
+                            </div>
+                          </div>
+                          {/* Region Filter */}
+                          <div className="min-w-[100px] flex flex-col items-end justify-end">
+                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Region</span>
+                            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                              <MultiSelect
+                                options={['Vietnam','Turkey','SEA','Philippines','Korea','Global','China','Brazil']}
+                                selected={kolFilters.region}
+                                onSelectedChange={(region) => setKolFilters(prev => ({ ...prev, region }))}
+                                className="w-full"
+                                renderOption={(option: string) => (
+                                  <div className="flex items-center space-x-2">
+                                    <span>{getRegionIcon(option).flag}</span>
+                                    <span>{option}</span>
+                                  </div>
+                                )}
+                                triggerContent={
+                                  <div className="w-full flex items-center h-7 min-h-[28px]">
+                                    {kolFilters.region.length > 0 ? (
+                                      <>
+                                        {kolFilters.region.map(item => (
+                                          <span key={item} className="text-xs font-semibold text-black flex items-center gap-1 mr-2">
+                                            <span>{getRegionIcon(item).flag}</span>
+                                            <span>{item}</span>
+                                          </span>
+                                        ))}
+                                      </>
+                                    ) : (
+                                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                    )}
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </div>
+                                }
+                              />
+                            </div>
+                          </div>
+                          {/* Creator Type Filter */}
+                          <div className="min-w-[120px] flex flex-col items-end justify-end">
+                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Creator Type</span>
+                            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                              <MultiSelect
+                                options={['Micro Influencer','KOL','Celebrity']}
+                                selected={kolFilters.creator_type}
+                                onSelectedChange={(creator_type) => setKolFilters(prev => ({ ...prev, creator_type }))}
+                                className="w-full"
+                                triggerContent={
+                                  <div className="w-full flex items-center h-7 min-h-[28px]">
+                                    {kolFilters.creator_type.length > 0 ? (
+                                      <>
+                                        {kolFilters.creator_type.map(item => (
+                                          <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getCreatorTypeColor(item)} mr-1`}>{item}</span>
+                                        ))}
+                                      </>
+                                    ) : (
+                                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                    )}
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </div>
+                                }
+                              />
+                            </div>
+                          </div>
+                          {/* Content Type Filter */}
+                          <div className="min-w-[120px] flex flex-col items-end justify-end">
+                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Content Type</span>
+                            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                              <MultiSelect
+                                options={['Meme','News','Trading','Deep Dive','Meme/Cultural Narrative','Drama Queen','Sceptics','Technical Educator','Bridge Builders','Visionaries']}
+                                selected={kolFilters.content_type}
+                                onSelectedChange={(content_type) => setKolFilters(prev => ({ ...prev, content_type }))}
+                                className="w-full"
+                                triggerContent={
+                                  <div className="w-full flex items-center h-7 min-h-[28px]">
+                                    {kolFilters.content_type.length > 0 ? (
+                                      <>
+                                        {kolFilters.content_type.map(item => (
+                                          <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getContentTypeColor(item)} mr-1`}>{item}</span>
+                                        ))}
+                                      </>
+                                    ) : (
+                                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                    )}
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </div>
+                                }
+                              />
+                            </div>
+                          </div>
+                          {/* Status Filter */}
+                          <div className="min-w-[100px] flex flex-col items-end justify-end">
+                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Status</span>
+                            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                              <MultiSelect
+                                options={['Curated','Interested','Onboarded','Concluded']}
+                                selected={kolFilters.hh_status}
+                                onSelectedChange={(hh_status) => setKolFilters(prev => ({ ...prev, hh_status }))}
+                                className="w-full"
+                                triggerContent={
+                                  <div className="w-full flex items-center h-7 min-h-[28px]">
+                                    {kolFilters.hh_status.length > 0 ? (
+                                      <>
+                                        {kolFilters.hh_status.map(item => (
+                                          <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getStatusColor(item as any)} mr-1`}>{item}</span>
+                                        ))}
+                                      </>
+                                    ) : (
+                                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                    )}
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </div>
+                                }
+                              />
+                            </div>
+                          </div>
+                          {/* Budget Type Filter */}
+                          <div className="min-w-[100px] flex flex-col items-end justify-end">
+                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Budget Type</span>
+                            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                              <MultiSelect
+                                options={['Token','Fiat','WL']}
+                                selected={kolFilters.budget_type}
+                                onSelectedChange={(budget_type) => setKolFilters(prev => ({ ...prev, budget_type }))}
+                                className="w-full"
+                                triggerContent={
+                                  <div className="w-full flex items-center h-7 min-h-[28px]">
+                                    {kolFilters.budget_type.length > 0 ? (
+                                      <>
+                                        {kolFilters.budget_type.map(item => (
+                                          <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 flex-shrink-0 mr-1">{item}</span>
+                                        ))}
+                                      </>
+                                    ) : (
+                                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                    )}
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </div>
+                                }
+                              />
+                            </div>
+                          </div>
+                          {/* Followers Filter */}
+                          <div className="min-w-[130px] flex flex-col items-end justify-end">
+                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Followers</span>
+                            <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
+                              <Select
+                                value={kolFilters.followers_operator}
+                                onValueChange={(value) => setKolFilters(prev => ({ ...prev, followers_operator: value }))}
+                              >
+                                <SelectTrigger className="border-none shadow-none bg-transparent w-auto h-auto px-1 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none" style={{ outline: 'none', boxShadow: 'none', minWidth: 40 }}>
+                                  <SelectValue placeholder="Select" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value=">">{'>'}</SelectItem>
+                                  <SelectItem value="<">{'<'}</SelectItem>
+                                  <SelectItem value="=">=</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                type="number"
+                                value={kolFilters.followers_value}
+                                onChange={(e) => setKolFilters(prev => ({ ...prev, followers_value: e.target.value }))}
+                                className="auth-input h-7 text-xs w-16"
+                              />
+                            </div>
+                          </div>
+                          {/* Budget Filter */}
+                          <div className="min-w-[130px] flex flex-col items-end justify-end">
+                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Budget</span>
+                            <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
+                              <Select
+                                value={kolFilters.budget_operator}
+                                onValueChange={(value) => setKolFilters(prev => ({ ...prev, budget_operator: value }))}
+                              >
+                                <SelectTrigger className="border-none shadow-none bg-transparent w-auto h-auto px-1 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none" style={{ outline: 'none', boxShadow: 'none', minWidth: 40 }}>
+                                  <SelectValue placeholder="Select" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value=">">{'>'}</SelectItem>
+                                  <SelectItem value="<">{'<'}</SelectItem>
+                                  <SelectItem value="=">=</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                type="number"
+                                value={kolFilters.budget_value}
+                                onChange={(e) => setKolFilters(prev => ({ ...prev, budget_value: e.target.value }))}
+                                className="auth-input h-7 text-xs w-16"
+                              />
+                            </div>
+                          </div>
+                          {/* Paid Filter */}
+                          <div className="min-w-[130px] flex flex-col items-end justify-end">
+                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Paid (USD)</span>
+                            <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
+                              <Select
+                                value={kolFilters.paid_operator}
+                                onValueChange={(value) => setKolFilters(prev => ({ ...prev, paid_operator: value }))}
+                              >
+                                <SelectTrigger className="border-none shadow-none bg-transparent w-auto h-auto px-1 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none" style={{ outline: 'none', boxShadow: 'none', minWidth: 40 }}>
+                                  <SelectValue placeholder="Select" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value=">">{'>'}</SelectItem>
+                                  <SelectItem value="<">{'<'}</SelectItem>
+                                  <SelectItem value="=">=</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                type="number"
+                                value={kolFilters.paid_value}
+                                onChange={(e) => setKolFilters(prev => ({ ...prev, paid_value: e.target.value }))}
+                                className="auth-input h-7 text-xs w-16"
+                              />
+                            </div>
+                          </div>
+                          {/* Reset Filters Button */}
+                          <div className="flex flex-col items-end justify-end">
+                            <span className="text-xs text-transparent mb-1 self-start">Reset</span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7"
+                              onClick={() => {
+                                setKolFilters({
+                                  platform: [],
+                                  region: [],
+                                  creator_type: [],
+                                  content_type: [],
+                                  hh_status: [],
+                                  budget_type: [],
+                                  followers_operator: '',
+                                  followers_value: '',
+                                  budget_operator: '',
+                                  budget_value: '',
+                                  paid_operator: '',
+                                  paid_value: ''
+                                });
+                              }}
+                            >
+                              Reset Filters
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredKOLs.map((campaignKOL) => (
                       <Card key={campaignKOL.id} className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-4">
                           <div className="flex flex-col items-center text-center">
@@ -3104,7 +3938,8 @@ const CampaignDetailsPage = () => {
                         </CardContent>
                       </Card>
                     ))}
-                  </div>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </div>
@@ -3118,9 +3953,36 @@ const CampaignDetailsPage = () => {
                   <h2 className="text-2xl font-bold text-gray-900">Contents</h2>
                 </div>
                 <div className="flex items-center">
-                  <Dialog open={isAddContentsDialogOpen} onOpenChange={setIsAddContentsDialogOpen}>
+                  <Dialog open={false} onOpenChange={setIsAddContentsDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button size="sm" style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+                      <Button
+                        size="sm"
+                        style={{ backgroundColor: '#3e8692', color: 'white' }}
+                        className="hover:opacity-90"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          const newId = `new-${Date.now()}`;
+                          const newContent: any = {
+                            id: newId,
+                            campaign_id: id,
+                            campaign_kols_id: '',
+                            activation_date: '',
+                            content_link: '',
+                            platform: '',
+                            type: '',
+                            status: '',
+                            impressions: null,
+                            likes: null,
+                            retweets: null,
+                            comments: null,
+                            bookmarks: null,
+                            master_kol: { name: '', link: '' },
+                            isNew: true
+                          };
+                          setContents((prev: any[]) => [newContent, ...prev]);
+                          setEditingContentCell({ contentId: newId, field: 'campaign_kols_id' });
+                        }}
+                      >
                         <Plus className="h-4 w-4 mr-2" />
                         Add Content
                       </Button>

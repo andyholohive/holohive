@@ -6,11 +6,12 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -74,6 +75,24 @@ const getPlatformIcon = (platform: string) => {
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
         </svg>
       );
+    case 'YouTube':
+      return (
+        <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+        </svg>
+      );
+    case 'Facebook':
+      return (
+        <svg className="h-4 w-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+        </svg>
+      );
+    case 'TikTok':
+      return (
+        <svg className="h-4 w-4 text-black" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.10-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+        </svg>
+      );
     default:
       return null;
   }
@@ -81,12 +100,16 @@ const getPlatformIcon = (platform: string) => {
 
 const getContentTypeColor = (type: string) => {
   const colorMap: { [key: string]: string } = {
-    'Post': 'bg-blue-100 text-blue-800',
-    'Video': 'bg-red-100 text-red-800',
-    'Article': 'bg-green-100 text-green-800',
-    'AMA': 'bg-purple-100 text-purple-800',
-    'Ambassadorship': 'bg-orange-100 text-orange-800',
-    'Alpha': 'bg-yellow-100 text-yellow-800'
+    'Meme': 'bg-yellow-100 text-yellow-800',
+    'News': 'bg-blue-100 text-blue-800',
+    'Trading': 'bg-green-100 text-green-800',
+    'Deep Dive': 'bg-purple-100 text-purple-800',
+    'Meme/Cultural Narrative': 'bg-pink-100 text-pink-800',
+    'Drama Queen': 'bg-red-100 text-red-800',
+    'Sceptics': 'bg-orange-100 text-orange-800',
+    'Technical Educator': 'bg-indigo-100 text-indigo-800',
+    'Bridge Builders': 'bg-teal-100 text-teal-800',
+    'Visionaries': 'bg-cyan-100 text-cyan-800'
   };
   return colorMap[type] || 'bg-gray-100 text-gray-800';
 };
@@ -117,6 +140,12 @@ export default function ListsPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [allKOLs, setAllKOLs] = useState<any[]>([]);
   const [kolSearchTerm, setKolSearchTerm] = useState('');
+  const [platformFilter, setPlatformFilter] = useState<string[]>([]);
+  const [regionFilter, setRegionFilter] = useState<string[]>([]);
+  const [platformFilterSearch, setPlatformFilterSearch] = useState('');
+  const [regionFilterSearch, setRegionFilterSearch] = useState('');
+  const [contentTypeFilter, setContentTypeFilter] = useState<string[]>([]);
+  const [contentTypeFilterSearch, setContentTypeFilterSearch] = useState('');
 
 
   // Confirmation dialog states
@@ -143,14 +172,117 @@ export default function ListsPage() {
     selectedKOLs: [] as string[],
   });
 
-  // Filter KOLs based on search term
-  const filteredAvailableKOLs = allKOLs.filter((kol: any) =>
-    kol.name.toLowerCase().includes(kolSearchTerm.toLowerCase()) ||
-    (kol.region && kol.region.toLowerCase().includes(kolSearchTerm.toLowerCase())) ||
-    (Array.isArray(kol.platform) && kol.platform.some((p: string) => p.toLowerCase().includes(kolSearchTerm.toLowerCase())))
-  );
+  // Filter KOLs based on search term + dropdown filters
+  const filteredAvailableKOLs = allKOLs.filter((kol: any) => {
+    const matchesSearch =
+      kol.name?.toLowerCase().includes(kolSearchTerm.toLowerCase()) ||
+      (kol.region && kol.region.toLowerCase().includes(kolSearchTerm.toLowerCase())) ||
+      (Array.isArray(kol.platform) && kol.platform.some((p: string) => p.toLowerCase().includes(kolSearchTerm.toLowerCase())));
+
+    const matchesPlatform =
+      platformFilter.length === 0 || (Array.isArray(kol.platform) && platformFilter.some(p => kol.platform.includes(p)));
+
+    const matchesRegion = regionFilter.length === 0 || (kol.region && regionFilter.includes(kol.region));
+
+    const matchesContentType =
+      contentTypeFilter.length === 0 || (Array.isArray(kol.content_type) && contentTypeFilter.some(ct => kol.content_type.includes(ct)));
+
+    return matchesSearch && matchesPlatform && matchesRegion && matchesContentType;
+  });
 
   const { toast } = useToast();
+
+  // Multi-select dropdown component (identical styling to KOLs bulk menu)
+  const MultiSelect = ({ 
+    options, 
+    selected, 
+    onSelectedChange, 
+    placeholder = "Select options...",
+    renderOption = (option: string) => option,
+    className = "",
+    triggerContent = null
+  }: {
+    options: string[];
+    selected: string[];
+    onSelectedChange: (selected: string[]) => void;
+    placeholder?: string;
+    renderOption?: (option: string) => React.ReactNode;
+    className?: string;
+    triggerContent?: React.ReactNode;
+  }) => {
+    const [open, setOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const safeOptions = Array.isArray(options) ? options : [];
+    const safeSelected = Array.isArray(selected) ? selected : [];
+
+    const filteredOptions = safeOptions.filter(option => 
+      option.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          {triggerContent ? (
+            <div className={`cursor-pointer w-full ${className}`}>
+              {triggerContent}
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              className={`h-auto border-none shadow-none p-1 bg-transparent hover:bg-transparent text-xs font-medium inline-flex items-center ${className}`}
+            >
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </Button>
+          )}
+        </PopoverTrigger>
+        <PopoverContent className="w-[220px] p-0" align="start">
+          <div className="flex items-center border-b px-3 py-2">
+            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+            <Input
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="border-0 p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
+            />
+          </div>
+          <div className="max-h-[300px] overflow-auto">
+            {filteredOptions.length === 0 ? (
+              <div className="p-2 text-sm text-muted-foreground">No options found.</div>
+            ) : (
+              filteredOptions.map((option) => (
+                <div
+                  key={option}
+                  className="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+                  onClick={() => {
+                    const newSelected = safeSelected.includes(option)
+                      ? safeSelected.filter(item => item !== option)
+                      : [...safeSelected, option];
+                    onSelectedChange(newSelected);
+                  }}
+                >
+                  <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                    {safeSelected.includes(option) && (
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m5 12 5 5L20 7" />
+                      </svg>
+                    )}
+                  </span>
+                  <div className="flex items-center space-x-2">
+                    {renderOption(option)}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  };
 
   useEffect(() => {
     fetchLists();
@@ -555,33 +687,6 @@ export default function ListsPage() {
     return regionMap[region] || { flag: '🏳️', icon: Flag };
   };
 
-  const getPlatformIcon = (platform: string) => {
-    switch (platform) {
-      case 'X':
-        return <span className="font-bold text-black text-sm">𝕏</span>;
-      case 'Telegram':
-        return (
-          <svg className="h-4 w-4 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
-          </svg>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const getContentTypeColor = (type: string) => {
-    const colorMap: { [key: string]: string } = {
-      'Post': 'bg-blue-100 text-blue-800',
-      'Video': 'bg-red-100 text-red-800',
-      'Article': 'bg-green-100 text-green-800',
-      'AMA': 'bg-purple-100 text-purple-800',
-      'Ambassadorship': 'bg-orange-100 text-orange-800',
-      'Alpha': 'bg-yellow-100 text-yellow-800'
-    };
-    return colorMap[type] || 'bg-gray-100 text-gray-800';
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -697,7 +802,7 @@ export default function ListsPage() {
                   Add List
                 </Button>
               </DialogTrigger>
-                              <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+                              <DialogContent className="max-w-5xl max-h-[80vh] overflow-hidden">
                 <DialogHeader>
                   <DialogTitle>{isEditMode ? 'Edit List' : 'Add New List'}</DialogTitle>
                   <DialogDescription>
@@ -731,13 +836,132 @@ export default function ListsPage() {
 
                     <div className="grid gap-2">
                       <Label>Select KOLs ({newList.selectedKOLs.length} selected)</Label>
-                      <div className="flex items-center max-w-sm w-full mb-2">
+                      {/* Search bar above filters */}
+                      <div className="min-w-[220px] flex flex-col items-end justify-end mb-3">
+                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Search</span>
                         <Input
                           placeholder="Search KOLs by name, region, or platform..."
                           className="auth-input"
                           value={kolSearchTerm}
                           onChange={e => setKolSearchTerm(e.target.value)}
                         />
+                      </div>
+                      {/* Bulk-style filter bar (match KOLs page bulk menu) */}
+                      <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-3">
+                        <div className="flex flex-wrap items-end gap-2">
+                          {/* Platform filter (multi-select + searchable like bulk menu) */}
+                          <div className="min-w-[120px] flex flex-col items-end justify-end">
+                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Platform</span>
+                            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                              <MultiSelect
+                                options={['X','Telegram','YouTube','Facebook','TikTok']}
+                                selected={platformFilter}
+                                onSelectedChange={setPlatformFilter}
+                                className="w-full"
+                                triggerContent={
+                                  <div className="w-full flex items-center h-7 min-h-[28px]">
+                                    {platformFilter.length > 0 ? (
+                                      <>
+                                        {platformFilter.map(item => (
+                                          <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 flex items-center">
+                                            {getPlatformIcon(item)}
+                                          </span>
+                                        ))}
+                                      </>
+                                    ) : (
+                                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                    )}
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </div>
+                                }
+                              />
+                            </div>
+                          </div>
+                          {/* Region filter (multi-select + searchable) */}
+                          <div className="min-w-[100px] flex flex-col items-end justify-end">
+                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Region</span>
+                            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                              <MultiSelect
+                                options={['Vietnam','Turkey','SEA','Philippines','Korea','Global','China','Brazil']}
+                                selected={regionFilter}
+                                onSelectedChange={setRegionFilter}
+                                className="w-full"
+                                renderOption={(option: string) => (
+                                  <div className="flex items-center space-x-2">
+                                    <span>{getRegionIcon(option).flag}</span>
+                                    <span>{option}</span>
+                                  </div>
+                                )}
+                                triggerContent={
+                                  <div className="w-full flex items-center h-7 min-h-[28px]">
+                                    {regionFilter.length > 0 ? (
+                                      <>
+                                        {regionFilter.map(item => (
+                                          <span key={item} className="text-xs font-semibold text-black flex items-center gap-1 mr-2">
+                                            <span>{getRegionIcon(item).flag}</span>
+                                            <span>{item}</span>
+                                          </span>
+                                        ))}
+                                      </>
+                                    ) : (
+                                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                    )}
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </div>
+                                }
+                              />
+                            </div>
+                          </div>
+                          {/* Content Type (multi-select + searchable) */}
+                          <div className="min-w-[120px] flex flex-col items-end justify-end">
+                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Content Type</span>
+                            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                              <MultiSelect
+                                options={['Meme','News','Trading','Deep Dive','Meme/Cultural Narrative','Drama Queen','Sceptics','Technical Educator','Bridge Builders','Visionaries']}
+                                selected={contentTypeFilter}
+                                onSelectedChange={setContentTypeFilter}
+                                className="w-full"
+                                triggerContent={
+                                  <div className="w-full flex items-center h-7 min-h-[28px]">
+                                    {contentTypeFilter.length > 0 ? (
+                                      <>
+                                        {contentTypeFilter.map(item => (
+                                          <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getContentTypeColor(item)} mr-1`}>{item}</span>
+                                        ))}
+                                      </>
+                                    ) : (
+                                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                    )}
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </div>
+                                }
+                              />
+                            </div>
+                          </div>
+                          {/* Reset Filters Button */}
+                          <div className="flex flex-col items-end justify-end">
+                            <span className="text-xs text-transparent mb-1 self-start">Reset</span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7"
+                              onClick={() => {
+                                setPlatformFilter([]);
+                                setRegionFilter([]);
+                                setContentTypeFilter([]);
+                              }}
+                            >
+                              Reset Filters
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                       <Button
                         type="button"
@@ -746,12 +970,12 @@ export default function ListsPage() {
                         className="mb-2"
                         onClick={() => {
                           const allIds = filteredAvailableKOLs.map(kol => kol.id);
-                          if (allIds.every(id => newList.selectedKOLs.includes(id))) {
-                            // Deselect all
-                            setNewList(prev => ({ ...prev, selectedKOLs: prev.selectedKOLs.filter(id => !allIds.includes(id)) }));
+                          if (allIds.length > 0 && allIds.every(id => newList.selectedKOLs.includes(id))) {
+                            // Deselect all (clear entire selection)
+                            setNewList(prev => ({ ...prev, selectedKOLs: [] }));
                           } else {
-                            // Select all
-                            setNewList(prev => ({ ...prev, selectedKOLs: Array.from(new Set([...prev.selectedKOLs, ...allIds])) }));
+                            // Select all (only the filtered ones)
+                            setNewList(prev => ({ ...prev, selectedKOLs: allIds }));
                           }
                         }}
                       >

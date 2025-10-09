@@ -283,7 +283,7 @@ export default function CampaignsPage() {
   };
 
   const CampaignCardSkeleton = () => (
-    <Card className="hover:shadow-md transition-shadow h-full flex flex-col">
+    <Card className="transition-shadow h-full flex flex-col">
       <CardHeader className="pb-4">
         <div className="mb-3">
           <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
@@ -971,6 +971,16 @@ export default function CampaignsPage() {
                   <span className="font-medium">Status:</span>
                   <span>{sharingCampaign?.status}</span>
                 </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="public-password">Password for Public View</Label>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-blue-900">Client Email:</span>
+                  <span className="text-sm font-mono text-blue-700">{sharingCampaign?.client_email || 'N/A'}</span>
+                </div>
+                <p className="text-xs text-blue-600 mt-2">Use the client's email address as the password to access the public campaign view</p>
               </div>
             </div>
             <div className="space-y-2">

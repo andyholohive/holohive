@@ -118,12 +118,11 @@ export default function ClientsPage() {
       return true;
     }
     if (startClientStep === 2) {
-      // Campaign Details step: require all campaign fields
+      // Campaign Details step: require all campaign fields except end date
       return (
         !!startClientForm.campaignName.trim() &&
         !!startClientForm.campaignManager &&
         !!startClientForm.startDate &&
-        !!startClientForm.endDate &&
         !!startClientForm.region &&
         !!startClientForm.totalBudget
       );
@@ -514,7 +513,9 @@ export default function ClientsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Section 1: Client Details</h3>
                         <div className="grid gap-4">
                           <div className="grid gap-2">
-                            <Label htmlFor="companyName">Company Name</Label>
+                            <Label htmlFor="companyName">
+                              Company Name {!startClientForm.isRenewingClient && <span className="text-red-500">*</span>}
+                            </Label>
                             <Input
                               id="companyName"
                               value={startClientForm.companyName}
@@ -529,8 +530,8 @@ export default function ClientsPage() {
                               id="renewingClient"
                               checked={startClientForm.isRenewingClient}
                               onCheckedChange={(checked) => {
-                                setStartClientForm({ 
-                                  ...startClientForm, 
+                                setStartClientForm({
+                                  ...startClientForm,
                                   isRenewingClient: checked as boolean,
                                   companyName: checked ? '' : startClientForm.companyName,
                                   email: checked ? '' : startClientForm.email,
@@ -543,7 +544,9 @@ export default function ClientsPage() {
                           </div>
                           {startClientForm.isRenewingClient && (
                             <div className="grid gap-2">
-                              <Label htmlFor="existingClient">Select Existing Client</Label>
+                              <Label htmlFor="existingClient">
+                                Select Existing Client <span className="text-red-500">*</span>
+                              </Label>
                               <Select value={startClientForm.selectedExistingClient} onValueChange={(value) => {
                                 const selectedClient = clients.find(c => c.id === value);
                                 if (selectedClient) {
@@ -571,7 +574,9 @@ export default function ClientsPage() {
                             </div>
                           )}
                           <div className="grid gap-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="email">
+                              Email {!startClientForm.isRenewingClient && <span className="text-red-500">*</span>}
+                            </Label>
                             <Input
                               id="email"
                               type="email"
@@ -598,7 +603,9 @@ export default function ClientsPage() {
                             />
                           </div>
                           <div className="grid gap-2">
-                            <Label htmlFor="source">Source</Label>
+                            <Label htmlFor="source">
+                              Source {!startClientForm.isRenewingClient && <span className="text-red-500">*</span>}
+                            </Label>
                             <Select value={startClientForm.source} onValueChange={(value) => setStartClientForm({ ...startClientForm, source: value })} disabled={startClientForm.isRenewingClient}>
                               <SelectTrigger className="auth-input" disabled={startClientForm.isRenewingClient}>
                                 <SelectValue />
@@ -622,8 +629,8 @@ export default function ClientsPage() {
                             <Checkbox
                               id="callHeld"
                               checked={startClientForm.callHeld}
-                              onCheckedChange={(checked) => setStartClientForm({ 
-                                ...startClientForm, 
+                              onCheckedChange={(checked) => setStartClientForm({
+                                ...startClientForm,
                                 callHeld: checked as boolean,
                                 callDate: checked ? startClientForm.callDate : undefined
                               })}
@@ -632,7 +639,9 @@ export default function ClientsPage() {
                           </div>
                           {startClientForm.callHeld && (
                             <div className="grid gap-2">
-                              <Label htmlFor="callDate">Call Date</Label>
+                              <Label htmlFor="callDate">
+                                Call Date <span className="text-red-500">*</span>
+                              </Label>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <Button
@@ -673,7 +682,9 @@ export default function ClientsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Section 3: Campaign Details</h3>
                         <div className="grid gap-4">
                           <div className="grid gap-2">
-                            <Label htmlFor="campaignName">Campaign Name</Label>
+                            <Label htmlFor="campaignName">
+                              Campaign Name <span className="text-red-500">*</span>
+                            </Label>
                             <Input
                               id="campaignName"
                               value={startClientForm.campaignName}
@@ -683,7 +694,9 @@ export default function ClientsPage() {
                             />
                           </div>
                           <div className="grid gap-2">
-                            <Label htmlFor="campaignManager">Campaign Manager</Label>
+                            <Label htmlFor="campaignManager">
+                              Campaign Manager <span className="text-red-500">*</span>
+                            </Label>
                             <Select value={startClientForm.campaignManager} onValueChange={(value) => setStartClientForm({ ...startClientForm, campaignManager: value })}>
                               <SelectTrigger className="auth-input">
                                 <SelectValue placeholder="Select campaign manager" />
@@ -699,7 +712,9 @@ export default function ClientsPage() {
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                              <Label htmlFor="startDate">Start Date</Label>
+                              <Label htmlFor="startDate">
+                                Start Date <span className="text-red-500">*</span>
+                              </Label>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <Button
@@ -768,7 +783,9 @@ export default function ClientsPage() {
                           </div>
                           {/* Moved from old Section 5: Campaign Details 2 */}
                           <div className="grid gap-2">
-                            <Label htmlFor="region">Region</Label>
+                            <Label htmlFor="region">
+                              Region <span className="text-red-500">*</span>
+                            </Label>
                             <Select value={startClientForm.region} onValueChange={(value) => {
                               setStartClientForm({
                                 ...startClientForm,
@@ -845,15 +862,17 @@ export default function ClientsPage() {
                             </div>
                           )}
                           <div className="grid gap-2">
-                            <Label htmlFor="totalBudget">Budget</Label>
+                            <Label htmlFor="totalBudget">
+                              Budget <span className="text-red-500">*</span>
+                            </Label>
                             <Input
                               id="totalBudget"
                               type="number"
                               value={startClientForm.totalBudget}
                               onChange={(e) => {
                                 const budget = e.target.value;
-                                setStartClientForm({ 
-                                  ...startClientForm, 
+                                setStartClientForm({
+                                  ...startClientForm,
                                   totalBudget: budget,
                                   callSupport: budget ? parseInt(budget) >= 10000 : false
                                 });
@@ -944,6 +963,34 @@ export default function ClientsPage() {
                              >Add Allocation</Button>
                            </div>
                          </div>
+                         {/* Budget Type */}
+                         <div className="grid gap-2">
+                           <Label>Budget Type</Label>
+                           <div className="flex space-x-4">
+                             {['Token', 'Fiat', 'WL'].map((type) => (
+                               <div key={type} className="flex items-center space-x-2">
+                                 <Checkbox
+                                   id={type}
+                                   checked={startClientForm.budgetType.includes(type)}
+                                   onCheckedChange={(checked) => {
+                                     if (checked) {
+                                       setStartClientForm({
+                                         ...startClientForm,
+                                         budgetType: [...startClientForm.budgetType, type]
+                                       });
+                                     } else {
+                                       setStartClientForm({
+                                         ...startClientForm,
+                                         budgetType: startClientForm.budgetType.filter(t => t !== type)
+                                       });
+                                     }
+                                   }}
+                                 />
+                                 <Label htmlFor={type} className="text-sm capitalize">{type}</Label>
+                               </div>
+                             ))}
+                           </div>
+                         </div>
                         </div>
                       </div>
                     )}
@@ -966,33 +1013,6 @@ export default function ClientsPage() {
                               onCheckedChange={(checked) => setStartClientForm({ ...startClientForm, ndaSigned: checked as boolean })}
                             />
                             <Label htmlFor="ndaSigned" className="text-sm">NDA signed?</Label>
-                          </div>
-                          <div className="grid gap-2">
-                            <Label>Budget Type</Label>
-                            <div className="flex space-x-4">
-                              {['Token', 'Fiat', 'WL'].map((type) => (
-                                <div key={type} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={type}
-                                    checked={startClientForm.budgetType.includes(type)}
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        setStartClientForm({
-                                          ...startClientForm,
-                                          budgetType: [...startClientForm.budgetType, type]
-                                        });
-                                      } else {
-                                        setStartClientForm({
-                                          ...startClientForm,
-                                          budgetType: startClientForm.budgetType.filter(t => t !== type)
-                                        });
-                                      }
-                                    }}
-                                  />
-                                  <Label htmlFor={type} className="text-sm capitalize">{type}</Label>
-                                </div>
-                              ))}
-                            </div>
                           </div>
                         </div>
                       </div>
@@ -1064,7 +1084,7 @@ export default function ClientsPage() {
                                 setStartClientStep(startClientStep + 1);
                               }
                             }}
-                            disabled={isStartClientSubmitting}
+                            disabled={!isStepValid() || isStartClientSubmitting}
                           >
                             Next
                           </Button>

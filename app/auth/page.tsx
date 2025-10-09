@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { SignUpForm } from '@/components/auth/SignUpForm'
+import { ForgotPasswordForm } from '@/components/auth/ForgotPasswordForm'
 import { useAuth } from '@/contexts/AuthContext'
 
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
   const { user, loading } = useAuth()
   const router = useRouter()
 
@@ -21,6 +23,15 @@ export default function AuthPage() {
 
   const toggleMode = () => {
     setIsLogin(!isLogin)
+    setShowForgotPassword(false)
+  }
+
+  const handleForgotPassword = () => {
+    setShowForgotPassword(true)
+  }
+
+  const handleBackToLogin = () => {
+    setShowForgotPassword(false)
   }
 
   if (loading) {
@@ -51,8 +62,10 @@ export default function AuthPage() {
           </div>
         </div>
         
-        {isLogin ? (
-          <LoginForm onToggleMode={toggleMode} />
+        {showForgotPassword ? (
+          <ForgotPasswordForm onBackToLogin={handleBackToLogin} />
+        ) : isLogin ? (
+          <LoginForm onToggleMode={toggleMode} onForgotPassword={handleForgotPassword} />
         ) : (
           <SignUpForm onToggleMode={toggleMode} />
         )}

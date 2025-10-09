@@ -107,27 +107,31 @@ export class CampaignService {
   /**
    * Create a new campaign
    */
-  static async createCampaign(campaignData: {
-    client_id: string;
-    name: string;
-    total_budget: number;
-    status?: 'Planning' | 'Active' | 'Paused' | 'Completed';
-    start_date: string;
-    end_date: string;
-    description?: string;
-    intro_call?: boolean;
-    intro_call_date?: string | null;
-    region?: string;
-    client_choosing_kols?: boolean;
-    multi_activation?: boolean;
-    manager?: string | null;
-    call_support?: boolean;
-    proposal_sent?: boolean;
-    nda_signed?: boolean;
-    budget_type?: string[];
-  }): Promise<Campaign> {
+  static async createCampaign(
+    campaignData: {
+      client_id: string;
+      name: string;
+      total_budget: number;
+      status?: 'Planning' | 'Active' | 'Paused' | 'Completed';
+      start_date: string;
+      end_date: string;
+      description?: string;
+      intro_call?: boolean;
+      intro_call_date?: string | null;
+      region?: string;
+      client_choosing_kols?: boolean;
+      multi_activation?: boolean;
+      manager?: string | null;
+      call_support?: boolean;
+      proposal_sent?: boolean;
+      nda_signed?: boolean;
+      budget_type?: string[];
+    },
+    supabaseClient?: any
+  ): Promise<Campaign> {
     try {
-      const { data, error } = await supabase
+      const client = supabaseClient || supabase;
+      const { data, error } = await client
         .from('campaigns')
         .insert(campaignData)
         .select()
