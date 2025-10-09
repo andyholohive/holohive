@@ -277,7 +277,7 @@ export const createKOLListTool: AgentTool = {
         .insert({
           name,
           notes: description || `List created from search: "${search_criteria}"`,
-          status: 'active',
+          status: 'curated', // Valid values: 'curated', 'approved', 'denied'
         })
         .select()
         .single();
@@ -294,7 +294,7 @@ export const createKOLListTool: AgentTool = {
         return {
           list_id: list.id,
           master_kol_id: kol.id,
-          status: 'active',
+          status: 'curated', // Valid values: 'curated', 'interested', 'onboarded', 'concluded'
           notes: null,
         };
       });
