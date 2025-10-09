@@ -17,14 +17,11 @@
 
 import OpenAI from 'openai';
 import { supabase } from './supabase';
-import { supabaseScript } from './supabase-script';
 import { MasterKOL } from './kolService';
 
-// Use script client in Node.js environment, browser client otherwise
+// Always use the browser client for web app
+// The script client is only for standalone Node.js scripts
 const getSupabaseClient = () => {
-  if (typeof window === 'undefined' && !process.env.NEXT_RUNTIME) {
-    return supabaseScript;
-  }
   return supabase;
 };
 

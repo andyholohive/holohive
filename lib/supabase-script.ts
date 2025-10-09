@@ -4,8 +4,16 @@ import { resolve } from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from './database.types';
 
+// IMPORTANT: This file should ONLY be imported in server-side code (API routes, scripts)
+// NEVER import this in client components or it will expose the service role key
+
+// Prevent loading in browser
+if (typeof window !== 'undefined') {
+  throw new Error('supabase-script.ts should not be imported in browser code');
+}
+
 // Load .env.local if running in Node.js (not Next.js)
-if (typeof window === 'undefined' && !process.env.NEXT_RUNTIME) {
+if (!process.env.NEXT_RUNTIME) {
   dotenv.config({ path: resolve(__dirname, '../.env.local') });
 }
 
