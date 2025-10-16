@@ -114,7 +114,7 @@ export class CampaignService {
       total_budget: number;
       status?: 'Planning' | 'Active' | 'Paused' | 'Completed';
       start_date: string;
-      end_date: string;
+      end_date?: string;
       description?: string;
       intro_call?: boolean;
       intro_call_date?: string | null;

@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabase";
 import { CampaignKOLService } from "@/lib/campaignKolService";
+import { UserService } from '@/lib/userService';
 
 export default function CampaignsPage() {
   const { user, userProfile } = useAuth();
@@ -42,6 +43,8 @@ export default function CampaignsPage() {
   const [selectedListId, setSelectedListId] = useState<string>("");
   const [listKOLs, setListKOLs] = useState<{ master_kol_id: string; name: string; followers: number | null; region: string | null; platform: string[] | null }[]>([]);
   const [selectedKolIds, setSelectedKolIds] = useState<Set<string>>(new Set());
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [contentCounts, setContentCounts] = useState<{ [campaignId: string]: { total: number; posted: number } }>({});
   // In newCampaign state, add region, clientChoosingKols, multiActivation, intro_call, intro_call_date, budgetAllocations
   const [newCampaign, setNewCampaign] = useState({
     client_id: "",
@@ -57,6 +60,7 @@ export default function CampaignsPage() {
     intro_call: false,
     intro_call_date: undefined as string | undefined,
     budgetAllocations: [] as { region: string; amount: string }[],
+    manager: "",
   });
 
   const router = useRouter();
@@ -70,6 +74,12 @@ export default function CampaignsPage() {
       fetchAvailableClients();
       fetchAvailableTemplates();
       fetchAvailableLists();
+      UserService.getAllUsers().then(setAllUsers);
+      // Set default manager to current user every time dialog opens
+      setNewCampaign(prev => ({ ...prev, manager: user.id }));
+    } else if (!isNewCampaignOpen) {
+      // Reset manager when dialog closes
+      setNewCampaign(prev => ({ ...prev, manager: user?.id || "" }));
     }
   }, [isNewCampaignOpen, user?.id, userProfile?.role]);
 
@@ -148,7 +158,7 @@ export default function CampaignsPage() {
 
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newCampaign.client_id || !newCampaign.name.trim() || !newCampaign.total_budget || !newCampaign.start_date || !newCampaign.end_date) return;
+    if (!newCampaign.client_id || !newCampaign.name.trim() || !newCampaign.total_budget || !newCampaign.start_date) return;
     try {
       setIsSubmittingCampaign(true);
       const campaign = await CampaignService.createCampaign({
@@ -164,6 +174,7 @@ export default function CampaignsPage() {
         multi_activation: newCampaign.multiActivation,
         intro_call: newCampaign.intro_call,
         intro_call_date: newCampaign.intro_call_date || null,
+        manager: newCampaign.manager || null,
       });
       setNewCampaign({
         client_id: "",
@@ -179,6 +190,7 @@ export default function CampaignsPage() {
         intro_call: false,
         intro_call_date: undefined,
         budgetAllocations: [],
+        manager: user?.id || "",
       });
       setIsNewCampaignOpen(false);
       await fetchCampaigns();
@@ -213,6 +225,32 @@ export default function CampaignsPage() {
         user.id
       );
       setCampaigns(fetchedCampaigns);
+
+      // Fetch content counts for each campaign
+      const counts: { [campaignId: string]: { total: number; posted: number } } = {};
+      await Promise.all(
+        fetchedCampaigns.map(async (campaign) => {
+          try {
+            const { data, error } = await supabase
+              .from('contents')
+              .select('status')
+              .eq('campaign_id', campaign.id);
+
+            if (!error && data) {
+              const total = data.length;
+              const posted = data.filter(content =>
+                content.status?.toLowerCase() === 'posted' ||
+                content.status?.toLowerCase() === 'published' ||
+                content.status?.toLowerCase() === 'live'
+              ).length;
+              counts[campaign.id] = { total, posted };
+            }
+          } catch (err) {
+            console.error(`Error fetching content counts for campaign ${campaign.id}:`, err);
+          }
+        })
+      );
+      setContentCounts(counts);
     } catch (err) {
       console.error("Error fetching campaigns:", err);
       setError("Failed to load campaigns");
@@ -410,7 +448,7 @@ export default function CampaignsPage() {
               <form onSubmit={handleCreateCampaign}>
                 <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
                   <div className="grid gap-2">
-                    <Label htmlFor="client">Client</Label>
+                    <Label htmlFor="client">Client <span className="text-red-500">*</span></Label>
                     <Select value={newCampaign.client_id} onValueChange={(value) => setNewCampaign({ ...newCampaign, client_id: value })}>
                       <SelectTrigger className="auth-input">
                         <SelectValue placeholder="Select a client" />
@@ -460,7 +498,7 @@ export default function CampaignsPage() {
                     )}
                   </div> */}
                   <div className="grid gap-2">
-                    <Label htmlFor="campaign-name">Campaign Name</Label>
+                    <Label htmlFor="campaign-name">Campaign Name <span className="text-red-500">*</span></Label>
                     <Input
                       id="campaign-name"
                       value={newCampaign.name}
@@ -469,6 +507,21 @@ export default function CampaignsPage() {
                       className="auth-input"
                       required
                     />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="manager">Campaign Manager</Label>
+                    <Select value={newCampaign.manager} onValueChange={(value) => setNewCampaign({ ...newCampaign, manager: value })}>
+                      <SelectTrigger className="auth-input">
+                        <SelectValue placeholder="Select campaign manager" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allUsers.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name || user.email}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
@@ -488,7 +541,7 @@ export default function CampaignsPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="start-date">Start Date</Label>
+                      <Label htmlFor="start-date">Start Date <span className="text-red-500">*</span></Label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
@@ -558,7 +611,7 @@ export default function CampaignsPage() {
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="description">Description (Optional)</Label>
+                    <Label htmlFor="description">Description (Optional) - Client Facing</Label>
                     <Textarea
                       id="description"
                       value={newCampaign.description}
@@ -715,7 +768,7 @@ export default function CampaignsPage() {
                   )}
                   {/* Move Budget and Budget Allocation fields here, at the end */}
                   <div className="grid gap-2 mt-2">
-                    <Label htmlFor="totalBudget">Budget</Label>
+                    <Label htmlFor="totalBudget">Total Budget <span className="text-red-500">*</span></Label>
                     <div className="relative w-full">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
                       <Input
@@ -735,7 +788,7 @@ export default function CampaignsPage() {
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label>Budget Allocation</Label>
+                    <Label>Regional Budget Allocation</Label>
                     <div className="bg-gray-50 border rounded p-3 text-sm text-gray-700 space-y-2">
                       {newCampaign.budgetAllocations.length === 0 && (
                         <div className="text-gray-400 text-sm">No allocations yet.</div>
@@ -898,27 +951,26 @@ export default function CampaignsPage() {
                 </div>
               </CardHeader>
               <CardContent className="pt-4 border-t border-gray-100 flex flex-col flex-1">
-                <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
-                  <span>Budget Utilized</span>
-                  <span className="bg-gray-100 px-2 py-1 rounded-md text-gray-600 font-medium">
-                    {CampaignService.calculateBudgetUtilization(campaign.total_budget, campaign.total_allocated || 0)}%
-                  </span>
-                </div>
-                {campaign.budget_allocations && campaign.budget_allocations.length > 0 && (
-                  <div className="mb-3">
-                    <p className="text-xs text-gray-600 mb-2">Regional Allocations:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {campaign.budget_allocations.map((allocation) => (
-                        <span
-                          key={allocation.id}
-                          className="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-700"
-                        >
-                          {allocation.region === 'apac' ? 'APAC' : allocation.region === 'global' ? 'Global' : allocation.region}: {CampaignService.formatCurrency(allocation.allocated_budget)}
-                        </span>
-                      ))}
-                    </div>
+                <div className="mb-3">
+                  <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
+                    <span>Campaign Progress</span>
+                    <span className="bg-gray-100 px-2 py-1 rounded-md text-gray-600 font-medium">
+                      {(() => {
+                        const counts = contentCounts[campaign.id];
+                        if (!counts || counts.total === 0) return '0%';
+                        const percentage = Math.round((counts.posted / counts.total) * 100);
+                        return `${percentage}%`;
+                      })()}
+                    </span>
                   </div>
-                )}
+                  <p className="text-xs text-gray-500">
+                    {(() => {
+                      const counts = contentCounts[campaign.id];
+                      if (!counts || counts.total === 0) return 'No content yet';
+                      return `${counts.posted} of ${counts.total} content posted`;
+                    })()}
+                  </p>
+                </div>
                 <Button
                   variant="outline"
                   size="sm"

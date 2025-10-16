@@ -12,7 +12,8 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 // import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, BarChart3, Table as TableIcon, Edit, CreditCard } from "lucide-react";
+import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserService } from "@/lib/userService";
@@ -78,6 +79,9 @@ const CampaignDetailsPage = () => {
 
   // Information tab toggle state
   const [informationViewMode, setInformationViewMode] = useState<'overview' | 'metrics'>('overview');
+
+  // Contents tab toggle state
+  const [contentsViewMode, setContentsViewMode] = useState<'overview' | 'table'>('overview');
 
   // Payments state
   const [payments, setPayments] = useState<any[]>([]);
@@ -163,15 +167,69 @@ const CampaignDetailsPage = () => {
     return colorMap[type] || 'bg-gray-100 text-gray-800';
   };
 
-  const getCreatorTypeColor = (type: string) => {
+  const getCreatorTypeColor = (creatorType: string) => {
     const colorMap: { [key: string]: string } = {
-      'Macro': 'bg-purple-100 text-purple-800',
-      'Micro': 'bg-blue-100 text-blue-800',
-      'Nano': 'bg-green-100 text-green-800',
-      'Celebrity': 'bg-pink-100 text-pink-800',
-      'Mega': 'bg-red-100 text-red-800'
+      'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
+      'Drama-Forward': 'bg-red-100 text-red-800',
+      'Skeptic': 'bg-orange-100 text-orange-800',
+      'Educator': 'bg-blue-100 text-blue-800',
+      'Bridge Builder': 'bg-green-100 text-green-800',
+      'Visionary': 'bg-indigo-100 text-indigo-800',
+      'Onboarder': 'bg-teal-100 text-teal-800',
+      'General': 'bg-gray-100 text-gray-800',
+      'Gaming': 'bg-pink-100 text-pink-800',
+      'Crypto': 'bg-yellow-100 text-yellow-800',
+      'Memecoin': 'bg-orange-100 text-orange-800',
+      'NFT': 'bg-purple-100 text-purple-800',
+      'Trading': 'bg-green-100 text-green-800',
+      'AI': 'bg-blue-100 text-blue-800',
+      'Research': 'bg-indigo-100 text-indigo-800',
+      'Airdrop': 'bg-teal-100 text-teal-800',
+      'Art': 'bg-pink-100 text-pink-800'
     };
-    return colorMap[type] || 'bg-gray-100 text-gray-800';
+    return colorMap[creatorType] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getNewContentTypeColor = (contentType: string) => {
+    const colorMap: { [key: string]: string } = {
+      'Meme': 'bg-yellow-100 text-yellow-800',
+      'News': 'bg-blue-100 text-blue-800',
+      'Trading': 'bg-green-100 text-green-800',
+      'Deep Dive': 'bg-purple-100 text-purple-800',
+      'Meme/Cultural Narrative': 'bg-pink-100 text-pink-800',
+      'Drama Queen': 'bg-red-100 text-red-800',
+      'Sceptics': 'bg-orange-100 text-orange-800',
+      'Technical Educator': 'bg-indigo-100 text-indigo-800',
+      'Bridge Builders': 'bg-teal-100 text-teal-800',
+      'Visionaries': 'bg-cyan-100 text-cyan-800'
+    };
+    return colorMap[contentType] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getPricingColor = (pricing: string) => {
+    const colorMap: { [key: string]: string } = {
+      '<$200': 'bg-green-100 text-green-800',
+      '$200-500': 'bg-yellow-100 text-yellow-800',
+      '$500-1K': 'bg-orange-100 text-orange-800',
+      '$1K-2K': 'bg-red-100 text-red-800',
+      '$2K-3K': 'bg-purple-100 text-purple-800',
+      '>$3K': 'bg-pink-100 text-pink-800'
+    };
+    return colorMap[pricing] || 'bg-blue-100 text-blue-800';
+  };
+
+  const budgetTypeOptions = ["Token", "Fiat", "WL"];
+
+  const nextUpdate = () => {
+    setCurrentUpdateIndex((prev) =>
+      prev === campaignUpdates.length - 1 ? 0 : prev + 1
+    );
+  };
+
+  const prevUpdate = () => {
+    setCurrentUpdateIndex((prev) =>
+      prev === 0 ? campaignUpdates.length - 1 : prev - 1
+    );
   };
 
   useEffect(() => {
@@ -1033,10 +1091,37 @@ const CampaignDetailsPage = () => {
   // 1. Add state for selection and bulk actions for contents
   const [selectedContents, setSelectedContents] = useState<string[]>([]);
 
+  // Content filters state
+  const [contentFilters, setContentFilters] = useState<{
+    platform: string[];
+    type: string[];
+    status: string[];
+  }>({
+    platform: [],
+    type: [],
+    status: []
+  });
+
   // 2. Add filtering logic for search and status
   const filteredContents = contents.filter(content => {
     const kol = campaignKOLs.find(k => k.id === content.campaign_kols_id);
     const search = contentsSearchTerm.toLowerCase();
+
+    // Platform filter
+    if (contentFilters.platform.length > 0 && !contentFilters.platform.includes(content.platform || '')) {
+      return false;
+    }
+
+    // Type filter
+    if (contentFilters.type.length > 0 && !contentFilters.type.includes(content.type || '')) {
+      return false;
+    }
+
+    // Status filter
+    if (contentFilters.status.length > 0 && !contentFilters.status.includes(content.status || '')) {
+      return false;
+    }
+
     return (
       (!search ||
         (kol?.master_kol?.name?.toLowerCase().includes(search)) ||
@@ -1398,20 +1483,6 @@ const CampaignDetailsPage = () => {
     return <div className="text-center py-8 text-red-500">{error || "Campaign not found"}</div>;
   }
 
-  const budgetTypeOptions = ["Token", "Fiat", "WL"];
-
-  const nextUpdate = () => {
-    setCurrentUpdateIndex((prev) => 
-      prev === campaignUpdates.length - 1 ? 0 : prev + 1
-    );
-  };
-
-  const prevUpdate = () => {
-    setCurrentUpdateIndex((prev) => 
-      prev === 0 ? campaignUpdates.length - 1 : prev - 1
-    );
-  };
-
   return (
     <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
       <div className="w-full">
@@ -1440,14 +1511,29 @@ const CampaignDetailsPage = () => {
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-100 p-2 rounded-lg"><Megaphone className="h-6 w-6 text-gray-600" /></div>
                   {editMode ? (
-                      <Input 
-                        className="text-2xl font-bold text-gray-900 auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]" 
+                      <Input
+                        className="text-2xl font-bold text-gray-900 auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
                         style={{ borderColor: '#e5e7eb' }}
-                        value={form?.name || ""} 
-                        onChange={e => handleChange("name", e.target.value)} 
+                        value={form?.name || ""}
+                        onChange={e => handleChange("name", e.target.value)}
                       />
                   ) : (
                     <h2 className="text-2xl font-bold text-gray-900">{campaign.name}</h2>
+                  )}
+                  {editMode ? (
+                    <Select value={form?.status || ""} onValueChange={value => handleChange("status", value)}>
+                      <SelectTrigger className="w-40 focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Planning">Planning</SelectItem>
+                        <SelectItem value="Active">Active</SelectItem>
+                        <SelectItem value="Paused">Paused</SelectItem>
+                        <SelectItem value="Completed">Completed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <div className="font-bold">{getStatusBadge(campaign.status)}</div>
                   )}
                 </div>
                 {!editMode && (
@@ -1455,31 +1541,9 @@ const CampaignDetailsPage = () => {
                 )}
               </CardHeader>
                 <CardContent className="pt-6">
-                  {/* Information Tab Toggle */}
-                  <div className="mb-4">
-                    <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
-                      <div
-                        onClick={() => setInformationViewMode('overview')}
-                        className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${informationViewMode === 'overview' ? 'bg-background text-foreground shadow-sm' : ''}`}
-                      >
-                        <BarChart3 className="h-4 w-4 mr-2" />
-                        Overview
-                      </div>
-                      <div
-                        onClick={() => setInformationViewMode('metrics')}
-                        className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${informationViewMode === 'metrics' ? 'bg-background text-foreground shadow-sm' : ''}`}
-                      >
-                        <BarChart3 className="h-4 w-4 mr-2" />
-                        Metrics
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Overview Tab */}
-                  {informationViewMode === 'overview' && (
-                    <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-8">
                                 {!editMode && (
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between col-span-2">
                     {/* Campaign Updates Carousel */}
                     <div className="flex-1 max-w-md">
                       <div className="text-sm font-medium text-gray-700 mb-2">Recent Updates</div>
@@ -1723,25 +1787,69 @@ const CampaignDetailsPage = () => {
                     </div>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-4 text-sm flex-1">
-                  <div className="col-span-2">
-                    <div className="text-gray-500 mb-1">Outline</div>
-                    {editMode ? (
-                      <Textarea
-                        value={form?.outline || ""}
-                        onChange={e => handleChange("outline", e.target.value)}
-                        className="auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
-                        style={{ borderColor: '#e5e7eb' }}
-                        placeholder="Enter campaign outline..."
-                        rows={3}
-                      />
-                    ) : (
-                      <div className="font-medium whitespace-pre-line">{campaign.outline || '-'}</div>
-                    )}
+                  {/* Campaign Overview Section */}
+                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                        <FileText className="h-5 w-5 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Campaign Overview</h3>
+                    </div>
+                    <div className="space-y-5">
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                            Outline
+                          </div>
+                          <Badge variant="outline" className="text-[10px] text-gray-500 border-gray-300">Internal</Badge>
+                        </div>
+                        {editMode ? (
+                          <Textarea
+                            value={form?.outline || ""}
+                            onChange={e => handleChange("outline", e.target.value)}
+                            className="auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                            style={{ borderColor: '#e5e7eb' }}
+                            placeholder="Enter campaign outline..."
+                            rows={3}
+                          />
+                        ) : (
+                          <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{campaign.outline || <span className="text-gray-400 italic">No outline provided</span>}</div>
+                        )}
+                      </div>
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                            Description
+                          </div>
+                          <Badge variant="outline" className="text-[10px] text-[#3e8692] border-[#3e8692]">Client-Facing</Badge>
+                        </div>
+                        {editMode ? (
+                          <Textarea
+                            value={form?.description || ""}
+                            onChange={e => handleChange("description", e.target.value)}
+                            className="auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                            style={{ borderColor: '#e5e7eb' }}
+                            rows={3}
+                          />
+                        ) : (
+                          <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{campaign.description || <span className="text-gray-400 italic">No description provided</span>}</div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-gray-500 mb-1">Start Date</div>
-                    {editMode ? (
+
+                  {/* Timeline Section */}
+                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                        <CalendarIcon className="h-5 w-5 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Timeline</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Start Date</div>
+                        {editMode ? (
                       <Popover key="start-date-popover">
                         <PopoverTrigger asChild>
                           <Button
@@ -1765,11 +1873,11 @@ const CampaignDetailsPage = () => {
                         </PopoverContent>
                       </Popover>
                     ) : (
-                      <div className="font-medium">{formatDate(campaign?.start_date)}</div>
+                      <div className="text-lg font-semibold text-gray-900">{formatDate(campaign?.start_date)}</div>
                     )}
                   </div>
-                  <div>
-                    <div className="text-gray-500 mb-1">End Date</div>
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">End Date</div>
                     {editMode ? (
                       <Popover key="end-date-popover">
                         <PopoverTrigger asChild>
@@ -1795,11 +1903,14 @@ const CampaignDetailsPage = () => {
                         </PopoverContent>
                       </Popover>
                     ) : (
-                      <div className="font-medium">{formatDate(campaign?.end_date)}</div>
+                      <div className="text-lg font-semibold text-gray-900">{formatDate(campaign?.end_date)}</div>
                     )}
                   </div>
-                  <div>
-                    <div className="text-gray-500 mb-1">Region</div>
+                  <div className="col-span-2 bg-white p-4 rounded-lg border border-gray-200">
+                    <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
+                      <MapPin className="h-3.5 w-3.5 text-[#3e8692]" />
+                      Region
+                    </div>
                     {editMode ? (
                       <Select value={form?.region || ""} onValueChange={value => handleChange("region", value)}>
                         <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
@@ -1811,46 +1922,52 @@ const CampaignDetailsPage = () => {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <div className="font-medium">{displayRegion(campaign?.region)}</div>
+                      <div className="text-lg font-semibold text-gray-900">{displayRegion(campaign?.region)}</div>
                     )}
                   </div>
-                  <div>
-                    <div className="text-gray-500 mb-1">Status</div>
-                    {editMode ? (
-                      <Select value={form?.status || ""} onValueChange={value => handleChange("status", value)}>
-                        <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Planning">Planning</SelectItem>
-                          <SelectItem value="Active">Active</SelectItem>
-                          <SelectItem value="Paused">Paused</SelectItem>
-                          <SelectItem value="Completed">Completed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <div className="font-medium">{getStatusBadge(campaign.status)}</div>
-                    )}
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-gray-500 mb-1">Intro Call</div>
-                    {editMode ? (
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="intro_call"
-                          checked={!!form?.intro_call}
-                          onCheckedChange={checked => handleChange("intro_call", !!checked)}
-                        />
-                        <Label htmlFor="intro_call" className="text-sm">Intro call held?</Label>
+
+                  {/* Client Communication Section */}
+                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                        <Phone className="h-5 w-5 text-white" />
                       </div>
-                    ) : (
-                      <div className="font-medium flex items-center gap-1">{campaign?.intro_call ? <><Phone className="h-4 w-4 text-[#3e8692]" />Yes</> : "No"}</div>
-                    )}
-                  </div>
-                  {!!(editMode ? form?.intro_call : campaign?.intro_call) && (
-                    <div>
-                      <div className="text-gray-500 mb-1">Intro Call Date</div>
-                      {editMode ? (
+                      <h3 className="text-lg font-semibold text-gray-900">Client Communication</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Intro Call</div>
+                        {editMode ? (
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id="intro_call"
+                              checked={!!form?.intro_call}
+                              onCheckedChange={checked => handleChange("intro_call", !!checked)}
+                            />
+                            <Label htmlFor="intro_call" className="text-sm">Intro call held?</Label>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {campaign?.intro_call ? (
+                              <>
+                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                <span className="text-base font-semibold text-green-600">Completed</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-5 w-5 text-gray-400" />
+                                <span className="text-base font-medium text-gray-400">Not Held</span>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {!!(editMode ? form?.intro_call : campaign?.intro_call) && (
+                        <div className="bg-white p-4 rounded-lg border border-gray-200">
+                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Intro Call Date</div>
+                          {editMode ? (
                         <Popover key="intro-call-popover">
                           <PopoverTrigger asChild>
                             <Button
@@ -1874,142 +1991,260 @@ const CampaignDetailsPage = () => {
                           </PopoverContent>
                         </Popover>
                       ) : (
-                        <div className="font-medium">{campaign?.intro_call_date ? formatDate(campaign.intro_call_date) : '-'}</div>
+                        <div className="text-base font-semibold text-gray-900">{campaign?.intro_call_date ? formatDate(campaign.intro_call_date) : '-'}</div>
                       )}
-                    </div>
-                  )}
-                  {/* Manager */}
-                  <div>
-                    <div className="text-gray-500 mb-1">Manager</div>
-                    {editMode ? (
-                      <Select value={form?.manager || ""} onValueChange={value => handleChange("manager", value)}>
-                        <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
-                          <SelectValue placeholder="Select manager" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {allUsers.map((user) => (
-                            <SelectItem key={user.id} value={user.id}>{user.name || user.email}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <div className="font-medium">{allUsers.find(u => u.id === campaign.manager)?.name || '-'}</div>
-                    )}
-                  </div>
-                  {/* Call Support */}
-                  <div>
-                    <div className="text-gray-500 mb-1">Call Support</div>
-                    {editMode ? (
-                      <Checkbox id="call_support" checked={!!form?.call_support} onCheckedChange={checked => handleChange("call_support", !!checked)} />
-                    ) : (
-                      <div className="font-medium">{campaign?.call_support ? 'Yes' : 'No'}</div>
-                    )}
-                  </div>
-                  {/* Client Choosing KOLs */}
-                  <div>
-                    <div className="text-gray-500 mb-1">Client Choosing KOLs</div>
-                    {editMode ? (
-                      <Checkbox id="client_choosing_kols" checked={!!form?.client_choosing_kols} onCheckedChange={checked => handleChange("client_choosing_kols", !!checked)} />
-                    ) : (
-                      <div className="font-medium">{campaign?.client_choosing_kols ? 'Yes' : 'No'}</div>
-                    )}
-                  </div>
-                  {/* Multi-Activation */}
-                  <div>
-                    <div className="text-gray-500 mb-1">Multi-Activation</div>
-                    {editMode ? (
-                      <Checkbox id="multi_activation" checked={!!form?.multi_activation} onCheckedChange={checked => handleChange("multi_activation", !!checked)} />
-                    ) : (
-                      <div className="font-medium">{campaign?.multi_activation ? 'Yes' : 'No'}</div>
-                    )}
-                  </div>
-                  {/* Proposal Sent */}
-                  <div>
-                    <div className="text-gray-500 mb-1">Proposal Sent</div>
-                    {editMode ? (
-                      <Checkbox id="proposal_sent" checked={!!form?.proposal_sent} onCheckedChange={checked => handleChange("proposal_sent", !!checked)} />
-                    ) : (
-                      <div className="font-medium">{campaign?.proposal_sent ? 'Yes' : 'No'}</div>
-                    )}
-                  </div>
-                  {/* NDA Signed */}
-                  <div>
-                    <div className="text-gray-500 mb-1">NDA Signed</div>
-                    {editMode ? (
-                      <Checkbox id="nda_signed" checked={!!form?.nda_signed} onCheckedChange={checked => handleChange("nda_signed", !!checked)} />
-                    ) : (
-                      <div className="font-medium">{campaign?.nda_signed ? 'Yes' : 'No'}</div>
-                    )}
-                  </div>
-                  {/* Budget Type */}
-                  <div>
-                    <div className="text-gray-500 mb-1">Budget Type</div>
-                    {editMode ? (
-                      <div className="flex gap-4">
-                        {budgetTypeOptions.map(type => (
-                          <div key={type} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`budget_type_${type}`}
-                              checked={form?.budget_type?.includes(type) || false}
-                              onCheckedChange={checked => {
-                                const current = form?.budget_type || [];
-                                if (checked) {
-                                  handleChange("budget_type", [...current, type]);
-                                } else {
-                                  handleChange("budget_type", current.filter(t => t !== type));
-                                }
-                              }}
-                            />
-                            <Label htmlFor={`budget_type_${type}`} className="text-sm capitalize">{type}</Label>
+                        </div>
+                      )}
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Proposal Sent</div>
+                        {editMode ? (
+                          <Checkbox id="proposal_sent" checked={!!form?.proposal_sent} onCheckedChange={checked => handleChange("proposal_sent", !!checked)} />
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {campaign?.proposal_sent ? (
+                              <>
+                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                <span className="text-base font-semibold text-green-600">Sent</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-5 w-5 text-gray-400" />
+                                <span className="text-base font-medium text-gray-400">Not Sent</span>
+                              </>
+                            )}
                           </div>
-                        ))}
+                        )}
                       </div>
-                    ) : (
-                      <div className="font-medium">{(campaign?.budget_type || []).join(', ') || '-'}</div>
-                    )}
-                  </div>
-                  <div className="col-span-2">
-                    <div className="text-gray-500 mb-1">Description</div>
-                    {editMode ? (
-                      <Textarea
-                        value={form?.description || ""}
-                        onChange={e => handleChange("description", e.target.value)}
-                        className="auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
-                        style={{ borderColor: '#e5e7eb' }}
-                      />
-                    ) : (
-                      <div className="font-medium whitespace-pre-line">{campaign.description || '-'}</div>
-                    )}
-                  </div>
-                </div>
-                {/* Move total budget and budget utilized above regional allocations */}
-                <div className="flex gap-8 items-center mb-2">
-                  <div>
-                    <div className="text-gray-500 text-sm mb-1">Total Budget</div>
-                    {editMode ? (
-                      <div className="relative w-full">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
-                        <Input
-                          type="number"
-                          className="pl-6 w-full auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] text-sm"
-                          style={{ borderColor: '#e5e7eb' }}
-                          value={form?.total_budget || ""}
-                          onChange={e => handleChange("total_budget", e.target.value)}
-                        />
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">NDA Signed</div>
+                        {editMode ? (
+                          <Checkbox id="nda_signed" checked={!!form?.nda_signed} onCheckedChange={checked => handleChange("nda_signed", !!checked)} />
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {campaign?.nda_signed ? (
+                              <>
+                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                <span className="text-base font-semibold text-green-600">Signed</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-5 w-5 text-gray-400" />
+                                <span className="text-base font-medium text-gray-400">Not Signed</span>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="text-sm">{CampaignService.formatCurrency(campaign.total_budget)}</div>
-                    )}
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-gray-500 text-sm mb-1">Budget Utilized</div>
-                    <div className="text-sm">{CampaignService.calculateBudgetUtilization(campaign.total_budget, campaign.total_allocated || 0)}%</div>
+
+                  {/* Team & Management Section */}
+                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                        <Users className="h-5 w-5 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Team & Management</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Manager</div>
+                        {editMode ? (
+                          <Select value={form?.manager || ""} onValueChange={value => handleChange("manager", value)}>
+                            <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
+                              <SelectValue placeholder="Select manager" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allUsers.map((user) => (
+                                <SelectItem key={user.id} value={user.id}>{user.name || user.email}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          (() => {
+                            const manager = allUsers.find(u => u.id === campaign.manager);
+                            const managerName = manager?.name || manager?.email || '-';
+                            const initials = managerName !== '-' ? managerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
+                            return (
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-10 w-10 border-2 border-[#3e8692]">
+                                  <AvatarFallback className="bg-[#3e8692] text-white font-semibold">
+                                    {initials}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="font-semibold text-gray-900">{managerName}</div>
+                                  {manager?.email && <div className="text-xs text-gray-500">{manager.email}</div>}
+                                </div>
+                              </div>
+                            );
+                          })()
+                        )}
+                      </div>
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Call Support</div>
+                        {editMode ? (
+                          <Checkbox id="call_support" checked={!!form?.call_support} onCheckedChange={checked => handleChange("call_support", !!checked)} />
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {campaign?.call_support ? (
+                              <>
+                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                <span className="text-base font-semibold text-green-600">Available</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-5 w-5 text-gray-400" />
+                                <span className="text-base font-medium text-gray-400">Not Available</span>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-                {editMode ? (
-                  <div>
-                    <div className="text-gray-500 mb-2 font-semibold">Regional Allocations</div>
-                    <div className="flex flex-col gap-2">
+
+                  {/* Campaign Settings Section */}
+                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                        <BadgeCheck className="h-5 w-5 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Campaign Settings</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Client Choosing KOLs</div>
+                        {editMode ? (
+                          <Checkbox id="client_choosing_kols" checked={!!form?.client_choosing_kols} onCheckedChange={checked => handleChange("client_choosing_kols", !!checked)} />
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {campaign?.client_choosing_kols ? (
+                              <>
+                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                <span className="text-base font-semibold text-green-600">Enabled</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-5 w-5 text-gray-400" />
+                                <span className="text-base font-medium text-gray-400">Disabled</span>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Multi-Activation</div>
+                        {editMode ? (
+                          <Checkbox id="multi_activation" checked={!!form?.multi_activation} onCheckedChange={checked => handleChange("multi_activation", !!checked)} />
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {campaign?.multi_activation ? (
+                              <>
+                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                <span className="text-base font-semibold text-green-600">Enabled</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-5 w-5 text-gray-400" />
+                                <span className="text-base font-medium text-gray-400">Disabled</span>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Budget Section */}
+                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                        <DollarSign className="h-5 w-5 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Budget</h3>
+                    </div>
+                    <div className="space-y-4">
+                      {/* Budget Overview Card */}
+                      <div className="bg-white p-5 rounded-lg border border-gray-200">
+                        <div className="grid grid-cols-2 gap-6 mb-4">
+                          <div>
+                            <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Total Budget</div>
+                            {editMode ? (
+                              <div className="relative w-full">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                                <Input
+                                  type="number"
+                                  className="pl-6 w-full auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                                  style={{ borderColor: '#e5e7eb' }}
+                                  value={form?.total_budget || ""}
+                                  onChange={e => handleChange("total_budget", e.target.value)}
+                                />
+                              </div>
+                            ) : (
+                              <div className="text-2xl font-bold text-gray-900">{CampaignService.formatCurrency(campaign.total_budget)}</div>
+                            )}
+                          </div>
+                          <div>
+                            <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Allocated</div>
+                            <div className="text-2xl font-bold text-[#3e8692]">{CampaignService.formatCurrency(campaign.total_allocated || 0)}</div>
+                          </div>
+                        </div>
+                        {/* Progress Bar */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-semibold text-gray-700">Budget Utilization</span>
+                            <span className="text-sm font-bold text-gray-900">{CampaignService.calculateBudgetUtilization(campaign.total_budget, campaign.total_allocated || 0)}%</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-[#3e8692] to-[#2d6470] transition-all duration-300 rounded-full"
+                              style={{ width: `${Math.min(CampaignService.calculateBudgetUtilization(campaign.total_budget, campaign.total_allocated || 0), 100)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Budget Type */}
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Budget Type</div>
+                        {editMode ? (
+                          <div className="flex gap-4">
+                            {budgetTypeOptions.map(type => (
+                              <div key={type} className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`budget_type_${type}`}
+                                  checked={form?.budget_type?.includes(type) || false}
+                                  onCheckedChange={checked => {
+                                    const current = form?.budget_type || [];
+                                    if (checked) {
+                                      handleChange("budget_type", [...current, type]);
+                                    } else {
+                                      handleChange("budget_type", current.filter(t => t !== type));
+                                    }
+                                  }}
+                                />
+                                <Label htmlFor={`budget_type_${type}`} className="text-sm capitalize">{type}</Label>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {(campaign?.budget_type || []).length > 0 ? (
+                              (campaign?.budget_type || []).map((type: string) => (
+                                <Badge key={type} variant="outline" className="capitalize text-[#3e8692] border-[#3e8692]">{type}</Badge>
+                              ))
+                            ) : (
+                              <span className="text-gray-400 italic">No budget types specified</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {editMode ? (
+                      <div className="mt-4 bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Regional Allocations</div>
+                        <div className="flex flex-col gap-2">
                       {allocations.map((alloc, idx) => (
                         <div key={alloc.id || idx} className="flex items-center gap-2">
                           <Select value={alloc.region} onValueChange={value => {
@@ -2066,325 +2301,36 @@ const CampaignDetailsPage = () => {
                         className="mt-2"
                         onClick={() => setAllocations([...allocations, { region: '', allocated_budget: '' }])}
                       >Add Allocation</Button>
-                    </div>
-                  </div>
-                ) : (
-                  Array.isArray(campaign.budget_allocations) && campaign.budget_allocations.length > 0 && (
-                    <div>
-                      <div className="text-gray-500 mb-2 font-semibold">Regional Allocations</div>
-                      <div className="flex flex-wrap gap-2">
-                        {campaign.budget_allocations.map((alloc: any) => (
-                          <span key={alloc.id} className="text-xs px-3 py-1 rounded-md bg-gray-100 text-gray-700">
-                            {alloc.region === 'apac' ? 'APAC' : alloc.region === 'global' ? 'Global' : alloc.region}: {CampaignService.formatCurrency(alloc.allocated_budget)}
-                          </span>
-                        ))}
+                        </div>
                       </div>
-                    </div>
-                  )
-                )}
+                    ) : (
+                      Array.isArray(campaign.budget_allocations) && campaign.budget_allocations.length > 0 && (
+                        <div className="mt-4 bg-white p-4 rounded-lg border border-gray-200">
+                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Regional Allocations</div>
+                          <div className="flex flex-wrap gap-2">
+                            {campaign.budget_allocations.map((alloc: any) => (
+                              <Badge key={alloc.id} variant="secondary" className="px-3 py-1.5 text-sm">
+                                <MapPin className="h-3.5 w-3.5 mr-1.5 inline" />
+                                {alloc.region === 'apac' ? 'APAC' : alloc.region === 'global' ? 'Global' : alloc.region}: {CampaignService.formatCurrency(alloc.allocated_budget)}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+
                 {editMode && (
-                  <div className="flex gap-2 mt-6">
+                  <div className="flex gap-2 mt-6 col-span-2">
                     <Button variant="default" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
                     <Button variant="outline" onClick={handleCancel} disabled={saving}>Cancel</Button>
                   </div>
                 )}
                     </div>
-                  )}
-
-                  {/* Metrics Tab */}
-                  {informationViewMode === 'metrics' && (
-                    <div className="space-y-6">
-                      {/* Metrics Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {/* Total Impressions */}
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {(() => {
-                                const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
-                                return totalImpressions.toLocaleString();
-                              })()}
-                            </div>
-                            <p className="text-sm text-gray-600 mt-1">Total Impressions</p>
-                          </CardContent>
-                        </Card>
-
-                        {/* Total Comments */}
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {(() => {
-                                const totalComments = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
-                                return totalComments.toLocaleString();
-                              })()}
-                            </div>
-                            <p className="text-sm text-gray-600 mt-1">Total Comments</p>
-                          </CardContent>
-                        </Card>
-
-                        {/* Total Retweets */}
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {(() => {
-                                const totalRetweets = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
-                                return totalRetweets.toLocaleString();
-                              })()}
-                            </div>
-                            <p className="text-sm text-gray-600 mt-1">Total Retweets</p>
-                          </CardContent>
-                        </Card>
-
-                        {/* Total Likes */}
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {(() => {
-                                const totalLikes = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
-                                return totalLikes.toLocaleString();
-                              })()}
-                            </div>
-                            <p className="text-sm text-gray-600 mt-1">Total Likes</p>
-                          </CardContent>
-                        </Card>
-
-                        {/* Total Engagements */}
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {(() => {
-                                const totalEngagements = contents.reduce((sum, content) => 
-                                  sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
-                                return totalEngagements.toLocaleString();
-                              })()}
-                            </div>
-                            <p className="text-sm text-gray-600 mt-1">Total Engagements</p>
-                          </CardContent>
-                        </Card>
-
-                        {/* Total Bookmarks */}
-                        <Card className="hover:shadow-lg transition-shadow duration-200">
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
-                                <BarChart3 className="h-6 w-6 text-white" />
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {(() => {
-                                const totalBookmarks = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
-                                return totalBookmarks.toLocaleString();
-                              })()}
-                            </div>
-                            <p className="text-sm text-gray-600 mt-1">Total Bookmarks</p>
-                          </CardContent>
-                        </Card>
-                      </div>
-
-                      {/* Average Engagement Rate */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
-                        <CardHeader>
-                          <CardTitle className="text-lg font-semibold text-gray-900">Average Engagement Rate</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-3xl font-bold text-gray-900">
-                            {(() => {
-                              const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
-                              const totalEngagements = contents.reduce((sum, content) => 
-                                sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
-                              const engagementRate = totalImpressions > 0 ? (totalEngagements / totalImpressions) * 100 : 0;
-                              return `${engagementRate.toFixed(2)}%`;
-                            })()}
-                          </div>
-                          <p className="text-sm text-gray-600 mt-1">Engagement Rate = (Likes + Comments + Retweets + Bookmarks) / Impressions</p>
-                        </CardContent>
-                      </Card>
-
-                      {/* Charts Section */}
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Impressions Over Time */}
-                        <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
-                          <div className="flex items-center justify-between mb-6">
-                            <div>
-                              <h3 className="text-xl font-bold text-gray-900">Impressions Over Time</h3>
-                              <p className="text-sm text-gray-500 mt-1">Impressions trend by activation date</p>
-                            </div>
-                          </div>
-                          <div className="h-96">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <LineChart 
-                                data={(() => {
-                                  // Group content by activation date and sum impressions
-                                  const impressionsByDate = contents.reduce((acc, content) => {
-                                    if (content.activation_date) {
-                                      const date = content.activation_date;
-                                      if (!acc[date]) {
-                                        acc[date] = 0;
-                                      }
-                                      acc[date] += content.impressions || 0;
-                                    }
-                                    return acc;
-                                  }, {} as Record<string, number>);
-
-                                  return Object.entries(impressionsByDate)
-                                    .map(([date, impressions]) => ({
-                                      date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                                      impressions
-                                    }))
-                                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                                })()}
-                                margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
-                              >
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                                <XAxis 
-                                  dataKey="date" 
-                                  axisLine={false}
-                                  tickLine={false}
-                                  tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
-                                />
-                                <YAxis 
-                                  axisLine={false}
-                                  tickLine={false}
-                                  tick={{ fontSize: 12, fill: '#64748b' }}
-                                />
-                                <Tooltip 
-                                  contentStyle={{
-                                    backgroundColor: 'white',
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '12px',
-                                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                                    fontSize: '14px'
-                                  }}
-                                  formatter={(value: number) => [value.toLocaleString(), 'Impressions']}
-                                  labelFormatter={(label: string) => `Date: ${label}`}
-                                />
-                                <Line 
-                                  type="monotone" 
-                                  dataKey="impressions" 
-                                  stroke="#3e8692" 
-                                  strokeWidth={3} 
-                                  dot={{ fill: '#3e8692', strokeWidth: 2, r: 4 }} 
-                                />
-                              </LineChart>
-                            </ResponsiveContainer>
-                          </div>
-                        </div>
-
-                        {/* Impressions by Platform */}
-                        <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
-                          <div className="flex items-center justify-between mb-6">
-                            <div>
-                              <h3 className="text-xl font-bold text-gray-900">Impressions by Platform</h3>
-                              <p className="text-sm text-gray-500 mt-1">Impressions distribution across platforms</p>
-                            </div>
-                          </div>
-                          <div className="h-96">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
-                                <Pie
-                                  data={(() => {
-                                    const platformImpressions = contents.reduce((acc, content) => {
-                                      const platform = content.platform || 'Unknown';
-                                      if (!acc[platform]) {
-                                        acc[platform] = 0;
-                                      }
-                                      acc[platform] += content.impressions || 0;
-                                      return acc;
-                                    }, {} as Record<string, number>);
-
-                                    return Object.entries(platformImpressions).map(([platform, impressions]) => ({
-                                      platform,
-                                      impressions
-                                    }));
-                                  })()}
-                                  cx="50%"
-                                  cy="50%"
-                                  outerRadius={120}
-                                  dataKey="impressions"
-                                  label={({ platform, impressions }) => `${platform}: ${impressions.toLocaleString()}`}
-                                >
-                                  {(() => {
-                                    const platformImpressions = contents.reduce((acc, content) => {
-                                      const platform = content.platform || 'Unknown';
-                                      if (!acc[platform]) {
-                                        acc[platform] = 0;
-                                      }
-                                      acc[platform] += content.impressions || 0;
-                                      return acc;
-                                    }, {} as Record<string, number>);
-
-                                    const colors = ['#3e8692', '#2d6470', '#1e4a5a', '#0f2d3a'];
-                                    return Object.entries(platformImpressions).map((entry, index) => (
-                                      <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-                                    ));
-                                  })()}
-                                </Pie>
-                                <Tooltip 
-                                  contentStyle={{
-                                    backgroundColor: 'white',
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '12px',
-                                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                                    fontSize: '14px'
-                                  }}
-                                  formatter={(value: number, name: string, props: any) => {
-                                    const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
-                                    const percentage = totalImpressions > 0 ? ((value / totalImpressions) * 100).toFixed(1) : 0;
-                                    return [
-                                      `${value.toLocaleString()} (${percentage}%)`, 
-                                      'Impressions'
-                                    ];
-                                  }}
-                                  labelFormatter={(label: string) => `Platform: ${label}`}
-                                />
-                              </PieChart>
-                            </ResponsiveContainer>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
               </CardContent>
             </div>
           </TabsContent>
-          
+
           <TabsContent value="kols" className="mt-4">
             <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
               <CardHeader className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
@@ -2403,37 +2349,11 @@ const CampaignDetailsPage = () => {
                         Add KOLs
                       </Button>
                     </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+                  <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-hidden">
                      <DialogHeader>
                        <DialogTitle>Add KOLs to Campaign</DialogTitle>
                      </DialogHeader>
-                     <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
-                       <div className="grid gap-2">
-                         <Label htmlFor="status-select">Default Status</Label>
-                         <Select 
-                           value={newKOLData.hh_status} 
-                           onValueChange={(value) => setNewKOLData(prev => ({ ...prev, hh_status: value as any }))}
-                         >
-                           <SelectTrigger className="auth-input">
-                             <SelectValue />
-                           </SelectTrigger>
-                           <SelectContent>
-                             {CampaignKOLService.getHHStatusOptions().map((status) => (
-                               <SelectItem key={status} value={status || ''}>{status}</SelectItem>
-                             ))}
-                           </SelectContent>
-                         </Select>
-                       </div>
-                       <div className="grid gap-2">
-                         <Label htmlFor="notes">Default Notes</Label>
-                         <Textarea
-                           id="notes"
-                           placeholder="Add notes for selected KOLs..."
-                           value={newKOLData.notes}
-                           onChange={(e) => setNewKOLData(prev => ({ ...prev, notes: e.target.value }))}
-                           className="auth-input"
-                         />
-                       </div>
+                     <div className="grid gap-4 py-4 max-h-[75vh] overflow-y-auto px-3 pb-6">
                        <div className="grid gap-2">
                          <Label>Select KOLs ({newKOLData.selectedKOLs.length} selected)</Label>
                          <div className="flex items-center max-w-sm w-full mb-2">
@@ -2447,7 +2367,7 @@ const CampaignDetailsPage = () => {
                          <Button
                            size="sm"
                            variant="outline"
-                           className="mb-2"
+                           className="mb-2 w-fit"
                            onClick={() => {
                              const allIds = filteredAvailableKOLs.map(kol => kol.id);
                              if (allIds.every(id => newKOLData.selectedKOLs.includes(id))) {
@@ -2470,13 +2390,16 @@ const CampaignDetailsPage = () => {
                                  <TableHead>Followers</TableHead>
                                  <TableHead>Region</TableHead>
                                  <TableHead>Platform</TableHead>
-                                 <TableHead>Content Type</TableHead>
+                                 <TableHead>Creator Type</TableHead>
+                                 <TableHead className="whitespace-nowrap">Content Type</TableHead>
+                                 <TableHead>Deliverables</TableHead>
+                                 <TableHead className="whitespace-nowrap">Pricing</TableHead>
                                </TableRow>
                              </TableHeader>
                              <TableBody>
                                {filteredAvailableKOLs.length === 0 ? (
                                  <TableRow>
-                                   <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                                   <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                                      No KOLs found.
                                    </TableCell>
                                  </TableRow>
@@ -2539,6 +2462,17 @@ const CampaignDetailsPage = () => {
                                        ) : '-'}
                                      </TableCell>
                                      <TableCell>
+                                       {Array.isArray(kol.creator_type) ? (
+                                         <div className="flex flex-wrap gap-1">
+                                           {kol.creator_type.map((type: string, index: number) => (
+                                             <span key={index} className={`px-2 py-1 rounded-md text-xs font-medium ${getCreatorTypeColor(type)}`}>
+                                               {type}
+                                             </span>
+                                           ))}
+                                         </div>
+                                       ) : '-'}
+                                     </TableCell>
+                                     <TableCell>
                                        {Array.isArray(kol.content_type) ? (
                                          <div className="flex flex-wrap gap-1">
                                            {kol.content_type.map((type: string, index: number) => (
@@ -2549,6 +2483,24 @@ const CampaignDetailsPage = () => {
                                          </div>
                                        ) : '-'}
                                      </TableCell>
+                                     <TableCell>
+                                       {Array.isArray(kol.deliverables) ? (
+                                         <div className="flex flex-wrap gap-1">
+                                           {kol.deliverables.map((deliverable: string, index: number) => (
+                                             <span key={index} className={`px-2 py-1 rounded-md text-xs font-medium ${getNewContentTypeColor(deliverable)}`}>
+                                               {deliverable}
+                                             </span>
+                                           ))}
+                                         </div>
+                                       ) : '-'}
+                                     </TableCell>
+                                     <TableCell>
+                                       {kol.pricing ? (
+                                         <span className={`px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap ${getPricingColor(kol.pricing)}`}>
+                                           {kol.pricing}
+                                         </span>
+                                       ) : '-'}
+                                     </TableCell>
                                    </TableRow>
                                  ))
                                )}
@@ -2556,13 +2508,39 @@ const CampaignDetailsPage = () => {
                            </Table>
                          </div>
                        </div>
+                       <div className="grid gap-2 w-64">
+                         <Label htmlFor="status-select">Default Status</Label>
+                         <Select
+                           value={newKOLData.hh_status}
+                           onValueChange={(value) => setNewKOLData(prev => ({ ...prev, hh_status: value as any }))}
+                         >
+                           <SelectTrigger className="auth-input">
+                             <SelectValue />
+                           </SelectTrigger>
+                           <SelectContent>
+                             {CampaignKOLService.getHHStatusOptions().map((status) => (
+                               <SelectItem key={status} value={status || ''}>{status}</SelectItem>
+                             ))}
+                           </SelectContent>
+                         </Select>
+                       </div>
+                       <div className="grid gap-2 max-w-md">
+                         <Label htmlFor="notes">Default Notes</Label>
+                         <Textarea
+                           id="notes"
+                           placeholder="Add notes for selected KOLs..."
+                           value={newKOLData.notes}
+                           onChange={(e) => setNewKOLData(prev => ({ ...prev, notes: e.target.value }))}
+                           className="auth-input"
+                         />
+                       </div>
                      </div>
                      <DialogFooter>
                        <Button variant="outline" onClick={() => setIsAddKOLsDialogOpen(false)}>
                          Cancel
                        </Button>
-                       <Button 
-                         onClick={handleAddKOLs} 
+                       <Button
+                         onClick={handleAddKOLs}
                          disabled={newKOLData.selectedKOLs.length === 0 || isAddingKOLs}
                          style={{ backgroundColor: '#3e8692', color: 'white' }}
                        >
@@ -2681,7 +2659,7 @@ const CampaignDetailsPage = () => {
                               return platforms.size;
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Unique Platforms</p>
+                          <p className="text-sm text-gray-600 mt-1">Unique Platform</p>
                         </CardContent>
                       </Card>
 
@@ -2914,370 +2892,83 @@ const CampaignDetailsPage = () => {
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
                       <span className="text-sm font-semibold text-gray-700">{selectedKOLs.length} KOL{selectedKOLs.length !== 1 ? 's' : ''} selected</span>
-                </div>
+                    </div>
                     <div className="h-4 w-px bg-gray-300"></div>
                     <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
                   </div>
-                  <div className="mb-4 pb-4 border-b border-gray-200">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="text-gray-600 border-gray-300 hover:bg-gray-50"
-                      onClick={() => {
-                        const allIds = filteredKOLs.map(kol => kol.id);
-                        if (allIds.every(id => selectedKOLs.includes(id))) {
-                          setSelectedKOLs(prev => prev.filter(id => !allIds.includes(id)));
-                        } else {
-                          setSelectedKOLs(prev => Array.from(new Set([...prev, ...allIds])));
-                        }
-                      }}
-                    >
-                      {filteredKOLs.length > 0 && filteredKOLs.every(kol => selectedKOLs.includes(kol.id)) ? 'Deselect All' : 'Select All'}
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap items-end gap-2">
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div className="flex flex-col items-end justify-end">
+                      <div className="h-5"></div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                        onClick={() => {
+                          const allIds = filteredKOLs.map(kol => kol.id);
+                          if (allIds.every(id => selectedKOLs.includes(id))) {
+                            setSelectedKOLs(prev => prev.filter(id => !allIds.includes(id)));
+                          } else {
+                            setSelectedKOLs(prev => Array.from(new Set([...prev, ...allIds])));
+                          }
+                        }}
+                      >
+                        {filteredKOLs.length > 0 && filteredKOLs.every(kol => selectedKOLs.includes(kol.id)) ? 'Deselect All' : 'Select All'}
+                      </Button>
+                    </div>
                     <div className="min-w-[120px] flex flex-col items-end justify-end">
                       <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Status</span>
                       <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                         <Select value={bulkStatus || ''} onValueChange={(value: string) => setBulkStatus(value as CampaignKOLWithDetails['hh_status'] | "") }>
-                    <SelectTrigger 
-                      className={`border-none shadow-none bg-transparent w-full h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none ${bulkStatus ? getStatusColor(bulkStatus) : ''}`}
-                      style={{ outline: 'none', boxShadow: 'none', minWidth: 90 }}
-                    >
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CampaignKOLService.getHHStatusOptions().map((status) => (
-                                  <SelectItem key={status} value={status || ''}>{status}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                    </div>
-                  </div>
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex gap-3">
-                  <Button
-                    size="sm"
-                          className="bg-[#3e8692] hover:bg-[#2d6b75] text-white border-0 shadow-sm"
-                    disabled={selectedKOLs.length === 0 || !bulkStatus}
-                    onClick={async () => {
-                      if (!bulkStatus || selectedKOLs.length === 0) return;
-                      setCampaignKOLs(prev => prev.map(kol => selectedKOLs.includes(kol.id) ? { ...kol, hh_status: bulkStatus } : kol));
-                      await Promise.all(selectedKOLs.map(kolId => CampaignKOLService.updateCampaignKOL(kolId, { hh_status: bulkStatus }))); 
-                      setBulkStatus("");
-                    }}
-                  >
-                    Apply
-                  </Button>
-                  <Button
-                    size="sm"
-                          className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm"
-                    disabled={selectedKOLs.length === 0}
-                    onClick={() => {
-                      setKolsToDelete(selectedKOLs);
-                                setShowKOLDeleteDialog(true);
-                    }}
-                  >
-                    Delete
-                  </Button>
-                </div>
-                      <div className="text-xs text-gray-500 font-medium">
-                        {selectedKOLs.length > 0 && `${selectedKOLs.length} item${selectedKOLs.length !== 1 ? 's' : ''} selected`}
+                          <SelectTrigger
+                            className="border-none shadow-none bg-transparent h-7 px-0 py-0 text-xs font-semibold text-black focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none [&>span]:text-xs [&>span]:font-semibold [&>span]:text-black"
+                            style={{ outline: 'none', boxShadow: 'none' }}
+                          >
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CampaignKOLService.getHHStatusOptions().map((status) => (
+                              <SelectItem key={status} value={status || ''}>{status}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
-                  </div>
-                  </div>
-                </div>
-
-                {/* Filters Section */}
-                <div className="mb-4">
-                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-                    <div className="flex flex-wrap items-end gap-2">
-                      {/* Platform Filter */}
-                      <div className="min-w-[120px] flex flex-col items-end justify-end">
-                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Platform</span>
-                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
-                          <MultiSelect
-                            options={['X','Telegram','YouTube','Facebook','TikTok']}
-                            selected={kolFilters.platform}
-                            onSelectedChange={(platform) => setKolFilters(prev => ({ ...prev, platform }))}
-                            className="w-full"
-                            triggerContent={
-                              <div className="w-full flex items-center h-7 min-h-[28px]">
-                                {kolFilters.platform.length > 0 ? (
-                                  <>
-                                    {kolFilters.platform.map(item => (
-                                      <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 flex items-center">
-                                        {getPlatformIcon(item)}
-                                      </span>
-                                    ))}
-                                  </>
-                                ) : (
-                                  <span className="flex items-center text-xs font-semibold text-black">Select</span>
-                                )}
-                                <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                              </div>
-                            }
-                          />
-                        </div>
-                      </div>
-                      {/* Region Filter */}
-                      <div className="min-w-[100px] flex flex-col items-end justify-end">
-                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Region</span>
-                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
-                          <MultiSelect
-                            options={['Vietnam','Turkey','SEA','Philippines','Korea','Global','China','Brazil']}
-                            selected={kolFilters.region}
-                            onSelectedChange={(region) => setKolFilters(prev => ({ ...prev, region }))}
-                            className="w-full"
-                            renderOption={(option: string) => (
-                              <div className="flex items-center space-x-2">
-                                <span>{getRegionIcon(option).flag}</span>
-                                <span>{option}</span>
-                              </div>
-                            )}
-                            triggerContent={
-                              <div className="w-full flex items-center h-7 min-h-[28px]">
-                                {kolFilters.region.length > 0 ? (
-                                  <>
-                                    {kolFilters.region.map(item => (
-                                      <span key={item} className="text-xs font-semibold text-black flex items-center gap-1 mr-2">
-                                        <span>{getRegionIcon(item).flag}</span>
-                                        <span>{item}</span>
-                                      </span>
-                                    ))}
-                                  </>
-                                ) : (
-                                  <span className="flex items-center text-xs font-semibold text-black">Select</span>
-                                )}
-                                <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                              </div>
-                            }
-                          />
-                        </div>
-                      </div>
-                      {/* Creator Type Filter */}
-                      <div className="min-w-[120px] flex flex-col items-end justify-end">
-                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Creator Type</span>
-                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
-                          <MultiSelect
-                            options={['Micro Influencer','KOL','Celebrity']}
-                            selected={kolFilters.creator_type}
-                            onSelectedChange={(creator_type) => setKolFilters(prev => ({ ...prev, creator_type }))}
-                            className="w-full"
-                            triggerContent={
-                              <div className="w-full flex items-center h-7 min-h-[28px]">
-                                {kolFilters.creator_type.length > 0 ? (
-                                  <>
-                                    {kolFilters.creator_type.map(item => (
-                                      <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getCreatorTypeColor(item)} mr-1`}>{item}</span>
-                                    ))}
-                                  </>
-                                ) : (
-                                  <span className="flex items-center text-xs font-semibold text-black">Select</span>
-                                )}
-                                <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                              </div>
-                            }
-                          />
-                        </div>
-                      </div>
-                      {/* Content Type Filter */}
-                      <div className="min-w-[120px] flex flex-col items-end justify-end">
-                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Content Type</span>
-                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
-                          <MultiSelect
-                            options={['Meme','News','Trading','Deep Dive','Meme/Cultural Narrative','Drama Queen','Sceptics','Technical Educator','Bridge Builders','Visionaries']}
-                            selected={kolFilters.content_type}
-                            onSelectedChange={(content_type) => setKolFilters(prev => ({ ...prev, content_type }))}
-                            className="w-full"
-                            triggerContent={
-                              <div className="w-full flex items-center h-7 min-h-[28px]">
-                                {kolFilters.content_type.length > 0 ? (
-                                  <>
-                                    {kolFilters.content_type.map(item => (
-                                      <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getContentTypeColor(item)} mr-1`}>{item}</span>
-                                    ))}
-                                  </>
-                                ) : (
-                                  <span className="flex items-center text-xs font-semibold text-black">Select</span>
-                                )}
-                                <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                              </div>
-                            }
-                          />
-                        </div>
-                      </div>
-                      {/* Status Filter */}
-                      <div className="min-w-[100px] flex flex-col items-end justify-end">
-                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Status</span>
-                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
-                          <MultiSelect
-                            options={['Curated','Interested','Onboarded','Concluded']}
-                            selected={kolFilters.hh_status}
-                            onSelectedChange={(hh_status) => setKolFilters(prev => ({ ...prev, hh_status }))}
-                            className="w-full"
-                            triggerContent={
-                              <div className="w-full flex items-center h-7 min-h-[28px]">
-                                {kolFilters.hh_status.length > 0 ? (
-                                  <>
-                                    {kolFilters.hh_status.map(item => (
-                                      <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getStatusColor(item as any)} mr-1`}>{item}</span>
-                                    ))}
-                                  </>
-                                ) : (
-                                  <span className="flex items-center text-xs font-semibold text-black">Select</span>
-                                )}
-                                <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                              </div>
-                            }
-                          />
-                        </div>
-                      </div>
-                      {/* Budget Type Filter */}
-                      <div className="min-w-[100px] flex flex-col items-end justify-end">
-                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Budget Type</span>
-                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
-                          <MultiSelect
-                            options={['Token','Fiat','WL']}
-                            selected={kolFilters.budget_type}
-                            onSelectedChange={(budget_type) => setKolFilters(prev => ({ ...prev, budget_type }))}
-                            className="w-full"
-                            triggerContent={
-                              <div className="w-full flex items-center h-7 min-h-[28px]">
-                                {kolFilters.budget_type.length > 0 ? (
-                                  <>
-                                    {kolFilters.budget_type.map(item => (
-                                      <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 flex-shrink-0 mr-1">{item}</span>
-                                    ))}
-                                  </>
-                                ) : (
-                                  <span className="flex items-center text-xs font-semibold text-black">Select</span>
-                                )}
-                                <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                              </div>
-                            }
-                          />
-                        </div>
-                      </div>
-                      {/* Followers Filter */}
-                      <div className="min-w-[130px] flex flex-col items-end justify-end">
-                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Followers</span>
-                        <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
-                          <Select
-                            value={kolFilters.followers_operator}
-                            onValueChange={(value) => setKolFilters(prev => ({ ...prev, followers_operator: value }))}
-                          >
-                            <SelectTrigger className="border-none shadow-none bg-transparent w-auto h-auto px-1 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none" style={{ outline: 'none', boxShadow: 'none', minWidth: 40 }}>
-                              <SelectValue placeholder="Select" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value=">">{'>'}</SelectItem>
-                              <SelectItem value="<">{'<'}</SelectItem>
-                              <SelectItem value="=">=</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            type="number"
-                            value={kolFilters.followers_value}
-                            onChange={(e) => setKolFilters(prev => ({ ...prev, followers_value: e.target.value }))}
-                            className="auth-input h-7 text-xs w-16"
-                          />
-                        </div>
-                      </div>
-                      {/* Budget Filter */}
-                      <div className="min-w-[130px] flex flex-col items-end justify-end">
-                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Budget</span>
-                        <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
-                          <Select
-                            value={kolFilters.budget_operator}
-                            onValueChange={(value) => setKolFilters(prev => ({ ...prev, budget_operator: value }))}
-                          >
-                            <SelectTrigger className="border-none shadow-none bg-transparent w-auto h-auto px-1 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none" style={{ outline: 'none', boxShadow: 'none', minWidth: 40 }}>
-                              <SelectValue placeholder="Select" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value=">">{'>'}</SelectItem>
-                              <SelectItem value="<">{'<'}</SelectItem>
-                              <SelectItem value="=">=</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            type="number"
-                            value={kolFilters.budget_value}
-                            onChange={(e) => setKolFilters(prev => ({ ...prev, budget_value: e.target.value }))}
-                            className="auth-input h-7 text-xs w-16"
-                          />
-                        </div>
-                      </div>
-                      {/* Paid Filter */}
-                      <div className="min-w-[130px] flex flex-col items-end justify-end">
-                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Paid (USD)</span>
-                        <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
-                          <Select
-                            value={kolFilters.paid_operator}
-                            onValueChange={(value) => setKolFilters(prev => ({ ...prev, paid_operator: value }))}
-                          >
-                            <SelectTrigger className="border-none shadow-none bg-transparent w-auto h-auto px-1 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none" style={{ outline: 'none', boxShadow: 'none', minWidth: 40 }}>
-                              <SelectValue placeholder="Select" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value=">">{'>'}</SelectItem>
-                              <SelectItem value="<">{'<'}</SelectItem>
-                              <SelectItem value="=">=</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Input
-                            type="number"
-                            value={kolFilters.paid_value}
-                            onChange={(e) => setKolFilters(prev => ({ ...prev, paid_value: e.target.value }))}
-                            className="auth-input h-7 text-xs w-16"
-                          />
-                        </div>
-                      </div>
-                      {/* Reset Filters Button */}
+                    <div className="flex gap-2">
                       <div className="flex flex-col items-end justify-end">
-                        <span className="text-xs text-transparent mb-1 self-start">Reset</span>
+                        <div className="h-5"></div>
                         <Button
-                          type="button"
                           size="sm"
-                          variant="outline"
-                          className="h-7"
-                          onClick={() => {
-                            setKolFilters({
-                              platform: [],
-                              region: [],
-                              creator_type: [],
-                              content_type: [],
-                              hh_status: [],
-                              budget_type: [],
-                              followers_operator: '',
-                              followers_value: '',
-                              budget_operator: '',
-                              budget_value: '',
-                              paid_operator: '',
-                              paid_value: ''
-                            });
+                          className="bg-[#3e8692] hover:bg-[#2d6b75] text-white border-0 shadow-sm whitespace-nowrap"
+                          disabled={selectedKOLs.length === 0 || !bulkStatus}
+                          onClick={async () => {
+                            if (!bulkStatus || selectedKOLs.length === 0) return;
+                            setCampaignKOLs(prev => prev.map(kol => selectedKOLs.includes(kol.id) ? { ...kol, hh_status: bulkStatus } : kol));
+                            await Promise.all(selectedKOLs.map(kolId => CampaignKOLService.updateCampaignKOL(kolId, { hh_status: bulkStatus })));
+                            setBulkStatus("");
                           }}
                         >
-                          Reset Filters
+                          Apply
+                        </Button>
+                      </div>
+                      <div className="flex flex-col items-end justify-end">
+                        <div className="h-5"></div>
+                        <Button
+                          size="sm"
+                          className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm whitespace-nowrap"
+                          disabled={selectedKOLs.length === 0}
+                          onClick={() => {
+                            setKolsToDelete(selectedKOLs);
+                            setShowKOLDeleteDialog(true);
+                          }}
+                        >
+                          Delete
                         </Button>
                       </div>
                     </div>
+                    <div className="text-xs text-gray-500 font-medium ml-auto whitespace-nowrap">
+                      {selectedKOLs.length > 0 && `${selectedKOLs.length} item${selectedKOLs.length !== 1 ? 's' : ''} selected`}
+                    </div>
+                  </div>
                   </div>
                 </div>
 
@@ -3326,15 +3017,15 @@ const CampaignDetailsPage = () => {
                       </TableBody>
                     </Table>
                   </div>
-                ) : filteredKOLs.length === 0 ? (
+                ) : campaignKOLs.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                     <p className="text-lg font-medium mb-2">No KOLs assigned yet</p>
                     <p className="text-sm text-gray-400">Add KOLs to this campaign to get started.</p>
                   </div>
                 ) : (
-                  <div className="border rounded-lg overflow-auto" style={{ minHeight: '400px', position: 'relative' }}>
-                    <Table className="min-w-full" style={{ 
+                  <div className="border rounded-lg overflow-auto" style={{ position: 'relative' }}>
+                    <Table className="min-w-full" style={{
                       tableLayout: 'auto',
                       width: 'auto',
                       borderCollapse: 'collapse',
@@ -3344,20 +3035,404 @@ const CampaignDetailsPage = () => {
                         <TableRow className="bg-gray-50 border-b border-gray-200">
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">KOL</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Platform</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Followers</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Region</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Status</TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Budget</TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Budget Type</TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Paid (USD)</TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Platform</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Platform</div>
+                                    {['X','Telegram','YouTube','Facebook','TikTok'].map((platform) => (
+                                      <div
+                                        key={platform}
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        onClick={() => {
+                                          const newPlatforms = kolFilters.platform.includes(platform)
+                                            ? kolFilters.platform.filter(p => p !== platform)
+                                            : [...kolFilters.platform, platform];
+                                          setKolFilters(prev => ({ ...prev, platform: newPlatforms }));
+                                        }}
+                                      >
+                                        <Checkbox checked={kolFilters.platform.includes(platform)} />
+                                        <div className="flex items-center gap-1" title={platform}>
+                                          {getPlatformIcon(platform)}
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {kolFilters.platform.length > 0 && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full mt-2 text-xs"
+                                        onClick={() => setKolFilters(prev => ({ ...prev, platform: [] }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {kolFilters.platform.length > 0 && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  {kolFilters.platform.length}
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Followers</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Followers</div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Select
+                                        value={kolFilters.followers_operator}
+                                        onValueChange={(value) => setKolFilters(prev => ({ ...prev, followers_operator: value }))}
+                                      >
+                                        <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                          <SelectValue placeholder="=" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value=">">{'>'}</SelectItem>
+                                          <SelectItem value="<">{'<'}</SelectItem>
+                                          <SelectItem value="=">=</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        placeholder="Value"
+                                        value={kolFilters.followers_value}
+                                        onChange={(e) => setKolFilters(prev => ({ ...prev, followers_value: e.target.value }))}
+                                        className="h-8 text-xs auth-input"
+                                      />
+                                    </div>
+                                    {(kolFilters.followers_operator || kolFilters.followers_value) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full text-xs"
+                                        onClick={() => setKolFilters(prev => ({ ...prev, followers_operator: '', followers_value: '' }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {(kolFilters.followers_operator && kolFilters.followers_value) && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  1
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Region</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Region</div>
+                                    {['Vietnam','Turkey','SEA','Philippines','Korea','Global','China','Brazil'].map((region) => (
+                                      <div
+                                        key={region}
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        onClick={() => {
+                                          const newRegions = kolFilters.region.includes(region)
+                                            ? kolFilters.region.filter(r => r !== region)
+                                            : [...kolFilters.region, region];
+                                          setKolFilters(prev => ({ ...prev, region: newRegions }));
+                                        }}
+                                      >
+                                        <Checkbox checked={kolFilters.region.includes(region)} />
+                                        <div className="flex items-center gap-2">
+                                          <span>{getRegionIcon(region).flag}</span>
+                                          <span className="text-sm">{region}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {kolFilters.region.length > 0 && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full mt-2 text-xs"
+                                        onClick={() => setKolFilters(prev => ({ ...prev, region: [] }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {kolFilters.region.length > 0 && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  {kolFilters.region.length}
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Status</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Status</div>
+                                    {['Curated','Interested','Onboarded','Concluded'].map((status) => (
+                                      <div
+                                        key={status}
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        onClick={() => {
+                                          const newStatuses = kolFilters.hh_status.includes(status)
+                                            ? kolFilters.hh_status.filter(s => s !== status)
+                                            : [...kolFilters.hh_status, status];
+                                          setKolFilters(prev => ({ ...prev, hh_status: newStatuses }));
+                                        }}
+                                      >
+                                        <Checkbox checked={kolFilters.hh_status.includes(status)} />
+                                        <span className={`px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(status as any)}`}>
+                                          {status}
+                                        </span>
+                                      </div>
+                                    ))}
+                                    {kolFilters.hh_status.length > 0 && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full mt-2 text-xs"
+                                        onClick={() => setKolFilters(prev => ({ ...prev, hh_status: [] }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {kolFilters.hh_status.length > 0 && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  {kolFilters.hh_status.length}
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Budget</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Budget</div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Select
+                                        value={kolFilters.budget_operator}
+                                        onValueChange={(value) => setKolFilters(prev => ({ ...prev, budget_operator: value }))}
+                                      >
+                                        <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                          <SelectValue placeholder="=" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value=">">{'>'}</SelectItem>
+                                          <SelectItem value="<">{'<'}</SelectItem>
+                                          <SelectItem value="=">=</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        placeholder="Value"
+                                        value={kolFilters.budget_value}
+                                        onChange={(e) => setKolFilters(prev => ({ ...prev, budget_value: e.target.value }))}
+                                        className="h-8 text-xs auth-input"
+                                      />
+                                    </div>
+                                    {(kolFilters.budget_operator || kolFilters.budget_value) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full text-xs"
+                                        onClick={() => setKolFilters(prev => ({ ...prev, budget_operator: '', budget_value: '' }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {(kolFilters.budget_operator && kolFilters.budget_value) && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  1
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Budget Type</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Budget Type</div>
+                                    {['Token','Fiat','WL'].map((budgetType) => (
+                                      <div
+                                        key={budgetType}
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        onClick={() => {
+                                          const newBudgetTypes = kolFilters.budget_type.includes(budgetType)
+                                            ? kolFilters.budget_type.filter(bt => bt !== budgetType)
+                                            : [...kolFilters.budget_type, budgetType];
+                                          setKolFilters(prev => ({ ...prev, budget_type: newBudgetTypes }));
+                                        }}
+                                      >
+                                        <Checkbox checked={kolFilters.budget_type.includes(budgetType)} />
+                                        <span className="text-sm">{budgetType}</span>
+                                      </div>
+                                    ))}
+                                    {kolFilters.budget_type.length > 0 && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full mt-2 text-xs"
+                                        onClick={() => setKolFilters(prev => ({ ...prev, budget_type: [] }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {kolFilters.budget_type.length > 0 && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  {kolFilters.budget_type.length}
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Paid</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Paid (USD)</div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Select
+                                        value={kolFilters.paid_operator}
+                                        onValueChange={(value) => setKolFilters(prev => ({ ...prev, paid_operator: value }))}
+                                      >
+                                        <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                          <SelectValue placeholder="=" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value=">">{'>'}</SelectItem>
+                                          <SelectItem value="<">{'<'}</SelectItem>
+                                          <SelectItem value="=">=</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        placeholder="Value"
+                                        value={kolFilters.paid_value}
+                                        onChange={(e) => setKolFilters(prev => ({ ...prev, paid_value: e.target.value }))}
+                                        className="h-8 text-xs auth-input"
+                                      />
+                                    </div>
+                                    {(kolFilters.paid_operator || kolFilters.paid_value) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full text-xs"
+                                        onClick={() => setKolFilters(prev => ({ ...prev, paid_operator: '', paid_value: '' }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {(kolFilters.paid_operator && kolFilters.paid_value) && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  1
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Wallet</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Notes</TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content</TableHead>
                           <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody className="bg-white">
-                        {filteredKOLs.map((campaignKOL, index) => {
+                        {filteredKOLs.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={13} className="text-center py-12">
+                              <div className="flex flex-col items-center justify-center text-gray-500">
+                                <Users className="h-12 w-12 mb-4 text-gray-300" />
+                                <p className="text-lg font-medium mb-2">No KOLs match your filters</p>
+                                <p className="text-sm text-gray-400 mb-4">Try adjusting your filter criteria</p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setKolFilters({
+                                      platform: [],
+                                      region: [],
+                                      creator_type: [],
+                                      content_type: [],
+                                      hh_status: [],
+                                      budget_type: [],
+                                      followers_operator: '',
+                                      followers_value: '',
+                                      budget_operator: '',
+                                      budget_value: '',
+                                      paid_operator: '',
+                                      paid_value: ''
+                                    });
+                                  }}
+                                >
+                                  Reset All Filters
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredKOLs.map((campaignKOL, index) => {
                           return (
                             <TableRow key={campaignKOL.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center text-gray-600 group`} style={{ verticalAlign: 'middle' }}>
@@ -3454,7 +3529,7 @@ const CampaignDetailsPage = () => {
                                       />
                                     ) : (
                                       <div className="truncate min-h-[32px] cursor-pointer flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.allocated_budget} onClick={() => { setEditingBudgetId(campaignKOL.id); setEditingBudget((prev) => ({ ...prev, [campaignKOL.id]: campaignKOL.allocated_budget ?? '' })); }}>
-                                        {campaignKOL.allocated_budget ? `$${campaignKOL.allocated_budget}` : <span className="text-gray-400 italic">Click to add</span>}
+                                        {campaignKOL.allocated_budget ? `$${Number(campaignKOL.allocated_budget).toLocaleString('en-US')}` : <span className="text-gray-400 italic">Click to add</span>}
                                       </div>
                                     )}
                                   </TableCell>
@@ -3515,11 +3590,30 @@ const CampaignDetailsPage = () => {
                                   </div>
                                 )}
                               </TableCell>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center`}>
+                                <div className="font-medium text-gray-900">
+                                  {contents.filter(content => content.campaign_kols_id === campaignKOL.id).length}
+                                </div>
+                              </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
                                 <div className="flex space-x-1">
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline" 
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      const kolName = campaignKOL.master_kol?.name || '';
+                                      setActiveTab('contents');
+                                      setTimeout(() => {
+                                        setContentsSearchTerm(kolName);
+                                      }, 100);
+                                    }}
+                                    title="View Content"
+                                  >
+                                    <FileText className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
                                     onClick={() => {
                                       setKolsToDelete([campaignKOL.id]);
                                           setShowKOLDeleteDialog(true);
@@ -3531,14 +3625,15 @@ const CampaignDetailsPage = () => {
                               </TableCell>
                             </TableRow>
                           );
-                        })}
+                        })
+                        )}
                       </TableBody>
                     </Table>
                       </div>
                     )}
                   </>
                 )}
-                
+
                 {/* Cards View */}
                 {kolViewMode === 'graph' && (
                   <>
@@ -3876,7 +3971,7 @@ const CampaignDetailsPage = () => {
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-gray-600">Allocated Budget</span>
                             <span className="font-medium text-gray-900">
-                              {campaignKOL.allocated_budget ? `$${campaignKOL.allocated_budget}` : '-'}
+                              {campaignKOL.allocated_budget ? `$${Number(campaignKOL.allocated_budget).toLocaleString('en-US')}` : '-'}
                             </span>
                           </div>
 
@@ -4261,6 +4356,319 @@ const CampaignDetailsPage = () => {
                 </div>
               </CardHeader>
               <CardContent className="pt-6">
+                {/* View Toggle */}
+                <div className="mb-4">
+                  <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+                    <div
+                      onClick={() => setContentsViewMode('overview')}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${contentsViewMode === 'overview' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                    >
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      Overview
+                    </div>
+                    <div
+                      onClick={() => setContentsViewMode('table')}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${contentsViewMode === 'table' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                    >
+                      <TableIcon className="h-4 w-4 mr-2" />
+                      Table
+                    </div>
+                  </div>
+                </div>
+                {/* Overview Tab - Metrics from Information */}
+                {contentsViewMode === 'overview' && (
+                  <div className="space-y-6">
+                    {/* Metrics Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {/* Total Impressions */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <BarChart3 className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                              const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                              return totalImpressions.toLocaleString();
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Total Impressions</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Total Comments */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <BarChart3 className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                              const totalComments = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
+                              return totalComments.toLocaleString();
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Total Comments</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Total Retweets */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <BarChart3 className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                              const totalRetweets = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
+                              return totalRetweets.toLocaleString();
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Total Retweets</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Total Likes */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <BarChart3 className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                              const totalLikes = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
+                              return totalLikes.toLocaleString();
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Total Likes</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Total Engagements */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <BarChart3 className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                              const totalEngagements = contents.reduce((sum, content) =>
+                                sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
+                              return totalEngagements.toLocaleString();
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Total Engagements</p>
+                        </CardContent>
+                      </Card>
+
+                      {/* Total Bookmarks */}
+                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <BarChart3 className="h-6 w-6 text-white" />
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                              const totalBookmarks = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
+                              return totalBookmarks.toLocaleString();
+                            })()}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">Total Bookmarks</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Average Engagement Rate */}
+                    <Card className="hover:shadow-lg transition-shadow duration-200">
+                      <CardHeader>
+                        <CardTitle className="text-lg font-semibold text-gray-900">Average Engagement Rate</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-3xl font-bold text-gray-900">
+                          {(() => {
+                            const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                            const totalEngagements = contents.reduce((sum, content) =>
+                              sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
+                            const engagementRate = totalImpressions > 0 ? (totalEngagements / totalImpressions) * 100 : 0;
+                            return `${engagementRate.toFixed(2)}%`;
+                          })()}
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">Engagement Rate = (Likes + Comments + Retweets + Bookmarks) / Impressions</p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Charts Section */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* Impressions Over Time */}
+                      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h3 className="text-xl font-bold text-gray-900">Impressions Over Time</h3>
+                            <p className="text-sm text-gray-500 mt-1">Impressions trend by activation date</p>
+                          </div>
+                        </div>
+                        <div className="h-96">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart
+                              data={(() => {
+                                // Group content by activation date and sum impressions
+                                const impressionsByDate = contents.reduce((acc, content) => {
+                                  if (content.activation_date) {
+                                    const date = content.activation_date;
+                                    if (!acc[date]) {
+                                      acc[date] = 0;
+                                    }
+                                    acc[date] += content.impressions || 0;
+                                  }
+                                  return acc;
+                                }, {} as Record<string, number>);
+
+                                return Object.entries(impressionsByDate)
+                                  .map(([date, impressions]) => ({
+                                    date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                                    impressions
+                                  }))
+                                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                              })()}
+                              margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                              <XAxis
+                                dataKey="date"
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                              />
+                              <YAxis
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 12, fill: '#64748b' }}
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '12px',
+                                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                  fontSize: '14px'
+                                }}
+                                formatter={(value: number) => [value.toLocaleString(), 'Impressions']}
+                                labelFormatter={(label: string) => `Date: ${label}`}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="impressions"
+                                stroke="#3e8692"
+                                strokeWidth={3}
+                                dot={{ fill: '#3e8692', strokeWidth: 2, r: 4 }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+
+                      {/* Impressions by Platform */}
+                      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h3 className="text-xl font-bold text-gray-900">Impressions by Platform</h3>
+                            <p className="text-sm text-gray-500 mt-1">Impressions distribution across platforms</p>
+                          </div>
+                        </div>
+                        <div className="h-96">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie
+                                data={(() => {
+                                  const platformImpressions = contents.reduce((acc, content) => {
+                                    const platform = content.platform || 'Unknown';
+                                    if (!acc[platform]) {
+                                      acc[platform] = 0;
+                                    }
+                                    acc[platform] += content.impressions || 0;
+                                    return acc;
+                                  }, {} as Record<string, number>);
+
+                                  return Object.entries(platformImpressions).map(([platform, impressions]) => ({
+                                    platform,
+                                    impressions
+                                  }));
+                                })()}
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={120}
+                                dataKey="impressions"
+                                label={({ platform, impressions }) => `${platform}: ${impressions.toLocaleString()}`}
+                              >
+                                {(() => {
+                                  const platformImpressions = contents.reduce((acc, content) => {
+                                    const platform = content.platform || 'Unknown';
+                                    if (!acc[platform]) {
+                                      acc[platform] = 0;
+                                    }
+                                    acc[platform] += content.impressions || 0;
+                                    return acc;
+                                  }, {} as Record<string, number>);
+
+                                  const colors = ['#3e8692', '#2d6470', '#1e4a5a', '#0f2d3a'];
+                                  return Object.entries(platformImpressions).map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                                  ));
+                                })()}
+                              </Pie>
+                              <Tooltip
+                                contentStyle={{
+                                  backgroundColor: 'white',
+                                  border: '1px solid #e2e8f0',
+                                  borderRadius: '12px',
+                                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                  fontSize: '14px'
+                                }}
+                                formatter={(value: number, name: string, props: any) => {
+                                  const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                                  const percentage = totalImpressions > 0 ? ((value / totalImpressions) * 100).toFixed(1) : 0;
+                                  return [
+                                    `${value.toLocaleString()} (${percentage}%)`,
+                                    'Impressions'
+                                  ];
+                                }}
+                                labelFormatter={(label: string) => `Platform: ${label}`}
+                              />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Table Tab - Existing Contents Table */}
+                {contentsViewMode === 'table' && (
+                  <>
                 <div className="flex items-center justify-between mb-2">
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -4278,61 +4686,66 @@ const CampaignDetailsPage = () => {
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
                         <span className="text-sm font-semibold text-gray-700">{selectedContents.length} Content{selectedContents.length !== 1 ? 's' : ''} selected</span>
-                </div>
+                      </div>
                       <div className="h-4 w-px bg-gray-300"></div>
                       <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
                     </div>
-                    <div className="mb-4 pb-4 border-b border-gray-200">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-gray-600 border-gray-300 hover:bg-gray-50"
-                        onClick={handleSelectAllContents}
-                      >
-                        {filteredContents.length > 0 && filteredContents.every(content => selectedContents.includes(content.id)) ? 'Deselect All' : 'Select All'}
-                      </Button>
-                    </div>
-                    <div className="flex flex-wrap items-end gap-2">
+                    <div className="flex flex-wrap items-end gap-4">
+                      <div className="flex flex-col items-end justify-end">
+                        <div className="h-5"></div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                          onClick={handleSelectAllContents}
+                        >
+                          {filteredContents.length > 0 && filteredContents.every(content => selectedContents.includes(content.id)) ? 'Deselect All' : 'Select All'}
+                        </Button>
+                      </div>
                       <div className="min-w-[120px] flex flex-col items-end justify-end">
                         <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Status</span>
                         <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
-                  <Select value={bulkContentStatus} onValueChange={v => setBulkContentStatus(v)}>
-                    <SelectTrigger className={`border-none shadow-none bg-transparent w-full h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none ${bulkContentStatus ? '' : ''}`}
-                      style={{ outline: 'none', boxShadow: 'none', minWidth: 90 }}>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {contentStatusOptions.map(option => (
-                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                      </div>
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex gap-3">
-                  <Button
-                    size="sm"
-                            className="bg-[#3e8692] hover:bg-[#2d6b75] text-white border-0 shadow-sm"
-                    disabled={selectedContents.length === 0 || !bulkContentStatus}
-                    onClick={handleBulkStatusChange}
-                  >
-                    Apply
-                  </Button>
-                  <Button
-                    size="sm"
-                            className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm"
-                    disabled={selectedContents.length === 0}
-                            onClick={() => setShowBulkDeleteDialog(true)}
-                  >
-                    Delete
-                  </Button>
-                </div>
-                        <div className="text-xs text-gray-500 font-medium">
-                          {selectedContents.length > 0 && `${selectedContents.length} item${selectedContents.length !== 1 ? 's' : ''} selected`}
+                          <Select value={bulkContentStatus} onValueChange={v => setBulkContentStatus(v)}>
+                            <SelectTrigger
+                              className="border-none shadow-none bg-transparent h-7 px-0 py-0 text-xs font-semibold text-black focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none [&>span]:text-xs [&>span]:font-semibold [&>span]:text-black"
+                              style={{ outline: 'none', boxShadow: 'none' }}
+                            >
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {contentStatusOptions.map(option => (
+                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="flex flex-col items-end justify-end">
+                          <div className="h-5"></div>
+                          <Button
+                            size="sm"
+                            className="bg-[#3e8692] hover:bg-[#2d6b75] text-white border-0 shadow-sm whitespace-nowrap"
+                            disabled={selectedContents.length === 0 || !bulkContentStatus}
+                            onClick={handleBulkStatusChange}
+                          >
+                            Apply
+                          </Button>
+                        </div>
+                        <div className="flex flex-col items-end justify-end">
+                          <div className="h-5"></div>
+                          <Button
+                            size="sm"
+                            className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm whitespace-nowrap"
+                            disabled={selectedContents.length === 0}
+                            onClick={() => setShowBulkDeleteDialog(true)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500 font-medium ml-auto whitespace-nowrap">
+                        {selectedContents.length > 0 && `${selectedContents.length} item${selectedContents.length !== 1 ? 's' : ''} selected`}
                       </div>
                     </div>
                   </div>
@@ -4368,7 +4781,7 @@ const CampaignDetailsPage = () => {
                       </TableBody>
                     </Table>
                   </div>
-                ) : filteredContents.length === 0 ? (
+                ) : contents.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
                     <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                     <p className="text-lg font-medium mb-2">No content created yet</p>
@@ -4381,9 +4794,149 @@ const CampaignDetailsPage = () => {
                         <TableRow className="bg-gray-50 border-b border-gray-200">
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">KOL</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Platform</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Type</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Status</TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Platform</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Platform</div>
+                                    {['X','Telegram','YouTube','Facebook','TikTok'].map((platform) => (
+                                      <div
+                                        key={platform}
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        onClick={() => {
+                                          const newPlatforms = contentFilters.platform.includes(platform)
+                                            ? contentFilters.platform.filter(p => p !== platform)
+                                            : [...contentFilters.platform, platform];
+                                          setContentFilters(prev => ({ ...prev, platform: newPlatforms }));
+                                        }}
+                                      >
+                                        <Checkbox checked={contentFilters.platform.includes(platform)} />
+                                        <div className="flex items-center gap-1" title={platform}>
+                                          {getPlatformIcon(platform)}
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {contentFilters.platform.length > 0 && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full mt-2 text-xs"
+                                        onClick={() => setContentFilters(prev => ({ ...prev, platform: [] }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {contentFilters.platform.length > 0 && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  {contentFilters.platform.length}
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Type</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Type</div>
+                                    {['Video','Thread','Post','Story','Reel','Short'].map((type) => (
+                                      <div
+                                        key={type}
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        onClick={() => {
+                                          const newTypes = contentFilters.type.includes(type)
+                                            ? contentFilters.type.filter(t => t !== type)
+                                            : [...contentFilters.type, type];
+                                          setContentFilters(prev => ({ ...prev, type: newTypes }));
+                                        }}
+                                      >
+                                        <Checkbox checked={contentFilters.type.includes(type)} />
+                                        <span className="text-sm">{type}</span>
+                                      </div>
+                                    ))}
+                                    {contentFilters.type.length > 0 && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full mt-2 text-xs"
+                                        onClick={() => setContentFilters(prev => ({ ...prev, type: [] }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {contentFilters.type.length > 0 && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  {contentFilters.type.length}
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Status</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Status</div>
+                                    {contentStatusOptions.map((option) => (
+                                      <div
+                                        key={option.value}
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        onClick={() => {
+                                          const newStatuses = contentFilters.status.includes(option.value)
+                                            ? contentFilters.status.filter(s => s !== option.value)
+                                            : [...contentFilters.status, option.value];
+                                          setContentFilters(prev => ({ ...prev, status: newStatuses }));
+                                        }}
+                                      >
+                                        <Checkbox checked={contentFilters.status.includes(option.value)} />
+                                        <span className="text-sm">{option.label}</span>
+                                      </div>
+                                    ))}
+                                    {contentFilters.status.length > 0 && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full mt-2 text-xs"
+                                        onClick={() => setContentFilters(prev => ({ ...prev, status: [] }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {contentFilters.status.length > 0 && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  {contentFilters.status.length}
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Activation Date</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content Link</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Impressions</TableHead>
@@ -4395,7 +4948,32 @@ const CampaignDetailsPage = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody className="bg-white">
-                        {filteredContents.map((content, index) => {
+                        {filteredContents.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={13} className="text-center py-12">
+                              <div className="flex flex-col items-center justify-center text-gray-500">
+                                <FileText className="h-12 w-12 mb-4 text-gray-300" />
+                                <p className="text-lg font-medium mb-2">No content matches your filters</p>
+                                <p className="text-sm text-gray-400 mb-4">Try adjusting your filter criteria</p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setContentFilters({
+                                      platform: [],
+                                      type: [],
+                                      status: []
+                                    });
+                                    setContentsSearchTerm('');
+                                  }}
+                                >
+                                  Reset All Filters
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredContents.map((content, index) => {
                           const kol = campaignKOLs.find(k => k.id === content.campaign_kols_id);
                           return (
                             <TableRow key={content.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
@@ -4467,10 +5045,13 @@ const CampaignDetailsPage = () => {
                               </TableCell>
                             </TableRow>
                           );
-                        })}
+                        })
+                        )}
                       </TableBody>
                     </Table>
                   </div>
+                )}
+                  </>
                 )}
               </CardContent>
             </div>

@@ -508,7 +508,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="bg-white border-b border-gray-200">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center space-x-4">
               <Image src="/images/logo.png" alt="KOL Campaign Manager Logo" width={40} height={40} className="rounded-lg" />
               <div>
@@ -518,7 +518,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
             </div>
           </div>
         </div>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white rounded-lg shadow-sm border p-8 text-center">
             <Megaphone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Campaign Not Found</h2>
@@ -552,7 +552,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center space-x-4">
             <Image src="/images/logo.png" alt="KOL Campaign Manager Logo" width={40} height={40} className="rounded-lg" />
             <div>
@@ -563,7 +563,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
         {/* Title */}
         <div className="flex items-center space-x-4 mb-6">
           <div className="bg-gray-100 p-2 rounded-lg">
@@ -582,7 +582,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
         {/* Information + Metrics */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className={`grid gap-4 ${campaign.budget_allocations && campaign.budget_allocations.length > 0 ? 'md:grid-cols-2' : 'md:grid-cols-1'}`}>
             <div className="space-y-3">
               <div className="flex items-center text-sm text-gray-600">
                 <Building2 className="h-4 w-4 mr-2 text-gray-500" />
@@ -607,19 +607,18 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                 </div>
               )}
             </div>
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-gray-900">Metrics</h3>
-              <div className="flex flex-wrap gap-2">
-                {(campaign.budget_allocations || []).map((alloc) => (
-                  <span key={alloc.id} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
-                    {alloc.region === 'apac' ? 'APAC' : alloc.region === 'global' ? 'Global' : alloc.region}: {formatCurrency(alloc.allocated_budget)}
-                  </span>
-                ))}
-                {(!campaign.budget_allocations || campaign.budget_allocations.length === 0) && (
-                  <span className="text-sm text-gray-500">No budget allocations.</span>
-                )}
+            {campaign.budget_allocations && campaign.budget_allocations.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-gray-900">Metrics</h3>
+                <div className="flex flex-wrap gap-2">
+                  {campaign.budget_allocations.map((alloc) => (
+                    <span key={alloc.id} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
+                      {alloc.region === 'apac' ? 'APAC' : alloc.region === 'global' ? 'Global' : alloc.region}: {formatCurrency(alloc.allocated_budget)}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -628,6 +627,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           <div className="px-6 pt-4">
             <TabsList>
               <TabsTrigger value="kols">KOLs</TabsTrigger>
+              {/* <TabsTrigger value="performance">Performance</TabsTrigger> */}
               <TabsTrigger value="contents">Contents</TabsTrigger>
             </TabsList>
           </div>
@@ -639,10 +639,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     <div className="bg-gray-100 p-2 rounded-lg">
                       <Users className="h-5 w-5 text-gray-600" />
                     </div>
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900">KOLs</h2>
-                      <p className="text-sm text-gray-500">Key Opinion Leaders and their performance</p>
-                    </div>
+                    <h2 className="text-xl font-semibold text-gray-900">KOLs Dashboard</h2>
                   </div>
                 </CardHeader>
 
@@ -741,7 +738,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               return platforms.size;
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Unique Platforms</p>
+                          <p className="text-sm text-gray-600 mt-1">Unique Platform</p>
                         </CardContent>
                       </Card>
 
@@ -777,8 +774,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-xl font-bold text-gray-900">Distribution of KOLs by Platform</h3>
-                            <p className="text-sm text-gray-500 mt-1">Breakdown of KOLs by social platform</p>
+                            <h3 className="text-xl font-bold text-gray-900">KOLs by Platform</h3>
                           </div>
                         </div>
                         <div className="h-96">
@@ -825,10 +821,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   </g>
                                 )}
                               />
-                              <YAxis 
+                              <YAxis
                                 axisLine={false}
                                 tickLine={false}
                                 tick={{ fontSize: 12, fill: '#64748b' }}
+                                allowDecimals={false}
                               />
                               <Tooltip 
                                 contentStyle={{
@@ -882,7 +879,6 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <div className="flex items-center justify-between mb-6">
                           <div>
                             <h3 className="text-xl font-bold text-gray-900">KOLs by Region</h3>
-                            <p className="text-sm text-gray-500 mt-1">Geographic distribution of KOLs</p>
                           </div>
                         </div>
                         <div className="h-96">
@@ -909,10 +905,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 tickLine={false}
                                 tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
                               />
-                              <YAxis 
+                              <YAxis
                                 axisLine={false}
                                 tickLine={false}
                                 tick={{ fontSize: 12, fill: '#64748b' }}
+                                allowDecimals={false}
                               />
                               <Tooltip 
                                 contentStyle={{
@@ -1141,6 +1138,210 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                 </CardContent>
               </div>
             </TabsContent>
+
+            {/* Performance Tab */}
+            <TabsContent value="performance">
+              <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
+                <CardHeader className="pb-6 border-b border-gray-100">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-gray-100 p-2 rounded-lg">
+                      <BarChart3 className="h-5 w-5 text-gray-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">Performance</h2>
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="pt-6">
+                  {/* Performance Metrics Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    {/* Number of KOLs */}
+                    <Card className="hover:shadow-lg transition-shadow duration-200">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <Users className="h-6 w-6 text-white" />
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-gray-900">
+                          {kols.length}
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">Total KOLs</p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Total Impressions */}
+                    <Card className="hover:shadow-lg transition-shadow duration-200">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <BarChart3 className="h-6 w-6 text-white" />
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-gray-900">
+                          {(() => {
+                            const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                            return totalImpressions.toLocaleString();
+                          })()}
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">Total Impressions</p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Total Likes */}
+                    <Card className="hover:shadow-lg transition-shadow duration-200">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <BarChart3 className="h-6 w-6 text-white" />
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-gray-900">
+                          {(() => {
+                            const totalLikes = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
+                            return totalLikes.toLocaleString();
+                          })()}
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">Total Likes</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Charts Section */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Top KOLs by Likes */}
+                    <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                      <div className="mb-6">
+                        <h3 className="text-xl font-bold text-gray-900">Top KOLs by Likes</h3>
+                        <p className="text-sm text-gray-500 mt-1">KOLs ranked by total likes</p>
+                      </div>
+                      <div className="h-96">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={(() => {
+                              // Calculate total likes per KOL
+                              const kolLikes = contents.reduce((acc, content) => {
+                                const kol = kols.find(k => k.id === content.campaign_kols_id);
+                                if (kol) {
+                                  const kolName = kol.master_kol.name;
+                                  if (!acc[kolName]) {
+                                    acc[kolName] = 0;
+                                  }
+                                  acc[kolName] += content.likes || 0;
+                                }
+                                return acc;
+                              }, {} as Record<string, number>);
+
+                              return Object.entries(kolLikes)
+                                .map(([name, likes]) => ({ name, likes }))
+                                .sort((a, b) => b.likes - a.likes)
+                                .slice(0, 10); // Top 10
+                            })()}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                            <XAxis
+                              dataKey="name"
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                              angle={-45}
+                              textAnchor="end"
+                              height={100}
+                            />
+                            <YAxis
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fontSize: 12, fill: '#64748b' }}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: 'white',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '12px',
+                                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                fontSize: '14px'
+                              }}
+                              formatter={(value: number) => [value.toLocaleString(), 'Likes']}
+                            />
+                            <Bar dataKey="likes" fill="#3e8692" radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* Top KOLs by Impressions */}
+                    <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                      <div className="mb-6">
+                        <h3 className="text-xl font-bold text-gray-900">Top KOLs by Impressions</h3>
+                        <p className="text-sm text-gray-500 mt-1">KOLs ranked by total impressions</p>
+                      </div>
+                      <div className="h-96">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={(() => {
+                              // Calculate total impressions per KOL
+                              const kolImpressions = contents.reduce((acc, content) => {
+                                const kol = kols.find(k => k.id === content.campaign_kols_id);
+                                if (kol) {
+                                  const kolName = kol.master_kol.name;
+                                  if (!acc[kolName]) {
+                                    acc[kolName] = 0;
+                                  }
+                                  acc[kolName] += content.impressions || 0;
+                                }
+                                return acc;
+                              }, {} as Record<string, number>);
+
+                              return Object.entries(kolImpressions)
+                                .map(([name, impressions]) => ({ name, impressions }))
+                                .sort((a, b) => b.impressions - a.impressions)
+                                .slice(0, 10); // Top 10
+                            })()}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                            <XAxis
+                              dataKey="name"
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
+                              angle={-45}
+                              textAnchor="end"
+                              height={100}
+                            />
+                            <YAxis
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fontSize: 12, fill: '#64748b' }}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: 'white',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '12px',
+                                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                                fontSize: '14px'
+                              }}
+                              formatter={(value: number) => [value.toLocaleString(), 'Impressions']}
+                            />
+                            <Bar dataKey="impressions" fill="#2d6470" radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </div>
+            </TabsContent>
+
             <TabsContent value="contents">
               <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
                 <CardHeader className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
@@ -1150,7 +1351,6 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     </div>
                     <div>
                       <h2 className="text-xl font-semibold text-gray-900">Contents</h2>
-                      <p className="text-sm text-gray-500">Campaign content performance and details</p>
                     </div>
                   </div>
                 </CardHeader>
