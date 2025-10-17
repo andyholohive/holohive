@@ -30,14 +30,16 @@ export default function ResetPasswordPage() {
         console.log('Hash:', window.location.hash)
         console.log('Search:', window.location.search)
 
-        // Check for token in query params (old email template format)
+        // Check for token_hash in query params (from email template)
         const queryParams = new URLSearchParams(window.location.search)
-        const tokenHash = queryParams.get('token')
+        const tokenHash = queryParams.get('token_hash')
+        const queryType = queryParams.get('type')
 
-        console.log('Token from query:', tokenHash)
+        console.log('Token hash from query:', tokenHash)
+        console.log('Type from query:', queryType)
 
         if (tokenHash) {
-          console.log('Found token in query params, verifying OTP...')
+          console.log('Found token_hash in query params, verifying OTP...')
 
           // Use verifyOtp for token-based password recovery
           const { data, error } = await supabase.auth.verifyOtp({
