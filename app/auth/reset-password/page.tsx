@@ -30,7 +30,39 @@ export default function ResetPasswordPage() {
         console.log('Hash:', window.location.hash)
         console.log('Search:', window.location.search)
 
-        // Check if we have hash params (Supabase sends tokens as hash fragments)
+        // Check for token in query params (old email template format)
+        const queryParams = new URLSearchParams(window.location.search)
+        const tokenHash = queryParams.get('token')
+
+        console.log('Token from query:', tokenHash)
+
+        if (tokenHash) {
+          console.log('Found token in query params, verifying OTP...')
+
+          // Use verifyOtp for token-based password recovery
+          const { data, error } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: 'recovery'
+          })
+
+          if (error) {
+            console.error('Error verifying OTP:', error)
+            setError(`Invalid or expired reset link: ${error.message}`)
+            setCheckingSession(false)
+            return
+          }
+
+          console.log('OTP verified successfully:', data)
+          if (data.session) {
+            setIsValidSession(true)
+          } else {
+            setError('Invalid or expired reset link: No session created')
+          }
+          setCheckingSession(false)
+          return
+        }
+
+        // Check if we have hash params (newer Supabase sends tokens as hash fragments)
         const hashParams = new URLSearchParams(window.location.hash.substring(1))
         const accessToken = hashParams.get('access_token')
         const type = hashParams.get('type')
@@ -40,7 +72,7 @@ export default function ResetPasswordPage() {
 
         // If we have a recovery token in the URL, set the session
         if (accessToken && type === 'recovery') {
-          console.log('Found recovery token, setting session...')
+          console.log('Found recovery token in hash, setting session...')
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: hashParams.get('refresh_token') || ''
