@@ -26,47 +26,61 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const checkSession = async () => {
       try {
+        console.log('Full URL:', window.location.href)
+        console.log('Hash:', window.location.hash)
+        console.log('Search:', window.location.search)
+
         // Check if we have hash params (Supabase sends tokens as hash fragments)
         const hashParams = new URLSearchParams(window.location.hash.substring(1))
         const accessToken = hashParams.get('access_token')
         const type = hashParams.get('type')
 
+        console.log('Access Token from hash:', accessToken)
+        console.log('Type from hash:', type)
+
         // If we have a recovery token in the URL, set the session
         if (accessToken && type === 'recovery') {
+          console.log('Found recovery token, setting session...')
           const { data, error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: hashParams.get('refresh_token') || ''
           })
 
           if (error) {
-            setError('Invalid or expired reset link')
+            console.error('Error setting session:', error)
+            setError(`Invalid or expired reset link: ${error.message}`)
             setCheckingSession(false)
             return
           }
 
+          console.log('Session set successfully:', data)
           if (data.session) {
             setIsValidSession(true)
           } else {
-            setError('Invalid or expired reset link')
+            setError('Invalid or expired reset link: No session created')
           }
         } else {
+          console.log('No recovery token in URL, checking existing session...')
           // Otherwise check for existing session
           const { data: { session }, error } = await supabase.auth.getSession()
 
           if (error) {
-            setError('Invalid or expired reset link')
+            console.error('Error getting session:', error)
+            setError(`Invalid or expired reset link: ${error.message}`)
             setCheckingSession(false)
             return
           }
 
+          console.log('Existing session:', session)
           if (session) {
             setIsValidSession(true)
           } else {
-            setError('Invalid or expired reset link')
+            setError('Invalid or expired reset link: No valid token found in URL. Please request a new password reset link.')
           }
         }
       } catch (err) {
-        setError('Invalid or expired reset link')
+        console.error('Unexpected error:', err)
+        setError(`Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}`)
       } finally {
         setCheckingSession(false)
       }
