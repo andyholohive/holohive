@@ -26,18 +26,44 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error) {
-          setError('Invalid or expired reset link')
-          setCheckingSession(false)
-          return
-        }
+        // Check if we have hash params (Supabase sends tokens as hash fragments)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+        const accessToken = hashParams.get('access_token')
+        const type = hashParams.get('type')
 
-        if (session) {
-          setIsValidSession(true)
+        // If we have a recovery token in the URL, set the session
+        if (accessToken && type === 'recovery') {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: hashParams.get('refresh_token') || ''
+          })
+
+          if (error) {
+            setError('Invalid or expired reset link')
+            setCheckingSession(false)
+            return
+          }
+
+          if (data.session) {
+            setIsValidSession(true)
+          } else {
+            setError('Invalid or expired reset link')
+          }
         } else {
-          setError('Invalid or expired reset link')
+          // Otherwise check for existing session
+          const { data: { session }, error } = await supabase.auth.getSession()
+
+          if (error) {
+            setError('Invalid or expired reset link')
+            setCheckingSession(false)
+            return
+          }
+
+          if (session) {
+            setIsValidSession(true)
+          } else {
+            setError('Invalid or expired reset link')
+          }
         }
       } catch (err) {
         setError('Invalid or expired reset link')
