@@ -3521,7 +3521,15 @@ const CampaignDetailsPage = () => {
                                     ) : '-'}
                               </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                {campaignKOL.master_kol.creator_type || '-'}
+                                {campaignKOL.master_kol.creator_type && campaignKOL.master_kol.creator_type.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {campaignKOL.master_kol.creator_type.map((type: string) => (
+                                      <span key={type} className={`px-2 py-1 rounded-md text-xs font-medium ${getCreatorTypeColor(type)}`}>
+                                        {type}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : '-'}
                               </TableCell>
                                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                                 <Select

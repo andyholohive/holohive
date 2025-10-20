@@ -48,7 +48,7 @@ type CampaignKOL = {
     platform: string[] | null;
     region: string | null;
     content_type: string[] | null;
-    creator_type: string | null;
+    creator_type: string[] | null;
   };
 };
 
@@ -94,6 +94,26 @@ const getRegionIcon = (region: string) => {
     Brazil: { flag: '🇧🇷' },
   };
   return regionMap[region] || { flag: '🏳️' };
+};
+
+const getCreatorTypeColor = (creatorType: string) => {
+  const colorMap: { [key: string]: string } = {
+    'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
+    'Drama-Forward': 'bg-red-100 text-red-800',
+    'Skeptic': 'bg-orange-100 text-orange-800',
+    'Educator': 'bg-blue-100 text-blue-800',
+    'Bridge Builder': 'bg-green-100 text-green-800',
+    'Visionary': 'bg-indigo-100 text-indigo-800',
+    'Onboarder': 'bg-teal-100 text-teal-800',
+    'General': 'bg-gray-100 text-gray-800',
+    'Gaming': 'bg-pink-100 text-pink-800',
+    'Crypto': 'bg-yellow-100 text-yellow-800',
+    'Memecoin': 'bg-orange-100 text-orange-800',
+    'NFT': 'bg-purple-100 text-purple-800',
+    'Trading': 'bg-green-100 text-green-800',
+    'AI': 'bg-blue-100 text-blue-800',
+  };
+  return colorMap[creatorType] || 'bg-gray-100 text-gray-800';
 };
 
 const getPlatformIcon = (platform: string) => {
@@ -1494,7 +1514,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     ) : '-'}
                                   </TableCell>
                                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                    {campaignKOL.master_kol.creator_type || '-'}
+                                    {campaignKOL.master_kol.creator_type && campaignKOL.master_kol.creator_type.length > 0 ? (
+                                      <div className="flex flex-wrap gap-1">
+                                        {campaignKOL.master_kol.creator_type.map((type: string) => (
+                                          <span key={type} className={`px-2 py-1 rounded-md text-xs font-medium ${getCreatorTypeColor(type)}`}>
+                                            {type}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : '-'}
                                   </TableCell>
                                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                                     <span className={`px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(campaignKOL.hh_status || 'curated')}`}>
