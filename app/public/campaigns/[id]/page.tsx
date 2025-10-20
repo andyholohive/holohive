@@ -3,12 +3,16 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { createClient } from '@supabase/supabase-js';
-import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users, BarChart3, Table as TableIcon, CreditCard, CheckCircle, Globe, Flag, FileText } from 'lucide-react';
+import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users, BarChart3, Table as TableIcon, CreditCard, CheckCircle, Globe, Flag, FileText, Search, ChevronDown } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -181,7 +185,70 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   const [emailError, setEmailError] = useState('');
   const [clientEmail, setClientEmail] = useState<string | null>(null);
   const [loadingClientEmail, setLoadingClientEmail] = useState(true);
-  
+
+  // KOL Table filters and search
+  const [searchTerm, setSearchTerm] = useState('');
+  const [kolFilters, setKolFilters] = useState({
+    platform: [] as string[],
+    region: [] as string[],
+    hh_status: [] as string[],
+    budget_type: [] as string[],
+    followers_operator: '',
+    followers_value: '',
+    budget_operator: '',
+    budget_value: '',
+    paid_operator: '',
+    paid_value: ''
+  });
+
+  // Filter and search KOLs
+  const filteredKOLs = kols.filter(kol => {
+    // Search filter
+    const matchesSearch = searchTerm === '' ||
+      kol.master_kol.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (kol.master_kol.region && kol.master_kol.region.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (kol.hh_status && kol.hh_status.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    // Platform filter
+    const matchesPlatform = kolFilters.platform.length === 0 ||
+      (kol.master_kol.platform && kol.master_kol.platform.some(p => kolFilters.platform.includes(p)));
+
+    // Region filter
+    const matchesRegion = kolFilters.region.length === 0 ||
+      (kol.master_kol.region && kolFilters.region.includes(kol.master_kol.region));
+
+    // Status filter
+    const matchesStatus = kolFilters.hh_status.length === 0 ||
+      (kol.hh_status && kolFilters.hh_status.includes(kol.hh_status));
+
+    // Budget Type filter
+    const matchesBudgetType = kolFilters.budget_type.length === 0 ||
+      (kol.budget_type && kolFilters.budget_type.includes(kol.budget_type));
+
+    // Followers filter
+    let matchesFollowers = true;
+    if (kolFilters.followers_operator && kolFilters.followers_value) {
+      const followers = kol.master_kol.followers || 0;
+      const value = parseFloat(kolFilters.followers_value);
+      if (kolFilters.followers_operator === '>') matchesFollowers = followers > value;
+      else if (kolFilters.followers_operator === '<') matchesFollowers = followers < value;
+      else if (kolFilters.followers_operator === '=') matchesFollowers = followers === value;
+    }
+
+    // Budget filter
+    let matchesBudget = true;
+    if (kolFilters.budget_operator && kolFilters.budget_value) {
+      const budget = kol.allocated_budget || 0;
+      const value = parseFloat(kolFilters.budget_value);
+      if (kolFilters.budget_operator === '>') matchesBudget = budget > value;
+      else if (kolFilters.budget_operator === '<') matchesBudget = budget < value;
+      else if (kolFilters.budget_operator === '=') matchesBudget = budget === value;
+    }
+
+    return matchesSearch && matchesPlatform && matchesRegion && matchesStatus &&
+           matchesBudgetType && matchesFollowers && matchesBudget;
+  });
+
   // Cache key for this specific campaign
   const cacheKey = `campaign_auth_${campaignId}`;
   const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
@@ -984,77 +1051,439 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
                 {/* Table View */}
                 {kolViewMode === 'table' && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">#</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Followers</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Region</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Platform</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content Type</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {kols.map((item, index) => (
-                          <tr key={item.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div>
-                                <div className="font-medium text-gray-900">{item.master_kol.name}</div>
-                                {item.master_kol.link && (
-                                  <a href={item.master_kol.link} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:text-blue-800">View Profile</a>
+                  <>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="relative flex-1 max-w-sm">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Search KOLs by name, region, or status..."
+                          className="pl-10 auth-input"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="border rounded-lg overflow-auto" style={{ position: 'relative' }}>
+                      <Table className="min-w-full" style={{
+                        tableLayout: 'auto',
+                        width: 'auto',
+                        borderCollapse: 'collapse',
+                        whiteSpace: 'nowrap'
+                      }} suppressHydrationWarning>
+                        <TableHeader>
+                          <TableRow className="bg-gray-50 border-b border-gray-200">
+                            <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
+                            <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">KOL</TableHead>
+                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <div className="flex items-center gap-1 cursor-pointer group">
+                                <span>Platform</span>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                      <ChevronDown className="h-3 w-3" />
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[200px] p-0" align="start">
+                                    <div className="p-3">
+                                      <div className="text-xs font-semibold text-gray-600 mb-2">Filter Platform</div>
+                                      {['X','Telegram','YouTube','Facebook','TikTok'].map((platform) => (
+                                        <div
+                                          key={platform}
+                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                          onClick={() => {
+                                            const newPlatforms = kolFilters.platform.includes(platform)
+                                              ? kolFilters.platform.filter(p => p !== platform)
+                                              : [...kolFilters.platform, platform];
+                                            setKolFilters(prev => ({ ...prev, platform: newPlatforms }));
+                                          }}
+                                        >
+                                          <Checkbox checked={kolFilters.platform.includes(platform)} />
+                                          <div className="flex items-center gap-1" title={platform}>
+                                            {getPlatformIcon(platform)}
+                                          </div>
+                                        </div>
+                                      ))}
+                                      {kolFilters.platform.length > 0 && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="w-full mt-2 text-xs"
+                                          onClick={() => setKolFilters(prev => ({ ...prev, platform: [] }))}
+                                        >
+                                          Clear
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                                {kolFilters.platform.length > 0 && (
+                                  <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    {kolFilters.platform.length}
+                                  </span>
                                 )}
                               </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatFollowers(item.master_kol.followers)}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {item.master_kol.region ? (
-                                <div className="flex items-center space-x-1">
-                                  <span>{getRegionIcon(item.master_kol.region).flag}</span>
-                                  <span>{item.master_kol.region}</span>
-                                </div>
-                              ) : '-'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {Array.isArray(item.master_kol.platform) ? (
-                                <div className="flex gap-1">
-                                  {item.master_kol.platform.map((platform: string, idx: number) => (
-                                    <div key={idx} className="flex items-center justify-center h-5 w-5" title={platform}>
-                                      {getPlatformIcon(platform)}
+                            </TableHead>
+                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <div className="flex items-center gap-1 cursor-pointer group">
+                                <span>Followers</span>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                      <ChevronDown className="h-3 w-3" />
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[200px] p-0" align="start">
+                                    <div className="p-3">
+                                      <div className="text-xs font-semibold text-gray-600 mb-2">Filter Followers</div>
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <Select
+                                          value={kolFilters.followers_operator}
+                                          onValueChange={(value) => setKolFilters(prev => ({ ...prev, followers_operator: value }))}
+                                        >
+                                          <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                            <SelectValue placeholder="=" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value=">">{'>'}</SelectItem>
+                                            <SelectItem value="<">{'<'}</SelectItem>
+                                            <SelectItem value="=">=</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                        <Input
+                                          type="number"
+                                          placeholder="Value"
+                                          value={kolFilters.followers_value}
+                                          onChange={(e) => setKolFilters(prev => ({ ...prev, followers_value: e.target.value }))}
+                                          className="h-8 text-xs auth-input"
+                                        />
+                                      </div>
+                                      {(kolFilters.followers_operator || kolFilters.followers_value) && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="w-full text-xs"
+                                          onClick={() => setKolFilters(prev => ({ ...prev, followers_operator: '', followers_value: '' }))}
+                                        >
+                                          Clear
+                                        </Button>
+                                      )}
                                     </div>
-                                  ))}
+                                  </PopoverContent>
+                                </Popover>
+                                {(kolFilters.followers_operator && kolFilters.followers_value) && (
+                                  <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    1
+                                  </span>
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <div className="flex items-center gap-1 cursor-pointer group">
+                                <span>Region</span>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                      <ChevronDown className="h-3 w-3" />
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[200px] p-0" align="start">
+                                    <div className="p-3">
+                                      <div className="text-xs font-semibold text-gray-600 mb-2">Filter Region</div>
+                                      {['Vietnam','Turkey','SEA','Philippines','Korea','Global','China','Brazil'].map((region) => (
+                                        <div
+                                          key={region}
+                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                          onClick={() => {
+                                            const newRegions = kolFilters.region.includes(region)
+                                              ? kolFilters.region.filter(r => r !== region)
+                                              : [...kolFilters.region, region];
+                                            setKolFilters(prev => ({ ...prev, region: newRegions }));
+                                          }}
+                                        >
+                                          <Checkbox checked={kolFilters.region.includes(region)} />
+                                          <div className="flex items-center gap-2">
+                                            <span>{getRegionIcon(region).flag}</span>
+                                            <span className="text-sm">{region}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                      {kolFilters.region.length > 0 && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="w-full mt-2 text-xs"
+                                          onClick={() => setKolFilters(prev => ({ ...prev, region: [] }))}
+                                        >
+                                          Clear
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                                {kolFilters.region.length > 0 && (
+                                  <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    {kolFilters.region.length}
+                                  </span>
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <div className="flex items-center gap-1 cursor-pointer group">
+                                <span>Status</span>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                      <ChevronDown className="h-3 w-3" />
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[200px] p-0" align="start">
+                                    <div className="p-3">
+                                      <div className="text-xs font-semibold text-gray-600 mb-2">Filter Status</div>
+                                      {['Curated','Interested','Onboarded','Concluded'].map((status) => (
+                                        <div
+                                          key={status}
+                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                          onClick={() => {
+                                            const newStatuses = kolFilters.hh_status.includes(status)
+                                              ? kolFilters.hh_status.filter(s => s !== status)
+                                              : [...kolFilters.hh_status, status];
+                                            setKolFilters(prev => ({ ...prev, hh_status: newStatuses }));
+                                          }}
+                                        >
+                                          <Checkbox checked={kolFilters.hh_status.includes(status)} />
+                                          <span className={`px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(status.toLowerCase())}`}>
+                                            {status}
+                                          </span>
+                                        </div>
+                                      ))}
+                                      {kolFilters.hh_status.length > 0 && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="w-full mt-2 text-xs"
+                                          onClick={() => setKolFilters(prev => ({ ...prev, hh_status: [] }))}
+                                        >
+                                          Clear
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                                {kolFilters.hh_status.length > 0 && (
+                                  <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    {kolFilters.hh_status.length}
+                                  </span>
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <div className="flex items-center gap-1 cursor-pointer group">
+                                <span>Budget</span>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                      <ChevronDown className="h-3 w-3" />
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[200px] p-0" align="start">
+                                    <div className="p-3">
+                                      <div className="text-xs font-semibold text-gray-600 mb-2">Filter Budget</div>
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <Select
+                                          value={kolFilters.budget_operator}
+                                          onValueChange={(value) => setKolFilters(prev => ({ ...prev, budget_operator: value }))}
+                                        >
+                                          <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                            <SelectValue placeholder="=" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value=">">{'>'}</SelectItem>
+                                            <SelectItem value="<">{'<'}</SelectItem>
+                                            <SelectItem value="=">=</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                        <Input
+                                          type="number"
+                                          placeholder="Value"
+                                          value={kolFilters.budget_value}
+                                          onChange={(e) => setKolFilters(prev => ({ ...prev, budget_value: e.target.value }))}
+                                          className="h-8 text-xs auth-input"
+                                        />
+                                      </div>
+                                      {(kolFilters.budget_operator || kolFilters.budget_value) && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="w-full text-xs"
+                                          onClick={() => setKolFilters(prev => ({ ...prev, budget_operator: '', budget_value: '' }))}
+                                        >
+                                          Clear
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                                {(kolFilters.budget_operator && kolFilters.budget_value) && (
+                                  <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    1
+                                  </span>
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <div className="flex items-center gap-1 cursor-pointer group">
+                                <span>Budget Type</span>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                      <ChevronDown className="h-3 w-3" />
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[200px] p-0" align="start">
+                                    <div className="p-3">
+                                      <div className="text-xs font-semibold text-gray-600 mb-2">Filter Budget Type</div>
+                                      {['Token','Fiat','WL'].map((budgetType) => (
+                                        <div
+                                          key={budgetType}
+                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                          onClick={() => {
+                                            const newBudgetTypes = kolFilters.budget_type.includes(budgetType)
+                                              ? kolFilters.budget_type.filter(bt => bt !== budgetType)
+                                              : [...kolFilters.budget_type, budgetType];
+                                            setKolFilters(prev => ({ ...prev, budget_type: newBudgetTypes }));
+                                          }}
+                                        >
+                                          <Checkbox checked={kolFilters.budget_type.includes(budgetType)} />
+                                          <span className="text-sm">{budgetType}</span>
+                                        </div>
+                                      ))}
+                                      {kolFilters.budget_type.length > 0 && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="w-full mt-2 text-xs"
+                                          onClick={() => setKolFilters(prev => ({ ...prev, budget_type: [] }))}
+                                        >
+                                          Clear
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                                {kolFilters.budget_type.length > 0 && (
+                                  <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    {kolFilters.budget_type.length}
+                                  </span>
+                                )}
+                              </div>
+                            </TableHead>
+                            <TableHead className="relative bg-gray-50 select-none">Content</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody className="bg-white">
+                          {filteredKOLs.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={9} className="text-center py-12">
+                                <div className="flex flex-col items-center justify-center text-gray-500">
+                                  <Users className="h-12 w-12 mb-4 text-gray-300" />
+                                  <p className="text-lg font-medium mb-2">No KOLs match your filters</p>
+                                  <p className="text-sm text-gray-400 mb-4">Try adjusting your filter criteria</p>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setKolFilters({
+                                        platform: [],
+                                        region: [],
+                                        hh_status: [],
+                                        budget_type: [],
+                                        followers_operator: '',
+                                        followers_value: '',
+                                        budget_operator: '',
+                                        budget_value: '',
+                                        paid_operator: '',
+                                        paid_value: ''
+                                      });
+                                      setSearchTerm('');
+                                    }}
+                                  >
+                                    Reset All Filters
+                                  </Button>
                                 </div>
-                              ) : '-'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {Array.isArray(item.master_kol.content_type) ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {item.master_kol.content_type.map((type: string, idx: number) => (
-                                    <span key={idx} className={`px-2 py-1 rounded-md text-xs font-medium ${getContentTypeColor(type)}`}>
-                                      {type}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredKOLs.map((campaignKOL, index) => {
+                              return (
+                                <TableRow key={campaignKOL.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center text-gray-600`} style={{ verticalAlign: 'middle' }}>
+                                    {index + 1}
+                                  </TableCell>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-gray-600`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
+                                    <div className="flex items-center w-full h-full">
+                                      <div className="truncate font-bold">{campaignKOL.master_kol.name}</div>
+                                      {campaignKOL.master_kol.link && (
+                                        <a
+                                          href={campaignKOL.master_kol.link}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-sm ml-2 underline hover:no-underline font-normal"
+                                          style={{ color: 'inherit' }}
+                                        >
+                                          View Profile
+                                        </a>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <div className="flex gap-1 items-center">
+                                      {(campaignKOL.master_kol.platform || []).map((platform: string) => (
+                                        <span key={platform} className="flex items-center justify-center h-5 w-5" title={platform}>
+                                          {getPlatformIcon(platform)}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    {campaignKOL.master_kol.followers ? formatFollowers(campaignKOL.master_kol.followers) : '-'}
+                                  </TableCell>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    {campaignKOL.master_kol.region ? (
+                                      <div className="flex items-center space-x-1">
+                                        <span>{getRegionIcon(campaignKOL.master_kol.region).flag}</span>
+                                        <span>{campaignKOL.master_kol.region}</span>
+                                      </div>
+                                    ) : '-'}
+                                  </TableCell>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(campaignKOL.hh_status || 'curated')}`}>
+                                      {campaignKOL.hh_status || 'Curated'}
                                     </span>
-                                  ))}
-                                </div>
-                              ) : '-'}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              <span className={`px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(item.hh_status || 'curated')}`}>
-                                {item.hh_status || 'Curated'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                        {kols.length === 0 && (
-                          <tr>
-                            <td className="px-6 py-8 text-center text-gray-500" colSpan={7}>No KOLs in this campaign.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                                  </TableCell>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <div className="truncate min-h-[32px] flex items-center px-1 py-1" style={{ minHeight: 32 }}>
+                                      {campaignKOL.allocated_budget ? `$${Number(campaignKOL.allocated_budget).toLocaleString('en-US')}` : '-'}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                    <div className="truncate min-h-[32px] flex items-center px-1 py-1" style={{ minHeight: 32 }}>
+                                      {campaignKOL.budget_type || '-'}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden text-center`}>
+                                    <div className="font-medium text-gray-900">
+                                      {contents.filter(content => content.campaign_kols_id === campaignKOL.id).length}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
                 )}
 
                 {/* Cards View */}
