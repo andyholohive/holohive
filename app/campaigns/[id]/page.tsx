@@ -1502,7 +1502,7 @@ const CampaignDetailsPage = () => {
               <TabsTrigger value="information">Information</TabsTrigger>
               <TabsTrigger value="kols">KOL Dashboard</TabsTrigger>
               <TabsTrigger value="contents">Content Dashboard</TabsTrigger>
-                  <TabsTrigger value="payments">Payments</TabsTrigger>
+                  <TabsTrigger value="payments">Budget</TabsTrigger>
             </TabsList>
             
             <TabsContent value="information" className="mt-4">
@@ -5122,7 +5122,7 @@ const CampaignDetailsPage = () => {
             </div>
           </TabsContent>
 
-          {/* Payments Tab */}
+          {/* Budget Tab */}
           <TabsContent value="payments" className="mt-4">
             <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
               <CardHeader className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
@@ -5130,7 +5130,7 @@ const CampaignDetailsPage = () => {
                   <div className="bg-gray-100 p-2 rounded-lg">
                     <DollarSign className="h-6 w-6 text-gray-600" />
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900">Payment Management</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">Budget Management</h2>
                 </div>
                 <div className="flex items-center gap-3">
                   <Dialog open={isAddingPayment} onOpenChange={setIsAddingPayment}>
