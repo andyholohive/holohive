@@ -201,6 +201,14 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     paid_value: ''
   });
 
+  // Content Table filters and search
+  const [contentsSearchTerm, setContentsSearchTerm] = useState('');
+  const [contentFilters, setContentFilters] = useState({
+    platform: [] as string[],
+    type: [] as string[],
+    status: [] as string[]
+  });
+
   // Filter and search KOLs
   const filteredKOLs = kols.filter(kol => {
     // Search filter
@@ -247,6 +255,33 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
     return matchesSearch && matchesPlatform && matchesRegion && matchesStatus &&
            matchesBudgetType && matchesFollowers && matchesBudget;
+  });
+
+  // Filter and search Contents
+  const filteredContents = contents.filter(content => {
+    // Get KOL name for search
+    const kol = kols.find(k => k.id === content.campaign_kols_id);
+    const kolName = kol?.master_kol?.name || '';
+
+    // Search filter
+    const matchesSearch = contentsSearchTerm === '' ||
+      kolName.toLowerCase().includes(contentsSearchTerm.toLowerCase()) ||
+      (content.platform && content.platform.toLowerCase().includes(contentsSearchTerm.toLowerCase())) ||
+      (content.status && content.status.toLowerCase().includes(contentsSearchTerm.toLowerCase()));
+
+    // Platform filter
+    const matchesPlatform = contentFilters.platform.length === 0 ||
+      (content.platform && contentFilters.platform.includes(content.platform));
+
+    // Type filter
+    const matchesType = contentFilters.type.length === 0 ||
+      (content.type && contentFilters.type.includes(content.type));
+
+    // Status filter
+    const matchesStatus = contentFilters.status.length === 0 ||
+      (content.status && contentFilters.status.includes(content.status));
+
+    return matchesSearch && matchesPlatform && matchesType && matchesStatus;
   });
 
   // Cache key for this specific campaign
@@ -1816,94 +1851,287 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
                   {/* Table View */}
                   {contentViewMode === 'table' && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">KOL</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Platform</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Activation</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Link</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Impressions</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Likes</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Retweets</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Comments</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bookmarks</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {contents.map((c, index) => (
-                            <tr key={c.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div>
-                                  <div className="font-medium text-gray-900">{(c as any).campaign_kol?.master_kol?.name || '-'}</div>
-                                  {(c as any).campaign_kol?.master_kol?.link && (
-                                    <a 
-                                      href={(c as any).campaign_kol.master_kol.link} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer" 
-                                      className="text-sm text-blue-600 hover:text-blue-800"
-                                    >
-                                      View Profile
-                                    </a>
+                    <>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="relative flex-1 max-w-sm">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            placeholder="Search Contents by KOL, platform, or status..."
+                            className="pl-10 auth-input"
+                            value={contentsSearchTerm}
+                            onChange={e => setContentsSearchTerm(e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="border rounded-lg overflow-auto" style={{ minHeight: '400px', position: 'relative' }}>
+                        <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
+                          <TableHeader>
+                            <TableRow className="bg-gray-50 border-b border-gray-200">
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">KOL</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <div className="flex items-center gap-1 cursor-pointer group">
+                                  <span>Platform</span>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[200px] p-0" align="start">
+                                      <div className="p-3">
+                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Platform</div>
+                                        {['X','Telegram','YouTube','Facebook','TikTok'].map((platform) => (
+                                          <div
+                                            key={platform}
+                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                            onClick={() => {
+                                              const newPlatforms = contentFilters.platform.includes(platform)
+                                                ? contentFilters.platform.filter(p => p !== platform)
+                                                : [...contentFilters.platform, platform];
+                                              setContentFilters(prev => ({ ...prev, platform: newPlatforms }));
+                                            }}
+                                          >
+                                            <Checkbox checked={contentFilters.platform.includes(platform)} />
+                                            <div className="flex items-center gap-1" title={platform}>
+                                              {getPlatformIcon(platform)}
+                                            </div>
+                                          </div>
+                                        ))}
+                                        {contentFilters.platform.length > 0 && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="w-full mt-2 text-xs"
+                                            onClick={() => setContentFilters(prev => ({ ...prev, platform: [] }))}
+                                          >
+                                            Clear
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                  {contentFilters.platform.length > 0 && (
+                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                      {contentFilters.platform.length}
+                                    </span>
                                   )}
                                 </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {c.platform ? (
-                                  <div className="flex gap-1">
-                                    <div className="flex items-center justify-center h-5 w-5" title={c.platform}>
-                                      {getPlatformIcon(c.platform)}
-                                    </div>
+                              </TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <div className="flex items-center gap-1 cursor-pointer group">
+                                  <span>Type</span>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[200px] p-0" align="start">
+                                      <div className="p-3">
+                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Type</div>
+                                        {['Video','Thread','Post','Story','Reel','Short'].map((type) => (
+                                          <div
+                                            key={type}
+                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                            onClick={() => {
+                                              const newTypes = contentFilters.type.includes(type)
+                                                ? contentFilters.type.filter(t => t !== type)
+                                                : [...contentFilters.type, type];
+                                              setContentFilters(prev => ({ ...prev, type: newTypes }));
+                                            }}
+                                          >
+                                            <Checkbox checked={contentFilters.type.includes(type)} />
+                                            <span className="text-sm">{type}</span>
+                                          </div>
+                                        ))}
+                                        {contentFilters.type.length > 0 && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="w-full mt-2 text-xs"
+                                            onClick={() => setContentFilters(prev => ({ ...prev, type: [] }))}
+                                          >
+                                            Clear
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                  {contentFilters.type.length > 0 && (
+                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                      {contentFilters.type.length}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <div className="flex items-center gap-1 cursor-pointer group">
+                                  <span>Status</span>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[200px] p-0" align="start">
+                                      <div className="p-3">
+                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Status</div>
+                                        {['Published','Scheduled','Draft','Pending','Failed','Removed'].map((status) => (
+                                          <div
+                                            key={status}
+                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                            onClick={() => {
+                                              const newStatuses = contentFilters.status.includes(status)
+                                                ? contentFilters.status.filter(s => s !== status)
+                                                : [...contentFilters.status, status];
+                                              setContentFilters(prev => ({ ...prev, status: newStatuses }));
+                                            }}
+                                          >
+                                            <Checkbox checked={contentFilters.status.includes(status)} />
+                                            <span className="text-sm">{status}</span>
+                                          </div>
+                                        ))}
+                                        {contentFilters.status.length > 0 && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="w-full mt-2 text-xs"
+                                            onClick={() => setContentFilters(prev => ({ ...prev, status: [] }))}
+                                          >
+                                            Clear
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                  {contentFilters.status.length > 0 && (
+                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                      {contentFilters.status.length}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Activation Date</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content Link</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Impressions</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Likes</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Retweets</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Comments</TableHead>
+                              <TableHead className="relative bg-gray-50 select-none">Bookmarks</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody className="bg-white">
+                            {filteredContents.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={12} className="text-center py-12">
+                                  <div className="flex flex-col items-center justify-center text-gray-500">
+                                    <FileText className="h-12 w-12 mb-4 text-gray-300" />
+                                    <p className="text-lg font-medium mb-2">No content matches your filters</p>
+                                    <p className="text-sm text-gray-400 mb-4">Try adjusting your filter criteria</p>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        setContentFilters({
+                                          platform: [],
+                                          type: [],
+                                          status: []
+                                        });
+                                        setContentsSearchTerm('');
+                                      }}
+                                    >
+                                      Reset All Filters
+                                    </Button>
                                   </div>
-                                ) : '-'}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {c.type ? (
-                                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${getContentTypeColor(c.type)}`}>
-                                    {c.type}
-                                  </span>
-                                ) : '-'}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                <span className={`px-2 py-1 rounded-md text-xs font-medium ${(() => {
-                                  const s = (c.status || '').toLowerCase();
-                                  if (['published', 'active', 'live'].includes(s)) return 'bg-green-100 text-green-800';
-                                  if (['scheduled'].includes(s)) return 'bg-blue-100 text-blue-800';
-                                  if (['draft', 'pending'].includes(s)) return 'bg-yellow-100 text-yellow-800';
-                                  if (['failed', 'removed'].includes(s)) return 'bg-red-100 text-red-800';
-                                  return 'bg-gray-100 text-gray-800';
-                                })()}`}>
-                                  {c.status ? c.status.charAt(0).toUpperCase() + c.status.slice(1).toLowerCase() : '-'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.activation_date ? formatDate(c.activation_date) : '-'}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                {c.content_link ? (
-                                  <a href={c.content_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">Open</a>
-                                ) : (
-                                  <span className="text-gray-500">-</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.impressions ? formatFollowers(c.impressions) : '-'}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.likes ? formatFollowers(c.likes) : '-'}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.retweets ? formatFollowers(c.retweets) : '-'}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.comments ? formatFollowers(c.comments) : '-'}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{c.bookmarks ? formatFollowers(c.bookmarks) : '-'}</td>
-                            </tr>
-                          ))}
-                          {contents.length === 0 && (
-                            <tr>
-                              <td className="px-6 py-8 text-center text-gray-500" colSpan={12}>No contents for this campaign.</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              filteredContents.map((content, index) => {
+                                const kol = kols.find(k => k.id === content.campaign_kols_id);
+                                return (
+                                  <TableRow key={content.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center text-gray-600`} style={{ verticalAlign: 'middle' }}>
+                                      {index + 1}
+                                    </TableCell>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-gray-600`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
+                                      <div className="flex items-center w-full h-full">
+                                        <div className="truncate font-bold">{kol?.master_kol?.name || '-'}</div>
+                                        {kol?.master_kol?.link && (
+                                          <a
+                                            href={kol.master_kol.link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-sm ml-2 underline hover:no-underline font-normal"
+                                            style={{ color: 'inherit' }}
+                                          >
+                                            View Profile
+                                          </a>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                      {content.platform ? (
+                                        <div className="flex gap-1 items-center">
+                                          <span className="flex items-center justify-center h-5 w-5" title={content.platform}>
+                                            {getPlatformIcon(content.platform)}
+                                          </span>
+                                        </div>
+                                      ) : '-'}
+                                    </TableCell>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                      {content.type ? (
+                                        <span className={`px-2 py-1 rounded-md text-xs font-medium ${getContentTypeColor(content.type)}`}>
+                                          {content.type}
+                                        </span>
+                                      ) : '-'}
+                                    </TableCell>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                      <span className={`px-2 py-1 rounded-md text-xs font-medium ${(() => {
+                                        const s = (content.status || '').toLowerCase();
+                                        if (['published', 'active', 'live'].includes(s)) return 'bg-green-100 text-green-800';
+                                        if (['scheduled'].includes(s)) return 'bg-blue-100 text-blue-800';
+                                        if (['draft', 'pending'].includes(s)) return 'bg-yellow-100 text-yellow-800';
+                                        if (['failed', 'removed'].includes(s)) return 'bg-red-100 text-red-800';
+                                        return 'bg-gray-100 text-gray-800';
+                                      })()}`}>
+                                        {content.status ? content.status.charAt(0).toUpperCase() + content.status.slice(1).toLowerCase() : '-'}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                      {content.activation_date ? formatDate(content.activation_date) : '-'}
+                                    </TableCell>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                      {content.content_link ? (
+                                        <a href={content.content_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline">
+                                          Open
+                                        </a>
+                                      ) : '-'}
+                                    </TableCell>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                      {content.impressions ? formatFollowers(content.impressions) : '-'}
+                                    </TableCell>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                      {content.likes ? formatFollowers(content.likes) : '-'}
+                                    </TableCell>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                      {content.retweets ? formatFollowers(content.retweets) : '-'}
+                                    </TableCell>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                      {content.comments ? formatFollowers(content.comments) : '-'}
+                                    </TableCell>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
+                                      {content.bookmarks ? formatFollowers(content.bookmarks) : '-'}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </>
                   )}
 
                   {/* Overview View - Metrics */}
