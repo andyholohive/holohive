@@ -512,8 +512,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
             <div className="flex items-center space-x-4">
               <Image src="/images/logo.png" alt="KOL Campaign Manager Logo" width={40} height={40} className="rounded-lg" />
               <div>
-                <h1 className="text-xl font-bold text-gray-900">KOL Campaign Manager</h1>
-                <p className="text-sm text-gray-600">Shared Campaign</p>
+                <h1 className="text-xl font-bold text-gray-900">Holo Hive Campaign Manager</h1>
               </div>
             </div>
           </div>
@@ -556,8 +555,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           <div className="flex items-center space-x-4">
             <Image src="/images/logo.png" alt="KOL Campaign Manager Logo" width={40} height={40} className="rounded-lg" />
             <div>
-              <h1 className="text-xl font-bold text-gray-900">KOL Campaign Manager</h1>
-              <p className="text-sm text-gray-600">Shared Campaign</p>
+              <h1 className="text-xl font-bold text-gray-900">Holo Hive Campaign Manager</h1>
             </div>
           </div>
         </div>
@@ -571,7 +569,6 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           </div>
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{campaign.name}</h2>
-            <p className="text-gray-600">Shared Campaign</p>
           </div>
           <div className="ml-auto">
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(campaign.status)}`}>
@@ -626,9 +623,9 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         <Tabs defaultValue="kols" className="bg-white rounded-lg shadow-sm border">
           <div className="px-6 pt-4">
             <TabsList>
-              <TabsTrigger value="kols">KOLs</TabsTrigger>
+              <TabsTrigger value="kols">KOL Dashboard</TabsTrigger>
               {/* <TabsTrigger value="performance">Performance</TabsTrigger> */}
-              <TabsTrigger value="contents">Contents</TabsTrigger>
+              <TabsTrigger value="contents">Content Dashboard</TabsTrigger>
             </TabsList>
           </div>
           <div className="px-6 pb-4">
@@ -639,7 +636,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     <div className="bg-gray-100 p-2 rounded-lg">
                       <Users className="h-5 w-5 text-gray-600" />
                     </div>
-                    <h2 className="text-xl font-semibold text-gray-900">KOLs Dashboard</h2>
+                    <h2 className="text-xl font-semibold text-gray-900">KOL Dashboard</h2>
                   </div>
                 </CardHeader>
 
@@ -679,27 +676,28 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       {/* Total KOLs in Campaign */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                               <Users className="h-6 w-6 text-white" />
                             </div>
+                            <p className="text-sm text-gray-600">Total KOLs in Campaign</p>
                           </div>
                         </CardHeader>
                         <CardContent>
                           <div className="text-2xl font-bold text-gray-900">
                             {kols.length}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Total KOLs in Campaign</p>
                         </CardContent>
                       </Card>
 
                       {/* Average Followers per KOL */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
+                            <p className="text-sm text-gray-600">Average Followers per KOL</p>
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -713,17 +711,27 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               return '0';
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Average Followers per KOL</p>
                         </CardContent>
                       </Card>
 
                       {/* Distribution of KOLs by Platform */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                               <Globe className="h-6 w-6 text-white" />
                             </div>
+                            <p className="text-sm text-gray-600">
+                              {(() => {
+                                const platforms = new Set();
+                                kols.forEach(kol => {
+                                  if (kol.master_kol.platform) {
+                                    kol.master_kol.platform.forEach((p: string) => platforms.add(p));
+                                  }
+                                });
+                                return platforms.size === 1 ? 'Unique Platform' : 'Unique Platforms';
+                              })()}
+                            </p>
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -738,17 +746,27 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               return platforms.size;
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Unique Platform</p>
                         </CardContent>
                       </Card>
 
                       {/* KOLs by Region */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                               <Flag className="h-6 w-6 text-white" />
                             </div>
+                            <p className="text-sm text-gray-600">
+                              {(() => {
+                                const regions = new Set();
+                                kols.forEach(kol => {
+                                  if (kol.master_kol.region) {
+                                    regions.add(kol.master_kol.region);
+                                  }
+                                });
+                                return regions.size === 1 ? 'Region Represented' : 'Regions Represented';
+                              })()}
+                            </p>
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -763,7 +781,6 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               return regions.size;
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Regions Represented</p>
                         </CardContent>
                       </Card>
                     </div>
@@ -1350,7 +1367,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       <FileText className="h-5 w-5 text-gray-600" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-semibold text-gray-900">Contents</h2>
+                      <h2 className="text-xl font-semibold text-gray-900">Content Dashboard</h2>
                     </div>
                   </div>
                 </CardHeader>
@@ -1468,10 +1485,16 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         {/* Total Impressions */}
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
                               <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
+                              <p className="text-sm text-gray-600">
+                                {(() => {
+                                  const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                                  return totalImpressions === 1 ? 'Total Impression' : 'Total Impressions';
+                                })()}
+                              </p>
                             </div>
                           </CardHeader>
                           <CardContent>
@@ -1481,17 +1504,22 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 return totalImpressions.toLocaleString();
                               })()}
                             </div>
-                            <p className="text-sm text-gray-600 mt-1">Total Impressions</p>
                           </CardContent>
                         </Card>
 
                         {/* Total Comments */}
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
                               <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
+                              <p className="text-sm text-gray-600">
+                                {(() => {
+                                  const totalComments = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
+                                  return totalComments === 1 ? 'Total Comment' : 'Total Comments';
+                                })()}
+                              </p>
                             </div>
                           </CardHeader>
                           <CardContent>
@@ -1501,17 +1529,22 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 return totalComments.toLocaleString();
                               })()}
                             </div>
-                            <p className="text-sm text-gray-600 mt-1">Total Comments</p>
                           </CardContent>
                         </Card>
 
                         {/* Total Retweets */}
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
                               <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
+                              <p className="text-sm text-gray-600">
+                                {(() => {
+                                  const totalRetweets = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
+                                  return totalRetweets === 1 ? 'Total Retweet' : 'Total Retweets';
+                                })()}
+                              </p>
                             </div>
                           </CardHeader>
                           <CardContent>
@@ -1521,17 +1554,22 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 return totalRetweets.toLocaleString();
                               })()}
                             </div>
-                            <p className="text-sm text-gray-600 mt-1">Total Retweets</p>
                           </CardContent>
                         </Card>
 
                         {/* Total Likes */}
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
                               <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
+                              <p className="text-sm text-gray-600">
+                                {(() => {
+                                  const totalLikes = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
+                                  return totalLikes === 1 ? 'Total Like' : 'Total Likes';
+                                })()}
+                              </p>
                             </div>
                           </CardHeader>
                           <CardContent>
@@ -1541,38 +1579,49 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 return totalLikes.toLocaleString();
                               })()}
                             </div>
-                            <p className="text-sm text-gray-600 mt-1">Total Likes</p>
                           </CardContent>
                         </Card>
 
                         {/* Total Engagements */}
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
                               <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
+                              <p className="text-sm text-gray-600">
+                                {(() => {
+                                  const totalEngagements = contents.reduce((sum, content) =>
+                                    sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
+                                  return totalEngagements === 1 ? 'Total Engagement' : 'Total Engagements';
+                                })()}
+                              </p>
                             </div>
                           </CardHeader>
                           <CardContent>
                             <div className="text-2xl font-bold text-gray-900">
                               {(() => {
-                                const totalEngagements = contents.reduce((sum, content) => 
+                                const totalEngagements = contents.reduce((sum, content) =>
                                   sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
                                 return totalEngagements.toLocaleString();
                               })()}
                             </div>
-                            <p className="text-sm text-gray-600 mt-1">Total Engagements</p>
                           </CardContent>
                         </Card>
 
                         {/* Total Bookmarks */}
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
                               <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
+                              <p className="text-sm text-gray-600">
+                                {(() => {
+                                  const totalBookmarks = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
+                                  return totalBookmarks === 1 ? 'Total Bookmark' : 'Total Bookmarks';
+                                })()}
+                              </p>
                             </div>
                           </CardHeader>
                           <CardContent>
@@ -1582,7 +1631,6 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 return totalBookmarks.toLocaleString();
                               })()}
                             </div>
-                            <p className="text-sm text-gray-600 mt-1">Total Bookmarks</p>
                           </CardContent>
                         </Card>
                       </div>

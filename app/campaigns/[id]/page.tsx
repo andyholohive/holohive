@@ -1500,8 +1500,8 @@ const CampaignDetailsPage = () => {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="information">Information</TabsTrigger>
-              <TabsTrigger value="kols">KOLs</TabsTrigger>
-              <TabsTrigger value="contents">Contents</TabsTrigger>
+              <TabsTrigger value="kols">KOL Dashboard</TabsTrigger>
+              <TabsTrigger value="contents">Content Dashboard</TabsTrigger>
                   <TabsTrigger value="payments">Payments</TabsTrigger>
             </TabsList>
             
@@ -2338,7 +2338,7 @@ const CampaignDetailsPage = () => {
                   <div className="bg-gray-100 p-2 rounded-lg">
                     <Users className="h-6 w-6 text-gray-600" />
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900">Campaign KOLs</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">KOL Dashboard</h2>
                 </div>
                 <div className="flex items-center gap-3">
                   
@@ -2590,27 +2590,28 @@ const CampaignDetailsPage = () => {
                       {/* Total KOLs in Campaign */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                               <Users className="h-6 w-6 text-white" />
                             </div>
+                            <p className="text-sm text-gray-600">Total KOLs in Campaign</p>
                           </div>
                         </CardHeader>
                         <CardContent>
                           <div className="text-2xl font-bold text-gray-900">
                             {campaignKOLs.length}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Total KOLs in Campaign</p>
                         </CardContent>
                       </Card>
 
                       {/* Average Followers per KOL */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
+                            <p className="text-sm text-gray-600">Average Followers per KOL</p>
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -2634,17 +2635,27 @@ const CampaignDetailsPage = () => {
                               return '0';
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Average Followers per KOL</p>
                         </CardContent>
                       </Card>
 
                       {/* Distribution of KOLs by Platform */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                               <Globe className="h-6 w-6 text-white" />
                             </div>
+                            <p className="text-sm text-gray-600">
+                              {(() => {
+                                const platforms = new Set();
+                                campaignKOLs.forEach(kol => {
+                                  if (kol.master_kol.platform) {
+                                    kol.master_kol.platform.forEach((p: string) => platforms.add(p));
+                                  }
+                                });
+                                return platforms.size === 1 ? 'Unique Platform' : 'Unique Platforms';
+                              })()}
+                            </p>
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -2659,17 +2670,27 @@ const CampaignDetailsPage = () => {
                               return platforms.size;
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Unique Platform</p>
                         </CardContent>
                       </Card>
 
                       {/* KOLs by Region */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                               <Flag className="h-6 w-6 text-white" />
                             </div>
+                            <p className="text-sm text-gray-600">
+                              {(() => {
+                                const regions = new Set();
+                                campaignKOLs.forEach(kol => {
+                                  if (kol.master_kol.region) {
+                                    regions.add(kol.master_kol.region);
+                                  }
+                                });
+                                return regions.size === 1 ? 'Region Represented' : 'Regions Represented';
+                              })()}
+                            </p>
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -2684,7 +2705,6 @@ const CampaignDetailsPage = () => {
                               return regions.size;
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Regions Represented</p>
                         </CardContent>
                       </Card>
                     </div>
@@ -2743,10 +2763,11 @@ const CampaignDetailsPage = () => {
                                   </g>
                                 )}
                               />
-                              <YAxis 
+                              <YAxis
                                 axisLine={false}
                                 tickLine={false}
                                 tick={{ fontSize: 12, fill: '#64748b' }}
+                                allowDecimals={false}
                               />
                               <Tooltip 
                                 contentStyle={{
@@ -2820,10 +2841,11 @@ const CampaignDetailsPage = () => {
                                 tickLine={false}
                                 tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
                               />
-                              <YAxis 
+                              <YAxis
                                 axisLine={false}
                                 tickLine={false}
                                 tick={{ fontSize: 12, fill: '#64748b' }}
+                                allowDecimals={false}
                               />
                               <Tooltip 
                                 contentStyle={{
@@ -4045,7 +4067,7 @@ const CampaignDetailsPage = () => {
               <CardHeader className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-100 p-2 rounded-lg"><FileText className="h-6 w-6 text-gray-600" /></div>
-                  <h2 className="text-2xl font-bold text-gray-900">Contents</h2>
+                  <h2 className="text-2xl font-bold text-gray-900">Content Dashboard</h2>
                 </div>
                 <div className="flex items-center">
                   <Dialog open={false} onOpenChange={setIsAddContentsDialogOpen}>
@@ -4383,10 +4405,16 @@ const CampaignDetailsPage = () => {
                       {/* Total Impressions */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
+                            <p className="text-sm text-gray-600">
+                              {(() => {
+                                const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                                return totalImpressions === 1 ? 'Total Impression' : 'Total Impressions';
+                              })()}
+                            </p>
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -4396,17 +4424,22 @@ const CampaignDetailsPage = () => {
                               return totalImpressions.toLocaleString();
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Total Impressions</p>
                         </CardContent>
                       </Card>
 
                       {/* Total Comments */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
+                            <p className="text-sm text-gray-600">
+                              {(() => {
+                                const totalComments = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
+                                return totalComments === 1 ? 'Total Comment' : 'Total Comments';
+                              })()}
+                            </p>
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -4416,17 +4449,22 @@ const CampaignDetailsPage = () => {
                               return totalComments.toLocaleString();
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Total Comments</p>
                         </CardContent>
                       </Card>
 
                       {/* Total Retweets */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
+                            <p className="text-sm text-gray-600">
+                              {(() => {
+                                const totalRetweets = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
+                                return totalRetweets === 1 ? 'Total Retweet' : 'Total Retweets';
+                              })()}
+                            </p>
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -4436,17 +4474,22 @@ const CampaignDetailsPage = () => {
                               return totalRetweets.toLocaleString();
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Total Retweets</p>
                         </CardContent>
                       </Card>
 
                       {/* Total Likes */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
+                            <p className="text-sm text-gray-600">
+                              {(() => {
+                                const totalLikes = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
+                                return totalLikes === 1 ? 'Total Like' : 'Total Likes';
+                              })()}
+                            </p>
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -4456,17 +4499,23 @@ const CampaignDetailsPage = () => {
                               return totalLikes.toLocaleString();
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Total Likes</p>
                         </CardContent>
                       </Card>
 
                       {/* Total Engagements */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
+                            <p className="text-sm text-gray-600">
+                              {(() => {
+                                const totalEngagements = contents.reduce((sum, content) =>
+                                  sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
+                                return totalEngagements === 1 ? 'Total Engagement' : 'Total Engagements';
+                              })()}
+                            </p>
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -4477,17 +4526,22 @@ const CampaignDetailsPage = () => {
                               return totalEngagements.toLocaleString();
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Total Engagements</p>
                         </CardContent>
                       </Card>
 
                       {/* Total Bookmarks */}
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
+                            <p className="text-sm text-gray-600">
+                              {(() => {
+                                const totalBookmarks = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
+                                return totalBookmarks === 1 ? 'Total Bookmark' : 'Total Bookmarks';
+                              })()}
+                            </p>
                           </div>
                         </CardHeader>
                         <CardContent>
@@ -4497,7 +4551,6 @@ const CampaignDetailsPage = () => {
                               return totalBookmarks.toLocaleString();
                             })()}
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">Total Bookmarks</p>
                         </CardContent>
                       </Card>
                     </div>

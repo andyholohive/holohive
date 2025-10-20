@@ -926,14 +926,14 @@ export default function CampaignsPage() {
                       </div>
                       {campaign.name}
                     </div>
+                    <Badge
+                      variant={getStatusVariant(campaign.status)}
+                      className="text-xs"
+                      style={campaign.status === "Active" ? { backgroundColor: "#3e8692", color: "white", borderColor: "#3e8692" } : {}}
+                    >
+                      {campaign.status}
+                    </Badge>
                   </div>
-                  <Badge
-                    variant={getStatusVariant(campaign.status)}
-                    className="text-xs"
-                    style={campaign.status === "Active" ? { backgroundColor: "#3e8692", color: "white", borderColor: "#3e8692" } : {}}
-                  >
-                    {campaign.status}
-                  </Badge>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center text-sm text-gray-600">
