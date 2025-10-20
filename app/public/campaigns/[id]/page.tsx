@@ -512,7 +512,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       try {
         const { data: kolData, error: kolError } = await supabasePublic
           .from('campaign_kols')
-          .select(`id, hh_status, client_status, allocated_budget, budget_type, master_kol:master_kols(id, name, link, followers, platform, region, content_type)`) 
+          .select(`id, hh_status, client_status, allocated_budget, budget_type, master_kol:master_kols(id, name, link, followers, platform, region, content_type, creator_type)`)
           .eq('campaign_id', campaignId)
           .order('created_at', { ascending: false });
         

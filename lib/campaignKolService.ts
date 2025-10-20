@@ -25,6 +25,7 @@ export interface CampaignKOLWithDetails extends CampaignKOL {
     region?: string | null;
     community?: boolean | null;
     content_type?: string[] | null;
+    creator_type?: string[] | null;
     niche?: string[] | null;
     pricing?: string | null;
     tier?: string | null;
