@@ -3210,6 +3210,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Creator Type</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Status</span>
@@ -3423,7 +3424,7 @@ const CampaignDetailsPage = () => {
                       <TableBody className="bg-white">
                         {filteredKOLs.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={13} className="text-center py-12">
+                            <TableCell colSpan={14} className="text-center py-12">
                               <div className="flex flex-col items-center justify-center text-gray-500">
                                 <Users className="h-12 w-12 mb-4 text-gray-300" />
                                 <p className="text-lg font-medium mb-2">No KOLs match your filters</p>
@@ -3519,8 +3520,11 @@ const CampaignDetailsPage = () => {
                                 </div>
                                     ) : '-'}
                               </TableCell>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                {campaignKOL.master_kol.creator_type || '-'}
+                              </TableCell>
                                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                <Select 
+                                <Select
                                   value={campaignKOL.hh_status} 
                                   onValueChange={(value) => handleUpdateKOLStatus(campaignKOL.id, value as any)}
                                 >
