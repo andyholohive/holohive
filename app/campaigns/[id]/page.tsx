@@ -4841,7 +4841,7 @@ const CampaignDetailsPage = () => {
                     <p className="text-sm text-gray-400">Content created for this campaign will appear here.</p>
                   </div>
                 ) : (
-                  <div className="border rounded-lg overflow-auto" style={{ minHeight: '400px', position: 'relative' }}>
+                  <div className="border rounded-lg overflow-auto">
                     <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                       <TableHeader>
                         <TableRow className="bg-gray-50 border-b border-gray-200">
@@ -5410,7 +5410,7 @@ const CampaignDetailsPage = () => {
                         <p className="text-sm text-gray-400">Payments recorded for this campaign will appear here.</p>
                       </div>
                     ) : (
-                      <div className="border rounded-lg overflow-auto" style={{ minHeight: '400px', position: 'relative' }}>
+                      <div className="border rounded-lg overflow-auto">
                         <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                           <TableHeader>
                             <TableRow className="bg-gray-50 border-b border-gray-200">

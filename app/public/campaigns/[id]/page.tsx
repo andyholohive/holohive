@@ -1864,7 +1864,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         </div>
                       </div>
 
-                      <div className="border rounded-lg overflow-auto" style={{ minHeight: '400px', position: 'relative' }}>
+                      <div className="border rounded-lg overflow-auto">
                         <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                           <TableHeader>
                             <TableRow className="bg-gray-50 border-b border-gray-200">
