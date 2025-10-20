@@ -1019,6 +1019,7 @@ const CampaignDetailsPage = () => {
 
   const [isAddKOLsDialogOpen, setIsAddKOLsDialogOpen] = useState(false);
   const [isAddContentsDialogOpen, setIsAddContentsDialogOpen] = useState(false);
+  const [quickAddContentKolId, setQuickAddContentKolId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // Campaign updates state
@@ -1064,24 +1065,25 @@ const CampaignDetailsPage = () => {
   const [loadingContents, setLoadingContents] = useState(false);
 
   // 2. Fetch contents for campaign when campaign changes
+  const fetchContents = async () => {
+    if (!id) return;
+    setLoadingContents(true);
+    try {
+      const { data, error } = await supabase
+        .from('contents')
+        .select('*')
+        .eq('campaign_id', id);
+      if (error) throw error;
+      setContents(data || []);
+    } catch (err) {
+      setContents([]);
+      console.error('Error fetching contents:', err);
+    } finally {
+      setLoadingContents(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchContents = async () => {
-      if (!id) return;
-      setLoadingContents(true);
-      try {
-        const { data, error } = await supabase
-          .from('contents')
-          .select('*')
-          .eq('campaign_id', id);
-        if (error) throw error;
-        setContents(data || []);
-      } catch (err) {
-        setContents([]);
-        console.error('Error fetching contents:', err);
-      } finally {
-        setLoadingContents(false);
-      }
-    };
     fetchContents();
   }, [id]); // When campaign changes
 
@@ -3417,6 +3419,7 @@ const CampaignDetailsPage = () => {
                           </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Wallet</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Notes</TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Add Content</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content</TableHead>
                           <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
                         </TableRow>
@@ -3424,7 +3427,7 @@ const CampaignDetailsPage = () => {
                       <TableBody className="bg-white">
                         {filteredKOLs.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={14} className="text-center py-12">
+                            <TableCell colSpan={15} className="text-center py-12">
                               <div className="flex flex-col items-center justify-center text-gray-500">
                                 <Users className="h-12 w-12 mb-4 text-gray-300" />
                                 <p className="text-lg font-medium mb-2">No KOLs match your filters</p>
@@ -3623,6 +3626,85 @@ const CampaignDetailsPage = () => {
                                     {campaignKOL.notes || <span className="text-gray-400 italic">Click to add notes</span>}
                                   </div>
                                 )}
+                              </TableCell>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                <div className="flex flex-wrap gap-1 items-center">
+                                  {contents
+                                    .filter(content => content.campaign_kols_id === campaignKOL.id)
+                                    .map((content, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800"
+                                      >
+                                        {content.type || 'No Type'}
+                                      </span>
+                                    ))}
+                                  <Popover
+                                    open={quickAddContentKolId === campaignKOL.id}
+                                    onOpenChange={(open) => setQuickAddContentKolId(open ? campaignKOL.id : null)}
+                                  >
+                                    <PopoverTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 w-6 p-0 hover:bg-gray-200"
+                                      >
+                                        <Plus className="h-4 w-4 text-gray-600" />
+                                      </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[200px] p-2" align="start">
+                                      <div className="space-y-1">
+                                        <div className="text-xs font-semibold text-gray-600 mb-2">Select Content Type</div>
+                                        {fieldOptions.deliverables.map((type) => (
+                                          <div
+                                            key={type}
+                                            className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer rounded"
+                                            onClick={async () => {
+                                              const payload = {
+                                                campaign_id: id,
+                                                campaign_kols_id: campaignKOL.id,
+                                                type: type,
+                                                status: 'pending',
+                                                activation_date: null,
+                                                content_link: null,
+                                                platform: null,
+                                                impressions: null,
+                                                likes: null,
+                                                retweets: null,
+                                                comments: null,
+                                                bookmarks: null,
+                                              };
+                                              try {
+                                                console.log('Creating content with payload:', payload);
+                                                const { error, data } = await supabase.from('contents').insert(payload).select().single();
+                                                if (error) {
+                                                  console.error('Error creating content:', error);
+                                                  console.error('Error details:', JSON.stringify(error, null, 2));
+                                                  toast({
+                                                    title: 'Error',
+                                                    description: `Failed to create content: ${error.message}`,
+                                                    variant: 'destructive'
+                                                  });
+                                                  return;
+                                                }
+                                                fetchContents();
+                                                setQuickAddContentKolId(null);
+                                                toast({
+                                                  title: 'Success',
+                                                  description: 'Content created successfully',
+                                                });
+                                              } catch (err) {
+                                                console.error('Unexpected error:', err);
+                                              }
+                                            }}
+                                          >
+                                            {type}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
                               </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center`}>
                                 <div className="font-medium text-gray-900">
