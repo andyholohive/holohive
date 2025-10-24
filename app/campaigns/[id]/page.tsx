@@ -12,17 +12,17 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 // import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin } from "lucide-react";
+import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserService } from "@/lib/userService";
 import { KOLService } from "@/lib/kolService";
 import { CampaignKOLService, CampaignKOLWithDetails } from "@/lib/campaignKolService";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 
@@ -60,13 +60,20 @@ const CampaignDetailsPage = () => {
   const [newKOLData, setNewKOLData] = useState({
     selectedKOLs: [] as string[],
     hh_status: 'Curated' as const,
-    notes: ''
+    notes: '',
+    createPayment: false,
+    payment_amount: 0,
+    payment_date: '',
+    payment_method: 'Token'
   });
 
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState<CampaignDetails | null>(null);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("information");
+  // Track cell editing for inline edits
+  const [editingCell, setEditingCell] = useState<{ row: string; field: string } | null>(null);
+  const [editingValue, setEditingValue] = useState<any>(null);
   // Track allocation edits
   const [allocations, setAllocations] = useState<any[]>([]);
   const [deletedAllocIds, setDeletedAllocIds] = useState<string[]>([]);
@@ -162,7 +169,11 @@ const CampaignDetailsPage = () => {
       'Article': 'bg-green-100 text-green-800',
       'AMA': 'bg-purple-100 text-purple-800',
       'Ambassadorship': 'bg-orange-100 text-orange-800',
-      'Alpha': 'bg-yellow-100 text-yellow-800'
+      'Alpha': 'bg-yellow-100 text-yellow-800',
+      'QRT': 'bg-cyan-100 text-cyan-800',
+      'Thread': 'bg-teal-100 text-teal-800',
+      'Spaces': 'bg-pink-100 text-pink-800',
+      'Newsletter': 'bg-slate-100 text-slate-800'
     };
     return colorMap[type] || 'bg-gray-100 text-gray-800';
   };
@@ -315,8 +326,8 @@ const CampaignDetailsPage = () => {
     if (!campaign || newKOLData.selectedKOLs.length === 0) return;
     setIsAddingKOLs(true);
     try {
-      // Add all selected KOLs to the campaign
-      await Promise.all(
+      // Add all selected KOLs to the campaign and collect their IDs
+      const addedKOLs = await Promise.all(
         newKOLData.selectedKOLs.map(kolId =>
           CampaignKOLService.addCampaignKOL(
             campaign.id,
@@ -326,7 +337,81 @@ const CampaignDetailsPage = () => {
           )
         )
       );
-      setNewKOLData({ selectedKOLs: [], hh_status: 'Curated', notes: '' });
+
+      // If createPayment is checked, create payment records for each added KOL
+      if (newKOLData.createPayment) {
+        console.log('Creating payments for KOLs:', {
+          amount: newKOLData.payment_amount,
+          date: newKOLData.payment_date,
+          method: newKOLData.payment_method,
+          kolCount: addedKOLs.length
+        });
+
+        const paymentResults = await Promise.all(
+          addedKOLs.map(async (campaignKOL) => {
+            try {
+              const { data: paymentData, error: paymentError } = await supabase
+                .from('payments')
+                .insert({
+                  campaign_id: campaign.id,
+                  campaign_kol_id: campaignKOL.id,
+                  amount: newKOLData.payment_amount || 0,
+                  payment_date: newKOLData.payment_date || new Date().toISOString().split('T')[0],
+                  payment_method: newKOLData.payment_method,
+                  content_id: null,
+                  transaction_id: null,
+                  notes: null
+                })
+                .select()
+                .single();
+
+              if (paymentError) {
+                console.error('Payment insert error:', paymentError);
+                throw paymentError;
+              }
+
+              console.log('Payment created:', paymentData);
+
+              // Update the KOL's paid amount
+              const paidAmount = newKOLData.payment_amount || 0;
+              const { error: updateError } = await supabase
+                .from('campaign_kols')
+                .update({ paid: paidAmount })
+                .eq('id', campaignKOL.id);
+
+              if (updateError) {
+                console.error('KOL update error:', updateError);
+                throw updateError;
+              }
+
+              return paymentData;
+            } catch (err) {
+              console.error('Error creating payment for KOL:', campaignKOL.id, err);
+              throw err;
+            }
+          })
+        );
+
+        console.log('All payments created:', paymentResults.length);
+
+        // Refresh payments
+        await fetchPayments();
+
+        toast({
+          title: 'Success',
+          description: `${paymentResults.length} payment(s) recorded successfully.`,
+        });
+      }
+
+      setNewKOLData({
+        selectedKOLs: [],
+        hh_status: 'Curated',
+        notes: '',
+        createPayment: false,
+        payment_amount: 0,
+        payment_date: '',
+        payment_method: 'Token'
+      });
       setIsAddKOLsDialogOpen(false);
       fetchCampaignKOLs();
       fetchAvailableKOLs();
@@ -1004,6 +1089,15 @@ const CampaignDetailsPage = () => {
     }
   };
 
+  const getContentStatusColor = (status: string) => {
+    switch (status) {
+      case 'scheduled': return 'bg-blue-100 text-blue-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'posted': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   const [selectedKOLs, setSelectedKOLs] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState<CampaignKOLWithDetails['hh_status'] | "">("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -1020,6 +1114,7 @@ const CampaignDetailsPage = () => {
   const [isAddKOLsDialogOpen, setIsAddKOLsDialogOpen] = useState(false);
   const [isAddContentsDialogOpen, setIsAddContentsDialogOpen] = useState(false);
   const [quickAddContentKolId, setQuickAddContentKolId] = useState<string | null>(null);
+  const [isShareCampaignOpen, setIsShareCampaignOpen] = useState(false);
   const { toast } = useToast();
 
   // Campaign updates state
@@ -1098,10 +1193,30 @@ const CampaignDetailsPage = () => {
     platform: string[];
     type: string[];
     status: string[];
+    impressions_operator: string;
+    impressions_value: string;
+    likes_operator: string;
+    likes_value: string;
+    retweets_operator: string;
+    retweets_value: string;
+    comments_operator: string;
+    comments_value: string;
+    bookmarks_operator: string;
+    bookmarks_value: string;
   }>({
     platform: [],
     type: [],
-    status: []
+    status: [],
+    impressions_operator: '',
+    impressions_value: '',
+    likes_operator: '',
+    likes_value: '',
+    retweets_operator: '',
+    retweets_value: '',
+    comments_operator: '',
+    comments_value: '',
+    bookmarks_operator: '',
+    bookmarks_value: ''
   });
 
   // 2. Add filtering logic for search and status
@@ -1122,6 +1237,51 @@ const CampaignDetailsPage = () => {
     // Status filter
     if (contentFilters.status.length > 0 && !contentFilters.status.includes(content.status || '')) {
       return false;
+    }
+
+    // Impressions filter
+    if (contentFilters.impressions_operator && contentFilters.impressions_value) {
+      const impressions = content.impressions || 0;
+      const value = parseFloat(contentFilters.impressions_value);
+      if (contentFilters.impressions_operator === '>' && !(impressions > value)) return false;
+      if (contentFilters.impressions_operator === '<' && !(impressions < value)) return false;
+      if (contentFilters.impressions_operator === '=' && !(impressions === value)) return false;
+    }
+
+    // Likes filter
+    if (contentFilters.likes_operator && contentFilters.likes_value) {
+      const likes = content.likes || 0;
+      const value = parseFloat(contentFilters.likes_value);
+      if (contentFilters.likes_operator === '>' && !(likes > value)) return false;
+      if (contentFilters.likes_operator === '<' && !(likes < value)) return false;
+      if (contentFilters.likes_operator === '=' && !(likes === value)) return false;
+    }
+
+    // Retweets filter
+    if (contentFilters.retweets_operator && contentFilters.retweets_value) {
+      const retweets = content.retweets || 0;
+      const value = parseFloat(contentFilters.retweets_value);
+      if (contentFilters.retweets_operator === '>' && !(retweets > value)) return false;
+      if (contentFilters.retweets_operator === '<' && !(retweets < value)) return false;
+      if (contentFilters.retweets_operator === '=' && !(retweets === value)) return false;
+    }
+
+    // Comments filter
+    if (contentFilters.comments_operator && contentFilters.comments_value) {
+      const comments = content.comments || 0;
+      const value = parseFloat(contentFilters.comments_value);
+      if (contentFilters.comments_operator === '>' && !(comments > value)) return false;
+      if (contentFilters.comments_operator === '<' && !(comments < value)) return false;
+      if (contentFilters.comments_operator === '=' && !(comments === value)) return false;
+    }
+
+    // Bookmarks filter
+    if (contentFilters.bookmarks_operator && contentFilters.bookmarks_value) {
+      const bookmarks = content.bookmarks || 0;
+      const value = parseFloat(contentFilters.bookmarks_value);
+      if (contentFilters.bookmarks_operator === '>' && !(bookmarks > value)) return false;
+      if (contentFilters.bookmarks_operator === '<' && !(bookmarks < value)) return false;
+      if (contentFilters.bookmarks_operator === '=' && !(bookmarks === value)) return false;
     }
 
     return (
@@ -1196,7 +1356,7 @@ const CampaignDetailsPage = () => {
         getColorClass = () => value ? getContentTypeColor(value) : 'bg-gray-100 text-gray-800';
       } else if (field === 'status') {
         options = contentStatusOptions.map(o => o.value);
-        getColorClass = () => value ? getStatusColor(value) : 'bg-gray-100 text-gray-800';
+        getColorClass = () => value ? getContentStatusColor(value) : 'bg-gray-100 text-gray-800';
       } else if (field === 'campaign_kols_id') {
         options = campaignKOLs.map(k => k.id);
       }
@@ -1336,7 +1496,7 @@ const CampaignDetailsPage = () => {
         }}
         title={textFields.includes(field) || numberFields.includes(field) ? "Double-click to edit" : undefined}
       >
-        {value || '-'}
+        {numberFields.includes(field) && value ? Number(value).toLocaleString() : (value || '-')}
       </div>
     );
   };
@@ -1489,13 +1649,21 @@ const CampaignDetailsPage = () => {
     <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
       <div className="w-full">
         <div className="space-y-4">
-          <div>
+          <div className="flex items-center justify-between">
             <Button
               variant="ghost"
               className="py-2 px-3 rounded-md text-gray-600 hover:text-[#3e8692] transition-colors mb-1 text-sm"
               onClick={() => router.back()}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />Back to Campaigns
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsShareCampaignOpen(true)}
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              Share Campaign
             </Button>
           </div>
           
@@ -2536,6 +2704,87 @@ const CampaignDetailsPage = () => {
                            className="auth-input"
                          />
                        </div>
+
+                       <div className="border-t pt-4 max-w-md">
+                         <div className="flex items-center space-x-2 mb-4">
+                           <Checkbox
+                             id="create-payment"
+                             checked={newKOLData.createPayment}
+                             onCheckedChange={(checked) => setNewKOLData(prev => ({ ...prev, createPayment: !!checked }))}
+                           />
+                           <Label htmlFor="create-payment" className="cursor-pointer font-semibold">
+                             Create initial payment record for selected KOLs
+                           </Label>
+                         </div>
+
+                         {newKOLData.createPayment && (
+                           <div className="grid gap-4 pl-6">
+                             <div className="grid gap-2">
+                               <Label htmlFor="payment-amount">Payment Amount (USD)</Label>
+                               <div className="relative w-full">
+                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                                 <Input
+                                   id="payment-amount"
+                                   type="number"
+                                   min={0}
+                                   className="auth-input pl-6 w-full"
+                                   value={newKOLData.payment_amount || ''}
+                                   onChange={(e) => setNewKOLData(prev => ({ ...prev, payment_amount: Number(e.target.value) || 0 }))}
+                                   placeholder="0.00"
+                                 />
+                               </div>
+                             </div>
+                             <div className="grid gap-2">
+                               <Label htmlFor="payment-date-kol">Payment Date</Label>
+                               <Popover>
+                                 <PopoverTrigger asChild>
+                                   <Button
+                                     variant="outline"
+                                     className="auth-input justify-start text-left font-normal"
+                                     style={{ borderColor: "#e5e7eb", backgroundColor: "white" }}
+                                   >
+                                     <CalendarIcon className="mr-2 h-4 w-4" />
+                                     {newKOLData.payment_date || "Select payment date"}
+                                   </Button>
+                                 </PopoverTrigger>
+                                 <PopoverContent className="!bg-white border shadow-md w-auto p-0 z-50" align="start">
+                                   <CalendarComponent
+                                     mode="single"
+                                     selected={newKOLData.payment_date ? new Date(newKOLData.payment_date) : undefined}
+                                     onSelect={date => setNewKOLData(prev => ({
+                                       ...prev,
+                                       payment_date: date ? formatDateLocal(date) : ''
+                                     }))}
+                                     initialFocus
+                                     classNames={{
+                                       day_selected: "text-white hover:text-white focus:text-white",
+                                     }}
+                                     modifiersStyles={{
+                                       selected: { backgroundColor: "#3e8692" }
+                                     }}
+                                   />
+                                 </PopoverContent>
+                               </Popover>
+                             </div>
+                             <div className="grid gap-2">
+                               <Label htmlFor="payment-method-kol">Payment Method</Label>
+                               <Select
+                                 value={newKOLData.payment_method}
+                                 onValueChange={(value) => setNewKOLData(prev => ({ ...prev, payment_method: value }))}
+                               >
+                                 <SelectTrigger className="auth-input">
+                                   <SelectValue />
+                                 </SelectTrigger>
+                                 <SelectContent>
+                                   <SelectItem value="Token">Token</SelectItem>
+                                   <SelectItem value="Fiat">Fiat</SelectItem>
+                                   <SelectItem value="WL">WL</SelectItem>
+                                 </SelectContent>
+                               </Select>
+                             </div>
+                           </div>
+                         )}
+                       </div>
                      </div>
                      <DialogFooter>
                        <Button variant="outline" onClick={() => setIsAddKOLsDialogOpen(false)}>
@@ -2910,6 +3159,7 @@ const CampaignDetailsPage = () => {
                     />
                   </div>
                 </div>
+                {selectedKOLs.length > 0 && (
                 <div className="mb-6 mt-6">
                   <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
                   <div className="flex items-center gap-3 mb-4">
@@ -2995,6 +3245,7 @@ const CampaignDetailsPage = () => {
                   </div>
                   </div>
                 </div>
+                )}
 
                 {loadingKOLs ? (
                   <div className="border rounded-lg overflow-hidden">
@@ -3057,8 +3308,21 @@ const CampaignDetailsPage = () => {
                     }} suppressHydrationWarning>
                       <TableHeader>
                         <TableRow className="bg-gray-50 border-b border-gray-200">
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">KOL</TableHead>
+                          <TableHead className="sticky left-0 z-20 bg-gray-50 text-center whitespace-nowrap group cursor-pointer hover:bg-gray-100 transition-colors px-4" style={{ minWidth: '60px', width: '60px', boxShadow: 'inset -1px 0 0 0 #d1d5db' }} onClick={() => {
+                            const allIds = filteredKOLs.map(kol => kol.id);
+                            if (allIds.every(id => selectedKOLs.includes(id))) {
+                              setSelectedKOLs(prev => prev.filter(id => !allIds.includes(id)));
+                            } else {
+                              setSelectedKOLs(prev => Array.from(new Set([...prev, ...allIds])));
+                            }
+                          }}>
+                            <span className="group-hover:hidden">#</span>
+                            <Checkbox
+                              className="hidden group-hover:inline-flex"
+                              checked={filteredKOLs.length > 0 && filteredKOLs.every(kol => selectedKOLs.includes(kol.id))}
+                            />
+                          </TableHead>
+                          <TableHead className="sticky bg-gray-50 text-left select-none z-20" style={{ left: '60px', boxShadow: 'inset -1px 0 0 0 #d1d5db' }}>KOL</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Platform</span>
@@ -3461,7 +3725,7 @@ const CampaignDetailsPage = () => {
                           filteredKOLs.map((campaignKOL, index) => {
                           return (
                             <TableRow key={campaignKOL.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center text-gray-600 group`} style={{ verticalAlign: 'middle' }}>
+                              <TableCell className={`sticky left-0 z-10 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} px-4 py-2 overflow-hidden text-center text-gray-600 group`} style={{ verticalAlign: 'middle', minWidth: '60px', width: '60px', boxShadow: 'inset -1px 0 0 0 #d1d5db' }}>
                                 <div className="flex items-center justify-center w-full h-full">
                                   {selectedKOLs.includes(campaignKOL.id) ? (
                                     <Checkbox
@@ -3487,7 +3751,7 @@ const CampaignDetailsPage = () => {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-gray-600 group`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
+                              <TableCell className={`sticky z-10 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden text-gray-600 group`} style={{ left: '60px', verticalAlign: 'middle', fontWeight: 'bold', width: '20%', boxShadow: 'inset -1px 0 0 0 #d1d5db' }}>
                                 <div className="flex items-center w-full h-full">
                                   <div className="truncate font-bold">{campaignKOL.master_kol.name}</div>
                                   {campaignKOL.master_kol.link && (
@@ -3504,35 +3768,174 @@ const CampaignDetailsPage = () => {
                                 </div>
                               </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                <div className="flex gap-1 items-center">
-                                  {(campaignKOL.master_kol.platform || []).map((platform: string) => (
-                                    <span key={platform} className="flex items-center justify-center h-5 w-5" title={platform}>
-                                      {getPlatformIcon(platform)}
+                                <MultiSelect
+                                  options={fieldOptions?.platforms || []}
+                                  selected={campaignKOL.master_kol.platform || []}
+                                  onSelectedChange={async (newValues) => {
+                                    const updatedMasterKOL = { ...campaignKOL.master_kol, platform: newValues };
+                                    setCampaignKOLs(prevKOLs =>
+                                      prevKOLs.map(k => k.id === campaignKOL.id ? { ...k, master_kol: updatedMasterKOL } : k)
+                                    );
+                                    try {
+                                      await KOLService.updateKOL(updatedMasterKOL);
+                                    } catch (error) {
+                                      console.error('Error updating platform:', error);
+                                      setCampaignKOLs(prevKOLs =>
+                                        prevKOLs.map(k => k.id === campaignKOL.id ? campaignKOL : k)
+                                      );
+                                    }
+                                  }}
+                                  placeholder="Select platforms..."
+                                  renderOption={(option) => (
+                                    <div className="flex items-center justify-center h-5 w-5" title={option}>
+                                      {getPlatformIcon(option)}
+                                    </div>
+                                  )}
+                                  triggerContent={
+                                    <div className="w-full flex items-center h-7 min-h-[28px]">
+                                      {campaignKOL.master_kol.platform && campaignKOL.master_kol.platform.length > 0 ? (
+                                        <>
+                                          {campaignKOL.master_kol.platform.map((platform: string) => (
+                                            <span key={platform} className="flex items-center justify-center h-5 w-5" title={platform}>
+                                              {getPlatformIcon(platform)}
+                                            </span>
+                                          ))}
+                                        </>
+                                      ) : (
+                                        <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                      )}
+                                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                      </svg>
+                                    </div>
+                                  }
+                                />
+                              </TableCell>
+                                  <TableCell
+                                    className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}
+                                    onDoubleClick={() => {
+                                      setEditingCell({ row: campaignKOL.id, field: 'followers' });
+                                      setEditingValue(campaignKOL.master_kol.followers);
+                                    }}
+                                  >
+                                    {editingCell?.row === campaignKOL.id && editingCell?.field === 'followers' ? (
+                                      <Input
+                                        type="number"
+                                        value={editingValue || ''}
+                                        onChange={(e) => setEditingValue(parseInt(e.target.value) || null)}
+                                        onBlur={async () => {
+                                          const updatedMasterKOL = { ...campaignKOL.master_kol, followers: editingValue };
+                                          setCampaignKOLs(prevKOLs =>
+                                            prevKOLs.map(k => k.id === campaignKOL.id ? { ...k, master_kol: updatedMasterKOL } : k)
+                                          );
+                                          try {
+                                            await KOLService.updateKOL(updatedMasterKOL);
+                                          } catch (error) {
+                                            console.error('Error updating followers:', error);
+                                            setCampaignKOLs(prevKOLs =>
+                                              prevKOLs.map(k => k.id === campaignKOL.id ? campaignKOL : k)
+                                            );
+                                          }
+                                          setEditingCell(null);
+                                          setEditingValue(null);
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.currentTarget.blur();
+                                          }
+                                        }}
+                                        className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      campaignKOL.master_kol.followers ? KOLService.formatFollowers(campaignKOL.master_kol.followers) : '-'
+                                    )}
+                              </TableCell>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                <MultiSelect
+                                  options={fieldOptions?.regions || []}
+                                  selected={campaignKOL.master_kol.region ? [campaignKOL.master_kol.region] : []}
+                                  onSelectedChange={async (selected) => {
+                                    const newValue = selected.length > 0 ? selected[selected.length - 1] : null;
+                                    const updatedMasterKOL = { ...campaignKOL.master_kol, region: newValue };
+                                    setCampaignKOLs(prevKOLs =>
+                                      prevKOLs.map(k => k.id === campaignKOL.id ? { ...k, master_kol: updatedMasterKOL } : k)
+                                    );
+                                    try {
+                                      await KOLService.updateKOL(updatedMasterKOL);
+                                    } catch (error) {
+                                      console.error('Error updating region:', error);
+                                      setCampaignKOLs(prevKOLs =>
+                                        prevKOLs.map(k => k.id === campaignKOL.id ? campaignKOL : k)
+                                      );
+                                    }
+                                  }}
+                                  renderOption={(option) => (
+                                    <div className="flex items-center space-x-2">
+                                      <span>{getRegionIcon(option).flag}</span>
+                                      <span>{option}</span>
+                                    </div>
+                                  )}
+                                  triggerContent={
+                                    <div className="w-full flex items-center h-7 min-h-[28px]">
+                                      {campaignKOL.master_kol.region ? (
+                                        <div className="flex items-center space-x-1">
+                                          <span>{getRegionIcon(campaignKOL.master_kol.region).flag}</span>
+                                          <span className="text-xs font-semibold text-black">{campaignKOL.master_kol.region}</span>
+                                        </div>
+                                      ) : (
+                                        <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                      )}
+                                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                      </svg>
+                                    </div>
+                                  }
+                                />
+                              </TableCell>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                <MultiSelect
+                                  options={fieldOptions?.creatorTypes || []}
+                                  selected={campaignKOL.master_kol.creator_type || []}
+                                  onSelectedChange={async (newValues) => {
+                                    const updatedMasterKOL = { ...campaignKOL.master_kol, creator_type: newValues };
+                                    setCampaignKOLs(prevKOLs =>
+                                      prevKOLs.map(k => k.id === campaignKOL.id ? { ...k, master_kol: updatedMasterKOL } : k)
+                                    );
+                                    try {
+                                      await KOLService.updateKOL(updatedMasterKOL);
+                                    } catch (error) {
+                                      console.error('Error updating creator_type:', error);
+                                      setCampaignKOLs(prevKOLs =>
+                                        prevKOLs.map(k => k.id === campaignKOL.id ? campaignKOL : k)
+                                      );
+                                    }
+                                  }}
+                                  placeholder="Select creator types..."
+                                  renderOption={(option) => (
+                                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${getCreatorTypeColor(option)}`}>
+                                      {option}
                                     </span>
-                                  ))}
-                                </div>
-                              </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                  {campaignKOL.master_kol.followers ? KOLService.formatFollowers(campaignKOL.master_kol.followers) : '-'}
-                              </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                    {campaignKOL.master_kol.region ? (
-                                      <div className="flex items-center space-x-1">
-                                        <span>{getRegionIcon(campaignKOL.master_kol.region).flag}</span>
-                                        <span>{campaignKOL.master_kol.region}</span>
-                                </div>
-                                    ) : '-'}
-                              </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                {campaignKOL.master_kol.creator_type && campaignKOL.master_kol.creator_type.length > 0 ? (
-                                  <div className="flex flex-wrap gap-1">
-                                    {campaignKOL.master_kol.creator_type.map((type: string) => (
-                                      <span key={type} className={`px-2 py-1 rounded-md text-xs font-medium ${getCreatorTypeColor(type)}`}>
-                                        {type}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : '-'}
+                                  )}
+                                  triggerContent={
+                                    <div className="w-full flex items-center h-7 min-h-[28px]">
+                                      {campaignKOL.master_kol.creator_type && campaignKOL.master_kol.creator_type.length > 0 ? (
+                                        <>
+                                          {campaignKOL.master_kol.creator_type.map((type: string) => (
+                                            <span key={type} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getCreatorTypeColor(type)} mr-1`}>
+                                              {type}
+                                            </span>
+                                          ))}
+                                        </>
+                                      ) : (
+                                        <span className="flex items-center text-xs font-semibold text-black">Select</span>
+                                      )}
+                                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                      </svg>
+                                    </div>
+                                  }
+                                />
                               </TableCell>
                                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                                 <Select
@@ -4670,12 +5073,11 @@ const CampaignDetailsPage = () => {
 
                     {/* Charts Section */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Impressions Over Time */}
+                      {/* Total Impressions */}
                       <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-xl font-bold text-gray-900">Impressions Over Time</h3>
-                            <p className="text-sm text-gray-500 mt-1">Impressions trend by activation date</p>
+                            <h3 className="text-xl font-bold text-gray-900">Total Impressions</h3>
                           </div>
                         </div>
                         <div className="h-96">
@@ -4694,12 +5096,19 @@ const CampaignDetailsPage = () => {
                                   return acc;
                                 }, {} as Record<string, number>);
 
-                                return Object.entries(impressionsByDate)
-                                  .map(([date, impressions]) => ({
+                                // Sort by date and calculate cumulative impressions
+                                const sortedEntries = Object.entries(impressionsByDate).sort(([dateA], [dateB]) =>
+                                  new Date(dateA).getTime() - new Date(dateB).getTime()
+                                ) as [string, number][];
+
+                                let cumulativeImpressions = 0;
+                                return sortedEntries.map(([date, impressions]) => {
+                                  cumulativeImpressions += impressions;
+                                  return {
                                     date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                                    impressions
-                                  }))
-                                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                                    impressions: cumulativeImpressions
+                                  };
+                                });
                               })()}
                               margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
                             >
@@ -4714,6 +5123,7 @@ const CampaignDetailsPage = () => {
                                 axisLine={false}
                                 tickLine={false}
                                 tick={{ fontSize: 12, fill: '#64748b' }}
+                                tickFormatter={(value) => value.toLocaleString()}
                               />
                               <Tooltip
                                 contentStyle={{
@@ -4723,7 +5133,7 @@ const CampaignDetailsPage = () => {
                                   boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
                                   fontSize: '14px'
                                 }}
-                                formatter={(value: number) => [value.toLocaleString(), 'Impressions']}
+                                formatter={(value: number) => [value.toLocaleString(), 'Cumulative Impressions']}
                                 labelFormatter={(label: string) => `Date: ${label}`}
                               />
                               <Line
@@ -4743,12 +5153,11 @@ const CampaignDetailsPage = () => {
                         <div className="flex items-center justify-between mb-6">
                           <div>
                             <h3 className="text-xl font-bold text-gray-900">Impressions by Platform</h3>
-                            <p className="text-sm text-gray-500 mt-1">Impressions distribution across platforms</p>
                           </div>
                         </div>
                         <div className="h-96">
                           <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
+                            <PieChart margin={{ top: 20, right: 80, bottom: 20, left: 80 }}>
                               <Pie
                                 data={(() => {
                                   const platformImpressions = contents.reduce((acc, content) => {
@@ -4762,14 +5171,37 @@ const CampaignDetailsPage = () => {
 
                                   return Object.entries(platformImpressions).map(([platform, impressions]) => ({
                                     platform,
-                                    impressions
+                                    impressions,
+                                    name: platform
                                   }));
                                 })()}
                                 cx="50%"
                                 cy="50%"
-                                outerRadius={120}
+                                labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
+                                label={(props: any) => {
+                                  const { cx, cy, midAngle, outerRadius, platform, impressions } = props;
+                                  const RADIAN = Math.PI / 180;
+                                  const radius = outerRadius + 35;
+                                  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+                                  return (
+                                    <g>
+                                      <foreignObject x={x - 50} y={y - 18} width={100} height={36}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2px' }}>
+                                            {getPlatformIcon(platform)}
+                                          </div>
+                                          <div style={{ fontSize: '11px', fontWeight: '600', color: '#374151', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                            {impressions.toLocaleString()}
+                                          </div>
+                                        </div>
+                                      </foreignObject>
+                                    </g>
+                                  );
+                                }}
+                                outerRadius={100}
                                 dataKey="impressions"
-                                label={({ platform, impressions }) => `${platform}: ${impressions.toLocaleString()}`}
                               >
                                 {(() => {
                                   const platformImpressions = contents.reduce((acc, content) => {
@@ -4827,6 +5259,7 @@ const CampaignDetailsPage = () => {
                     />
                   </div>
                 </div>
+                {selectedContents.length > 0 && (
                 <div className="mb-6 mt-6">
                   <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
                     <div className="flex items-center gap-3 mb-4">
@@ -4897,6 +5330,7 @@ const CampaignDetailsPage = () => {
                     </div>
                   </div>
                 </div>
+                )}
                 {loadingContents ? (
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
@@ -4909,11 +5343,276 @@ const CampaignDetailsPage = () => {
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Status</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Activation Date</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content Link</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Impressions</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Likes</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Retweets</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Comments</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Bookmarks</TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Impressions</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Impressions</div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Select
+                                        value={contentFilters.impressions_operator}
+                                        onValueChange={(value) => setContentFilters(prev => ({ ...prev, impressions_operator: value }))}
+                                      >
+                                        <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                          <SelectValue placeholder="=" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value=">">{'>'}</SelectItem>
+                                          <SelectItem value="<">{'<'}</SelectItem>
+                                          <SelectItem value="=">=</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        placeholder="Value"
+                                        value={contentFilters.impressions_value}
+                                        onChange={(e) => setContentFilters(prev => ({ ...prev, impressions_value: e.target.value }))}
+                                        className="h-8 text-xs auth-input"
+                                      />
+                                    </div>
+                                    {(contentFilters.impressions_operator || contentFilters.impressions_value) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full text-xs"
+                                        onClick={() => setContentFilters(prev => ({ ...prev, impressions_operator: '', impressions_value: '' }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {(contentFilters.impressions_operator && contentFilters.impressions_value) && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  1
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Likes</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Likes</div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Select
+                                        value={contentFilters.likes_operator}
+                                        onValueChange={(value) => setContentFilters(prev => ({ ...prev, likes_operator: value }))}
+                                      >
+                                        <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                          <SelectValue placeholder="=" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value=">">{'>'}</SelectItem>
+                                          <SelectItem value="<">{'<'}</SelectItem>
+                                          <SelectItem value="=">=</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        placeholder="Value"
+                                        value={contentFilters.likes_value}
+                                        onChange={(e) => setContentFilters(prev => ({ ...prev, likes_value: e.target.value }))}
+                                        className="h-8 text-xs auth-input"
+                                      />
+                                    </div>
+                                    {(contentFilters.likes_operator || contentFilters.likes_value) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full text-xs"
+                                        onClick={() => setContentFilters(prev => ({ ...prev, likes_operator: '', likes_value: '' }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {(contentFilters.likes_operator && contentFilters.likes_value) && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  1
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Retweets</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Retweets</div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Select
+                                        value={contentFilters.retweets_operator}
+                                        onValueChange={(value) => setContentFilters(prev => ({ ...prev, retweets_operator: value }))}
+                                      >
+                                        <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                          <SelectValue placeholder="=" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value=">">{'>'}</SelectItem>
+                                          <SelectItem value="<">{'<'}</SelectItem>
+                                          <SelectItem value="=">=</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        placeholder="Value"
+                                        value={contentFilters.retweets_value}
+                                        onChange={(e) => setContentFilters(prev => ({ ...prev, retweets_value: e.target.value }))}
+                                        className="h-8 text-xs auth-input"
+                                      />
+                                    </div>
+                                    {(contentFilters.retweets_operator || contentFilters.retweets_value) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full text-xs"
+                                        onClick={() => setContentFilters(prev => ({ ...prev, retweets_operator: '', retweets_value: '' }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {(contentFilters.retweets_operator && contentFilters.retweets_value) && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  1
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Comments</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Comments</div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Select
+                                        value={contentFilters.comments_operator}
+                                        onValueChange={(value) => setContentFilters(prev => ({ ...prev, comments_operator: value }))}
+                                      >
+                                        <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                          <SelectValue placeholder="=" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value=">">{'>'}</SelectItem>
+                                          <SelectItem value="<">{'<'}</SelectItem>
+                                          <SelectItem value="=">=</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        placeholder="Value"
+                                        value={contentFilters.comments_value}
+                                        onChange={(e) => setContentFilters(prev => ({ ...prev, comments_value: e.target.value }))}
+                                        className="h-8 text-xs auth-input"
+                                      />
+                                    </div>
+                                    {(contentFilters.comments_operator || contentFilters.comments_value) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full text-xs"
+                                        onClick={() => setContentFilters(prev => ({ ...prev, comments_operator: '', comments_value: '' }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {(contentFilters.comments_operator && contentFilters.comments_value) && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  1
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Bookmarks</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Bookmarks</div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Select
+                                        value={contentFilters.bookmarks_operator}
+                                        onValueChange={(value) => setContentFilters(prev => ({ ...prev, bookmarks_operator: value }))}
+                                      >
+                                        <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                          <SelectValue placeholder="=" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value=">">{'>'}</SelectItem>
+                                          <SelectItem value="<">{'<'}</SelectItem>
+                                          <SelectItem value="=">=</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        placeholder="Value"
+                                        value={contentFilters.bookmarks_value}
+                                        onChange={(e) => setContentFilters(prev => ({ ...prev, bookmarks_value: e.target.value }))}
+                                        className="h-8 text-xs auth-input"
+                                      />
+                                    </div>
+                                    {(contentFilters.bookmarks_operator || contentFilters.bookmarks_value) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full text-xs"
+                                        onClick={() => setContentFilters(prev => ({ ...prev, bookmarks_operator: '', bookmarks_value: '' }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {(contentFilters.bookmarks_operator && contentFilters.bookmarks_value) && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  1
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
                           <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -4939,7 +5638,13 @@ const CampaignDetailsPage = () => {
                     <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                       <TableHeader>
                         <TableRow className="bg-gray-50 border-b border-gray-200">
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap group cursor-pointer hover:bg-gray-100 transition-colors px-4" style={{ minWidth: '60px', width: '60px' }} onClick={handleSelectAllContents}>
+                            <span className="group-hover:hidden">#</span>
+                            <Checkbox
+                              className="hidden group-hover:inline-flex"
+                              checked={filteredContents.length > 0 && filteredContents.every(content => selectedContents.includes(content.id))}
+                            />
+                          </TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">KOL</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
@@ -5086,11 +5791,276 @@ const CampaignDetailsPage = () => {
                           </TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Activation Date</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content Link</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Impressions</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Likes</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Retweets</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Comments</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Bookmarks</TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Impressions</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Impressions</div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Select
+                                        value={contentFilters.impressions_operator}
+                                        onValueChange={(value) => setContentFilters(prev => ({ ...prev, impressions_operator: value }))}
+                                      >
+                                        <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                          <SelectValue placeholder="=" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value=">">{'>'}</SelectItem>
+                                          <SelectItem value="<">{'<'}</SelectItem>
+                                          <SelectItem value="=">=</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        placeholder="Value"
+                                        value={contentFilters.impressions_value}
+                                        onChange={(e) => setContentFilters(prev => ({ ...prev, impressions_value: e.target.value }))}
+                                        className="h-8 text-xs auth-input"
+                                      />
+                                    </div>
+                                    {(contentFilters.impressions_operator || contentFilters.impressions_value) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full text-xs"
+                                        onClick={() => setContentFilters(prev => ({ ...prev, impressions_operator: '', impressions_value: '' }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {(contentFilters.impressions_operator && contentFilters.impressions_value) && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  1
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Likes</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Likes</div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Select
+                                        value={contentFilters.likes_operator}
+                                        onValueChange={(value) => setContentFilters(prev => ({ ...prev, likes_operator: value }))}
+                                      >
+                                        <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                          <SelectValue placeholder="=" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value=">">{'>'}</SelectItem>
+                                          <SelectItem value="<">{'<'}</SelectItem>
+                                          <SelectItem value="=">=</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        placeholder="Value"
+                                        value={contentFilters.likes_value}
+                                        onChange={(e) => setContentFilters(prev => ({ ...prev, likes_value: e.target.value }))}
+                                        className="h-8 text-xs auth-input"
+                                      />
+                                    </div>
+                                    {(contentFilters.likes_operator || contentFilters.likes_value) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full text-xs"
+                                        onClick={() => setContentFilters(prev => ({ ...prev, likes_operator: '', likes_value: '' }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {(contentFilters.likes_operator && contentFilters.likes_value) && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  1
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Retweets</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Retweets</div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Select
+                                        value={contentFilters.retweets_operator}
+                                        onValueChange={(value) => setContentFilters(prev => ({ ...prev, retweets_operator: value }))}
+                                      >
+                                        <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                          <SelectValue placeholder="=" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value=">">{'>'}</SelectItem>
+                                          <SelectItem value="<">{'<'}</SelectItem>
+                                          <SelectItem value="=">=</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        placeholder="Value"
+                                        value={contentFilters.retweets_value}
+                                        onChange={(e) => setContentFilters(prev => ({ ...prev, retweets_value: e.target.value }))}
+                                        className="h-8 text-xs auth-input"
+                                      />
+                                    </div>
+                                    {(contentFilters.retweets_operator || contentFilters.retweets_value) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full text-xs"
+                                        onClick={() => setContentFilters(prev => ({ ...prev, retweets_operator: '', retweets_value: '' }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {(contentFilters.retweets_operator && contentFilters.retweets_value) && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  1
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Comments</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Comments</div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Select
+                                        value={contentFilters.comments_operator}
+                                        onValueChange={(value) => setContentFilters(prev => ({ ...prev, comments_operator: value }))}
+                                      >
+                                        <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                          <SelectValue placeholder="=" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value=">">{'>'}</SelectItem>
+                                          <SelectItem value="<">{'<'}</SelectItem>
+                                          <SelectItem value="=">=</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        placeholder="Value"
+                                        value={contentFilters.comments_value}
+                                        onChange={(e) => setContentFilters(prev => ({ ...prev, comments_value: e.target.value }))}
+                                        className="h-8 text-xs auth-input"
+                                      />
+                                    </div>
+                                    {(contentFilters.comments_operator || contentFilters.comments_value) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full text-xs"
+                                        onClick={() => setContentFilters(prev => ({ ...prev, comments_operator: '', comments_value: '' }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {(contentFilters.comments_operator && contentFilters.comments_value) && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  1
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Bookmarks</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Bookmarks</div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <Select
+                                        value={contentFilters.bookmarks_operator}
+                                        onValueChange={(value) => setContentFilters(prev => ({ ...prev, bookmarks_operator: value }))}
+                                      >
+                                        <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                          <SelectValue placeholder="=" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value=">">{'>'}</SelectItem>
+                                          <SelectItem value="<">{'<'}</SelectItem>
+                                          <SelectItem value="=">=</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Input
+                                        type="number"
+                                        placeholder="Value"
+                                        value={contentFilters.bookmarks_value}
+                                        onChange={(e) => setContentFilters(prev => ({ ...prev, bookmarks_value: e.target.value }))}
+                                        className="h-8 text-xs auth-input"
+                                      />
+                                    </div>
+                                    {(contentFilters.bookmarks_operator || contentFilters.bookmarks_value) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full text-xs"
+                                        onClick={() => setContentFilters(prev => ({ ...prev, bookmarks_operator: '', bookmarks_value: '' }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {(contentFilters.bookmarks_operator && contentFilters.bookmarks_value) && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  1
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
                           <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -5109,7 +6079,17 @@ const CampaignDetailsPage = () => {
                                     setContentFilters({
                                       platform: [],
                                       type: [],
-                                      status: []
+                                      status: [],
+                                      impressions_operator: '',
+                                      impressions_value: '',
+                                      likes_operator: '',
+                                      likes_value: '',
+                                      retweets_operator: '',
+                                      retweets_value: '',
+                                      comments_operator: '',
+                                      comments_value: '',
+                                      bookmarks_operator: '',
+                                      bookmarks_value: ''
                                     });
                                     setContentsSearchTerm('');
                                   }}
@@ -5124,7 +6104,7 @@ const CampaignDetailsPage = () => {
                           const kol = campaignKOLs.find(k => k.id === content.campaign_kols_id);
                           return (
                             <TableRow key={content.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center text-gray-600 group`} style={{ verticalAlign: 'middle' }}>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 px-4 py-2 overflow-hidden text-center text-gray-600 group`} style={{ verticalAlign: 'middle', minWidth: '60px', width: '60px' }}>
                                 <div className="flex items-center justify-center w-full h-full">
                                   {selectedContents.includes(content.id) ? (
                                     <Checkbox
@@ -5412,76 +6392,90 @@ const CampaignDetailsPage = () => {
                         />
                       </div>
                     </div>
-                {/* Bulk Menu */}
                 {selectedPayments.length > 0 && (
-                  <div className="mb-4">
-                    <Card className="border border-gray-200 bg-white">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <span className="text-sm font-medium text-gray-700">
-                              {selectedPayments.length} payments selected
-                            </span>
-                            <span className="text-sm text-gray-500">Bulk Edit Fields</span>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleSelectAllPayments}
-                            className="h-8 px-3 text-xs"
-                          >
-                            {(() => {
-                              const filteredPayments = payments.filter(payment => {
-                                const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
-                                const search = paymentsSearchTerm.toLowerCase();
-                                return (
-                                  !search ||
-                                  (kol?.master_kol?.name?.toLowerCase().includes(search)) ||
-                                  (payment.payment_method?.toLowerCase().includes(search)) ||
-                                  (payment.notes?.toLowerCase().includes(search))
-                                );
-                              });
-                              const allSelected = filteredPayments.length > 0 && filteredPayments.every(p => selectedPayments.includes(p.id));
-                              return allSelected ? 'Deselect All' : 'Select All';
-                            })()}
-                          </Button>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 max-w-xs">
-                            <Select value={bulkPaymentMethod} onValueChange={v => setBulkPaymentMethod(v)}>
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Select payment method" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Token">Token</SelectItem>
-                                <SelectItem value="Fiat">Fiat</SelectItem>
-                                <SelectItem value="WL">WL</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <Button
-                            size="sm"
-                            style={{ backgroundColor: '#3e8692', color: 'white' }}
-                            disabled={selectedPayments.length === 0 || !bulkPaymentMethod}
-                            onClick={handleBulkPaymentMethodChange}
-                            className="h-8 px-3 text-xs"
-                          >
-                            Apply
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            disabled={selectedPayments.length === 0}
-                            onClick={handleBulkDeletePayments}
-                            className="h-8 px-3 text-xs"
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                <div className="mb-6 mt-6">
+                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                      <span className="text-sm font-semibold text-gray-700">{selectedPayments.length} Payment{selectedPayments.length !== 1 ? 's' : ''} selected</span>
+                    </div>
+                    <div className="h-4 w-px bg-gray-300"></div>
+                    <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
                   </div>
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div className="flex flex-col items-end justify-end">
+                      <div className="h-5"></div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                        onClick={handleSelectAllPayments}
+                      >
+                        {(() => {
+                          const filteredPayments = payments.filter(payment => {
+                            const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
+                            const search = paymentsSearchTerm.toLowerCase();
+                            return (
+                              !search ||
+                              (kol?.master_kol?.name?.toLowerCase().includes(search)) ||
+                              (payment.payment_method?.toLowerCase().includes(search)) ||
+                              (payment.notes?.toLowerCase().includes(search))
+                            );
+                          });
+                          const allSelected = filteredPayments.length > 0 && filteredPayments.every(p => selectedPayments.includes(p.id));
+                          return allSelected ? 'Deselect All' : 'Select All';
+                        })()}
+                      </Button>
+                    </div>
+                    <div className="min-w-[120px] flex flex-col items-end justify-end">
+                      <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Payment Method</span>
+                      <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                        <Select value={bulkPaymentMethod || ''} onValueChange={v => setBulkPaymentMethod(v)}>
+                          <SelectTrigger
+                            className="border-none shadow-none bg-transparent h-7 px-0 py-0 text-xs font-semibold text-black focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none [&>span]:text-xs [&>span]:font-semibold [&>span]:text-black"
+                            style={{ outline: 'none', boxShadow: 'none' }}
+                          >
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Token">Token</SelectItem>
+                            <SelectItem value="Fiat">Fiat</SelectItem>
+                            <SelectItem value="WL">WL</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="flex flex-col items-end justify-end">
+                        <div className="h-5"></div>
+                        <Button
+                          size="sm"
+                          className="bg-[#3e8692] hover:bg-[#2d6b75] text-white border-0 shadow-sm whitespace-nowrap"
+                          disabled={selectedPayments.length === 0 || !bulkPaymentMethod}
+                          onClick={handleBulkPaymentMethodChange}
+                        >
+                          Apply
+                        </Button>
+                      </div>
+                      <div className="flex flex-col items-end justify-end">
+                        <div className="h-5"></div>
+                        <Button
+                          size="sm"
+                          className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm whitespace-nowrap"
+                          disabled={selectedPayments.length === 0}
+                          onClick={handleBulkDeletePayments}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 font-medium ml-auto whitespace-nowrap">
+                      {selectedPayments.length > 0 && `${selectedPayments.length} item${selectedPayments.length !== 1 ? 's' : ''} selected`}
+                    </div>
+                  </div>
+                  </div>
+                </div>
                 )}
                 {loadingPayments ? (
                   <div className="space-y-4">
@@ -5508,7 +6502,25 @@ const CampaignDetailsPage = () => {
                         <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                           <TableHeader>
                             <TableRow className="bg-gray-50 border-b border-gray-200">
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap group cursor-pointer hover:bg-gray-100 transition-colors" onClick={handleSelectAllPayments}>
+                                <span className="group-hover:hidden">#</span>
+                                <Checkbox
+                                  className="hidden group-hover:inline-flex"
+                                  checked={(() => {
+                                    const filteredPayments = payments.filter(payment => {
+                                      const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
+                                      const search = paymentsSearchTerm.toLowerCase();
+                                      return (
+                                        !search ||
+                                        (kol?.master_kol?.name?.toLowerCase().includes(search)) ||
+                                        (payment.payment_method?.toLowerCase().includes(search)) ||
+                                        (payment.notes?.toLowerCase().includes(search))
+                                      );
+                                    });
+                                    return filteredPayments.length > 0 && filteredPayments.every(p => selectedPayments.includes(p.id));
+                                  })()}
+                                />
+                              </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">KOL</TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Amount</TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Payment Date</TableHead>
@@ -6410,6 +7422,110 @@ const CampaignDetailsPage = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Share Campaign Dialog */}
+      <Dialog open={isShareCampaignOpen} onOpenChange={setIsShareCampaignOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Campaign: {campaign?.name}</DialogTitle>
+            <DialogDescription>
+              Share this campaign by copying the link below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Campaign Details</Label>
+              <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                <div className="flex justify-between mb-2">
+                  <span className="font-medium">Client:</span>
+                  <span>{campaign?.client_name || 'Unknown'}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="font-medium">Budget:</span>
+                  <span>{CampaignService.formatCurrency(campaign?.total_budget || 0)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="font-medium">Dates:</span>
+                  <span>{campaign ? new Date(campaign.start_date).toLocaleDateString() : ''} - {campaign ? new Date(campaign.end_date).toLocaleDateString() : ''}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Status:</span>
+                  <span>{campaign?.status}</span>
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="public-password">Password for Public View</Label>
+              <div className="bg-blue-50 rounded-lg p-3 text-sm border border-blue-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-blue-900">Client Email:</span>
+                  <span className="text-sm font-mono text-blue-700">{campaign?.client_email || 'N/A'}</span>
+                </div>
+                <p className="text-xs text-blue-600 mt-2">Use the client's email address as the password to access the public campaign view</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="share-creator-type"
+                  checked={campaign?.share_creator_type || false}
+                  onCheckedChange={async (checked) => {
+                    if (campaign?.id) {
+                      try {
+                        await CampaignService.updateCampaign(campaign.id, {
+                          share_creator_type: checked as boolean
+                        } as any);
+                        setCampaign({ ...campaign, share_creator_type: checked as boolean });
+                      } catch (error) {
+                        console.error('Error updating campaign:', error);
+                      }
+                    }
+                  }}
+                />
+                <Label htmlFor="share-creator-type" className="text-sm font-medium cursor-pointer">
+                  Share Creator Type for KOLs
+                </Label>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="share-campaign-link">Share Link</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="share-campaign-link"
+                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/public/campaigns/${campaign?.id}`}
+                  readOnly
+                  className="flex-1 auth-input"
+                />
+                <Button
+                  variant="outline"
+                  className="h-10"
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && campaign?.id) {
+                      navigator.clipboard.writeText(`${window.location.origin}/public/campaigns/${campaign.id}`);
+                      toast({
+                        title: 'Link Copied',
+                        description: 'Campaign link has been copied to clipboard',
+                      });
+                    }
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-10"
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && campaign?.id) {
+                      window.open(`${window.location.origin}/public/campaigns/${campaign.id}`, '_blank');
+                    }
+                  }}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

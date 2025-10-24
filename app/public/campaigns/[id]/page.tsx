@@ -32,6 +32,7 @@ type Campaign = {
   client_id: string;
   client_name?: string | null;
   budget_allocations?: { id: string; region: string; allocated_budget: number }[];
+  share_creator_type?: boolean | null;
 };
 
 type CampaignKOL = {
@@ -157,6 +158,10 @@ const getContentTypeColor = (type: string) => {
     AMA: 'bg-purple-100 text-purple-800',
     Ambassadorship: 'bg-orange-100 text-orange-800',
     Alpha: 'bg-yellow-100 text-yellow-800',
+    QRT: 'bg-cyan-100 text-cyan-800',
+    Thread: 'bg-teal-100 text-teal-800',
+    Spaces: 'bg-pink-100 text-pink-800',
+    Newsletter: 'bg-slate-100 text-slate-800',
   };
   return colorMap[type] || 'bg-gray-100 text-gray-800';
 };
@@ -505,6 +510,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         client_id: campaignData.client_id,
         client_name: (campaignData.clients as any)?.name || null,
         budget_allocations: (campaignData.campaign_budget_allocations || []).map((b: any) => ({ id: b.id, region: b.region, allocated_budget: b.allocated_budget })),
+        share_creator_type: campaignData.share_creator_type || false,
       };
       setCampaign(normalizedCampaign);
 
@@ -1284,7 +1290,9 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 )}
                               </div>
                             </TableHead>
-                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Creator Type</TableHead>
+                            {campaign?.share_creator_type && (
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Creator Type</TableHead>
+                            )}
                             <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
                               <div className="flex items-center gap-1 cursor-pointer group">
                                 <span>Status</span>
@@ -1441,7 +1449,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <TableBody className="bg-white">
                           {filteredKOLs.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={10} className="text-center py-12">
+                              <TableCell colSpan={campaign?.share_creator_type ? 10 : 9} className="text-center py-12">
                                 <div className="flex flex-col items-center justify-center text-gray-500">
                                   <Users className="h-12 w-12 mb-4 text-gray-300" />
                                   <p className="text-lg font-medium mb-2">No KOLs match your filters</p>
@@ -1513,17 +1521,19 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                       </div>
                                     ) : '-'}
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                    {campaignKOL.master_kol.creator_type && campaignKOL.master_kol.creator_type.length > 0 ? (
-                                      <div className="flex flex-wrap gap-1">
-                                        {campaignKOL.master_kol.creator_type.map((type: string) => (
-                                          <span key={type} className={`px-2 py-1 rounded-md text-xs font-medium ${getCreatorTypeColor(type)}`}>
-                                            {type}
-                                          </span>
-                                        ))}
-                                      </div>
-                                    ) : '-'}
-                                  </TableCell>
+                                  {campaign?.share_creator_type && (
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                      {campaignKOL.master_kol.creator_type && campaignKOL.master_kol.creator_type.length > 0 ? (
+                                        <div className="flex flex-wrap gap-1">
+                                          {campaignKOL.master_kol.creator_type.map((type: string) => (
+                                            <span key={type} className={`px-2 py-1 rounded-md text-xs font-medium ${getCreatorTypeColor(type)}`}>
+                                              {type}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : '-'}
+                                    </TableCell>
+                                  )}
                                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                                     <span className={`px-2 py-1 rounded-md text-xs font-medium ${getStatusColor(campaignKOL.hh_status || 'curated')}`}>
                                       {campaignKOL.hh_status || 'Curated'}
@@ -2123,7 +2133,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                                       <span className={`px-2 py-1 rounded-md text-xs font-medium ${(() => {
                                         const s = (content.status || '').toLowerCase();
-                                        if (['published', 'active', 'live'].includes(s)) return 'bg-green-100 text-green-800';
+                                        if (['published', 'active', 'live', 'posted'].includes(s)) return 'bg-green-100 text-green-800';
                                         if (['scheduled'].includes(s)) return 'bg-blue-100 text-blue-800';
                                         if (['draft', 'pending'].includes(s)) return 'bg-yellow-100 text-yellow-800';
                                         if (['failed', 'removed'].includes(s)) return 'bg-red-100 text-red-800';
@@ -2346,17 +2356,16 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
                       {/* Charts Section */}
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Impressions Over Time */}
+                        {/* Total Impressions */}
                         <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
                           <div className="flex items-center justify-between mb-6">
                             <div>
-                              <h3 className="text-xl font-bold text-gray-900">Impressions Over Time</h3>
-                              <p className="text-sm text-gray-500 mt-1">Impressions trend by activation date</p>
+                              <h3 className="text-xl font-bold text-gray-900">Total Impressions</h3>
                             </div>
                           </div>
                           <div className="h-96">
                             <ResponsiveContainer width="100%" height="100%">
-                              <LineChart 
+                              <LineChart
                                 data={(() => {
                                   // Group content by activation date and sum impressions
                                   const impressionsByDate = contents.reduce((acc, content) => {
@@ -2370,28 +2379,36 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     return acc;
                                   }, {} as Record<string, number>);
 
-                                  return Object.entries(impressionsByDate)
-                                    .map(([date, impressions]) => ({
+                                  // Sort by date and calculate cumulative impressions
+                                  const sortedEntries = Object.entries(impressionsByDate).sort(([dateA], [dateB]) =>
+                                    new Date(dateA).getTime() - new Date(dateB).getTime()
+                                  ) as [string, number][];
+
+                                  let cumulativeImpressions = 0;
+                                  return sortedEntries.map(([date, impressions]) => {
+                                    cumulativeImpressions += impressions;
+                                    return {
                                       date: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-                                      impressions
-                                    }))
-                                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                                      impressions: cumulativeImpressions
+                                    };
+                                  });
                                 })()}
                                 margin={{ top: 30, right: 40, left: 40, bottom: 30 }}
                               >
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                                <XAxis 
-                                  dataKey="date" 
+                                <XAxis
+                                  dataKey="date"
                                   axisLine={false}
                                   tickLine={false}
                                   tick={{ fontSize: 12, fill: '#64748b', fontWeight: 500 }}
                                 />
-                                <YAxis 
+                                <YAxis
                                   axisLine={false}
                                   tickLine={false}
                                   tick={{ fontSize: 12, fill: '#64748b' }}
+                                  tickFormatter={(value) => value.toLocaleString()}
                                 />
-                                <Tooltip 
+                                <Tooltip
                                   contentStyle={{
                                     backgroundColor: 'white',
                                     border: '1px solid #e2e8f0',
@@ -2401,7 +2418,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     padding: '12px 16px',
                                     fontWeight: '500'
                                   }}
-                                  formatter={(value: number) => [value.toLocaleString(), 'Impressions']}
+                                  formatter={(value: number) => [value.toLocaleString(), 'Cumulative Impressions']}
                                   labelFormatter={(label: string) => `Date: ${label}`}
                                   labelStyle={{
                                     color: '#374151',
@@ -2409,12 +2426,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     marginBottom: '4px'
                                   }}
                                 />
-                                <Line 
-                                  type="monotone" 
-                                  dataKey="impressions" 
-                                  stroke="#3e8692" 
-                                  strokeWidth={3} 
-                                  dot={{ fill: '#3e8692', strokeWidth: 2, r: 4 }} 
+                                <Line
+                                  type="monotone"
+                                  dataKey="impressions"
+                                  stroke="#3e8692"
+                                  strokeWidth={3}
+                                  dot={{ fill: '#3e8692', strokeWidth: 2, r: 4 }}
                                 />
                               </LineChart>
                             </ResponsiveContainer>
@@ -2426,12 +2443,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <div className="flex items-center justify-between mb-6">
                             <div>
                               <h3 className="text-xl font-bold text-gray-900">Impressions by Platform</h3>
-                              <p className="text-sm text-gray-500 mt-1">Impressions distribution across platforms</p>
                             </div>
                           </div>
                           <div className="h-96">
                             <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
+                              <PieChart margin={{ top: 20, right: 80, bottom: 20, left: 80 }}>
                                 <Pie
                                   data={(() => {
                                     const platformImpressions = contents.reduce((acc, content) => {
@@ -2445,14 +2461,37 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
                                     return Object.entries(platformImpressions).map(([platform, impressions]) => ({
                                       platform,
-                                      impressions
+                                      impressions,
+                                      name: platform
                                     }));
                                   })()}
                                   cx="50%"
                                   cy="50%"
-                                  outerRadius={120}
+                                  labelLine={{ stroke: '#94a3b8', strokeWidth: 1 }}
+                                  label={(props: any) => {
+                                    const { cx, cy, midAngle, outerRadius, platform, impressions } = props;
+                                    const RADIAN = Math.PI / 180;
+                                    const radius = outerRadius + 35;
+                                    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+                                    return (
+                                      <g>
+                                        <foreignObject x={x - 50} y={y - 18} width={100} height={36}>
+                                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2px' }}>
+                                              {getPlatformIcon(platform)}
+                                            </div>
+                                            <div style={{ fontSize: '11px', fontWeight: '600', color: '#374151', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                              {impressions.toLocaleString()}
+                                            </div>
+                                          </div>
+                                        </foreignObject>
+                                      </g>
+                                    );
+                                  }}
+                                  outerRadius={100}
                                   dataKey="impressions"
-                                  label={({ platform, impressions }) => `${platform}: ${impressions.toLocaleString()}`}
                                 >
                                   {(() => {
                                     const platformImpressions = contents.reduce((acc, content) => {
@@ -2470,7 +2509,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     ));
                                   })()}
                                 </Pie>
-                                <Tooltip 
+                                <Tooltip
                                   contentStyle={{
                                     backgroundColor: 'white',
                                     border: '1px solid #e2e8f0',
@@ -2484,7 +2523,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
                                     const percentage = totalImpressions > 0 ? ((value / totalImpressions) * 100).toFixed(1) : 0;
                                     return [
-                                      `${value.toLocaleString()} (${percentage}%)`, 
+                                      `${value.toLocaleString()} (${percentage}%)`,
                                       'Impressions'
                                     ];
                                   }}

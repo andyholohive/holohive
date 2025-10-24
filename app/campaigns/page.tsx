@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2 } from "lucide-react";
+import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Copy, ExternalLink } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ClientService, ClientWithAccess } from "@/lib/clientService";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
@@ -1036,6 +1036,29 @@ export default function CampaignsPage() {
               </div>
             </div>
             <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="share-creator-type"
+                  checked={sharingCampaign?.share_creator_type || false}
+                  onCheckedChange={async (checked) => {
+                    if (sharingCampaign?.id) {
+                      try {
+                        await CampaignService.updateCampaign(sharingCampaign.id, {
+                          share_creator_type: checked as boolean
+                        } as any);
+                        setSharingCampaign({ ...sharingCampaign, share_creator_type: checked as boolean });
+                      } catch (error) {
+                        console.error('Error updating campaign:', error);
+                      }
+                    }
+                  }}
+                />
+                <Label htmlFor="share-creator-type" className="text-sm font-medium cursor-pointer">
+                  Share Creator Type for KOLs
+                </Label>
+              </div>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="share-campaign-link">Share Link</Label>
               <div className="flex gap-2">
                 <Input
@@ -1053,7 +1076,18 @@ export default function CampaignsPage() {
                     }
                   }}
                 >
-                  Copy
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-10"
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && sharingCampaign?.id) {
+                      window.open(`${window.location.origin}/public/campaigns/${sharingCampaign.id}`, '_blank');
+                    }
+                  }}
+                >
+                  <ExternalLink className="h-4 w-4" />
                 </Button>
               </div>
             </div>

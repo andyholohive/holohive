@@ -9,6 +9,7 @@ export interface CampaignWithDetails extends Campaign {
   client_email?: string;
   budget_allocations?: CampaignBudgetAllocation[];
   total_allocated?: number;
+  share_creator_type?: boolean;
 }
 
 export class CampaignService {

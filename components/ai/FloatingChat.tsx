@@ -26,8 +26,8 @@ export default function FloatingChat() {
   const { userProfile } = useAuth();
   const pathname = usePathname();
 
-  // Hide chat entirely on auth page or when user is not logged in
-  if (!userProfile || pathname?.startsWith('/auth')) {
+  // Hide chat entirely on auth page, public pages, or when user is not logged in
+  if (!userProfile || pathname?.startsWith('/auth') || pathname?.startsWith('/public')) {
     return null;
   }
   const [isOpen, setIsOpen] = useState(false);
