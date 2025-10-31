@@ -332,7 +332,9 @@ const CampaignDetailsPage = () => {
         setLoading(true);
         const fetchedCampaign = await CampaignService.getCampaignById(id);
         setCampaign(fetchedCampaign);
-        setShareReportPublicly(fetchedCampaign.share_report_publicly || false);
+        if (fetchedCampaign) {
+          setShareReportPublicly(fetchedCampaign.share_report_publicly || false);
+        }
       } catch (err) {
         setError("Failed to fetch campaign details");
         console.error(err);

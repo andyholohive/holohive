@@ -303,14 +303,14 @@ export default function PublicReportPage({ params }: { params: { id: string } })
       // Fetch campaign KOLs
       const { data: kolsData } = await supabasePublic
         .from('campaign_kols')
-        .select('id, master_kols(name)')
+        .select('id, master_kol:master_kol_id(name)')
         .eq('campaign_id', campaignId);
 
       if (kolsData) {
-        const formattedKOLs = kolsData.map(kol => ({
+        const formattedKOLs = kolsData.map((kol: any) => ({
           id: kol.id,
           master_kol: {
-            name: kol.master_kols?.name || 'Unknown'
+            name: kol.master_kol?.name || 'Unknown'
           }
         }));
         setCampaignKOLs(formattedKOLs as CampaignKOL[]);
