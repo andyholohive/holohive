@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2 } from 'lucide-react';
+import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2, ChevronDown, Star } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { KOLService } from '@/lib/kolService';
 import { useToast } from '@/hooks/use-toast';
@@ -146,6 +146,10 @@ export default function ListsPage() {
   const [regionFilterSearch, setRegionFilterSearch] = useState('');
   const [contentTypeFilter, setContentTypeFilter] = useState<string[]>([]);
   const [contentTypeFilterSearch, setContentTypeFilterSearch] = useState('');
+  const [followersOperator, setFollowersOperator] = useState('');
+  const [followersValue, setFollowersValue] = useState('');
+  const [ratingOperator, setRatingOperator] = useState('');
+  const [ratingValue, setRatingValue] = useState('');
 
 
   // Confirmation dialog states
@@ -187,7 +191,43 @@ export default function ListsPage() {
     const matchesContentType =
       contentTypeFilter.length === 0 || (Array.isArray(kol.content_type) && contentTypeFilter.some(ct => kol.content_type.includes(ct)));
 
-    return matchesSearch && matchesPlatform && matchesRegion && matchesContentType;
+    const matchesFollowers = (() => {
+      if (!followersOperator || !followersValue) return true;
+      const kolFollowers = kol.followers || 0;
+      const filterValue = parseInt(followersValue, 10);
+      if (isNaN(filterValue)) return true;
+
+      switch (followersOperator) {
+        case '>':
+          return kolFollowers > filterValue;
+        case '<':
+          return kolFollowers < filterValue;
+        case '=':
+          return kolFollowers === filterValue;
+        default:
+          return true;
+      }
+    })();
+
+    const matchesRating = (() => {
+      if (!ratingOperator || !ratingValue) return true;
+      const kolRating = kol.rating || 0;
+      const filterValue = parseInt(ratingValue, 10);
+      if (isNaN(filterValue)) return true;
+
+      switch (ratingOperator) {
+        case '>':
+          return kolRating > filterValue;
+        case '<':
+          return kolRating < filterValue;
+        case '=':
+          return kolRating === filterValue;
+        default:
+          return true;
+      }
+    })();
+
+    return matchesSearch && matchesPlatform && matchesRegion && matchesContentType && matchesFollowers && matchesRating;
   });
 
   const { toast } = useToast();
@@ -357,7 +397,7 @@ export default function ListsPage() {
     try {
       const { data, error } = await supabase
         .from('master_kols')
-        .select('id, name, platform, followers, region, link, content_type')
+        .select('id, name, platform, followers, region, link, content_type, rating')
         .order('name');
 
       if (error) throw error;
@@ -802,7 +842,7 @@ export default function ListsPage() {
                   Add List
                 </Button>
               </DialogTrigger>
-                              <DialogContent className="max-w-5xl max-h-[80vh] overflow-hidden">
+                              <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden">
                 <DialogHeader>
                   <DialogTitle>{isEditMode ? 'Edit List' : 'Add New List'}</DialogTitle>
                   <DialogDescription>
@@ -833,135 +873,18 @@ export default function ListsPage() {
                       />
                     </div>
 
+                    <div className="border-t pt-4 mt-2"></div>
 
-                    <div className="grid gap-2">
-                      <Label>Select KOLs ({newList.selectedKOLs.length} selected)</Label>
-                      {/* Search bar above filters */}
-                      <div className="min-w-[220px] flex flex-col items-end justify-end mb-3">
-                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Search</span>
+                    <div className="grid gap-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <Label className="text-base font-semibold">Select KOLs ({newList.selectedKOLs.length} selected)</Label>
+                      {/* Search bar */}
+                      <div className="mb-3">
                         <Input
                           placeholder="Search KOLs by name, region, or platform..."
                           className="auth-input"
                           value={kolSearchTerm}
                           onChange={e => setKolSearchTerm(e.target.value)}
                         />
-                      </div>
-                      {/* Bulk-style filter bar (match KOLs page bulk menu) */}
-                      <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-3">
-                        <div className="flex flex-wrap items-end gap-2">
-                          {/* Platform filter (multi-select + searchable like bulk menu) */}
-                          <div className="min-w-[120px] flex flex-col items-end justify-end">
-                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Platform</span>
-                            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
-                              <MultiSelect
-                                options={['X','Telegram','YouTube','Facebook','TikTok']}
-                                selected={platformFilter}
-                                onSelectedChange={setPlatformFilter}
-                                className="w-full"
-                                triggerContent={
-                                  <div className="w-full flex items-center h-7 min-h-[28px]">
-                                    {platformFilter.length > 0 ? (
-                                      <>
-                                        {platformFilter.map(item => (
-                                          <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 flex items-center">
-                                            {getPlatformIcon(item)}
-                                          </span>
-                                        ))}
-                                      </>
-                                    ) : (
-                                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
-                                    )}
-                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                  </div>
-                                }
-                              />
-                            </div>
-                          </div>
-                          {/* Region filter (multi-select + searchable) */}
-                          <div className="min-w-[100px] flex flex-col items-end justify-end">
-                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Region</span>
-                            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
-                              <MultiSelect
-                                options={['Vietnam','Turkey','SEA','Philippines','Korea','Global','China','Brazil']}
-                                selected={regionFilter}
-                                onSelectedChange={setRegionFilter}
-                                className="w-full"
-                                renderOption={(option: string) => (
-                                  <div className="flex items-center space-x-2">
-                                    <span>{getRegionIcon(option).flag}</span>
-                                    <span>{option}</span>
-                                  </div>
-                                )}
-                                triggerContent={
-                                  <div className="w-full flex items-center h-7 min-h-[28px]">
-                                    {regionFilter.length > 0 ? (
-                                      <>
-                                        {regionFilter.map(item => (
-                                          <span key={item} className="text-xs font-semibold text-black flex items-center gap-1 mr-2">
-                                            <span>{getRegionIcon(item).flag}</span>
-                                            <span>{item}</span>
-                                          </span>
-                                        ))}
-                                      </>
-                                    ) : (
-                                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
-                                    )}
-                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                  </div>
-                                }
-                              />
-                            </div>
-                          </div>
-                          {/* Content Type (multi-select + searchable) */}
-                          <div className="min-w-[120px] flex flex-col items-end justify-end">
-                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Content Type</span>
-                            <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
-                              <MultiSelect
-                                options={['Meme','News','Trading','Deep Dive','Meme/Cultural Narrative','Drama Queen','Sceptics','Technical Educator','Bridge Builders','Visionaries']}
-                                selected={contentTypeFilter}
-                                onSelectedChange={setContentTypeFilter}
-                                className="w-full"
-                                triggerContent={
-                                  <div className="w-full flex items-center h-7 min-h-[28px]">
-                                    {contentTypeFilter.length > 0 ? (
-                                      <>
-                                        {contentTypeFilter.map(item => (
-                                          <span key={item} className={`px-2 py-1 rounded-md text-xs font-medium flex-shrink-0 ${getContentTypeColor(item)} mr-1`}>{item}</span>
-                                        ))}
-                                      </>
-                                    ) : (
-                                      <span className="flex items-center text-xs font-semibold text-black">Select</span>
-                                    )}
-                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                  </div>
-                                }
-                              />
-                            </div>
-                          </div>
-                          {/* Reset Filters Button */}
-                          <div className="flex flex-col items-end justify-end">
-                            <span className="text-xs text-transparent mb-1 self-start">Reset</span>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              className="h-7"
-                              onClick={() => {
-                                setPlatformFilter([]);
-                                setRegionFilter([]);
-                                setContentTypeFilter([]);
-                              }}
-                            >
-                              Reset Filters
-                            </Button>
-                          </div>
-                        </div>
                       </div>
                       <Button
                         type="button"
@@ -987,16 +910,272 @@ export default function ListsPage() {
                             <TableRow className="bg-gray-50">
                               <TableHead className="w-12">Select</TableHead>
                               <TableHead>Name</TableHead>
-                              <TableHead>Followers</TableHead>
-                              <TableHead>Region</TableHead>
-                              <TableHead>Platform</TableHead>
-                              <TableHead>Content Type</TableHead>
+                              <TableHead className="relative bg-gray-50 select-none">
+                                <div className="flex items-center gap-1 cursor-pointer group">
+                                  <span>Followers</span>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[200px] p-0" align="start">
+                                      <div className="p-3">
+                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Followers</div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <Select
+                                            value={followersOperator}
+                                            onValueChange={(value) => setFollowersOperator(value)}
+                                          >
+                                            <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                              <SelectValue placeholder="=" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value=">">{'>'}</SelectItem>
+                                              <SelectItem value="<">{'<'}</SelectItem>
+                                              <SelectItem value="=">=</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                          <Input
+                                            type="number"
+                                            placeholder="Value"
+                                            value={followersValue}
+                                            onChange={(e) => setFollowersValue(e.target.value)}
+                                            className="h-8 text-xs auth-input"
+                                          />
+                                        </div>
+                                        {(followersOperator || followersValue) && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="w-full text-xs"
+                                            onClick={() => {
+                                              setFollowersOperator('');
+                                              setFollowersValue('');
+                                            }}
+                                          >
+                                            Clear
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                  {(followersOperator && followersValue) && (
+                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                      1
+                                    </span>
+                                  )}
+                                </div>
+                              </TableHead>
+                              <TableHead className="relative bg-gray-50 select-none">
+                                <div className="flex items-center gap-1 cursor-pointer group">
+                                  <span>Rating</span>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[200px] p-0" align="start">
+                                      <div className="p-3">
+                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Rating</div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <Select
+                                            value={ratingOperator}
+                                            onValueChange={(value) => setRatingOperator(value)}
+                                          >
+                                            <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                              <SelectValue placeholder="=" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value=">">{'>'}</SelectItem>
+                                              <SelectItem value="<">{'<'}</SelectItem>
+                                              <SelectItem value="=">=</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                          <Input
+                                            type="number"
+                                            placeholder="Value"
+                                            value={ratingValue}
+                                            onChange={(e) => setRatingValue(e.target.value)}
+                                            className="h-8 text-xs auth-input"
+                                          />
+                                        </div>
+                                        {(ratingOperator || ratingValue) && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="w-full text-xs"
+                                            onClick={() => {
+                                              setRatingOperator('');
+                                              setRatingValue('');
+                                            }}
+                                          >
+                                            Clear
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                  {(ratingOperator && ratingValue) && (
+                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                      1
+                                    </span>
+                                  )}
+                                </div>
+                              </TableHead>
+                              <TableHead className="relative bg-gray-50 select-none">
+                                <div className="flex items-center gap-1 cursor-pointer group">
+                                  <span>Region</span>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[200px] p-0" align="start">
+                                      <div className="p-3">
+                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Region</div>
+                                        {['Vietnam','Turkey','SEA','Philippines','Korea','Global','China','Brazil'].map((region) => (
+                                          <div
+                                            key={region}
+                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                            onClick={() => {
+                                              const newRegions = regionFilter.includes(region)
+                                                ? regionFilter.filter(r => r !== region)
+                                                : [...regionFilter, region];
+                                              setRegionFilter(newRegions);
+                                            }}
+                                          >
+                                            <Checkbox checked={regionFilter.includes(region)} />
+                                            <div className="flex items-center gap-1">
+                                              <span>{getRegionIcon(region).flag}</span>
+                                              <span className="text-sm">{region}</span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                        {regionFilter.length > 0 && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="w-full mt-2 text-xs"
+                                            onClick={() => setRegionFilter([])}
+                                          >
+                                            Clear
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                  {regionFilter.length > 0 && (
+                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                      {regionFilter.length}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableHead>
+                              <TableHead className="relative bg-gray-50 select-none">
+                                <div className="flex items-center gap-1 cursor-pointer group">
+                                  <span>Platform</span>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[200px] p-0" align="start">
+                                      <div className="p-3">
+                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Platform</div>
+                                        {['X','Telegram','YouTube','Facebook','TikTok'].map((platform) => (
+                                          <div
+                                            key={platform}
+                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                            onClick={() => {
+                                              const newPlatforms = platformFilter.includes(platform)
+                                                ? platformFilter.filter(p => p !== platform)
+                                                : [...platformFilter, platform];
+                                              setPlatformFilter(newPlatforms);
+                                            }}
+                                          >
+                                            <Checkbox checked={platformFilter.includes(platform)} />
+                                            <div className="flex items-center gap-1" title={platform}>
+                                              {getPlatformIcon(platform)}
+                                            </div>
+                                          </div>
+                                        ))}
+                                        {platformFilter.length > 0 && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="w-full mt-2 text-xs"
+                                            onClick={() => setPlatformFilter([])}
+                                          >
+                                            Clear
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                  {platformFilter.length > 0 && (
+                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                      {platformFilter.length}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableHead>
+                              <TableHead className="relative bg-gray-50 select-none">
+                                <div className="flex items-center gap-1 cursor-pointer group">
+                                  <span>Content Type</span>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[250px] p-0" align="start">
+                                      <div className="p-3">
+                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Content Type</div>
+                                        {['Meme','News','Trading','Deep Dive','Meme/Cultural Narrative','Drama Queen','Sceptics','Technical Educator','Bridge Builders','Visionaries'].map((type) => (
+                                          <div
+                                            key={type}
+                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                            onClick={() => {
+                                              const newTypes = contentTypeFilter.includes(type)
+                                                ? contentTypeFilter.filter(t => t !== type)
+                                                : [...contentTypeFilter, type];
+                                              setContentTypeFilter(newTypes);
+                                            }}
+                                          >
+                                            <Checkbox checked={contentTypeFilter.includes(type)} />
+                                            <span className="text-sm">{type}</span>
+                                          </div>
+                                        ))}
+                                        {contentTypeFilter.length > 0 && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="w-full mt-2 text-xs"
+                                            onClick={() => setContentTypeFilter([])}
+                                          >
+                                            Clear
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                  {contentTypeFilter.length > 0 && (
+                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                      {contentTypeFilter.length}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {filteredAvailableKOLs.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                                <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                                   No KOLs found.
                                 </TableCell>
                               </TableRow>
@@ -1040,6 +1219,18 @@ export default function ListsPage() {
                                     {kol.followers ? KOLService.formatFollowers(kol.followers) : '-'}
                                   </TableCell>
                                   <TableCell>
+                                    <div className="flex items-center space-x-1">
+                                      {[1, 2, 3, 4, 5].map(star => (
+                                        <Star
+                                          key={star}
+                                          className={`h-3 w-3 ${
+                                            star <= (kol.rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+                                          }`}
+                                        />
+                                      ))}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
                                     {kol.region ? (
                                       <div className="flex items-center space-x-1">
                                         <span>{getRegionIcon(kol.region).flag}</span>
@@ -1076,8 +1267,8 @@ export default function ListsPage() {
                           </TableBody>
                         </Table>
                       </div>
-                    </div>
-                  </div>
+                    </div> {/* Close bg-gray-50 wrapper */}
+                  </div> {/* Close grid gap-4 */}
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={handleCloseListModal}>
                       Cancel

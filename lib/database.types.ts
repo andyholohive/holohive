@@ -270,6 +270,8 @@ export type Database = {
           outline: string | null
           proposal_sent: boolean | null
           region: string | null
+          report_share_link: string | null
+          share_report_publicly: boolean | null
           start_date: string
           status: string
           total_budget: number
@@ -293,6 +295,8 @@ export type Database = {
           outline?: string | null
           proposal_sent?: boolean | null
           region?: string | null
+          report_share_link?: string | null
+          share_report_publicly?: boolean | null
           start_date: string
           status?: string
           total_budget: number
@@ -316,6 +320,8 @@ export type Database = {
           outline?: string | null
           proposal_sent?: boolean | null
           region?: string | null
+          report_share_link?: string | null
+          share_report_publicly?: boolean | null
           start_date?: string
           status?: string
           total_budget?: number
@@ -327,6 +333,92 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_reports: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          custom_message: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          custom_message?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          custom_message?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_reports_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      campaign_report_files: {
+        Row: {
+          campaign_id: string
+          created_at: string
+          display_order: number
+          file_name: string
+          file_size: number
+          file_type: string
+          file_url: string
+          id: string
+          is_public: boolean
+          uploaded_by: string | null
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string
+          display_order?: number
+          file_name: string
+          file_size: number
+          file_type: string
+          file_url: string
+          id?: string
+          is_public?: boolean
+          uploaded_by?: string | null
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string
+          display_order?: number
+          file_name?: string
+          file_size?: number
+          file_type?: string
+          file_url?: string
+          id?: string
+          is_public?: boolean
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_report_files_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_report_files_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]

@@ -346,9 +346,8 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e8692] mx-auto mb-4"></div>
           <p className="text-gray-600">Loading list...</p>
-          <p className="text-gray-400 text-sm mt-2">List ID: {listId}</p>
         </div>
       </div>
     );
@@ -359,7 +358,7 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
       <div className="min-h-screen bg-gray-50">
         {/* Header with Logo */}
         <div className="bg-white border-b border-gray-200">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <Image
@@ -370,15 +369,14 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                   className="rounded-lg"
                 />
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">KOL Campaign Manager</h1>
-                  <p className="text-sm text-gray-600">Shared List</p>
+                  <h1 className="text-xl font-bold text-gray-900">Holo Hive Campaign Manager</h1>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white rounded-lg shadow-sm border p-8 text-center">
             <List className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">List Not Found</h2>
@@ -396,26 +394,23 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
     <div className="min-h-screen bg-gray-50">
       {/* Header with Logo */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Image
-                src="/images/logo.png"
-                alt="KOL Campaign Manager Logo"
-                width={40}
-                height={40}
-                className="rounded-lg"
-              />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">KOL Campaign Manager</h1>
-                <p className="text-sm text-gray-600">Shared List</p>
-              </div>
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center space-x-4">
+            <Image
+              src="/images/logo.png"
+              alt="KOL Campaign Manager Logo"
+              width={40}
+              height={40}
+              className="rounded-lg"
+            />
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Holo Hive Campaign Manager</h1>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
         {/* List Title */}
         <div className="flex items-center space-x-4 mb-6">
           <div className="bg-gray-100 p-2 rounded-lg">
@@ -423,7 +418,6 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
           </div>
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{list.name}</h2>
-            <p className="text-gray-600">Shared List</p>
           </div>
           <div className="ml-auto">
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${getListStatusColor(list.status)}`}>

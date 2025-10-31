@@ -12,7 +12,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 // import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink } from "lucide-react";
+import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,8 +23,11 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { FileUploadComponent } from '@/components/campaign/FileUploadComponent';
+import { ReportTabContent } from '@/components/campaign/ReportTabContent';
 
 const CampaignDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -57,6 +60,8 @@ const CampaignDetailsPage = () => {
     paid_value: '' as string
   });
   const [isAddingKOLs, setIsAddingKOLs] = useState(false);
+  const [editingKolCell, setEditingKolCell] = useState<{ kolId: string, field: string } | null>(null);
+  const [editingKolValue, setEditingKolValue] = useState<any>(null);
   const [newKOLData, setNewKOLData] = useState({
     selectedKOLs: [] as string[],
     hh_status: 'Curated' as const,
@@ -99,6 +104,13 @@ const CampaignDetailsPage = () => {
   const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
   const [bulkPaymentMethod, setBulkPaymentMethod] = useState('');
   const [paymentsSearchTerm, setPaymentsSearchTerm] = useState('');
+
+  // Report state
+  const [reportFiles, setReportFiles] = useState<any[]>([]);
+  const [loadingReportFiles, setLoadingReportFiles] = useState(false);
+  const [customMessage, setCustomMessage] = useState('');
+  const [shareReportPublicly, setShareReportPublicly] = useState(false);
+
   const [newPaymentData, setNewPaymentData] = useState({
     campaign_kol_id: '',
     amount: 0,
@@ -108,6 +120,77 @@ const CampaignDetailsPage = () => {
     transaction_id: '',
     notes: ''
   });
+
+  // Multi-KOL payment state
+  const [selectedKOLsForPayment, setSelectedKOLsForPayment] = useState<string[]>([]);
+  const [multiKOLPayments, setMultiKOLPayments] = useState<{[kolId: string]: {
+    number_of_payments: number;
+    payments: Array<{
+      amount: number;
+      payment_date: string;
+      payment_method: string;
+      content_id: string;
+      transaction_id: string;
+      notes: string;
+    }>;
+  }}>({});
+
+  // Payment filters state
+  const [paymentFilters, setPaymentFilters] = useState({
+    kol_ids: [] as string[],
+    payment_methods: [] as string[],
+    has_content: '' as '' | 'yes' | 'no',
+    amount_operator: '' as string,
+    amount_value: '' as string,
+  });
+
+  // Payment inline editing state
+  const [editingPaymentCell, setEditingPaymentCell] = useState<{ paymentId: string, field: string } | null>(null);
+  const [editingPaymentValue, setEditingPaymentValue] = useState<any>(null);
+
+  // Helper function to filter payments
+  const getFilteredPayments = () => {
+    return payments.filter(payment => {
+      const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
+      const search = paymentsSearchTerm.toLowerCase();
+
+      // Search term filter
+      const matchesSearch = (
+        !search ||
+        (kol?.master_kol?.name?.toLowerCase().includes(search)) ||
+        (payment.payment_method?.toLowerCase().includes(search)) ||
+        (payment.notes?.toLowerCase().includes(search))
+      );
+
+      // KOL filter
+      const matchesKOL = paymentFilters.kol_ids.length === 0 ||
+        paymentFilters.kol_ids.includes(payment.campaign_kol_id);
+
+      // Payment method filter
+      const matchesMethod = paymentFilters.payment_methods.length === 0 ||
+        paymentFilters.payment_methods.includes(payment.payment_method);
+
+      // Has content filter
+      const matchesContent = !paymentFilters.has_content ||
+        (paymentFilters.has_content === 'yes' && payment.content_id) ||
+        (paymentFilters.has_content === 'no' && !payment.content_id);
+
+      // Amount filter
+      const matchesAmount = !paymentFilters.amount_operator || !paymentFilters.amount_value || (() => {
+        const amount = payment.amount || 0;
+        const value = parseFloat(paymentFilters.amount_value);
+        if (isNaN(value)) return true;
+        switch (paymentFilters.amount_operator) {
+          case '>': return amount > value;
+          case '<': return amount < value;
+          case '=': return amount === value;
+          default: return true;
+        }
+      })();
+
+      return matchesSearch && matchesKOL && matchesMethod && matchesContent && matchesAmount;
+    });
+  };
 
   // Column resize state for KOLs table
   // Remove columnWidths, isResizing, resizingColumn
@@ -249,6 +332,7 @@ const CampaignDetailsPage = () => {
         setLoading(true);
         const fetchedCampaign = await CampaignService.getCampaignById(id);
         setCampaign(fetchedCampaign);
+        setShareReportPublicly(fetchedCampaign.share_report_publicly || false);
       } catch (err) {
         setError("Failed to fetch campaign details");
         console.error(err);
@@ -262,6 +346,13 @@ const CampaignDetailsPage = () => {
   useEffect(() => {
     UserService.getAllUsers().then(setAllUsers);
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'report') {
+      fetchReportFiles();
+      fetchReportData();
+    }
+  }, [activeTab, id]);
 
   // Fetch campaign KOLs when campaign changes
   useEffect(() => {
@@ -635,6 +726,176 @@ const CampaignDetailsPage = () => {
   const handleChange = (field: keyof CampaignDetails, value: any) => {
     setForm((prev: CampaignDetails | null) => prev ? { ...prev, [field]: value } : prev);
   };
+
+  // Report functions
+  const fetchReportFiles = async () => {
+    if (!id) return;
+    setLoadingReportFiles(true);
+    try {
+      const { data, error } = await supabase
+        .from('campaign_report_files')
+        .select('*')
+        .eq('campaign_id', id)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      setReportFiles(data || []);
+    } catch (err) {
+      console.error('Error fetching report files:', err);
+      toast({ title: "Error", description: "Failed to fetch report files.", variant: "destructive" });
+    } finally {
+      setLoadingReportFiles(false);
+    }
+  };
+
+  const fetchReportData = async () => {
+    if (!id) return;
+    try {
+      const { data, error } = await supabase
+        .from('campaign_reports')
+        .select('*')
+        .eq('campaign_id', id)
+        .single();
+
+      if (data) {
+        setCustomMessage(data.custom_message || '');
+      }
+    } catch (err) {
+      console.error('Error fetching report data:', err);
+    }
+  };
+
+  const handleToggleFilePublic = async (fileId: string, isPublic: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('campaign_report_files')
+        .update({ is_public: isPublic })
+        .eq('id', fileId);
+
+      if (error) throw error;
+
+      setReportFiles(prev =>
+        prev.map(file => file.id === fileId ? { ...file, is_public: isPublic } : file)
+      );
+
+      toast({
+        title: 'Success',
+        description: `File ${isPublic ? 'shown in' : 'hidden from'} public report`,
+      });
+    } catch (err: any) {
+      console.error('Error updating file visibility:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to update file visibility',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteFile = async (fileId: string, fileUrl: string) => {
+    try {
+      // Delete from storage
+      const fileName = fileUrl.split('/').pop();
+      if (fileName) {
+        await supabase.storage
+          .from('campaign-report-files')
+          .remove([`${id}/${fileName}`]);
+      }
+
+      // Delete from database
+      const { error } = await supabase
+        .from('campaign_report_files')
+        .delete()
+        .eq('id', fileId);
+
+      if (error) throw error;
+
+      setReportFiles(prev => prev.filter(file => file.id !== fileId));
+
+      toast({
+        title: 'Success',
+        description: 'File deleted successfully',
+      });
+    } catch (err: any) {
+      console.error('Error deleting file:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete file',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSaveCustomMessage = async () => {
+    if (!id) return;
+    try {
+      // Check if report exists
+      const { data: existingReport } = await supabase
+        .from('campaign_reports')
+        .select('id')
+        .eq('campaign_id', id)
+        .single();
+
+      if (existingReport) {
+        // Update existing
+        const { error } = await supabase
+          .from('campaign_reports')
+          .update({ custom_message: customMessage })
+          .eq('campaign_id', id);
+
+        if (error) throw error;
+      } else {
+        // Create new
+        const { error } = await supabase
+          .from('campaign_reports')
+          .insert({ campaign_id: id, custom_message: customMessage });
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Custom message saved',
+      });
+    } catch (err: any) {
+      console.error('Error saving custom message:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to save custom message',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleTogglePublicReport = async (enabled: boolean) => {
+    if (!id) return;
+    try {
+      const { error } = await supabase
+        .from('campaigns')
+        .update({ share_report_publicly: enabled })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setShareReportPublicly(enabled);
+      if (campaign) {
+        setCampaign({ ...campaign, share_report_publicly: enabled });
+      }
+
+      toast({
+        title: 'Success',
+        description: `Public report ${enabled ? 'enabled' : 'disabled'}`,
+      });
+    } catch (err: any) {
+      console.error('Error toggling public report:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to update public report setting',
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Add local utility functions
   const formatDate = (dateString: string | undefined | null) => {
     if (!dateString) return "-";
@@ -902,6 +1163,84 @@ const CampaignDetailsPage = () => {
     }
   };
 
+  const handleAddMultiKOLPayments = async () => {
+    if (selectedKOLsForPayment.length === 0) {
+      toast({ title: "Error", description: "Please select at least one KOL.", variant: "destructive" });
+      return;
+    }
+
+    // Validate that all selected KOLs have payment data
+    const missingData = selectedKOLsForPayment.filter(kolId => {
+      const kolData = multiKOLPayments[kolId];
+      if (!kolData || !kolData.payments) return true;
+      return kolData.payments.some(p => !p.amount || p.amount <= 0);
+    });
+
+    if (missingData.length > 0) {
+      toast({ title: "Error", description: "Please fill in amount for all payments.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      // Create payments for all selected KOLs
+      const paymentInserts = selectedKOLsForPayment.flatMap(kolId => {
+        const kolData = multiKOLPayments[kolId];
+        if (!kolData || !kolData.payments) return [];
+
+        // Create a payment record for each payment in the array
+        return kolData.payments.map((payment, index) => ({
+          campaign_id: id,
+          campaign_kol_id: kolId,
+          amount: payment.amount,
+          payment_date: payment.payment_date || new Date().toISOString().split('T')[0],
+          payment_method: payment.payment_method || 'Token',
+          content_id: payment.content_id === 'none' ? null : payment.content_id || null,
+          transaction_id: payment.transaction_id || null,
+          notes: payment.notes || null
+        }));
+      });
+
+      const { data, error } = await supabase
+        .from('payments')
+        .insert(paymentInserts)
+        .select();
+
+      if (error) throw error;
+
+      // Update each KOL's paid amount
+      for (const kolId of selectedKOLsForPayment) {
+        const kolData = multiKOLPayments[kolId];
+        if (!kolData || !kolData.payments) continue;
+
+        const currentKol = campaignKOLs.find(kol => kol.id === kolId);
+        const currentPaid = currentKol?.paid || 0;
+        const totalAmount = kolData.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        const newPaid = currentPaid + totalAmount;
+
+        await supabase
+          .from('campaign_kols')
+          .update({ paid: newPaid })
+          .eq('id', kolId);
+
+        setCampaignKOLs(prev => prev.map(kol =>
+          kol.id === kolId ? { ...kol, paid: newPaid } : kol
+        ));
+      }
+
+      // Refetch payments
+      fetchPayments();
+
+      // Reset state
+      setSelectedKOLsForPayment([]);
+      setMultiKOLPayments({});
+      setIsAddingPayment(false);
+      toast({ title: "Success", description: `${paymentInserts.length} payment record(s) created for ${selectedKOLsForPayment.length} KOL(s).` });
+    } catch (err) {
+      console.error('Error adding payments:', err);
+      toast({ title: "Error", description: "Failed to record payments.", variant: "destructive" });
+    }
+  };
+
   const handleDeletePayment = async (paymentId: string) => {
     try {
       const paymentToDelete = payments.find(p => p.id === paymentId);
@@ -1020,18 +1359,128 @@ const CampaignDetailsPage = () => {
     }
   };
 
+  // Payment inline editing functions
+  const handlePaymentCellSave = async (payment: any, field: string, newValue: any) => {
+    try {
+      // Update database
+      await supabase.from('payments').update({ [field]: newValue }).eq('id', payment.id);
+
+      // Update local state
+      setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, [field]: newValue } : p));
+
+      setEditingPaymentCell(null);
+      setEditingPaymentValue(null);
+
+      toast({ title: 'Success', description: 'Payment updated successfully' });
+    } catch (error) {
+      console.error('Error updating payment:', error);
+      toast({ title: 'Error', description: 'Failed to update payment', variant: 'destructive' });
+    }
+  };
+
+  const renderEditablePaymentCell = (value: any, field: string, payment: any) => {
+    const isEditing = editingPaymentCell?.paymentId === payment.id && editingPaymentCell?.field === field;
+    const numberFields = ["amount"];
+    const textFields = ["notes", "transaction_id"];
+    const selectFields = ["payment_method"];
+    const dateFields = ["payment_date"];
+
+    // Always-editable select fields (payment_method)
+    if (selectFields.includes(field)) {
+      return (
+        <Select
+          value={value || ''}
+          onValueChange={async (v) => {
+            await handlePaymentCellSave(payment, field, v);
+          }}
+        >
+          <SelectTrigger
+            className="border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
+            style={{ outline: 'none', boxShadow: 'none', minWidth: 90 }}
+          >
+            <SelectValue>{value || 'Select'}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Token">Token</SelectItem>
+            <SelectItem value="Fiat">Fiat</SelectItem>
+            <SelectItem value="WL">WL</SelectItem>
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    // Date field - double click to edit
+    if (dateFields.includes(field)) {
+      if (isEditing) {
+        return (
+          <Input
+            type="date"
+            value={editingPaymentValue ?? ''}
+            onChange={e => setEditingPaymentValue(e.target.value)}
+            onBlur={() => handlePaymentCellSave(payment, field, editingPaymentValue)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handlePaymentCellSave(payment, field, editingPaymentValue);
+              if (e.key === 'Escape') { setEditingPaymentCell(null); setEditingPaymentValue(null); }
+            }}
+            className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
+            style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
+            autoFocus
+          />
+        );
+      }
+      return (
+        <div
+          className="cursor-pointer w-full h-full flex items-center px-1 py-1"
+          onDoubleClick={() => {
+            setEditingPaymentCell({ paymentId: payment.id, field });
+            setEditingPaymentValue(value);
+          }}
+          title="Double-click to edit"
+        >
+          {value ? new Date(value).toLocaleDateString() : '-'}
+        </div>
+      );
+    }
+
+    // For text/number fields: double-click to edit
+    if (isEditing && (textFields.includes(field) || numberFields.includes(field))) {
+      return (
+        <Input
+          type={numberFields.includes(field) ? 'number' : 'text'}
+          value={editingPaymentValue ?? ''}
+          onChange={e => setEditingPaymentValue(e.target.value)}
+          onBlur={() => handlePaymentCellSave(payment, field, editingPaymentValue)}
+          onKeyDown={e => {
+            if (e.key === 'Enter') handlePaymentCellSave(payment, field, editingPaymentValue);
+            if (e.key === 'Escape') { setEditingPaymentCell(null); setEditingPaymentValue(null); }
+          }}
+          className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
+          style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
+          autoFocus
+        />
+      );
+    }
+
+    // Default display for text/number fields
+    return (
+      <div
+        className="cursor-pointer w-full h-full flex items-center px-1 py-1"
+        onDoubleClick={() => {
+          if (textFields.includes(field) || numberFields.includes(field)) {
+            setEditingPaymentCell({ paymentId: payment.id, field });
+            setEditingPaymentValue(value);
+          }
+        }}
+        title={textFields.includes(field) || numberFields.includes(field) ? "Double-click to edit" : undefined}
+      >
+        {numberFields.includes(field) && value != null ? `$${Number(value).toLocaleString()}` : (value || '-')}
+      </div>
+    );
+  };
+
   // Bulk payment functions
   const handleSelectAllPayments = () => {
-    const filteredPayments = payments.filter(payment => {
-      const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
-      const search = paymentsSearchTerm.toLowerCase();
-      return (
-        !search ||
-        (kol?.master_kol?.name?.toLowerCase().includes(search)) ||
-        (payment.payment_method?.toLowerCase().includes(search)) ||
-        (payment.notes?.toLowerCase().includes(search))
-      );
-    });
+    const filteredPayments = getFilteredPayments();
     
     if (filteredPayments.every(payment => selectedPayments.includes(payment.id))) {
       setSelectedPayments(prev => prev.filter(id => !filteredPayments.some(p => p.id === id)));
@@ -1115,6 +1564,7 @@ const CampaignDetailsPage = () => {
   const [isAddContentsDialogOpen, setIsAddContentsDialogOpen] = useState(false);
   const [quickAddContentKolId, setQuickAddContentKolId] = useState<string | null>(null);
   const [isShareCampaignOpen, setIsShareCampaignOpen] = useState(false);
+  const [isWarningsOpen, setIsWarningsOpen] = useState(false);
   const { toast } = useToast();
 
   // Campaign updates state
@@ -1561,11 +2011,205 @@ const CampaignDetailsPage = () => {
     setEditingContentValue(null);
   };
 
+  // KOL inline editing functions
+  const handleKolCellDoubleClick = (kolId: string, field: string, value: any) => {
+    setEditingKolCell({ kolId, field });
+    setEditingKolValue(value);
+  };
+
+  const handleKolCellSave = async () => {
+    if (!editingKolCell) return;
+    const { kolId, field } = editingKolCell;
+    const kolToUpdate = campaignKOLs.find(k => k.id === kolId);
+    if (!kolToUpdate) return;
+
+    await handleKolCellSaveImmediate(kolToUpdate, field, editingKolValue);
+  };
+
+  const handleKolCellCancel = () => {
+    setEditingKolCell(null);
+    setEditingKolValue(null);
+  };
+
+  const handleKolCellSaveImmediate = async (kol: any, field: string, newValue: any) => {
+    // Update local state
+    setCampaignKOLs(prev => prev.map(k => k.id === kol.id ? { ...k, [field]: newValue } : k));
+
+    // Update database
+    try {
+      await supabase.from('campaign_kols').update({ [field]: newValue }).eq('id', kol.id);
+    } catch (err) {
+      console.error('Error updating KOL:', err);
+    }
+
+    setEditingKolCell(null);
+    setEditingKolValue(null);
+  };
+
+  const renderEditableKolCell = (value: any, field: string, kol: any) => {
+    const isEditing = editingKolCell?.kolId === kol.id && editingKolCell?.field === field;
+    const textFields = ["notes", "wallet_address"];
+    const numberFields = ["allocated_budget"];
+    const selectFields = ["hh_status", "budget_type"];
+
+    // Always-editable select fields
+    if (selectFields.includes(field)) {
+      let options: string[] = [];
+      let getColorClass = () => '';
+
+      if (field === 'hh_status') {
+        options = ['Curated', 'Interested', 'Onboarded', 'Concluded'];
+        getColorClass = () => value ? getStatusColor(value) : 'bg-gray-100 text-gray-800';
+      } else if (field === 'budget_type') {
+        options = ['Token', 'Fiat', 'WL'];
+      }
+
+      return (
+        <Select value={value || ''} onValueChange={async v => {
+          setEditingKolCell({ kolId: kol.id, field });
+          setEditingKolValue(v);
+          await handleKolCellSaveImmediate(kol, field, v);
+        }}>
+          <SelectTrigger
+            className={`border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none ${field === 'hh_status' ? getColorClass() : ''}`}
+            style={{ outline: 'none', boxShadow: 'none', minWidth: 90 }}
+          >
+            <SelectValue>
+              {field === 'hh_status' && value ? (
+                <span>{value}</span>
+              ) : field === 'budget_type' && value ? (
+                <span>{value}</span>
+              ) : value || '-'}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {options.map(option => (
+              <SelectItem key={option} value={option}>
+                {option}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      );
+    }
+
+    // For text/number fields: double-click to edit
+    if (isEditing && (textFields.includes(field) || numberFields.includes(field))) {
+      return (
+        <Input
+          type={numberFields.includes(field) ? 'number' : 'text'}
+          value={editingKolValue ?? ''}
+          onChange={e => setEditingKolValue(e.target.value)}
+          onBlur={handleKolCellSave}
+          onKeyDown={e => {
+            if (e.key === 'Enter') handleKolCellSave();
+            if (e.key === 'Escape') handleKolCellCancel();
+          }}
+          className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
+          style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
+          autoFocus
+        />
+      );
+    }
+
+    // Default display for text/number fields
+    return (
+      <div
+        className="cursor-pointer w-full h-full flex items-center px-1 py-1"
+        onDoubleClick={() => {
+          if (textFields.includes(field) || numberFields.includes(field)) {
+            setEditingKolCell({ kolId: kol.id, field });
+            setEditingKolValue(value);
+          }
+        }}
+        title={textFields.includes(field) || numberFields.includes(field) ? "Double-click to edit" : undefined}
+      >
+        {numberFields.includes(field) && value ? Number(value).toLocaleString() : (value || '-')}
+      </div>
+    );
+  };
+
   // Add at the top of the component, after other useState declarations:
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [contentToDelete, setContentToDelete] = useState<any | null>(null);
   const [showPaymentDeleteDialog, setShowPaymentDeleteDialog] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<any | null>(null);
+
+  // Validation function to check for missing fields
+  const getMissingFields = () => {
+    const missing: Array<{tab: string, field: string, label: string}> = [];
+
+    // Information tab validations
+    if (!campaign?.name || campaign.name.trim() === '') {
+      missing.push({tab: 'information', field: 'name', label: 'Campaign Name'});
+    }
+    if (!campaign?.status) {
+      missing.push({tab: 'information', field: 'status', label: 'Status'});
+    }
+    if (!campaign?.start_date) {
+      missing.push({tab: 'information', field: 'start_date', label: 'Start Date'});
+    }
+    if (!campaign?.end_date) {
+      missing.push({tab: 'information', field: 'end_date', label: 'End Date'});
+    }
+    if (!campaign?.client_id) {
+      missing.push({tab: 'information', field: 'client_id', label: 'Client'});
+    }
+    if (!campaign?.region) {
+      missing.push({tab: 'information', field: 'region', label: 'Region'});
+    }
+    if (!campaign?.total_budget || campaign.total_budget === 0) {
+      missing.push({tab: 'information', field: 'total_budget', label: 'Total Budget'});
+    }
+
+    // KOL Dashboard validations
+    if (!campaignKOLs || campaignKOLs.length === 0) {
+      missing.push({tab: 'kols', field: 'kols', label: 'At least one KOL'});
+    } else {
+      // Check if any KOLs are missing budget allocations
+      const kolsWithoutBudget = campaignKOLs.filter(kol =>
+        !kol.allocated_budget || kol.allocated_budget === 0
+      );
+      if (kolsWithoutBudget.length > 0) {
+        missing.push({tab: 'kols', field: 'budget', label: `Budget for ${kolsWithoutBudget.length} KOL(s)`});
+      }
+
+      // Check if any KOLs are missing status
+      const kolsWithoutStatus = campaignKOLs.filter(kol => !kol.hh_status);
+      if (kolsWithoutStatus.length > 0) {
+        missing.push({tab: 'kols', field: 'status', label: `Status for ${kolsWithoutStatus.length} KOL(s)`});
+      }
+    }
+
+    // Content Dashboard validations
+    if (!contents || contents.length === 0) {
+      missing.push({tab: 'contents', field: 'contents', label: 'At least one content piece'});
+    } else {
+      // Check for contents missing activation dates
+      const contentsWithoutDate = contents.filter(c => !c.activation_date);
+      if (contentsWithoutDate.length > 0) {
+        missing.push({tab: 'contents', field: 'activation_date', label: `Activation date for ${contentsWithoutDate.length} content(s)`});
+      }
+
+      // Check for contents missing platform
+      const contentsWithoutPlatform = contents.filter(c => !c.platform);
+      if (contentsWithoutPlatform.length > 0) {
+        missing.push({tab: 'contents', field: 'platform', label: `Platform for ${contentsWithoutPlatform.length} content(s)`});
+      }
+    }
+
+    // Budget/Payments validations
+    const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const totalAllocated = campaignKOLs.reduce((sum, kol) => sum + (kol.allocated_budget || 0), 0);
+    if (totalPaid < totalAllocated) {
+      missing.push({tab: 'payments', field: 'payments', label: `Remaining payments (${CampaignService.formatCurrency(totalAllocated - totalPaid)} unpaid)`});
+    }
+
+    return missing;
+  };
+
+  const missingFields = getMissingFields();
+  const hasWarnings = missingFields.length > 0;
 
   if (loading) {
     return (
@@ -1657,22 +2301,36 @@ const CampaignDetailsPage = () => {
             >
               <ArrowLeft className="h-4 w-4 mr-2" />Back to Campaigns
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsShareCampaignOpen(true)}
-            >
-              <Share2 className="h-4 w-4 mr-2" />
-              Share Campaign
-            </Button>
+            <div className="flex items-center gap-2">
+              {hasWarnings && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsWarningsOpen(true)}
+                  className="border-amber-500 text-amber-600 hover:bg-amber-50 hover:text-amber-600"
+                >
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  {missingFields.length} Warning{missingFields.length !== 1 ? 's' : ''}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsShareCampaignOpen(true)}
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Share Campaign
+              </Button>
+            </div>
           </div>
           
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                            <TabsList className="grid w-full grid-cols-4">
+                            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="information">Information</TabsTrigger>
               <TabsTrigger value="kols">KOL Dashboard</TabsTrigger>
               <TabsTrigger value="contents">Content Dashboard</TabsTrigger>
                   <TabsTrigger value="payments">Budget</TabsTrigger>
+                  <TabsTrigger value="report">Report</TabsTrigger>
             </TabsList>
             
             <TabsContent value="information" className="mt-4">
@@ -1691,7 +2349,21 @@ const CampaignDetailsPage = () => {
                     <h2 className="text-2xl font-bold text-gray-900">{campaign.name}</h2>
                   )}
                   {editMode ? (
-                    <Select value={form?.status || ""} onValueChange={value => handleChange("status", value)}>
+                    <Select
+                      value={form?.status || ""}
+                      onValueChange={(value) => {
+                        if (value === "Completed" && hasWarnings) {
+                          toast({
+                            title: "Cannot Mark as Completed",
+                            description: `There are ${missingFields.length} missing field(s). Please review warnings before marking as completed.`,
+                            variant: "destructive",
+                          });
+                          setIsWarningsOpen(true);
+                          return;
+                        }
+                        handleChange("status", value);
+                      }}
+                    >
                       <SelectTrigger className="w-40 focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
                         <SelectValue />
                       </SelectTrigger>
@@ -1699,7 +2371,12 @@ const CampaignDetailsPage = () => {
                         <SelectItem value="Planning">Planning</SelectItem>
                         <SelectItem value="Active">Active</SelectItem>
                         <SelectItem value="Paused">Paused</SelectItem>
-                        <SelectItem value="Completed">Completed</SelectItem>
+                        <SelectItem value="Completed">
+                          <div className="flex items-center gap-2">
+                            Completed
+                            {hasWarnings && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                          </div>
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   ) : (
@@ -3476,7 +4153,53 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Creator Type</TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                            <div className="flex items-center gap-1 cursor-pointer group">
+                              <span>Creator Type</span>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0" align="start">
+                                  <div className="p-3">
+                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Creator Type</div>
+                                    {['Nano','Micro','Mid-Tier','Macro','Mega'].map((creatorType) => (
+                                      <div
+                                        key={creatorType}
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        onClick={() => {
+                                          const newCreatorTypes = kolFilters.creator_type.includes(creatorType)
+                                            ? kolFilters.creator_type.filter(ct => ct !== creatorType)
+                                            : [...kolFilters.creator_type, creatorType];
+                                          setKolFilters(prev => ({ ...prev, creator_type: newCreatorTypes }));
+                                        }}
+                                      >
+                                        <Checkbox checked={kolFilters.creator_type.includes(creatorType)} />
+                                        <span className="text-sm">{creatorType}</span>
+                                      </div>
+                                    ))}
+                                    {kolFilters.creator_type.length > 0 && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="w-full mt-2 text-xs"
+                                        onClick={() => setKolFilters(prev => ({ ...prev, creator_type: [] }))}
+                                      >
+                                        Clear
+                                      </Button>
+                                    )}
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                              {kolFilters.creator_type.length > 0 && (
+                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  {kolFilters.creator_type.length}
+                                </span>
+                              )}
+                            </div>
+                          </TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Status</span>
@@ -4034,14 +4757,31 @@ const CampaignDetailsPage = () => {
                                 <div className="flex flex-wrap gap-1 items-center">
                                   {contents
                                     .filter(content => content.campaign_kols_id === campaignKOL.id)
-                                    .map((content, idx) => (
-                                      <span
-                                        key={idx}
-                                        className="px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800"
-                                      >
-                                        {content.type || 'No Type'}
-                                      </span>
-                                    ))}
+                                    .map((content, idx) => {
+                                      // Different colors for different content types
+                                      const getContentColor = (type: string) => {
+                                        const colors: {[key: string]: string} = {
+                                          'Post': 'bg-blue-100 text-blue-800',
+                                          'Tweet': 'bg-cyan-100 text-cyan-800',
+                                          'Story': 'bg-purple-100 text-purple-800',
+                                          'Reel': 'bg-pink-100 text-pink-800',
+                                          'Video': 'bg-red-100 text-red-800',
+                                          'Article': 'bg-green-100 text-green-800',
+                                          'Review': 'bg-yellow-100 text-yellow-800',
+                                          'Thread': 'bg-indigo-100 text-indigo-800',
+                                        };
+                                        return colors[type] || 'bg-gray-100 text-gray-800';
+                                      };
+
+                                      return (
+                                        <span
+                                          key={idx}
+                                          className={`px-2 py-1 rounded-md text-xs font-medium ${getContentColor(content.type || '')}`}
+                                        >
+                                          {content.type || 'No Type'}
+                                        </span>
+                                      );
+                                    })}
                                   <Popover
                                     open={quickAddContentKolId === campaignKOL.id}
                                     onOpenChange={(open) => setQuickAddContentKolId(open ? campaignKOL.id : null)}
@@ -4090,11 +4830,41 @@ const CampaignDetailsPage = () => {
                                                   });
                                                   return;
                                                 }
+
+                                                // Auto-create payment for this content
+                                                if (data) {
+                                                  const paymentPayload = {
+                                                    campaign_id: id,
+                                                    campaign_kol_id: campaignKOL.id,
+                                                    content_id: data.id,
+                                                    amount: 0,
+                                                    payment_date: new Date().toISOString().split('T')[0],
+                                                    payment_method: 'Token',
+                                                    notes: `Auto-created for content: ${data.content_link || type}`
+                                                  };
+
+                                                  const { error: paymentError } = await supabase
+                                                    .from('payments')
+                                                    .insert(paymentPayload);
+
+                                                  if (paymentError) {
+                                                    console.error('Error creating payment:', paymentError);
+                                                    toast({
+                                                      title: 'Warning',
+                                                      description: 'Content created but failed to create payment record',
+                                                      variant: 'destructive'
+                                                    });
+                                                  } else {
+                                                    // Refetch payments to update the table
+                                                    fetchPayments();
+                                                  }
+                                                }
+
                                                 fetchContents();
                                                 setQuickAddContentKolId(null);
                                                 toast({
                                                   title: 'Success',
-                                                  description: 'Content created successfully',
+                                                  description: 'Content and payment created successfully',
                                                 });
                                               } catch (err) {
                                                 console.error('Unexpected error:', err);
@@ -4806,10 +5576,50 @@ const CampaignDetailsPage = () => {
                             };
                             console.log('Add Content payload:', payload);
                             try {
-                              const { error, data } = await supabase.from('contents').insert(payload);
+                              const { error, data } = await supabase.from('contents').insert(payload).select();
                               if (error) {
                                 console.error('Supabase error:', error.message, error.details, error.hint);
+                                toast({
+                                  title: 'Error',
+                                  description: `Failed to create content: ${error.message}`,
+                                  variant: 'destructive'
+                                });
+                                setIsAddingContent(false);
                                 return;
+                              }
+
+                              // Auto-create payment for this content
+                              if (data && data.length > 0) {
+                                const newContent = data[0];
+                                const kol = campaignKOLs.find(k => k.id === newContent.campaign_kols_id);
+
+                                if (kol) {
+                                  const paymentPayload = {
+                                    campaign_id: id,
+                                    campaign_kol_id: kol.id,
+                                    content_id: newContent.id,
+                                    amount: 0,
+                                    payment_date: new Date().toISOString().split('T')[0],
+                                    payment_method: 'Token',
+                                    notes: `Auto-created for content: ${newContent.content_link || 'New content'}`
+                                  };
+
+                                  const { error: paymentError } = await supabase
+                                    .from('payments')
+                                    .insert(paymentPayload);
+
+                                  if (paymentError) {
+                                    console.error('Error creating payment:', paymentError);
+                                    toast({
+                                      title: 'Warning',
+                                      description: 'Content created but failed to create payment record',
+                                      variant: 'destructive'
+                                    });
+                                  } else {
+                                    // Refetch payments to update the table
+                                    fetchPayments();
+                                  }
+                                }
                               }
                               setIsAddContentsDialogOpen(false);
                               setAddContentData({
@@ -6202,155 +7012,303 @@ const CampaignDetailsPage = () => {
                         Record Payment
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+                    <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden">
                       <DialogHeader>
-                        <DialogTitle>Record Payment</DialogTitle>
+                        <DialogTitle>Record Payment(s)</DialogTitle>
+                        <p className="text-sm text-gray-500 mt-1">Select one or more KOLs and enter payment details for each</p>
                       </DialogHeader>
                       <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
                         <div className="grid gap-2">
-                          <Label htmlFor="kol-select">KOL</Label>
-                          <Select
-                            value={newPaymentData.campaign_kol_id}
-                            onValueChange={(value) => setNewPaymentData(prev => ({ ...prev, campaign_kol_id: value }))}
-                          >
-                            <SelectTrigger className="auth-input">
-                              <SelectValue placeholder="Select KOL" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {campaignKOLs.map((kol) => (
-                                <SelectItem key={kol.id} value={kol.id}>
-                                  {kol.master_kol.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="amount">Amount (USD)</Label>
-                          <div className="relative w-full">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
-                            <Input
-                              id="amount"
-                              type="text"
-                              inputMode="numeric"
-                              pattern="[0-9,]*"
-                              className="auth-input pl-6 w-full"
-                              value={newPaymentData.amount ? Number(newPaymentData.amount).toLocaleString('en-US') : ''}
-                              onChange={(e) => {
-                                const raw = e.target.value.replace(/[^0-9]/g, '');
-                                setNewPaymentData(prev => ({ ...prev, amount: parseFloat(raw) || 0 }));
-                              }}
-                              placeholder="Enter amount"
-                            />
+                          <Label htmlFor="kol-select">Select KOLs</Label>
+                          <div className="border rounded-lg p-3 max-h-64 overflow-y-auto space-y-2">
+                            {campaignKOLs.map((kol) => (
+                              <div
+                                key={kol.id}
+                                className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded"
+                              >
+                                <Checkbox
+                                  checked={selectedKOLsForPayment.includes(kol.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setSelectedKOLsForPayment(prev => [...prev, kol.id]);
+                                      setMultiKOLPayments(prev => ({
+                                        ...prev,
+                                        [kol.id]: {
+                                          number_of_payments: 1,
+                                          payments: [{
+                                            amount: 0,
+                                            payment_date: new Date().toISOString().split('T')[0],
+                                            payment_method: 'Token',
+                                            content_id: 'none',
+                                            transaction_id: '',
+                                            notes: ''
+                                          }]
+                                        }
+                                      }));
+                                    } else {
+                                      setSelectedKOLsForPayment(prev => prev.filter(id => id !== kol.id));
+                                      const newPayments = { ...multiKOLPayments };
+                                      delete newPayments[kol.id];
+                                      setMultiKOLPayments(newPayments);
+                                    }
+                                  }}
+                                />
+                                <span className="font-medium flex-1">{kol.master_kol.name}</span>
+                                {selectedKOLsForPayment.includes(kol.id) && (
+                                  <div className="flex items-center gap-2">
+                                    <Label className="text-xs text-gray-600 whitespace-nowrap">Payments:</Label>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      className="w-16 h-8 text-xs"
+                                      value={multiKOLPayments[kol.id]?.number_of_payments || 1}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={(e) => {
+                                        const num = Math.max(1, parseInt(e.target.value) || 1);
+                                        setMultiKOLPayments(prev => {
+                                          const currentPayments = prev[kol.id]?.payments || [];
+                                          const newPayments = Array.from({ length: num }, (_, i) => {
+                                            // Keep existing payment data if available, otherwise create new
+                                            return currentPayments[i] || {
+                                              amount: 0,
+                                              payment_date: new Date().toISOString().split('T')[0],
+                                              payment_method: 'Token',
+                                              content_id: 'none',
+                                              transaction_id: '',
+                                              notes: ''
+                                            };
+                                          });
+                                          return {
+                                            ...prev,
+                                            [kol.id]: { number_of_payments: num, payments: newPayments }
+                                          };
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         </div>
-                        <div className="grid gap-2">
-                          <Label>Payment Date</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
-                                style={{
-                                  borderColor: "#e5e7eb",
-                                  backgroundColor: "white",
-                                  color: newPaymentData.payment_date ? "#111827" : "#9ca3af"
-                                }}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {newPaymentData.payment_date ? newPaymentData.payment_date : "Select payment date"}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="!bg-white border shadow-md w-auto p-0 z-50" align="start">
-                              <CalendarComponent
-                                mode="single"
-                                selected={newPaymentData.payment_date ? new Date(newPaymentData.payment_date) : undefined}
-                                onSelect={date => setNewPaymentData(prev => ({
-                                  ...prev,
-                                  payment_date: date ? formatDateLocal(date) : ''
-                                }))}
-                                initialFocus
-                                classNames={{
-                                  day_selected: "text-white hover:text-white focus:text-white",
-                                }}
-                                modifiersStyles={{
-                                  selected: { backgroundColor: "#3e8692" }
-                                }}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="payment-method">Payment Method</Label>
-                          <Select
-                            value={newPaymentData.payment_method}
-                            onValueChange={(value) => setNewPaymentData(prev => ({ ...prev, payment_method: value }))}
-                          >
-                            <SelectTrigger className="auth-input">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Token">Token</SelectItem>
-                              <SelectItem value="Fiat">Fiat</SelectItem>
-                              <SelectItem value="WL">WL</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="content">Content (Optional)</Label>
-                          <Select
-                            value={newPaymentData.content_id}
-                            onValueChange={(value) => setNewPaymentData(prev => ({ ...prev, content_id: value }))}
-                          >
-                            <SelectTrigger className="auth-input">
-                              <SelectValue placeholder="Select content" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">No content linked</SelectItem>
-                              {contents
-                                .filter(content => content.campaign_kols_id === newPaymentData.campaign_kol_id)
-                                .map(content => (
-                                  <SelectItem key={content.id} value={content.id}>
-                                    {content.type || 'Content'} - {content.platform || 'Unknown'} 
-                                    {content.activation_date && ` (${new Date(content.activation_date).toLocaleDateString()})`}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="transaction-id">Transaction ID (Optional)</Label>
-                          <Input
-                            id="transaction-id"
-                            value={newPaymentData.transaction_id}
-                            onChange={(e) => setNewPaymentData(prev => ({ ...prev, transaction_id: e.target.value }))}
-                            placeholder="Enter transaction ID"
-                            className="auth-input"
-                          />
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="notes">Notes (Optional)</Label>
-                          <Textarea
-                            id="notes"
-                            value={newPaymentData.notes}
-                            onChange={(e) => setNewPaymentData(prev => ({ ...prev, notes: e.target.value }))}
-                            placeholder="Add any notes about this payment"
-                            rows={3}
-                            className="auth-input"
-                          />
-                        </div>
+
+                        {/* Payment details for each selected KOL */}
+                        {selectedKOLsForPayment.length > 0 && (
+                          <div className="space-y-6 border-t pt-4">
+                            <h3 className="font-semibold text-lg">Payment Details</h3>
+                            {selectedKOLsForPayment.map((kolId) => {
+                              const kol = campaignKOLs.find(k => k.id === kolId);
+                              if (!kol) return null;
+                              const kolData = multiKOLPayments[kolId];
+                              if (!kolData) return null;
+                              const numberOfPayments = kolData.number_of_payments || 1;
+                              const payments = kolData.payments || [];
+
+                              return (
+                                <div key={kolId} className="space-y-4">
+                                  <div className="flex items-center gap-2 pb-2 border-b">
+                                    <h4 className="font-semibold text-md text-[#3e8692]">{kol.master_kol.name}</h4>
+                                    <span className="text-sm text-gray-500">({numberOfPayments} payment{numberOfPayments > 1 ? 's' : ''})</span>
+                                  </div>
+
+                                  {payments.map((payment, paymentIndex) => (
+                                    <div key={paymentIndex} className="border rounded-lg p-4 space-y-4 bg-gray-50">
+                                      {numberOfPayments > 1 && (
+                                        <div className="text-sm font-medium text-gray-700 border-b pb-2">
+                                          Payment {paymentIndex + 1} of {numberOfPayments}
+                                        </div>
+                                      )}
+
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid gap-2">
+                                          <Label>Amount (USD) *</Label>
+                                      <div className="relative w-full">
+                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                                        <Input
+                                          type="text"
+                                          inputMode="numeric"
+                                          pattern="[0-9,]*"
+                                          className="auth-input pl-6 w-full"
+                                          value={payment.amount ? Number(payment.amount).toLocaleString('en-US') : ''}
+                                          onChange={(e) => {
+                                            const raw = e.target.value.replace(/[^0-9]/g, '');
+                                            setMultiKOLPayments(prev => {
+                                              const newPayments = [...(prev[kolId]?.payments || [])];
+                                              newPayments[paymentIndex] = { ...newPayments[paymentIndex], amount: parseFloat(raw) || 0 };
+                                              return {
+                                                ...prev,
+                                                [kolId]: { ...prev[kolId], payments: newPayments }
+                                              };
+                                            });
+                                          }}
+                                          placeholder="Enter amount"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                      <Label>Payment Date</Label>
+                                      <Popover>
+                                        <PopoverTrigger asChild>
+                                          <Button
+                                            variant="outline"
+                                            className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                                            style={{
+                                              borderColor: "#e5e7eb",
+                                              backgroundColor: "white",
+                                              color: payment.payment_date ? "#111827" : "#9ca3af"
+                                            }}
+                                          >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {payment.payment_date ? payment.payment_date : "Select payment date"}
+                                          </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="!bg-white border shadow-md w-auto p-0 z-50" align="start">
+                                          <CalendarComponent
+                                            mode="single"
+                                            selected={payment.payment_date ? new Date(payment.payment_date) : undefined}
+                                            onSelect={date => {
+                                              setMultiKOLPayments(prev => {
+                                                const newPayments = [...(prev[kolId]?.payments || [])];
+                                                newPayments[paymentIndex] = { ...newPayments[paymentIndex], payment_date: date ? formatDateLocal(date) : '' };
+                                                return {
+                                                  ...prev,
+                                                  [kolId]: { ...prev[kolId], payments: newPayments }
+                                                };
+                                              });
+                                            }}
+                                            initialFocus
+                                            classNames={{
+                                              day_selected: "text-white hover:text-white focus:text-white",
+                                            }}
+                                            modifiersStyles={{
+                                              selected: { backgroundColor: "#3e8692" }
+                                            }}
+                                          />
+                                        </PopoverContent>
+                                      </Popover>
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                      <Label>Payment Method</Label>
+                                      <Select
+                                        value={payment.payment_method || 'Token'}
+                                        onValueChange={(value) => {
+                                          setMultiKOLPayments(prev => {
+                                            const newPayments = [...(prev[kolId]?.payments || [])];
+                                            newPayments[paymentIndex] = { ...newPayments[paymentIndex], payment_method: value };
+                                            return {
+                                              ...prev,
+                                              [kolId]: { ...prev[kolId], payments: newPayments }
+                                            };
+                                          });
+                                        }}
+                                      >
+                                        <SelectTrigger className="auth-input">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="Token">Token</SelectItem>
+                                          <SelectItem value="Fiat">Fiat</SelectItem>
+                                          <SelectItem value="WL">WL</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                      <Label>Content (Optional)</Label>
+                                      <Select
+                                        value={payment.content_id || 'none'}
+                                        onValueChange={(value) => {
+                                          setMultiKOLPayments(prev => {
+                                            const newPayments = [...(prev[kolId]?.payments || [])];
+                                            newPayments[paymentIndex] = { ...newPayments[paymentIndex], content_id: value };
+                                            return {
+                                              ...prev,
+                                              [kolId]: { ...prev[kolId], payments: newPayments }
+                                            };
+                                          });
+                                        }}
+                                      >
+                                        <SelectTrigger className="auth-input">
+                                          <SelectValue placeholder="Select content" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="none">No content linked</SelectItem>
+                                          {contents
+                                            .filter(content => content.campaign_kols_id === kolId)
+                                            .map(content => (
+                                              <SelectItem key={content.id} value={content.id}>
+                                                {content.type || 'Content'} - {content.platform || 'Unknown'}
+                                                {content.activation_date && ` (${new Date(content.activation_date).toLocaleDateString()})`}
+                                              </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid gap-2">
+                                    <Label>Transaction ID (Optional)</Label>
+                                    <Input
+                                      value={payment.transaction_id || ''}
+                                      onChange={(e) => {
+                                        setMultiKOLPayments(prev => {
+                                          const newPayments = [...(prev[kolId]?.payments || [])];
+                                          newPayments[paymentIndex] = { ...newPayments[paymentIndex], transaction_id: e.target.value };
+                                          return {
+                                            ...prev,
+                                            [kolId]: { ...prev[kolId], payments: newPayments }
+                                          };
+                                        });
+                                      }}
+                                      placeholder="Enter transaction ID"
+                                      className="auth-input"
+                                    />
+                                  </div>
+
+                                  <div className="grid gap-2">
+                                    <Label>Notes (Optional)</Label>
+                                    <Textarea
+                                      value={payment.notes || ''}
+                                      onChange={(e) => {
+                                        setMultiKOLPayments(prev => {
+                                          const newPayments = [...(prev[kolId]?.payments || [])];
+                                          newPayments[paymentIndex] = { ...newPayments[paymentIndex], notes: e.target.value };
+                                          return {
+                                            ...prev,
+                                            [kolId]: { ...prev[kolId], payments: newPayments }
+                                          };
+                                        });
+                                      }}
+                                      placeholder="Add any notes about this payment"
+                                      rows={2}
+                                      className="auth-input"
+                                    />
+                                  </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                       <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsAddingPayment(false)}>
+                        <Button variant="outline" onClick={() => {
+                          setIsAddingPayment(false);
+                          setSelectedKOLsForPayment([]);
+                          setMultiKOLPayments({});
+                        }}>
                           Cancel
                         </Button>
-                        <Button 
-                          onClick={handleAddPayment} 
-                          disabled={!newPaymentData.campaign_kol_id || newPaymentData.amount <= 0}
+                        <Button
+                          onClick={handleAddMultiKOLPayments}
+                          disabled={selectedKOLsForPayment.length === 0}
                           style={{ backgroundColor: '#3e8692', color: 'white' }}
                           className="hover:opacity-90"
                         >
-                          Record Payment
+                          Record {selectedKOLsForPayment.length > 0 ? `${selectedKOLsForPayment.length} Payment${selectedKOLsForPayment.length > 1 ? 's' : ''}` : 'Payment'}
                         </Button>
                       </DialogFooter>
                     </DialogContent>
@@ -6507,42 +7465,224 @@ const CampaignDetailsPage = () => {
                                 <Checkbox
                                   className="hidden group-hover:inline-flex"
                                   checked={(() => {
-                                    const filteredPayments = payments.filter(payment => {
-                                      const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
-                                      const search = paymentsSearchTerm.toLowerCase();
-                                      return (
-                                        !search ||
-                                        (kol?.master_kol?.name?.toLowerCase().includes(search)) ||
-                                        (payment.payment_method?.toLowerCase().includes(search)) ||
-                                        (payment.notes?.toLowerCase().includes(search))
-                                      );
-                                    });
+                                    const filteredPayments = getFilteredPayments();
                                     return filteredPayments.length > 0 && filteredPayments.every(p => selectedPayments.includes(p.id));
                                   })()}
                                 />
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">KOL</TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Amount</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">
+                                <div className="flex items-center gap-1 cursor-pointer group">
+                                  <span>KOL</span>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[250px] p-0" align="start">
+                                      <div className="p-3">
+                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter KOL</div>
+                                        <div className="max-h-48 overflow-y-auto space-y-1">
+                                          {campaignKOLs.map((kol) => (
+                                            <div
+                                              key={kol.id}
+                                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                              onClick={() => {
+                                                const newKolIds = paymentFilters.kol_ids.includes(kol.id)
+                                                  ? paymentFilters.kol_ids.filter(id => id !== kol.id)
+                                                  : [...paymentFilters.kol_ids, kol.id];
+                                                setPaymentFilters(prev => ({ ...prev, kol_ids: newKolIds }));
+                                              }}
+                                            >
+                                              <Checkbox checked={paymentFilters.kol_ids.includes(kol.id)} />
+                                              <span className="text-sm">{kol.master_kol.name}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                        {paymentFilters.kol_ids.length > 0 && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="w-full mt-2 text-xs"
+                                            onClick={() => setPaymentFilters(prev => ({ ...prev, kol_ids: [] }))}
+                                          >
+                                            Clear
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                  {paymentFilters.kol_ids.length > 0 && (
+                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                      {paymentFilters.kol_ids.length}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <div className="flex items-center gap-1 cursor-pointer group">
+                                  <span>Amount</span>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[200px] p-0" align="start">
+                                      <div className="p-3">
+                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Amount (USD)</div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <Select
+                                            value={paymentFilters.amount_operator}
+                                            onValueChange={(value) => setPaymentFilters(prev => ({ ...prev, amount_operator: value }))}
+                                          >
+                                            <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                              <SelectValue placeholder="=" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value=">">{'>'}</SelectItem>
+                                              <SelectItem value="<">{'<'}</SelectItem>
+                                              <SelectItem value="=">=</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                          <Input
+                                            type="number"
+                                            placeholder="Value"
+                                            value={paymentFilters.amount_value}
+                                            onChange={(e) => setPaymentFilters(prev => ({ ...prev, amount_value: e.target.value }))}
+                                            className="h-8 text-xs auth-input"
+                                          />
+                                        </div>
+                                        {(paymentFilters.amount_operator || paymentFilters.amount_value) && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="w-full text-xs"
+                                            onClick={() => setPaymentFilters(prev => ({ ...prev, amount_operator: '', amount_value: '' }))}
+                                          >
+                                            Clear
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                  {(paymentFilters.amount_operator && paymentFilters.amount_value) && (
+                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                      1
+                                    </span>
+                                  )}
+                                </div>
+                              </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Payment Date</TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Method</TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <div className="flex items-center gap-1 cursor-pointer group">
+                                  <span>Method</span>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[200px] p-0" align="start">
+                                      <div className="p-3">
+                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Method</div>
+                                        {['Token', 'Fiat', 'WL'].map((method) => (
+                                          <div
+                                            key={method}
+                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                            onClick={() => {
+                                              const newMethods = paymentFilters.payment_methods.includes(method)
+                                                ? paymentFilters.payment_methods.filter(m => m !== method)
+                                                : [...paymentFilters.payment_methods, method];
+                                              setPaymentFilters(prev => ({ ...prev, payment_methods: newMethods }));
+                                            }}
+                                          >
+                                            <Checkbox checked={paymentFilters.payment_methods.includes(method)} />
+                                            <span className="text-sm">{method}</span>
+                                          </div>
+                                        ))}
+                                        {paymentFilters.payment_methods.length > 0 && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="w-full mt-2 text-xs"
+                                            onClick={() => setPaymentFilters(prev => ({ ...prev, payment_methods: [] }))}
+                                          >
+                                            Clear
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                  {paymentFilters.payment_methods.length > 0 && (
+                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                      {paymentFilters.payment_methods.length}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <div className="flex items-center gap-1 cursor-pointer group">
+                                  <span>Content</span>
+                                  <Popover>
+                                    <PopoverTrigger asChild>
+                                      <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                                        <ChevronDown className="h-3 w-3" />
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-[200px] p-0" align="start">
+                                      <div className="p-3">
+                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Content</div>
+                                        <div
+                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                          onClick={() => {
+                                            setPaymentFilters(prev => ({
+                                              ...prev,
+                                              has_content: prev.has_content === 'yes' ? '' : 'yes'
+                                            }));
+                                          }}
+                                        >
+                                          <Checkbox checked={paymentFilters.has_content === 'yes'} />
+                                          <span className="text-sm">Has content linked</span>
+                                        </div>
+                                        <div
+                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                          onClick={() => {
+                                            setPaymentFilters(prev => ({
+                                              ...prev,
+                                              has_content: prev.has_content === 'no' ? '' : 'no'
+                                            }));
+                                          }}
+                                        >
+                                          <Checkbox checked={paymentFilters.has_content === 'no'} />
+                                          <span className="text-sm">No content linked</span>
+                                        </div>
+                                        {paymentFilters.has_content && (
+                                          <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="w-full mt-2 text-xs"
+                                            onClick={() => setPaymentFilters(prev => ({ ...prev, has_content: '' }))}
+                                          >
+                                            Clear
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                  {paymentFilters.has_content && (
+                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                      1
+                                    </span>
+                                  )}
+                                </div>
+                              </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Notes</TableHead>
                               <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody className="bg-white">
-                            {payments
-                              .filter(payment => {
-                                const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
-                                const search = paymentsSearchTerm.toLowerCase();
-                                return (
-                                  !search ||
-                                  (kol?.master_kol?.name?.toLowerCase().includes(search)) ||
-                                  (payment.payment_method?.toLowerCase().includes(search)) ||
-                                  (payment.notes?.toLowerCase().includes(search))
-                                );
-                              })
-                              .map((payment, index) => (
+                            {getFilteredPayments().map((payment, index) => (
                               <TableRow key={payment.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
                                 <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center text-gray-600 group`} style={{ verticalAlign: 'middle' }}>
                                   <div className="flex items-center justify-center w-full h-full">
@@ -6576,28 +7716,77 @@ const CampaignDetailsPage = () => {
                                   </div>
                                 </TableCell>
                                 <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                  ${payment.amount.toLocaleString()}
+                                  {renderEditablePaymentCell(payment.amount, 'amount', payment)}
                                 </TableCell>
                                 <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                  {new Date(payment.payment_date).toLocaleDateString()}
+                                  {renderEditablePaymentCell(payment.payment_date, 'payment_date', payment)}
                                 </TableCell>
                                 <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                  {payment.payment_method}
+                                  {renderEditablePaymentCell(payment.payment_method, 'payment_method', payment)}
                                 </TableCell>
                                 <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                  {payment.content_id ? (
-                                    (() => {
-                                      const content = contents.find(c => c.id === payment.content_id);
-                                      return content ? 
-                                        `${content.type || 'Content'} - ${content.platform || 'Unknown'}` : 
-                                        'Content not found';
-                                    })()
-                                  ) : (
-                                    <span className="text-gray-400 italic">No content linked</span>
-                                  )}
+                                  <Select
+                                    value={payment.content_id || 'none'}
+                                    onValueChange={async (value) => {
+                                      try {
+                                        const newContentId = value === 'none' ? null : value;
+                                        await supabase
+                                          .from('payments')
+                                          .update({ content_id: newContentId })
+                                          .eq('id', payment.id);
+
+                                        setPayments(prev => prev.map(p =>
+                                          p.id === payment.id ? { ...p, content_id: newContentId } : p
+                                        ));
+
+                                        toast({
+                                          title: 'Success',
+                                          description: 'Content link updated successfully'
+                                        });
+                                      } catch (error) {
+                                        console.error('Error updating content link:', error);
+                                        toast({
+                                          title: 'Error',
+                                          description: 'Failed to update content link',
+                                          variant: 'destructive'
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger
+                                      className="border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
+                                      style={{ outline: 'none', boxShadow: 'none', minWidth: 150 }}
+                                    >
+                                      <SelectValue>
+                                        {payment.content_id ? (
+                                          (() => {
+                                            const content = contents.find(c => c.id === payment.content_id);
+                                            return content ?
+                                              `${content.type || 'Content'} - ${content.platform || 'Unknown'}` :
+                                              'Content not found';
+                                          })()
+                                        ) : (
+                                          <span className="text-gray-400 italic">No content linked</span>
+                                        )}
+                                      </SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="none">
+                                        <span className="text-gray-400 italic">No content linked</span>
+                                      </SelectItem>
+                                      {contents
+                                        .filter(content => content.campaign_kols_id === payment.campaign_kol_id)
+                                        .map(content => (
+                                          <SelectItem key={content.id} value={content.id}>
+                                            {content.type || 'Content'} - {content.platform || 'Unknown'}
+                                            {content.activation_date && ` (${new Date(content.activation_date).toLocaleDateString()})`}
+                                          </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                  </Select>
                                 </TableCell>
                                 <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                  {payment.notes || '-'}
+                                  {renderEditablePaymentCell(payment.notes, 'notes', payment)}
                                 </TableCell>
                                 <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
                                   <div className="flex items-center gap-2">
@@ -7114,6 +8303,25 @@ const CampaignDetailsPage = () => {
               </CardContent>
             </div>
           </TabsContent>
+
+          {/* Report Tab */}
+          <TabsContent value="report" className="mt-4">
+            <ReportTabContent
+              campaignId={id}
+              reportFiles={reportFiles}
+              loadingReportFiles={loadingReportFiles}
+              customMessage={customMessage}
+              shareReportPublicly={shareReportPublicly}
+              contents={contents}
+              campaignKOLs={campaignKOLs}
+              onCustomMessageChange={setCustomMessage}
+              onSaveCustomMessage={handleSaveCustomMessage}
+              onToggleFilePublic={handleToggleFilePublic}
+              onDeleteFile={handleDeleteFile}
+              onTogglePublicReport={handleTogglePublicReport}
+              onUploadSuccess={fetchReportFiles}
+            />
+          </TabsContent>
         </Tabs>
         </div>
       </div>
@@ -7523,6 +8731,50 @@ const CampaignDetailsPage = () => {
                 </Button>
               </div>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Warnings Dialog */}
+      <Dialog open={isWarningsOpen} onOpenChange={setIsWarningsOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Campaign Validation Warnings ({missingFields.length})
+            </DialogTitle>
+            <DialogDescription>
+              The following fields are missing or incomplete. Click on any item to navigate to the relevant tab.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-4">
+            {missingFields.map((item, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  setActiveTab(item.tab);
+                  setIsWarningsOpen(false);
+                }}
+                className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-amber-500 hover:bg-amber-50 transition-colors group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    <div>
+                      <p className="font-medium text-gray-900 group-hover:text-amber-700">{item.label}</p>
+                      <p className="text-sm text-gray-500 capitalize">
+                        {item.tab === 'information' ? 'Information' :
+                         item.tab === 'kols' ? 'KOL Dashboard' :
+                         item.tab === 'contents' ? 'Content Dashboard' :
+                         item.tab === 'payments' ? 'Budget' :
+                         item.tab}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-amber-500" />
+                </div>
+              </button>
+            ))}
           </div>
         </DialogContent>
       </Dialog>

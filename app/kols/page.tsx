@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { KOLService, MasterKOL } from "@/lib/kolService";
 import { FieldOptionsService } from "@/lib/fieldOptionsService";
@@ -1249,6 +1249,7 @@ export default function KOLsPage() {
       </div>
 
       {/* Bulk action bar (split into two rows) */}
+      {selectedKOLs.length > 0 && (
       <div className="mb-4 mt-6">
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
@@ -1618,8 +1619,10 @@ export default function KOLsPage() {
         </div>
         </div>
       </div>
+      )}
 
-      {/* Filter Menu */}
+      {/* Filter Menu - Hidden as filters are now in table headers */}
+      {false && (
       <div className="mb-4">
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
           <div className="flex flex-wrap items-end gap-2">
@@ -1959,6 +1962,7 @@ export default function KOLsPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Column visibility dropdown */}
       <div className="mb-4">
@@ -2033,17 +2037,558 @@ export default function KOLsPage() {
               <TableHead className="bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
               {visibleColumns.name && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Name</TableHead>}
               {visibleColumns.link && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Link</TableHead>}
-              {visibleColumns.platform && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Platform</TableHead>}
-              {visibleColumns.followers && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Followers</TableHead>}
-              {visibleColumns.region && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Region</TableHead>}
-              {visibleColumns.creator_type && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Creator Type</TableHead>}
-              {visibleColumns.content_type && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Content Type</TableHead>}
-              {visibleColumns.deliverables && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Deliverables</TableHead>}
-              {visibleColumns.pricing && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>}
-              {visibleColumns.rating && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Rating</TableHead>}
-              {visibleColumns.community && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Community</TableHead>}
-              {visibleColumns.group_chat && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Group Chat</TableHead>}
-              {visibleColumns.in_house && <TableHead className={`bg-gray-50 border-r border-gray-200 select-none ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}>In-House</TableHead>}
+              {visibleColumns.platform && (
+                <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">
+                  <div className="flex items-center gap-1 cursor-pointer group">
+                    <span>Platform</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[200px] p-0" align="start">
+                        <div className="p-3">
+                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Platform</div>
+                          {(fieldOptions.platforms || []).map((platform) => (
+                            <div
+                              key={platform}
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                const newPlatforms = filters.platform.includes(platform)
+                                  ? filters.platform.filter(p => p !== platform)
+                                  : [...filters.platform, platform];
+                                setFilters(prev => ({ ...prev, platform: newPlatforms }));
+                              }}
+                            >
+                              <Checkbox checked={filters.platform.includes(platform)} />
+                              <div className="flex items-center gap-1" title={platform}>
+                                {getPlatformIcon ? getPlatformIcon(platform) : null}
+                              </div>
+                            </div>
+                          ))}
+                          {filters.platform.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full mt-2 text-xs"
+                              onClick={() => setFilters(prev => ({ ...prev, platform: [] }))}
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {filters.platform.length > 0 && (
+                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                        {filters.platform.length}
+                      </span>
+                    )}
+                  </div>
+                </TableHead>
+              )}
+              {visibleColumns.followers && (
+                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                  <div className="flex items-center gap-1 cursor-pointer group">
+                    <span>Followers</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[200px] p-0" align="start">
+                        <div className="p-3">
+                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Followers</div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Select
+                              value={filters.followersOperator}
+                              onValueChange={(value) => setFilters(prev => ({ ...prev, followersOperator: value as '>' | '<' | '=' }))}
+                            >
+                              <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                <SelectValue placeholder="=" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value=">">{'>'}</SelectItem>
+                                <SelectItem value="<">{'<'}</SelectItem>
+                                <SelectItem value="=">=</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              placeholder="Value"
+                              value={filters.followers}
+                              onChange={(e) => setFilters(prev => ({ ...prev, followers: e.target.value }))}
+                              className="h-8 text-xs auth-input"
+                            />
+                          </div>
+                          {(filters.followersOperator || filters.followers) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full text-xs"
+                              onClick={() => setFilters(prev => ({ ...prev, followersOperator: '>' as '>' | '<' | '=', followers: '' }))}
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {(filters.followersOperator && filters.followers) && (
+                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                        1
+                      </span>
+                    )}
+                  </div>
+                </TableHead>
+              )}
+              {visibleColumns.region && (
+                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                  <div className="flex items-center gap-1 cursor-pointer group">
+                    <span>Region</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[200px] p-0" align="start">
+                        <div className="p-3">
+                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Region</div>
+                          {(fieldOptions.regions || []).map((region) => (
+                            <div
+                              key={region}
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                const newRegions = filters.region.includes(region)
+                                  ? filters.region.filter(r => r !== region)
+                                  : [...filters.region, region];
+                                setFilters(prev => ({ ...prev, region: newRegions }));
+                              }}
+                            >
+                              <Checkbox checked={filters.region.includes(region)} />
+                              <div className="flex items-center gap-1">
+                                <span>{getRegionIcon(region).flag}</span>
+                                <span className="text-sm">{region}</span>
+                              </div>
+                            </div>
+                          ))}
+                          {filters.region.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full mt-2 text-xs"
+                              onClick={() => setFilters(prev => ({ ...prev, region: [] }))}
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {filters.region.length > 0 && (
+                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                        {filters.region.length}
+                      </span>
+                    )}
+                  </div>
+                </TableHead>
+              )}
+              {visibleColumns.creator_type && (
+                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                  <div className="flex items-center gap-1 cursor-pointer group">
+                    <span>Creator Type</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[200px] p-0" align="start">
+                        <div className="p-3">
+                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Creator Type</div>
+                          {(fieldOptions.creatorTypes || []).map((type) => (
+                            <div
+                              key={type}
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                const newTypes = filters.creator_type.includes(type)
+                                  ? filters.creator_type.filter(t => t !== type)
+                                  : [...filters.creator_type, type];
+                                setFilters(prev => ({ ...prev, creator_type: newTypes }));
+                              }}
+                            >
+                              <Checkbox checked={filters.creator_type.includes(type)} />
+                              <span className={`px-2 py-1 rounded-md text-xs font-medium ${getCreatorTypeColor(type)}`}>{type}</span>
+                            </div>
+                          ))}
+                          {filters.creator_type.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full mt-2 text-xs"
+                              onClick={() => setFilters(prev => ({ ...prev, creator_type: [] }))}
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {filters.creator_type.length > 0 && (
+                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                        {filters.creator_type.length}
+                      </span>
+                    )}
+                  </div>
+                </TableHead>
+              )}
+              {visibleColumns.content_type && (
+                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                  <div className="flex items-center gap-1 cursor-pointer group">
+                    <span>Content Type</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[250px] p-0" align="start">
+                        <div className="p-3">
+                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Content Type</div>
+                          {(fieldOptions.contentTypes || []).map((type) => (
+                            <div
+                              key={type}
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                const newTypes = filters.content_type.includes(type)
+                                  ? filters.content_type.filter(t => t !== type)
+                                  : [...filters.content_type, type];
+                                setFilters(prev => ({ ...prev, content_type: newTypes }));
+                              }}
+                            >
+                              <Checkbox checked={filters.content_type.includes(type)} />
+                              <span className="text-sm">{type}</span>
+                            </div>
+                          ))}
+                          {filters.content_type.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full mt-2 text-xs"
+                              onClick={() => setFilters(prev => ({ ...prev, content_type: [] }))}
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {filters.content_type.length > 0 && (
+                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                        {filters.content_type.length}
+                      </span>
+                    )}
+                  </div>
+                </TableHead>
+              )}
+              {visibleColumns.deliverables && (
+                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                  <div className="flex items-center gap-1 cursor-pointer group">
+                    <span>Deliverables</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[200px] p-0" align="start">
+                        <div className="p-3">
+                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Deliverables</div>
+                          {(fieldOptions.deliverables || []).map((deliverable) => (
+                            <div
+                              key={deliverable}
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                const newDeliverables = filters.deliverables.includes(deliverable)
+                                  ? filters.deliverables.filter(d => d !== deliverable)
+                                  : [...filters.deliverables, deliverable];
+                                setFilters(prev => ({ ...prev, deliverables: newDeliverables }));
+                              }}
+                            >
+                              <Checkbox checked={filters.deliverables.includes(deliverable)} />
+                              <span className="text-sm">{deliverable}</span>
+                            </div>
+                          ))}
+                          {filters.deliverables.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full mt-2 text-xs"
+                              onClick={() => setFilters(prev => ({ ...prev, deliverables: [] }))}
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {filters.deliverables.length > 0 && (
+                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                        {filters.deliverables.length}
+                      </span>
+                    )}
+                  </div>
+                </TableHead>
+              )}
+              {visibleColumns.pricing && (
+                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                  <div className="flex items-center gap-1 cursor-pointer group">
+                    <span>Pricing</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[200px] p-0" align="start">
+                        <div className="p-3">
+                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Pricing</div>
+                          {(fieldOptions.pricingTiers || []).map((pricing) => (
+                            <div
+                              key={pricing}
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                const newPricing = filters.pricing.includes(pricing)
+                                  ? filters.pricing.filter(p => p !== pricing)
+                                  : [...filters.pricing, pricing];
+                                setFilters(prev => ({ ...prev, pricing: newPricing }));
+                              }}
+                            >
+                              <Checkbox checked={filters.pricing.includes(pricing)} />
+                              <span className="text-sm">{pricing}</span>
+                            </div>
+                          ))}
+                          {filters.pricing.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full mt-2 text-xs"
+                              onClick={() => setFilters(prev => ({ ...prev, pricing: [] }))}
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {filters.pricing.length > 0 && (
+                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                        {filters.pricing.length}
+                      </span>
+                    )}
+                  </div>
+                </TableHead>
+              )}
+              {visibleColumns.rating && (
+                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                  <div className="flex items-center gap-1 cursor-pointer group">
+                    <span>Rating</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[200px] p-0" align="start">
+                        <div className="p-3">
+                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Rating</div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Select
+                              value={filters.ratingOperator}
+                              onValueChange={(value) => setFilters(prev => ({ ...prev, ratingOperator: value as '>' | '<' | '=' }))}
+                            >
+                              <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
+                                <SelectValue placeholder="=" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value=">">{'>'}</SelectItem>
+                                <SelectItem value="<">{'<'}</SelectItem>
+                                <SelectItem value="=">=</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Input
+                              type="number"
+                              placeholder="Value"
+                              value={filters.rating}
+                              onChange={(e) => setFilters(prev => ({ ...prev, rating: e.target.value }))}
+                              className="h-8 text-xs auth-input"
+                            />
+                          </div>
+                          {(filters.ratingOperator || filters.rating) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full text-xs"
+                              onClick={() => setFilters(prev => ({ ...prev, ratingOperator: '>' as '>' | '<' | '=', rating: '' }))}
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {(filters.ratingOperator && filters.rating) && (
+                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                        1
+                      </span>
+                    )}
+                  </div>
+                </TableHead>
+              )}
+              {visibleColumns.community && (
+                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                  <div className="flex items-center gap-1 cursor-pointer group">
+                    <span>Community</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[200px] p-0" align="start">
+                        <div className="p-3">
+                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Community</div>
+                          {['Yes', 'No'].map((option) => (
+                            <div
+                              key={option}
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                setFilters(prev => ({ ...prev, community: prev.community === option ? '' : option }));
+                              }}
+                            >
+                              <Checkbox checked={filters.community === option} />
+                              <span className="text-sm">{option}</span>
+                            </div>
+                          ))}
+                          {filters.community && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full mt-2 text-xs"
+                              onClick={() => setFilters(prev => ({ ...prev, community: '' }))}
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {filters.community && (
+                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                        1
+                      </span>
+                    )}
+                  </div>
+                </TableHead>
+              )}
+              {visibleColumns.group_chat && (
+                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                  <div className="flex items-center gap-1 cursor-pointer group">
+                    <span>Group Chat</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[200px] p-0" align="start">
+                        <div className="p-3">
+                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Group Chat</div>
+                          {['Yes', 'No'].map((option) => (
+                            <div
+                              key={option}
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                setFilters(prev => ({ ...prev, group_chat: prev.group_chat === option ? '' : option }));
+                              }}
+                            >
+                              <Checkbox checked={filters.group_chat === option} />
+                              <span className="text-sm">{option}</span>
+                            </div>
+                          ))}
+                          {filters.group_chat && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full mt-2 text-xs"
+                              onClick={() => setFilters(prev => ({ ...prev, group_chat: '' }))}
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {filters.group_chat && (
+                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                        1
+                      </span>
+                    )}
+                  </div>
+                </TableHead>
+              )}
+              {visibleColumns.in_house && (
+                <TableHead className={`bg-gray-50 border-r border-gray-200 select-none ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}>
+                  <div className="flex items-center gap-1 cursor-pointer group">
+                    <span>In-House</span>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="opacity-50 group-hover:opacity-100 transition-opacity">
+                          <ChevronDown className="h-3 w-3" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[200px] p-0" align="start">
+                        <div className="p-3">
+                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter In-House</div>
+                          {(dynamicFieldOptions.in_house || []).map((option) => (
+                            <div
+                              key={option}
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              onClick={() => {
+                                const newInHouse = filters.in_house.includes(option)
+                                  ? filters.in_house.filter(h => h !== option)
+                                  : [...filters.in_house, option];
+                                setFilters(prev => ({ ...prev, in_house: newInHouse }));
+                              }}
+                            >
+                              <Checkbox checked={filters.in_house.includes(option)} />
+                              <span className="text-sm">{option}</span>
+                            </div>
+                          ))}
+                          {filters.in_house.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="w-full mt-2 text-xs"
+                              onClick={() => setFilters(prev => ({ ...prev, in_house: [] }))}
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    {filters.in_house.length > 0 && (
+                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                        {filters.in_house.length}
+                      </span>
+                    )}
+                  </div>
+                </TableHead>
+              )}
               {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Description</TableHead>}
               <TableHead className="bg-gray-50 whitespace-nowrap">Actions</TableHead>
             </TableRow>
