@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
 import FloatingChat from '@/components/ai/FloatingChat';
 import { ChunkErrorHandler } from '@/components/ChunkErrorHandler';
+import { VersionCheck } from '@/components/VersionCheck';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -27,6 +28,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <ChunkErrorHandler />
+        <VersionCheck />
         <AuthProvider>
           {children}
           <FloatingChat />
