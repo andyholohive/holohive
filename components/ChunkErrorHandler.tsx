@@ -20,6 +20,12 @@ export function ChunkErrorHandler() {
 
         if (reloadAttempts < 3) {
           sessionStorage.setItem('chunkErrorReloads', String(reloadAttempts + 1));
+
+          // Set a timeout to clear the counter after 10 seconds of successful operation
+          setTimeout(() => {
+            sessionStorage.removeItem('chunkErrorReloads');
+          }, 10000);
+
           window.location.reload();
         } else {
           console.error('Multiple chunk load errors detected. Please clear your browser cache and try again.');
@@ -29,9 +35,6 @@ export function ChunkErrorHandler() {
         event.preventDefault();
       }
     };
-
-    // Reset reload counter on successful load
-    sessionStorage.removeItem('chunkErrorReloads');
 
     window.addEventListener('error', handleError);
 
