@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -534,7 +534,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
             </div>
             <div className="flex items-center gap-2">
               <h2 className="text-2xl font-bold text-gray-900">{campaign?.name}</h2>
-              <span className="text-2xl font-bold text-gray-500">Report</span>
+              <span className="text-2xl font-bold text-gray-900">Report</span>
             </div>
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(campaign?.status || '')}`}>
               {campaign?.status}
@@ -637,7 +637,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
             {/* Timeline Chart */}
             {timelineData.length > 0 && (
               <div className="mt-6">
-                <h4 className="text-xl font-bold text-gray-900 mb-6">Performance Timeline</h4>
+                <h4 className="text-xl font-bold text-gray-900 mb-6">Performance Over Time</h4>
                 <div className="h-96">
                   <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={timelineData} margin={{ top: 30, right: 40, left: 40, bottom: 30 }}>
@@ -663,6 +663,10 @@ export default function PublicReportPage({ params }: { params: { id: string } })
                         fontSize: '14px'
                       }}
                       formatter={(value: number) => [value.toLocaleString()]}
+                    />
+                    <Legend
+                      wrapperStyle={{ paddingTop: '20px' }}
+                      iconType="circle"
                     />
                     <Line
                       type="monotone"
@@ -721,11 +725,22 @@ export default function PublicReportPage({ params }: { params: { id: string } })
                       }}
                       formatter={(value: number) => [value.toLocaleString()]}
                     />
-                    <Bar dataKey="impressions" name="Impressions" radius={[8, 8, 0, 0]}>
-                      {kolPerformance.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill="#3b82f6" />
-                      ))}
-                    </Bar>
+                    <Legend
+                      wrapperStyle={{ paddingTop: '20px' }}
+                      iconType="circle"
+                    />
+                    <Bar
+                      dataKey="impressions"
+                      name="Impressions"
+                      fill="#3b82f6"
+                      radius={[8, 8, 0, 0]}
+                    />
+                    <Bar
+                      dataKey="engagement"
+                      name="Engagement"
+                      fill="#10b981"
+                      radius={[8, 8, 0, 0]}
+                    />
                   </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -773,6 +788,32 @@ export default function PublicReportPage({ params }: { params: { id: string } })
               </div>
             </div>
           )}
+
+          {/* Calendly CTA Section */}
+          <div className="bg-gradient-to-r from-[#3e8692] to-[#2d6570] p-8 rounded-lg border shadow-lg text-center">
+            <h3 className="text-2xl font-bold text-white mb-4">Ready to Launch Your Next Campaign?</h3>
+            <p className="text-white/90 mb-6 text-lg">
+              Schedule a call with our team to discuss your influencer marketing needs
+            </p>
+            <div className="flex gap-4 justify-center flex-wrap">
+              <a
+                href="https://yano.holohive.io"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-6 py-3 bg-white text-[#3e8692] font-semibold rounded-lg hover:bg-gray-100 transition-colors shadow-md"
+              >
+                Schedule with Yano
+              </a>
+              <a
+                href="https://jdot.holohive.io"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-6 py-3 bg-white text-[#3e8692] font-semibold rounded-lg hover:bg-gray-100 transition-colors shadow-md"
+              >
+                Schedule with Jdot
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </div>

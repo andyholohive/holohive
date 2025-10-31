@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
 import FloatingChat from '@/components/ai/FloatingChat';
+import { ChunkErrorHandler } from '@/components/ChunkErrorHandler';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -25,6 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
+        <ChunkErrorHandler />
         <AuthProvider>
           {children}
           <FloatingChat />

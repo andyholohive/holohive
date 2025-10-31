@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { FileUploadComponent } from './FileUploadComponent';
 import { Image as ImageIcon, Video, File, Download, Eye, EyeOff, Trash2, Copy, FileText, ExternalLink } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
 
 interface ReportTabContentProps {
   campaignId: string;
@@ -267,8 +267,8 @@ export function ReportTabContent({
           <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-xl font-bold text-gray-900">Per-KOL Performance</h3>
-                <p className="text-sm text-gray-500 mt-1">Individual performance breakdown by KOL</p>
+                <h3 className="text-xl font-bold text-gray-900">Creator Performance</h3>
+                <p className="text-sm text-gray-500 mt-1">Individual performance breakdown by creator</p>
               </div>
             </div>
             <div className="h-96">
@@ -299,26 +299,20 @@ export function ReportTabContent({
                   />
                   <Legend
                     wrapperStyle={{ paddingTop: '20px' }}
-                    iconType="rect"
+                    iconType="circle"
                   />
                   <Bar
                     dataKey="impressions"
                     name="Impressions"
+                    fill="#3b82f6"
                     radius={[8, 8, 0, 0]}
-                  >
-                    {kolPerformance.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill="#3b82f6" />
-                    ))}
-                  </Bar>
+                  />
                   <Bar
                     dataKey="engagement"
                     name="Engagement"
+                    fill="#10b981"
                     radius={[8, 8, 0, 0]}
-                  >
-                    {kolPerformance.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill="#10b981" />
-                    ))}
-                  </Bar>
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -975,7 +975,14 @@ export default function CampaignsPage() {
                   variant="outline"
                   size="sm"
                   className="w-full mt-auto"
-                  onClick={() => router.push(`/campaigns/${campaign.id}`)}
+                  onClick={() => {
+                    console.log('Campaign clicked:', campaign.id, campaign);
+                    if (!campaign.id) {
+                      console.error('Campaign ID is missing!', campaign);
+                      return;
+                    }
+                    router.push(`/campaigns/${campaign.id}`);
+                  }}
                 >
                   View Campaign
                 </Button>
