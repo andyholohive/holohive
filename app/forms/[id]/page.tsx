@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,9 +14,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Plus, Edit, Trash2, Save, Share2, Copy, CheckCircle2, GripVertical, FileText, Download, Eye, ExternalLink, X } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Save, Share2, Copy, CheckCircle2, GripVertical, FileText, Download, Eye, ExternalLink, X, Bold, Italic, Palette, Upload, Minus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { FormService, FormWithFields, FormField, FieldType, FormStatus, FormResponse } from '@/lib/formService';
+import { CustomColorPicker } from '@/components/ui/custom-color-picker';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -24,13 +25,14 @@ import { CSS } from '@dnd-kit/utilities';
 // Sortable Field Item Component
 interface SortableFieldItemProps {
   field: FormField;
-  expandedFieldId: string | null;
-  setExpandedFieldId: (id: string | null) => void;
   handleOpenFieldDialog: (field: FormField) => void;
   handleDeleteField: (id: string, label: string) => void;
+  editingFieldId: string | null;
+  setEditingFieldId: (id: string | null) => void;
+  onSaveField: (fieldId: string, updates: Partial<FormField>) => Promise<void>;
 }
 
-function SortableFieldItem({ field, expandedFieldId, setExpandedFieldId, handleOpenFieldDialog, handleDeleteField }: SortableFieldItemProps) {
+function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, editingFieldId, setEditingFieldId, onSaveField }: SortableFieldItemProps) {
   const {
     attributes,
     listeners,
@@ -46,154 +48,986 @@ function SortableFieldItem({ field, expandedFieldId, setExpandedFieldId, handleO
     opacity: isDragging ? 0.5 : 1,
   };
 
-  return (
-    <div ref={setNodeRef} style={style} className="border rounded-lg overflow-hidden">
-      {/* Field Header */}
-      <div
-        className="flex items-center gap-3 p-4 bg-white hover:bg-gray-50"
-      >
-        <div {...attributes} {...listeners} className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing">
-          <GripVertical className="h-5 w-5" />
-        </div>
-        <div className="text-2xl">{FormService.getFieldTypeIcon(field.field_type)}</div>
-        <div
-          className="flex-1 cursor-pointer"
-          onClick={() => setExpandedFieldId(expandedFieldId === field.id ? null : field.id)}
-        >
-          <div className="flex items-center gap-2">
-            <p className="font-medium text-gray-900">{field.label}</p>
-            {field.required && (
-              <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
-                Required
-              </Badge>
-            )}
+  const isEditing = editingFieldId === field.id;
+  const [editLabel, setEditLabel] = useState(field.label);
+  const [editRequired, setEditRequired] = useState(field.required);
+  const [editFieldType, setEditFieldType] = useState<FieldType>(field.field_type);
+  const [editAllowMultiple, setEditAllowMultiple] = useState(field.allow_multiple || false);
+  const [editIncludeOther, setEditIncludeOther] = useState(field.include_other || false);
+  const [editAllowAttachments, setEditAllowAttachments] = useState(field.allow_attachments || false);
+  const [editRequireYesReason, setEditRequireYesReason] = useState(field.require_yes_reason || false);
+  const [editRequireNoReason, setEditRequireNoReason] = useState(field.require_no_reason || false);
+  const [editOptions, setEditOptions] = useState<string[]>(field.options || []);
+  const [isYesNoDropdown, setIsYesNoDropdown] = useState(field.is_yes_no_dropdown || false);
+  const [newOption, setNewOption] = useState('');
+  const labelEditRef = useRef<HTMLDivElement>(null);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showCustomColorPicker, setShowCustomColorPicker] = useState(false);
+  const [currentColor, setCurrentColor] = useState('#000000');
+  const [savedSelection, setSavedSelection] = useState<Range | null>(null);
+
+  // Sync edit state when field changes
+  useEffect(() => {
+    setEditLabel(field.label);
+    setEditRequired(field.required);
+    setEditFieldType(field.field_type);
+    setEditAllowMultiple(field.allow_multiple || false);
+    setEditIncludeOther(field.include_other || false);
+    setEditAllowAttachments(field.allow_attachments || false);
+    setEditRequireYesReason(field.require_yes_reason || false);
+    setEditRequireNoReason(field.require_no_reason || false);
+    setEditOptions(field.options || []);
+    setIsYesNoDropdown(field.is_yes_no_dropdown || false);
+  }, [field.label, field.required, field.field_type, field.allow_multiple, field.include_other, field.allow_attachments, field.require_yes_reason, field.require_no_reason, field.is_yes_no_dropdown, field.options, field.id]);
+
+  // Focus label input when entering edit mode
+  useEffect(() => {
+    if (isEditing && labelEditRef.current) {
+      labelEditRef.current.focus();
+      labelEditRef.current.innerHTML = editLabel;
+    }
+  }, [isEditing]);
+
+  // Helper functions for text selection
+  const saveSelection = () => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      setSavedSelection(selection.getRangeAt(0));
+    }
+  };
+
+  const restoreSelection = () => {
+    if (savedSelection) {
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(savedSelection);
+      }
+    }
+  };
+
+  const applyColorToSelection = (color: string) => {
+    if (!labelEditRef.current) return;
+    labelEditRef.current.focus();
+    restoreSelection();
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+      document.execCommand('foreColor', false, color);
+    } else {
+      document.execCommand('foreColor', false, color);
+    }
+  };
+
+  const changeFontSize = (increase: boolean) => {
+    if (!labelEditRef.current) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    if (range.collapsed) return; // No text selected
+
+    // Get the parent element of the selection
+    const parentElement = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+      ? range.commonAncestorContainer.parentElement
+      : range.commonAncestorContainer as HTMLElement;
+
+    // Find if we're inside a span with fontSize (walk up the DOM)
+    let existingSpan: HTMLElement | null = null;
+    let current: HTMLElement | null = parentElement;
+
+    while (current && current !== labelEditRef.current) {
+      if (current.tagName === 'SPAN' && current.style.fontSize) {
+        existingSpan = current;
+        break;
+      }
+      current = current.parentElement;
+    }
+
+    // Determine current font size
+    let currentSize = 16; // Default
+    if (existingSpan) {
+      currentSize = parseInt(existingSpan.style.fontSize) || 16;
+    } else {
+      // Check if selection contains any element with fontSize
+      const tempDiv = document.createElement('div');
+      tempDiv.appendChild(range.cloneContents());
+      const spanWithSize = tempDiv.querySelector('[style*="font-size"]') as HTMLElement;
+      if (spanWithSize && spanWithSize.style.fontSize) {
+        currentSize = parseInt(spanWithSize.style.fontSize) || 16;
+      }
+    }
+
+    // Calculate new size (increase/decrease by 2px)
+    const newSize = increase
+      ? Math.min(72, currentSize + 2)
+      : Math.max(10, currentSize - 2);
+
+    // If we're entirely within an existing span with fontSize, just update it
+    if (existingSpan &&
+        range.startContainer.parentElement === existingSpan &&
+        range.endContainer.parentElement === existingSpan) {
+      existingSpan.style.fontSize = `${newSize}px`;
+      setEditLabel(labelEditRef.current.innerHTML);
+    } else {
+      // Extract the selected content with all its styles
+      const fragment = range.cloneContents();
+      const tempDiv = document.createElement('div');
+      tempDiv.appendChild(fragment);
+
+      // Create new span with font size
+      const span = document.createElement('span');
+      span.style.fontSize = `${newSize}px`;
+      span.innerHTML = tempDiv.innerHTML;
+
+      // Replace the selection
+      range.deleteContents();
+      range.insertNode(span);
+
+      setEditLabel(labelEditRef.current.innerHTML);
+
+      // Keep the selection on the new content
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      selection.removeAllRanges();
+      selection.addRange(newRange);
+    }
+  };
+
+  const handleSave = async () => {
+    await onSaveField(field.id, {
+      label: editLabel,
+      required: editRequired,
+      field_type: editFieldType,
+      allow_multiple: editAllowMultiple,
+      include_other: editIncludeOther,
+      allow_attachments: editAllowAttachments,
+      is_yes_no_dropdown: isYesNoDropdown,
+      require_yes_reason: editRequireYesReason,
+      require_no_reason: editRequireNoReason,
+      options: editOptions.length > 0 ? editOptions : undefined,
+    });
+    setEditingFieldId(null);
+  };
+
+  const handleCancel = () => {
+    setEditLabel(field.label);
+    setEditRequired(field.required);
+    setEditFieldType(field.field_type);
+    setEditAllowMultiple(field.allow_multiple || false);
+    setEditIncludeOther(field.include_other || false);
+    setEditAllowAttachments(field.allow_attachments || false);
+    setEditRequireYesReason(field.require_yes_reason || false);
+    setEditRequireNoReason(field.require_no_reason || false);
+    setEditOptions(field.options || []);
+    setIsYesNoDropdown(field.is_yes_no_dropdown || false);
+    setEditingFieldId(null);
+  };
+
+  const addOption = () => {
+    if (newOption.trim()) {
+      setEditOptions([...editOptions, newOption.trim()]);
+      setNewOption('');
+    }
+  };
+
+  const removeOption = (index: number) => {
+    setEditOptions(editOptions.filter((_, i) => i !== index));
+  };
+
+  // Render field as it appears in the form (public form style)
+  if (field.field_type === 'section') {
+    return (
+      <div ref={setNodeRef} style={style} className="group relative border-b-2 border-gray-300 pb-2">
+        <div className="absolute -left-8 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
+            <GripVertical className="h-4 w-4" />
           </div>
-          <p className="text-sm text-gray-500">{FormService.getFieldTypeLabel(field.field_type)}</p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenFieldDialog(field);
-            }}
-            className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleDeleteField(field.id, field.label);
-            }}
-            className="hover:bg-red-50 hover:text-red-700 hover:border-red-300"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+        {isEditing ? (
+          <div className="space-y-3">
+            <div>
+              <Label className="text-sm text-gray-600">Section Title</Label>
+              <div className="flex gap-1 mb-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (!labelEditRef.current) return;
+                    labelEditRef.current.focus();
+                    document.execCommand('bold', false);
+                  }}
+                  title="Bold"
+                >
+                  <Bold className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (!labelEditRef.current) return;
+                    labelEditRef.current.focus();
+                    document.execCommand('italic', false);
+                  }}
+                  title="Italic"
+                >
+                  <Italic className="h-4 w-4" />
+                </Button>
+                <div className="relative">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      saveSelection();
+                      setShowColorPicker(!showColorPicker);
+                    }}
+                    title="Text Color"
+                  >
+                    <Palette className="h-4 w-4" />
+                  </Button>
+                  {showColorPicker && !showCustomColorPicker && (
+                    <div className="absolute top-full mt-1 left-0 z-50 bg-white border rounded-lg shadow-lg p-3 w-64">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium">Text Color</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setShowColorPicker(false)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-8 gap-2 mb-3">
+                        {[
+                          '#000000', '#374151', '#6B7280', '#9CA3AF',
+                          '#EF4444', '#F59E0B', '#10B981', '#3B82F6',
+                          '#8B5CF6', '#EC4899', '#F97316', '#14B8A6',
+                          '#84CC16', '#EAB308', '#06B6D4', '#6366F1',
+                          '#FFFFFF', '#DC2626', '#EA580C', '#3e8692'
+                        ].map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            className="w-6 h-6 rounded border-2 hover:scale-110 transition-transform"
+                            style={{
+                              backgroundColor: color,
+                              borderColor: color === '#FFFFFF' ? '#D1D5DB' : color
+                            }}
+                            onClick={() => {
+                              applyColorToSelection(color);
+                              setShowColorPicker(false);
+                            }}
+                          />
+                        ))}
+                        <button
+                          type="button"
+                          className="w-6 h-6 rounded border-2 hover:scale-110 transition-transform relative"
+                          style={{
+                            background: 'linear-gradient(135deg, #FF0000 0%, #FF7F00 14%, #FFFF00 28%, #00FF00 42%, #0000FF 56%, #4B0082 70%, #9400D3 84%, #FF0000 100%)',
+                            borderColor: '#D1D5DB'
+                          }}
+                          onClick={() => setShowCustomColorPicker(true)}
+                          title="Custom Color Picker"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {showColorPicker && showCustomColorPicker && (
+                    <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] bg-white rounded-lg shadow-xl p-4" style={{ width: '420px' }}>
+                      <CustomColorPicker
+                        isOpen={showCustomColorPicker}
+                        onClose={() => {
+                          setShowCustomColorPicker(false);
+                          setShowColorPicker(false);
+                        }}
+                        onApply={(color) => {
+                          applyColorToSelection(color);
+                          setCurrentColor(color);
+                          setShowCustomColorPicker(false);
+                          setShowColorPicker(false);
+                        }}
+                        initialColor={currentColor}
+                        presetColors={[
+                          '#000000', '#374151', '#6B7280', '#9CA3AF',
+                          '#EF4444', '#F59E0B', '#10B981', '#3B82F6',
+                          '#8B5CF6', '#EC4899', '#F97316', '#14B8A6',
+                          '#84CC16', '#EAB308', '#06B6D4', '#6366F1',
+                          '#FFFFFF', '#DC2626', '#EA580C', '#3e8692'
+                        ]}
+                      />
+                    </div>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    changeFontSize(false);
+                  }}
+                  title="Decrease Font Size"
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    changeFontSize(true);
+                  }}
+                  title="Increase Font Size"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <div
+                ref={labelEditRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={(e) => setEditLabel(e.currentTarget.innerHTML)}
+                className="font-semibold text-gray-900 border rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-[#3e8692]"
+                style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleSave} style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+                <Save className="h-4 w-4 mr-2" />
+                Save
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900" style={{ whiteSpace: 'pre-wrap' }} dangerouslySetInnerHTML={{ __html: field.label }} />
+            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditingFieldId(field.id)}
+                className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDeleteField(field.id, field.label)}
+                className="hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (field.field_type === 'description') {
+    return (
+      <div ref={setNodeRef} style={style} className="group relative">
+        <div className="absolute -left-8 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
+            <GripVertical className="h-4 w-4" />
+          </div>
+        </div>
+        {isEditing ? (
+          <div className="space-y-3">
+            <div>
+              <Label className="text-sm text-gray-600">Description Text</Label>
+              <div className="flex gap-1 mb-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (!labelEditRef.current) return;
+                    labelEditRef.current.focus();
+                    document.execCommand('bold', false);
+                  }}
+                  title="Bold"
+                >
+                  <Bold className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (!labelEditRef.current) return;
+                    labelEditRef.current.focus();
+                    document.execCommand('italic', false);
+                  }}
+                  title="Italic"
+                >
+                  <Italic className="h-4 w-4" />
+                </Button>
+                <div className="relative">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      saveSelection();
+                      setShowColorPicker(!showColorPicker);
+                    }}
+                    title="Text Color"
+                  >
+                    <Palette className="h-4 w-4" />
+                  </Button>
+                  {showColorPicker && !showCustomColorPicker && (
+                    <div className="absolute top-full mt-1 left-0 z-50 bg-white border rounded-lg shadow-lg p-3 w-64">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium">Text Color</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setShowColorPicker(false)}
+                          className="h-6 w-6 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-8 gap-2 mb-3">
+                        {[
+                          '#000000', '#374151', '#6B7280', '#9CA3AF',
+                          '#EF4444', '#F59E0B', '#10B981', '#3B82F6',
+                          '#8B5CF6', '#EC4899', '#F97316', '#14B8A6',
+                          '#84CC16', '#EAB308', '#06B6D4', '#6366F1',
+                          '#FFFFFF', '#DC2626', '#EA580C', '#3e8692'
+                        ].map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            className="w-6 h-6 rounded border-2 hover:scale-110 transition-transform"
+                            style={{
+                              backgroundColor: color,
+                              borderColor: color === '#FFFFFF' ? '#D1D5DB' : color
+                            }}
+                            onClick={() => {
+                              applyColorToSelection(color);
+                              setShowColorPicker(false);
+                            }}
+                          />
+                        ))}
+                        <button
+                          type="button"
+                          className="w-6 h-6 rounded border-2 hover:scale-110 transition-transform relative"
+                          style={{
+                            background: 'linear-gradient(135deg, #FF0000 0%, #FF7F00 14%, #FFFF00 28%, #00FF00 42%, #0000FF 56%, #4B0082 70%, #9400D3 84%, #FF0000 100%)',
+                            borderColor: '#D1D5DB'
+                          }}
+                          onClick={() => setShowCustomColorPicker(true)}
+                          title="Custom Color Picker"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {showColorPicker && showCustomColorPicker && (
+                    <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] bg-white rounded-lg shadow-xl p-4" style={{ width: '420px' }}>
+                      <CustomColorPicker
+                        isOpen={showCustomColorPicker}
+                        onClose={() => {
+                          setShowCustomColorPicker(false);
+                          setShowColorPicker(false);
+                        }}
+                        onApply={(color) => {
+                          applyColorToSelection(color);
+                          setCurrentColor(color);
+                          setShowCustomColorPicker(false);
+                          setShowColorPicker(false);
+                        }}
+                        initialColor={currentColor}
+                        presetColors={[
+                          '#000000', '#374151', '#6B7280', '#9CA3AF',
+                          '#EF4444', '#F59E0B', '#10B981', '#3B82F6',
+                          '#8B5CF6', '#EC4899', '#F97316', '#14B8A6',
+                          '#84CC16', '#EAB308', '#06B6D4', '#6366F1',
+                          '#FFFFFF', '#DC2626', '#EA580C', '#3e8692'
+                        ]}
+                      />
+                    </div>
+                  )}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    changeFontSize(false);
+                  }}
+                  title="Decrease Font Size"
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    changeFontSize(true);
+                  }}
+                  title="Increase Font Size"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <div
+                ref={labelEditRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={(e) => setEditLabel(e.currentTarget.innerHTML)}
+                className="text-gray-600 border rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-[#3e8692]"
+                style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleSave} style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+                <Save className="h-4 w-4 mr-2" />
+                Save
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-start justify-between gap-2">
+            <div className="text-gray-600 flex-1" style={{ whiteSpace: 'pre-wrap' }} dangerouslySetInnerHTML={{ __html: field.label }} />
+            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditingFieldId(field.id)}
+                className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDeleteField(field.id, field.label)}
+                className="hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // All other field types with input fields
+  return (
+    <div ref={setNodeRef} style={style} className="group relative space-y-2">
+      <div className="absolute -left-8 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
+          <GripVertical className="h-4 w-4" />
         </div>
       </div>
-
-      {/* Expanded Field Details & Preview */}
-      {expandedFieldId === field.id && (
-        <div className="p-4 bg-gray-50 border-t">
-          <div className="grid grid-cols-2 gap-6">
-            {/* Field Configuration */}
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-3 text-sm">Field Configuration</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Type:</span>
-                  <span className="text-gray-900">{FormService.getFieldTypeLabel(field.field_type)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Required:</span>
-                  <span className="text-gray-900">{field.required ? 'Yes' : 'No'}</span>
-                </div>
-                {field.options && field.options.length > 0 && (
-                  <div>
-                    <span className="text-gray-600">Options:</span>
-                    <ul className="mt-1 ml-4 list-disc text-gray-900">
-                      {field.options.map((option, idx) => (
-                        <li key={idx}>{option}</li>
+      {isEditing ? (
+        <div className="space-y-3 p-4 border-2 border-[#3e8692] rounded-lg bg-blue-50/30">
+          <div>
+            <Label className="text-sm text-gray-600">Field Label</Label>
+            <div className="flex gap-1 mb-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (!labelEditRef.current) return;
+                  labelEditRef.current.focus();
+                  document.execCommand('bold', false);
+                }}
+                title="Bold"
+              >
+                <Bold className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (!labelEditRef.current) return;
+                  labelEditRef.current.focus();
+                  document.execCommand('italic', false);
+                }}
+                title="Italic"
+              >
+                <Italic className="h-4 w-4" />
+              </Button>
+              <div className="relative">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    saveSelection();
+                    setShowColorPicker(!showColorPicker);
+                  }}
+                  title="Text Color"
+                >
+                  <Palette className="h-4 w-4" />
+                </Button>
+                {showColorPicker && !showCustomColorPicker && (
+                  <div className="absolute top-full mt-1 left-0 z-50 bg-white border rounded-lg shadow-lg p-3 w-64">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium">Text Color</span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setShowColorPicker(false)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-8 gap-2 mb-3">
+                      {[
+                        '#000000', '#374151', '#6B7280', '#9CA3AF',
+                        '#EF4444', '#F59E0B', '#10B981', '#3B82F6',
+                        '#8B5CF6', '#EC4899', '#F97316', '#14B8A6',
+                        '#84CC16', '#EAB308', '#06B6D4', '#6366F1',
+                        '#FFFFFF', '#DC2626', '#EA580C', '#3e8692'
+                      ].map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          className="w-6 h-6 rounded border-2 hover:scale-110 transition-transform"
+                          style={{
+                            backgroundColor: color,
+                            borderColor: color === '#FFFFFF' ? '#D1D5DB' : color
+                          }}
+                          onClick={() => {
+                            applyColorToSelection(color);
+                            setShowColorPicker(false);
+                          }}
+                        />
                       ))}
-                    </ul>
+                      <button
+                        type="button"
+                        className="w-6 h-6 rounded border-2 hover:scale-110 transition-transform relative"
+                        style={{
+                          background: 'linear-gradient(135deg, #FF0000 0%, #FF7F00 14%, #FFFF00 28%, #00FF00 42%, #0000FF 56%, #4B0082 70%, #9400D3 84%, #FF0000 100%)',
+                          borderColor: '#D1D5DB'
+                        }}
+                        onClick={() => setShowCustomColorPicker(true)}
+                        title="Custom Color Picker"
+                      />
+                    </div>
+                  </div>
+                )}
+                {showColorPicker && showCustomColorPicker && (
+                  <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] bg-white rounded-lg shadow-xl p-4" style={{ width: '420px' }}>
+                    <CustomColorPicker
+                      isOpen={showCustomColorPicker}
+                      onClose={() => {
+                        setShowCustomColorPicker(false);
+                        setShowColorPicker(false);
+                      }}
+                      onApply={(color) => {
+                        applyColorToSelection(color);
+                        setCurrentColor(color);
+                        setShowCustomColorPicker(false);
+                        setShowColorPicker(false);
+                      }}
+                      initialColor={currentColor}
+                      presetColors={[
+                        '#000000', '#374151', '#6B7280', '#9CA3AF',
+                        '#EF4444', '#F59E0B', '#10B981', '#3B82F6',
+                        '#8B5CF6', '#EC4899', '#F97316', '#14B8A6',
+                        '#84CC16', '#EAB308', '#06B6D4', '#6366F1',
+                        '#FFFFFF', '#DC2626', '#EA580C', '#3e8692'
+                      ]}
+                    />
                   </div>
                 )}
               </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  saveSelection();
+                  changeFontSize(false);
+                }}
+                title="Decrease Font Size"
+              >
+                <Minus className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  saveSelection();
+                  changeFontSize(true);
+                }}
+                title="Increase Font Size"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
             </div>
-
-            {/* Field Preview */}
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-3 text-sm">Preview</h4>
-              <div className="space-y-2">
-                <Label className="text-sm">
-                  {field.label}
-                  {field.required && <span className="text-red-500 ml-1">*</span>}
-                </Label>
-                {field.field_type === 'text' && (
-                  <Input placeholder="Enter text..." disabled className="auth-input bg-white" />
-                )}
-                {field.field_type === 'textarea' && (
-                  <Textarea placeholder="Enter text..." rows={3} disabled className="auth-input bg-white" />
-                )}
-                {field.field_type === 'email' && (
-                  <Input type="email" placeholder="email@example.com" disabled className="auth-input bg-white" />
-                )}
-                {field.field_type === 'number' && (
-                  <Input type="number" placeholder="Enter number..." disabled className="auth-input bg-white" />
-                )}
-                {field.field_type === 'date' && (
-                  <Input type="date" disabled className="auth-input bg-white" />
-                )}
-                {field.field_type === 'select' && (
-                  <Select disabled>
-                    <SelectTrigger className="auth-input bg-white">
-                      <SelectValue placeholder="Select an option..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {field.options?.map((option, idx) => (
-                        <SelectItem key={idx} value={option}>{option}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {field.field_type === 'radio' && (
-                  <div className="space-y-2">
-                    {field.options?.map((option, idx) => (
-                      <div key={idx} className="flex items-center space-x-2">
-                        <input type="radio" disabled className="h-4 w-4" />
-                        <Label className="text-sm font-normal">{option}</Label>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {field.field_type === 'checkbox' && (
-                  <div className="space-y-2">
-                    {field.options?.map((option, idx) => (
-                      <div key={idx} className="flex items-center space-x-2">
-                        <Checkbox disabled />
-                        <Label className="text-sm font-normal">{option}</Label>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {field.field_type === 'section' && (
-                  <div className="border-b-2 border-gray-300 pb-2">
-                    <h3 className="text-xl font-semibold text-gray-900">{field.label}</h3>
-                  </div>
-                )}
-                {field.field_type === 'description' && (
-                  <div>
-                    <p className="text-sm text-gray-600">{field.label}</p>
-                  </div>
-                )}
+            <div
+              ref={labelEditRef}
+              contentEditable
+              suppressContentEditableWarning
+              onInput={(e) => setEditLabel(e.currentTarget.innerHTML)}
+              className="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e8692] bg-white"
+              style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
+            />
+          </div>
+          <div>
+            <Label className="text-sm text-gray-600">Field Type</Label>
+            <Select value={editFieldType} onValueChange={(value) => setEditFieldType(value as FieldType)}>
+              <SelectTrigger className="auth-input">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="section">Section Header</SelectItem>
+                <SelectItem value="description">Description Text</SelectItem>
+                <SelectItem value="text">Short Text</SelectItem>
+                <SelectItem value="textarea">Long Text</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+                <SelectItem value="number">Number</SelectItem>
+                <SelectItem value="select">Dropdown</SelectItem>
+                <SelectItem value="radio">Multiple Choice</SelectItem>
+                <SelectItem value="checkbox">Checkboxes</SelectItem>
+                <SelectItem value="date">Date</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox checked={editRequired} onCheckedChange={(checked) => setEditRequired(checked as boolean)} />
+            <Label className="text-sm">Required field</Label>
+          </div>
+          {['text', 'textarea', 'email', 'number', 'date'].includes(editFieldType) && (
+            <div className="flex items-center gap-2">
+              <Checkbox checked={editAllowMultiple} onCheckedChange={(checked) => setEditAllowMultiple(checked as boolean)} />
+              <Label className="text-sm">Allow multiple answers</Label>
+            </div>
+          )}
+          {['text', 'textarea'].includes(editFieldType) && (
+            <div className="flex items-center gap-2">
+              <Checkbox checked={editAllowAttachments} onCheckedChange={(checked) => setEditAllowAttachments(checked as boolean)} />
+              <Label className="text-sm">Allow file attachments</Label>
+            </div>
+          )}
+          {editFieldType === 'select' && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={isYesNoDropdown}
+                onCheckedChange={(checked) => {
+                  setIsYesNoDropdown(checked as boolean);
+                  if (checked) {
+                    setEditOptions(['Yes', 'No']);
+                    setEditIncludeOther(false);
+                  } else {
+                    setEditOptions([]);
+                    setEditRequireYesReason(false);
+                    setEditRequireNoReason(false);
+                  }
+                }}
+              />
+              <Label className="text-sm">Yes/No dropdown</Label>
+            </div>
+          )}
+          {editFieldType === 'select' && !isYesNoDropdown && (
+            <div className="flex items-center gap-2">
+              <Checkbox checked={editIncludeOther} onCheckedChange={(checked) => setEditIncludeOther(checked as boolean)} />
+              <Label className="text-sm">Include "Other" option</Label>
+            </div>
+          )}
+          {editFieldType === 'select' && isYesNoDropdown && (
+            <div className="space-y-2 border-l-2 border-gray-300 pl-4">
+              <Label className="text-sm text-gray-600 mb-2">Reason Options</Label>
+              <div className="flex items-center gap-2">
+                <Checkbox checked={editRequireYesReason} onCheckedChange={(checked) => setEditRequireYesReason(checked as boolean)} />
+                <Label className="text-sm">Require reason when "Yes" is selected</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox checked={editRequireNoReason} onCheckedChange={(checked) => setEditRequireNoReason(checked as boolean)} />
+                <Label className="text-sm">Require reason when "No" is selected</Label>
               </div>
             </div>
+          )}
+          {['select', 'radio', 'checkbox'].includes(editFieldType) && !(editFieldType === 'select' && isYesNoDropdown) && (
+            <div>
+              <Label className="text-sm text-gray-600">Options</Label>
+              <div className="flex gap-2 mb-2">
+                <Input
+                  value={newOption}
+                  onChange={(e) => setNewOption(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addOption())}
+                  placeholder="Add option"
+                  className="auth-input"
+                  disabled={editFieldType === 'select' && isYesNoDropdown}
+                />
+                <Button type="button" onClick={addOption} size="sm" style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">Add</Button>
+              </div>
+              <div className="space-y-1">
+                {editOptions.map((option, index) => (
+                  <div key={index} className="flex items-center gap-2 p-2 bg-white border rounded">
+                    <span className="flex-1">{option}</span>
+                    <Button variant="ghost" size="sm" onClick={() => removeOption(index)} disabled={editFieldType === 'select' && isYesNoDropdown}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {editFieldType === 'select' && isYesNoDropdown && (
+            <div className="p-3 bg-gray-50 border rounded-md">
+              <Label className="text-sm text-gray-600 mb-2">Dropdown Options (Locked)</Label>
+              <div className="space-y-1 mt-2">
+                {editOptions.map((option, index) => (
+                  <div key={index} className="flex items-center gap-2 p-2 bg-white border rounded">
+                    <span className="flex-1">{option}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={handleCancel}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleSave} style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+              <Save className="h-4 w-4 mr-2" />
+              Save
+            </Button>
           </div>
         </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between">
+            <Label>
+              <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
+              {field.required && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditingFieldId(field.id)}
+                className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDeleteField(field.id, field.label)}
+                className="hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+      {field.field_type === 'text' && (
+        <>
+          <Input
+            placeholder={`Enter ${field.label.replace(/<[^>]*>/g, '').toLowerCase()}...`}
+            className="auth-input"
+            disabled
+          />
+          {field.allow_attachments && (
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center bg-gray-50">
+              <div className="flex items-center justify-center gap-2">
+                <Upload className="w-4 h-4 text-gray-500" />
+                <p className="text-sm text-gray-500">Drag files here or click to upload</p>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+      {field.field_type === 'textarea' && (
+        <>
+          <Textarea
+            rows={4}
+            placeholder={`Enter ${field.label.replace(/<[^>]*>/g, '').toLowerCase()}...`}
+            className="auth-input"
+            disabled
+          />
+          {field.allow_attachments && (
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center bg-gray-50">
+              <div className="flex items-center justify-center gap-2">
+                <Upload className="w-4 h-4 text-gray-500" />
+                <p className="text-sm text-gray-500">Drag files here or click to upload</p>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+      {field.field_type === 'email' && (
+        <Input
+          type="email"
+          placeholder="email@example.com"
+          className="auth-input"
+          disabled
+        />
+      )}
+      {field.field_type === 'number' && (
+        <Input
+          type="number"
+          placeholder="Enter number..."
+          className="auth-input"
+          disabled
+        />
+      )}
+      {field.field_type === 'date' && (
+        <Input type="date" className="auth-input" disabled />
+      )}
+      {field.field_type === 'select' && (
+        <Select disabled>
+          <SelectTrigger className="auth-input">
+            <SelectValue placeholder="Select an option..." />
+          </SelectTrigger>
+          <SelectContent>
+            {field.options?.map((option, idx) => (
+              <SelectItem key={idx} value={option}>{option}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+      {field.field_type === 'radio' && (
+        <div className="space-y-2">
+          {field.options?.map((option, idx) => (
+            <div key={idx} className="flex items-center space-x-2">
+              <input type="radio" disabled className="h-4 w-4" />
+              <Label className="text-sm font-normal">{option}</Label>
+            </div>
+          ))}
+        </div>
+      )}
+      {field.field_type === 'checkbox' && (
+        <div className="space-y-2">
+          {field.options?.map((option, idx) => (
+            <div key={idx} className="flex items-center space-x-2">
+              <Checkbox disabled />
+              <Label className="text-sm font-normal">{option}</Label>
+            </div>
+          ))}
+        </div>
+      )}
+        </>
       )}
     </div>
   );
@@ -284,6 +1118,12 @@ export default function FormBuilderPage() {
   // Field editor state
   const [isFieldDialogOpen, setIsFieldDialogOpen] = useState(false);
   const [editingField, setEditingField] = useState<FormField | null>(null);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showCustomColorPicker, setShowCustomColorPicker] = useState(false);
+  const [currentColor, setCurrentColor] = useState('#000000');
+  const [savedSelection, setSavedSelection] = useState<Range | null>(null);
+  const labelInputRef = useRef<HTMLDivElement>(null);
+  const isInitialMount = useRef(true);
   const [fieldForm, setFieldForm] = useState({
     field_type: 'text' as FieldType,
     label: '',
@@ -294,6 +1134,7 @@ export default function FormBuilderPage() {
   const [optionInput, setOptionInput] = useState('');
   const [isSavingField, setIsSavingField] = useState(false);
   const [expandedFieldId, setExpandedFieldId] = useState<string | null>(null);
+  const [inlineEditingFieldId, setInlineEditingFieldId] = useState<string | null>(null);
 
   // Preview state
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -444,7 +1285,16 @@ export default function FormBuilderPage() {
       });
     }
     setIsFieldDialogOpen(true);
+    isInitialMount.current = true; // Mark that we need to sync
   };
+
+  // Sync content only on dialog open or field change
+  useEffect(() => {
+    if (isInitialMount.current && labelInputRef.current && isFieldDialogOpen) {
+      labelInputRef.current.innerHTML = fieldForm.label;
+      isInitialMount.current = false;
+    }
+  }, [isFieldDialogOpen, editingField?.id]);
 
   const handleSaveField = async () => {
     if (!fieldForm.label.trim()) {
@@ -514,6 +1364,28 @@ export default function FormBuilderPage() {
         description: 'Failed to delete field',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleInlineSaveField = async (fieldId: string, updates: Partial<FormField>) => {
+    try {
+      await FormService.updateField({
+        id: fieldId,
+        ...updates,
+      });
+      toast({
+        title: 'Success',
+        description: 'Field updated successfully',
+      });
+      await fetchForm();
+    } catch (error) {
+      console.error('Error updating field:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update field',
+        variant: 'destructive',
+      });
+      throw error;
     }
   };
 
@@ -597,6 +1469,43 @@ export default function FormBuilderPage() {
       ...prev,
       options: prev.options.filter((_, i) => i !== index)
     }));
+  };
+
+  // Helper functions for managing text selection in contentEditable
+  const saveSelection = () => {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      setSavedSelection(selection.getRangeAt(0));
+    }
+  };
+
+  const restoreSelection = () => {
+    if (savedSelection) {
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(savedSelection);
+      }
+    }
+  };
+
+  const applyColorToSelection = (color: string) => {
+    if (!labelInputRef.current) return;
+
+    // Focus the input first
+    labelInputRef.current.focus();
+
+    // Restore the saved selection
+    restoreSelection();
+
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+      // Apply color to selected text
+      document.execCommand('foreColor', false, color);
+    } else {
+      // No selection - just apply color for future typing
+      document.execCommand('foreColor', false, color);
+    }
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -865,6 +1774,7 @@ export default function FormBuilderPage() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="build">Build</TabsTrigger>
+            <TabsTrigger value="preview">Preview</TabsTrigger>
             <TabsTrigger value="responses">
               Responses ({responses.length})
             </TabsTrigger>
@@ -872,168 +1782,430 @@ export default function FormBuilderPage() {
 
           {/* Build Tab */}
           <TabsContent value="build" className="space-y-6">
-            {/* Form Info Card */}
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle>Form Information</CardTitle>
-                  {!isEditingInfo ? (
-                    <Button variant="outline" size="sm" onClick={() => setIsEditingInfo(true)} className="hover:opacity-90">
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </Button>
-                  ) : (
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setIsEditingInfo(false)}>
-                        Cancel
-                      </Button>
-                      <Button size="sm" onClick={handleSaveInfo} disabled={isSavingInfo} className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save
-                      </Button>
+                  <div className="flex-1">
+                    {isEditingInfo ? (
+                      <div className="space-y-3">
+                        <div>
+                          <Label className="text-sm text-gray-600">Form Name</Label>
+                          <Input value={editedName} onChange={(e) => setEditedName(e.target.value)} className="auth-input text-2xl font-bold h-auto py-2" />
+                        </div>
+                        <div>
+                          <Label className="text-sm text-gray-600">Description</Label>
+                          <Textarea value={editedDescription} onChange={(e) => setEditedDescription(e.target.value)} rows={2} className="auth-input" />
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <Label className="text-sm text-gray-600">Status</Label>
+                            <Select value={editedStatus} onValueChange={(value) => setEditedStatus(value as FormStatus)}>
+                              <SelectTrigger className="auth-input w-[140px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="draft">Draft</SelectItem>
+                                <SelectItem value="published">Published</SelectItem>
+                                <SelectItem value="closed">Closed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex gap-2 mt-5">
+                            <Button variant="outline" size="sm" onClick={() => setIsEditingInfo(false)}>
+                              Cancel
+                            </Button>
+                            <Button size="sm" onClick={handleSaveInfo} disabled={isSavingInfo} className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                              <Save className="h-4 w-4 mr-2" />
+                              Save
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <CardTitle className="text-2xl">{form.name}</CardTitle>
+                        {form.description && (
+                          <p className="text-gray-600 mt-2">{form.description}</p>
+                        )}
+                        <div className="flex items-center gap-3 mt-3">
+                          <Badge className={`${FormService.getStatusColor(form.status)} pointer-events-none`}>
+                            {form.status.charAt(0).toUpperCase() + form.status.slice(1)}
+                          </Badge>
+                          <Button variant="ghost" size="sm" onClick={() => setIsEditingInfo(true)} className="text-gray-500 hover:text-gray-700 h-7">
+                            <Edit className="h-3 w-3 mr-1" />
+                            Edit Info
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="text-sm text-gray-500">
+                      Page {currentPage} of {totalPages}
                     </div>
                   )}
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {isEditingInfo ? (
-                  <>
-                    <div>
-                      <Label>Form Name</Label>
-                      <Input value={editedName} onChange={(e) => setEditedName(e.target.value)} className="auth-input" />
-                    </div>
-                    <div>
-                      <Label>Description</Label>
-                      <Textarea value={editedDescription} onChange={(e) => setEditedDescription(e.target.value)} rows={3} className="auth-input" />
-                    </div>
-                    <div>
-                      <Label>Status</Label>
-                      <Select value={editedStatus} onValueChange={(value) => setEditedStatus(value as FormStatus)}>
-                        <SelectTrigger className="auth-input">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="draft">Draft</SelectItem>
-                          <SelectItem value="published">Published</SelectItem>
-                          <SelectItem value="closed">Closed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div>
-                      <Label className="text-gray-600">Name</Label>
-                      <p className="text-gray-900">{form.name}</p>
-                    </div>
-                    {form.description && (
-                      <div>
-                        <Label className="text-gray-600">Description</Label>
-                        <p className="text-gray-900">{form.description}</p>
-                      </div>
-                    )}
-                    <div>
-                      <Label className="text-gray-600">Status</Label>
-                      <div>
-                        <Badge className={`${FormService.getStatusColor(form.status)} pointer-events-none`}>
-                          {form.status.charAt(0).toUpperCase() + form.status.slice(1)}
-                        </Badge>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
 
-            {/* Fields Card */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between mb-4">
-                  <CardTitle>Form Fields ({form.fields.length} total)</CardTitle>
+                {/* Page Navigation and Actions */}
+                <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handlePageDragEnd}
+                  >
+                    <SortableContext
+                      items={pageOrder.map(p => `page-${p}`)}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {pageOrder.map((pageNum) => {
+                          const fieldsOnPage = form.fields.filter(f => f.page_number === pageNum).length;
+                          return (
+                            <SortablePageTab
+                              key={pageNum}
+                              pageNum={pageNum}
+                              currentPage={currentPage}
+                              fieldsCount={fieldsOnPage}
+                              totalPages={totalPages}
+                              onPageClick={setCurrentPage}
+                              onDeletePage={handleDeletePage}
+                            />
+                          );
+                        })}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
                   <div className="flex gap-2">
-                    <Button onClick={handleAddPage} variant="outline" className="hover:opacity-90">
-                      <Plus className="h-4 w-4 mr-2" />
+                    <Button onClick={handleAddPage} variant="outline" size="sm" className="hover:opacity-90">
+                      <Plus className="h-4 w-4 mr-1" />
                       Add Page
                     </Button>
-                    <Button onClick={() => handleOpenFieldDialog()} className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
-                      <Plus className="h-4 w-4 mr-2" />
+                    <Button onClick={() => handleOpenFieldDialog()} size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                      <Plus className="h-4 w-4 mr-1" />
                       Add Field
                     </Button>
                   </div>
                 </div>
-
-                {/* Page Navigation */}
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handlePageDragEnd}
-                >
-                  <SortableContext
-                    items={pageOrder.map(p => `page-${p}`)}
-                    strategy={horizontalListSortingStrategy}
-                  >
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {pageOrder.map((pageNum) => {
-                        const fieldsOnPage = form.fields.filter(f => f.page_number === pageNum).length;
-                        return (
-                          <SortablePageTab
-                            key={pageNum}
-                            pageNum={pageNum}
-                            currentPage={currentPage}
-                            fieldsCount={fieldsOnPage}
-                            totalPages={totalPages}
-                            onPageClick={setCurrentPage}
-                            onDeletePage={handleDeletePage}
-                          />
-                        );
-                      })}
-                    </div>
-                  </SortableContext>
-                </DndContext>
               </CardHeader>
               <CardContent>
-                {(() => {
-                  const fieldsOnCurrentPage = form.fields.filter(f => f.page_number === currentPage);
+                <div className="space-y-6">
+                  {(() => {
+                    const fieldsOnCurrentPage = form.fields
+                      .filter(f => f.page_number === currentPage)
+                      .sort((a, b) => a.display_order - b.display_order);
 
-                  if (fieldsOnCurrentPage.length === 0) {
-                    return (
-                      <div className="text-center py-12">
-                        <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                        <p className="text-gray-600">No fields on this page yet.</p>
-                        <Button onClick={() => handleOpenFieldDialog()} variant="outline" className="mt-4">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add First Field
-                        </Button>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <SortableContext
-                        items={fieldsOnCurrentPage.map(f => f.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        <div className="space-y-3">
-                          {fieldsOnCurrentPage.map((field) => (
-                            <SortableFieldItem
-                              key={field.id}
-                              field={field}
-                              expandedFieldId={expandedFieldId}
-                              setExpandedFieldId={setExpandedFieldId}
-                              handleOpenFieldDialog={handleOpenFieldDialog}
-                              handleDeleteField={handleDeleteField}
-                            />
-                          ))}
+                    if (fieldsOnCurrentPage.length === 0) {
+                      return (
+                        <div className="text-center py-12">
+                          <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                          <p className="text-gray-600">No fields on this page yet.</p>
+                          <Button onClick={() => handleOpenFieldDialog()} variant="outline" className="mt-4">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add First Field
+                          </Button>
                         </div>
-                      </SortableContext>
-                    </DndContext>
-                  );
-                })()}
+                      );
+                    }
+
+                    return (
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                      >
+                        <SortableContext
+                          items={fieldsOnCurrentPage.map(f => f.id)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <div className="space-y-6">
+                            {fieldsOnCurrentPage.map((field) => (
+                              <SortableFieldItem
+                                key={field.id}
+                                field={field}
+                                handleOpenFieldDialog={handleOpenFieldDialog}
+                                handleDeleteField={handleDeleteField}
+                                editingFieldId={inlineEditingFieldId}
+                                setEditingFieldId={setInlineEditingFieldId}
+                                onSaveField={handleInlineSaveField}
+                              />
+                            ))}
+                          </div>
+                        </SortableContext>
+                      </DndContext>
+                    );
+                  })()}
+                </div>
+
+                {/* Page Navigation */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-8 pt-6 border-t">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(prev => prev - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <div className="text-sm text-gray-600">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                    <Button
+                      onClick={() => setCurrentPage(prev => prev + 1)}
+                      disabled={currentPage === totalPages}
+                      style={{ backgroundColor: '#3e8692', color: 'white' }}
+                      className="hover:opacity-90"
+                    >
+                      {currentPage === totalPages ? 'Submit' : 'Next'}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Preview Tab */}
+          <TabsContent value="preview" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-2xl">{form.name}</CardTitle>
+                    {form.description && (
+                      <p className="text-gray-600 mt-2">{form.description}</p>
+                    )}
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="text-sm text-gray-500">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  {(() => {
+                    const fieldsOnCurrentPage = form.fields
+                      .filter(f => f.page_number === currentPage)
+                      .sort((a, b) => a.display_order - b.display_order);
+
+                    if (fieldsOnCurrentPage.length === 0) {
+                      return (
+                        <div className="text-center py-12 text-gray-500">
+                          <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>No fields on this page</p>
+                          <p className="text-sm mt-2">Add fields in the Build tab</p>
+                        </div>
+                      );
+                    }
+
+                    return fieldsOnCurrentPage.map((field) => {
+                      // Render different field types
+                      if (field.field_type === 'section') {
+                        return (
+                          <div key={field.id} className="border-b-2 border-gray-300 pb-2">
+                            <div className="font-semibold text-gray-900" style={{ whiteSpace: 'pre-wrap' }} dangerouslySetInnerHTML={{ __html: field.label }} />
+                          </div>
+                        );
+                      }
+
+                      if (field.field_type === 'description') {
+                        return (
+                          <div key={field.id}>
+                            <div className="text-gray-600" style={{ whiteSpace: 'pre-wrap' }} dangerouslySetInnerHTML={{ __html: field.label }} />
+                          </div>
+                        );
+                      }
+
+                      if (field.field_type === 'text' || field.field_type === 'email' || field.field_type === 'number') {
+                        return (
+                          <div key={field.id} className="space-y-2">
+                            <Label>
+                              <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
+                              {field.required && <span className="text-red-500 ml-1">*</span>}
+                            </Label>
+                            {field.allow_multiple ? (
+                              <div className="flex gap-2">
+                                <Input
+                                  type={field.field_type}
+                                  placeholder={`Enter ${field.label.replace(/<[^>]*>/g, '').toLowerCase()}...`}
+                                  className="auth-input flex-1"
+                                  disabled
+                                />
+                                <Button
+                                  type="button"
+                                  style={{ backgroundColor: '#3e8692', color: 'white' }}
+                                  className="hover:opacity-90"
+                                  disabled
+                                >
+                                  +
+                                </Button>
+                              </div>
+                            ) : (
+                              <Input
+                                type={field.field_type}
+                                placeholder={`Enter ${field.label.replace(/<[^>]*>/g, '').toLowerCase()}...`}
+                                className="auth-input"
+                                disabled
+                              />
+                            )}
+                            {field.allow_attachments && (
+                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center bg-gray-50">
+                                <div className="flex items-center justify-center gap-2">
+                                  <Upload className="w-4 h-4 text-gray-500" />
+                                  <p className="text-sm text-gray-500">Drag files here or click to upload</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      if (field.field_type === 'textarea') {
+                        return (
+                          <div key={field.id} className="space-y-2">
+                            <Label>
+                              <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
+                              {field.required && <span className="text-red-500 ml-1">*</span>}
+                            </Label>
+                            {field.allow_multiple ? (
+                              <div className="flex gap-2">
+                                <Textarea
+                                  rows={4}
+                                  placeholder={`Enter ${field.label.replace(/<[^>]*>/g, '').toLowerCase()}...`}
+                                  className="auth-input flex-1"
+                                  disabled
+                                />
+                                <Button
+                                  type="button"
+                                  style={{ backgroundColor: '#3e8692', color: 'white' }}
+                                  className="hover:opacity-90"
+                                  disabled
+                                >
+                                  +
+                                </Button>
+                              </div>
+                            ) : (
+                              <Textarea
+                                rows={4}
+                                placeholder={`Enter ${field.label.replace(/<[^>]*>/g, '').toLowerCase()}...`}
+                                className="auth-input"
+                                disabled
+                              />
+                            )}
+                            {field.allow_attachments && (
+                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center bg-gray-50">
+                                <div className="flex items-center justify-center gap-2">
+                                  <Upload className="w-4 h-4 text-gray-500" />
+                                  <p className="text-sm text-gray-500">Drag files here or click to upload</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      if (field.field_type === 'select') {
+                        return (
+                          <div key={field.id} className="space-y-2">
+                            <Label>
+                              <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
+                              {field.required && <span className="text-red-500 ml-1">*</span>}
+                            </Label>
+                            <Select disabled>
+                              <SelectTrigger className="auth-input">
+                                <SelectValue placeholder="Select an option..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {field.options?.map((option, idx) => (
+                                  <SelectItem key={idx} value={option}>{option}</SelectItem>
+                                ))}
+                                {field.include_other && (
+                                  <SelectItem value="__OTHER__">Other</SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        );
+                      }
+
+                      if (field.field_type === 'radio') {
+                        return (
+                          <div key={field.id} className="space-y-2">
+                            <Label>
+                              <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
+                              {field.required && <span className="text-red-500 ml-1">*</span>}
+                            </Label>
+                            <div className="space-y-2">
+                              {field.options?.map((option, idx) => (
+                                <div key={idx} className="flex items-center space-x-2">
+                                  <input type="radio" disabled className="h-4 w-4" />
+                                  <Label className="text-sm font-normal">{option}</Label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      if (field.field_type === 'checkbox') {
+                        return (
+                          <div key={field.id} className="space-y-2">
+                            <Label>
+                              <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
+                              {field.required && <span className="text-red-500 ml-1">*</span>}
+                            </Label>
+                            <div className="space-y-2">
+                              {field.options?.map((option, idx) => (
+                                <div key={idx} className="flex items-center space-x-2">
+                                  <Checkbox disabled />
+                                  <Label className="text-sm font-normal">{option}</Label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      if (field.field_type === 'date') {
+                        return (
+                          <div key={field.id} className="space-y-2">
+                            <Label>
+                              <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
+                              {field.required && <span className="text-red-500 ml-1">*</span>}
+                            </Label>
+                            <Input type="date" className="auth-input" disabled />
+                          </div>
+                        );
+                      }
+
+                      return null;
+                    });
+                  })()}
+                </div>
+
+                {/* Page Navigation */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-8 pt-6 border-t">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(prev => prev - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <div className="text-sm text-gray-600">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                    <Button
+                      onClick={() => setCurrentPage(prev => prev + 1)}
+                      disabled={currentPage === totalPages}
+                      style={{ backgroundColor: '#3e8692', color: 'white' }}
+                      className="hover:opacity-90"
+                    >
+                      {currentPage === totalPages ? 'Submit' : 'Next'}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1129,7 +2301,144 @@ export default function FormBuilderPage() {
               </div>
               <div>
                 <Label>Label</Label>
-                <Input value={fieldForm.label} onChange={(e) => setFieldForm(prev => ({ ...prev, label: e.target.value }))} placeholder="e.g., Full Name" className="auth-input" />
+                <div className="space-y-2">
+                  <div className="flex gap-1 mb-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (!labelInputRef.current) return;
+                        labelInputRef.current.focus();
+                        document.execCommand('bold', false);
+                      }}
+                      title="Bold"
+                    >
+                      <Bold className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (!labelInputRef.current) return;
+                        labelInputRef.current.focus();
+                        document.execCommand('italic', false);
+                      }}
+                      title="Italic"
+                    >
+                      <Italic className="h-4 w-4" />
+                    </Button>
+                    <div className="relative">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          saveSelection();
+                          setShowColorPicker(!showColorPicker);
+                        }}
+                        title="Text Color"
+                      >
+                        <Palette className="h-4 w-4" />
+                      </Button>
+                      {showColorPicker && !showCustomColorPicker && (
+                        <div className="absolute top-full mt-1 left-0 z-50 bg-white border rounded-lg shadow-lg p-3 w-64">
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium">Text Color</span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setShowColorPicker(false)}
+                              className="h-6 w-6 p-0"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="grid grid-cols-8 gap-2 mb-3">
+                            {[
+                              '#000000', '#374151', '#6B7280', '#9CA3AF',
+                              '#EF4444', '#F59E0B', '#10B981', '#3B82F6',
+                              '#8B5CF6', '#EC4899', '#F97316', '#14B8A6',
+                              '#84CC16', '#EAB308', '#06B6D4', '#6366F1',
+                              '#FFFFFF', '#DC2626', '#EA580C', '#3e8692'
+                            ].map((color) => (
+                              <button
+                                key={color}
+                                type="button"
+                                className="w-6 h-6 rounded border-2 hover:scale-110 transition-transform"
+                                style={{
+                                  backgroundColor: color,
+                                  borderColor: color === '#FFFFFF' ? '#D1D5DB' : color
+                                }}
+                                onClick={() => {
+                                  applyColorToSelection(color);
+                                  setShowColorPicker(false);
+                                }}
+                              />
+                            ))}
+                            {/* Custom Color Button */}
+                            <button
+                              type="button"
+                              className="w-6 h-6 rounded border-2 hover:scale-110 transition-transform relative"
+                              style={{
+                                background: 'linear-gradient(135deg, #FF0000 0%, #FF7F00 14%, #FFFF00 28%, #00FF00 42%, #0000FF 56%, #4B0082 70%, #9400D3 84%, #FF0000 100%)',
+                                borderColor: '#D1D5DB'
+                              }}
+                              onClick={() => {
+                                setShowCustomColorPicker(true);
+                              }}
+                              title="Custom Color Picker"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      {showColorPicker && showCustomColorPicker && (
+                        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] bg-white rounded-lg shadow-xl p-4" style={{ width: '420px' }}>
+                          <CustomColorPicker
+                            isOpen={showCustomColorPicker}
+                            onClose={() => {
+                              setShowCustomColorPicker(false);
+                              setShowColorPicker(false);
+                            }}
+                            onApply={(color) => {
+                              applyColorToSelection(color);
+                              setCurrentColor(color);
+                              setShowCustomColorPicker(false);
+                              setShowColorPicker(false);
+                            }}
+                            initialColor={currentColor}
+                            presetColors={[
+                              '#000000', '#374151', '#6B7280', '#9CA3AF',
+                              '#EF4444', '#F59E0B', '#10B981', '#3B82F6',
+                              '#8B5CF6', '#EC4899', '#F97316', '#14B8A6',
+                              '#84CC16', '#EAB308', '#06B6D4', '#6366F1',
+                              '#FFFFFF', '#DC2626', '#EA580C', '#3e8692'
+                            ]}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div
+                    ref={labelInputRef}
+                    id="field-label-input"
+                    contentEditable
+                    suppressContentEditableWarning
+                    onInput={(e) => {
+                      const html = e.currentTarget.innerHTML;
+                      setFieldForm(prev => ({ ...prev, label: html }));
+                    }}
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      const text = e.clipboardData.getData('text/plain');
+                      document.execCommand('insertText', false, text);
+                    }}
+                    className="auth-input p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e8692] overflow-auto"
+                    style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
+                  />
+                </div>
               </div>
               <div>
                 <Label>Page</Label>

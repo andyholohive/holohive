@@ -1,0 +1,236 @@
+
+> nextjs@0.1.0 build
+> next build
+
+   Creating an optimized production build...
+ ⚠ Compiled with warnings
+
+./node_modules/@supabase/auth-js/dist/main/lib/helpers.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/auth-js/dist/main/lib/helpers.js
+./node_modules/@supabase/auth-js/dist/main/GoTrueAdminApi.js
+./node_modules/@supabase/auth-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/public/forms/[id]/page.tsx
+
+./node_modules/@supabase/functions-js/dist/main/helper.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/functions-js/dist/main/helper.js
+./node_modules/@supabase/functions-js/dist/main/FunctionsClient.js
+./node_modules/@supabase/functions-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/public/forms/[id]/page.tsx
+
+./node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
+./node_modules/@supabase/realtime-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/public/forms/[id]/page.tsx
+
+./node_modules/@supabase/storage-js/dist/main/lib/helpers.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/storage-js/dist/main/lib/helpers.js
+./node_modules/@supabase/storage-js/dist/main/packages/StorageAnalyticsApi.js
+./node_modules/@supabase/storage-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/SupabaseClient.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/public/forms/[id]/page.tsx
+
+./node_modules/@supabase/storage-js/dist/main/lib/helpers.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/storage-js/dist/main/lib/helpers.js
+./node_modules/@supabase/storage-js/dist/main/packages/StorageAnalyticsApi.js
+./node_modules/@supabase/storage-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/SupabaseClient.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/public/forms/[id]/page.tsx
+
+./node_modules/@supabase/storage-js/dist/main/lib/vectors/helpers.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/storage-js/dist/main/lib/vectors/helpers.js
+./node_modules/@supabase/storage-js/dist/main/lib/vectors/index.js
+./node_modules/@supabase/storage-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/SupabaseClient.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/public/forms/[id]/page.tsx
+
+./node_modules/@supabase/storage-js/dist/main/lib/vectors/helpers.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/storage-js/dist/main/lib/vectors/helpers.js
+./node_modules/@supabase/storage-js/dist/main/lib/vectors/index.js
+./node_modules/@supabase/storage-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/SupabaseClient.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/public/forms/[id]/page.tsx
+
+./node_modules/@supabase/auth-js/dist/main/lib/helpers.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/auth-js/dist/main/lib/helpers.js
+./node_modules/@supabase/auth-js/dist/main/GoTrueAdminApi.js
+./node_modules/@supabase/auth-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/public/lists/test/page.tsx
+
+./node_modules/@supabase/functions-js/dist/main/helper.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/functions-js/dist/main/helper.js
+./node_modules/@supabase/functions-js/dist/main/FunctionsClient.js
+./node_modules/@supabase/functions-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/public/lists/test/page.tsx
+
+./node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
+./node_modules/@supabase/realtime-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/public/lists/test/page.tsx
+
+./node_modules/@supabase/storage-js/dist/main/lib/helpers.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/storage-js/dist/main/lib/helpers.js
+./node_modules/@supabase/storage-js/dist/main/packages/StorageAnalyticsApi.js
+./node_modules/@supabase/storage-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/SupabaseClient.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/public/lists/test/page.tsx
+
+./node_modules/@supabase/storage-js/dist/main/lib/helpers.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/storage-js/dist/main/lib/helpers.js
+./node_modules/@supabase/storage-js/dist/main/packages/StorageAnalyticsApi.js
+./node_modules/@supabase/storage-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/SupabaseClient.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/public/lists/test/page.tsx
+
+./node_modules/@supabase/storage-js/dist/main/lib/vectors/helpers.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/storage-js/dist/main/lib/vectors/helpers.js
+./node_modules/@supabase/storage-js/dist/main/lib/vectors/index.js
+./node_modules/@supabase/storage-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/SupabaseClient.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/public/lists/test/page.tsx
+
+./node_modules/@supabase/storage-js/dist/main/lib/vectors/helpers.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/storage-js/dist/main/lib/vectors/helpers.js
+./node_modules/@supabase/storage-js/dist/main/lib/vectors/index.js
+./node_modules/@supabase/storage-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/SupabaseClient.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/public/lists/test/page.tsx
+
+   Skipping validation of types
+   Skipping linting
+   Collecting page data...
+   Generating static pages (0/27)...
+Error in learning examples API: n [Error]: Dynamic server usage: Page couldn't be rendered statically because it used `cookies`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at a (/Users/andylee/Downloads/KOL Campaign Manager/.next/server/chunks/4650.js:1:1375)
+    at c (/Users/andylee/Downloads/KOL Campaign Manager/.next/server/chunks/9859.js:1:1458)
+    at l (/Users/andylee/Downloads/KOL Campaign Manager/.next/server/app/api/templates/examples/route.js:1:1023)
+    at /Users/andylee/Downloads/KOL Campaign Manager/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:1:45649
+    at /Users/andylee/Downloads/KOL Campaign Manager/node_modules/next/dist/server/lib/trace/tracer.js:117:36
+    at NoopContextManager.with (/Users/andylee/Downloads/KOL Campaign Manager/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:7057)
+    at ContextAPI.with (/Users/andylee/Downloads/KOL Campaign Manager/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:516)
+    at NoopTracer.startActiveSpan (/Users/andylee/Downloads/KOL Campaign Manager/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:18086)
+    at ProxyTracer.startActiveSpan (/Users/andylee/Downloads/KOL Campaign Manager/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:18847)
+    at /Users/andylee/Downloads/KOL Campaign Manager/node_modules/next/dist/server/lib/trace/tracer.js:106:107 {
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+Error in templates API: n [Error]: Dynamic server usage: Page couldn't be rendered statically because it used `cookies`. See more info here: https://nextjs.org/docs/messages/dynamic-server-error
+    at a (/Users/andylee/Downloads/KOL Campaign Manager/.next/server/chunks/4650.js:1:1375)
+    at c (/Users/andylee/Downloads/KOL Campaign Manager/.next/server/chunks/9859.js:1:1458)
+    at u (/Users/andylee/Downloads/KOL Campaign Manager/.next/server/app/api/templates/route.js:1:1023)
+    at /Users/andylee/Downloads/KOL Campaign Manager/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:1:45649
+    at /Users/andylee/Downloads/KOL Campaign Manager/node_modules/next/dist/server/lib/trace/tracer.js:117:36
+    at NoopContextManager.with (/Users/andylee/Downloads/KOL Campaign Manager/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:7057)
+    at ContextAPI.with (/Users/andylee/Downloads/KOL Campaign Manager/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:516)
+    at NoopTracer.startActiveSpan (/Users/andylee/Downloads/KOL Campaign Manager/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:18086)
+    at ProxyTracer.startActiveSpan (/Users/andylee/Downloads/KOL Campaign Manager/node_modules/next/dist/compiled/@opentelemetry/api/index.js:1:18847)
+    at /Users/andylee/Downloads/KOL Campaign Manager/node_modules/next/dist/server/lib/trace/tracer.js:106:107 {
+  digest: 'DYNAMIC_SERVER_USAGE'
+}
+   Generating static pages (6/27)
+
+ ⚠ Entire page /auth/reset-password deopted into client-side rendering. https://nextjs.org/docs/messages/deopted-into-client-rendering /auth/reset-password
+   Generating static pages (13/27)
+
+   Generating static pages (20/27)
+
+ ✓ Generating static pages (27/27)
+   Finalizing page optimization...
+
+Route (app)                              Size     First Load JS
+┌ ○ /                                    2.06 kB         136 kB
+├ ○ /_not-found                          877 B          80.4 kB
+├ ○ /admin/field-options                 5.8 kB          175 kB
+├ ○ /ai-insights                         12.9 kB         221 kB
+├ λ /api/ai                              0 B                0 B
+├ λ /api/chat/agent                      0 B                0 B
+├ λ /api/chat/feedback                   0 B                0 B
+├ λ /api/embeddings                      0 B                0 B
+├ λ /api/kols/index                      0 B                0 B
+├ λ /api/templates                       0 B                0 B
+├ λ /api/templates/examples              0 B                0 B
+├ λ /api/version                         0 B                0 B
+├ ○ /auth                                6.3 kB          180 kB
+├ ○ /auth/reset-password                 5.93 kB         152 kB
+├ ○ /campaigns                           14.6 kB         204 kB
+├ λ /campaigns/[id]                      51.6 kB         383 kB
+├ ○ /clients                             13.9 kB         235 kB
+├ ○ /forms                               8.52 kB         181 kB
+├ λ /forms/[id]                          18.4 kB         209 kB
+├ ○ /kols                                20.6 kB         224 kB
+├ ○ /lists                               16.9 kB         220 kB
+├ ○ /partners                            10.3 kB         179 kB
+├ ○ /public                              148 B          79.7 kB
+├ λ /public/campaigns/[id]               17.8 kB         300 kB
+├ λ /public/forms/[id]                   10.6 kB         206 kB
+├ ○ /public/lists                        148 B          79.7 kB
+├ λ /public/lists/[id]                   7.19 kB         177 kB
+├ ○ /public/lists/test                   180 B          84.8 kB
+├ λ /public/reports/[id]                 8.42 kB         252 kB
+├ ○ /team                                4.08 kB         145 kB
+├ ○ /templates                           16.1 kB         112 kB
+└ ○ /test-ai                             9.66 kB         131 kB
++ First Load JS shared by all            79.6 kB
+  ├ chunks/7864-0d15ae04888cebbd.js      26.6 kB
+  ├ chunks/fd9d1056-51fb47213e20bf3a.js  50.9 kB
+  ├ chunks/main-app-f95a6a05f96a06a4.js  228 B
+  └ chunks/webpack-f8c73f89ecacdff5.js   1.82 kB
+
+
+λ  (Server)  server-side renders at runtime (uses getInitialProps or getServerSideProps)
+○  (Static)  automatically rendered as static HTML (uses no initial props)
+

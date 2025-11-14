@@ -21,6 +21,12 @@ export interface FormField {
   label: string;
   required: boolean;
   options: string[] | null; // For select/radio/checkbox
+  allow_multiple: boolean | null; // Allow multiple answers
+  include_other: boolean | null; // Include "Other" option for select fields
+  allow_attachments: boolean | null; // Allow file attachments for text/textarea fields
+  is_yes_no_dropdown: boolean | null; // For select fields, indicates this is a Yes/No dropdown
+  require_yes_reason: boolean | null; // Require reason input when "Yes" is selected
+  require_no_reason: boolean | null; // Require reason input when "No" is selected
   display_order: number;
   page_number: number;
   created_at: string;
@@ -62,6 +68,12 @@ export interface CreateFieldData {
   label: string;
   required?: boolean;
   options?: string[];
+  allow_multiple?: boolean;
+  include_other?: boolean;
+  allow_attachments?: boolean;
+  is_yes_no_dropdown?: boolean;
+  require_yes_reason?: boolean;
+  require_no_reason?: boolean;
   display_order?: number;
   page_number?: number;
 }
@@ -72,6 +84,12 @@ export interface UpdateFieldData {
   label?: string;
   required?: boolean;
   options?: string[] | null;
+  allow_multiple?: boolean | null;
+  include_other?: boolean | null;
+  allow_attachments?: boolean | null;
+  is_yes_no_dropdown?: boolean | null;
+  require_yes_reason?: boolean | null;
+  require_no_reason?: boolean | null;
   display_order?: number;
   page_number?: number;
 }

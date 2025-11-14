@@ -169,6 +169,12 @@ export default function ListsPage() {
   const [isShareListDialogOpen, setIsShareListDialogOpen] = useState(false);
   const [sharingList, setSharingList] = useState<ListItem | null>(null);
 
+  // Combine lists dialog state
+  const [isCombineListsDialogOpen, setIsCombineListsDialogOpen] = useState(false);
+  const [selectedListsToCombine, setSelectedListsToCombine] = useState<string[]>([]);
+  const [combinedListName, setCombinedListName] = useState('');
+  const [isCombining, setIsCombining] = useState(false);
+
   // New list form state
   const [newList, setNewList] = useState({
     name: '',
@@ -712,6 +718,72 @@ export default function ListsPage() {
     setEditingKolNotes(null);
   };
 
+  const handleCombineLists = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!combinedListName.trim() || selectedListsToCombine.length === 0) return;
+
+    try {
+      setIsCombining(true);
+
+      // Get all unique KOL IDs from selected lists
+      const selectedLists = lists.filter(list => selectedListsToCombine.includes(list.id));
+      const allKolIds = new Set<string>();
+
+      selectedLists.forEach(list => {
+        list.kols?.forEach(kol => {
+          allKolIds.add(kol.id);
+        });
+      });
+
+      // Create new list
+      const { data: newListData, error: insertError } = await supabase
+        .from('lists')
+        .insert({
+          name: combinedListName.trim(),
+          notes: `Combined from: ${selectedLists.map(l => l.name).join(', ')}`,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // Add all unique KOLs to the new list
+      if (allKolIds.size > 0) {
+        const kolAssociations = Array.from(allKolIds).map(kolId => ({
+          list_id: newListData.id,
+          master_kol_id: kolId,
+          status: 'curated',
+        }));
+
+        const { error: kolsError } = await supabase
+          .from('list_kols')
+          .insert(kolAssociations);
+
+        if (kolsError) throw kolsError;
+      }
+
+      // Reset state and close dialog
+      setIsCombineListsDialogOpen(false);
+      setSelectedListsToCombine([]);
+      setCombinedListName('');
+      await fetchLists();
+
+      toast({
+        title: "Lists Combined",
+        description: `Successfully created "${combinedListName}" with ${allKolIds.size} unique KOLs.`,
+      });
+    } catch (err) {
+      console.error('Error combining lists:', err);
+      toast({
+        title: "Error",
+        description: "Failed to combine lists. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCombining(false);
+    }
+  };
+
   // Styling functions for KOL table display
   const getRegionIcon = (region: string) => {
     const regionMap: { [key: string]: { flag: string; icon: any } } = {
@@ -778,6 +850,10 @@ export default function ListsPage() {
             </div>
             <div className="flex space-x-3">
               <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} disabled>
+                <List className="h-4 w-4 mr-2" />
+                Combine Lists
+              </Button>
+              <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} disabled>
                 <Plus className="h-4 w-4 mr-2" />
                 Add List
               </Button>
@@ -829,6 +905,16 @@ export default function ListsPage() {
             <p className="text-gray-600">Manage your KOL lists and notes</p>
           </div>
           <div className="flex space-x-3">
+            <Button
+              className="hover:opacity-90"
+              style={{ backgroundColor: '#3e8692', color: 'white' }}
+              onClick={() => setIsCombineListsDialogOpen(true)}
+              disabled={lists.length < 2}
+              title={lists.length < 2 ? "Need at least 2 lists to combine" : "Combine multiple lists into one"}
+            >
+              <List className="h-4 w-4 mr-2" />
+              Combine Lists
+            </Button>
             <Dialog open={isNewListOpen} onOpenChange={(open) => {
               if (!open) {
                 handleCloseListModal();
@@ -1551,6 +1637,150 @@ export default function ListsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Combine Lists Dialog */}
+        <Dialog open={isCombineListsDialogOpen} onOpenChange={setIsCombineListsDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle>Combine Lists</DialogTitle>
+              <DialogDescription>
+                Select multiple lists to combine into a new list. All unique KOLs will be merged.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCombineLists}>
+              <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="combined-list-name">New List Name</Label>
+                  <Input
+                    id="combined-list-name"
+                    value={combinedListName}
+                    onChange={(e) => setCombinedListName(e.target.value)}
+                    placeholder="Enter name for combined list"
+                    className="auth-input"
+                    required
+                  />
+                </div>
+
+                <div className="border-t pt-4"></div>
+
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-base font-semibold">
+                      Select Lists to Combine ({selectedListsToCombine.length} selected)
+                    </Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (selectedListsToCombine.length === lists.length) {
+                          setSelectedListsToCombine([]);
+                        } else {
+                          setSelectedListsToCombine(lists.map(l => l.id));
+                        }
+                      }}
+                    >
+                      {selectedListsToCombine.length === lists.length ? 'Deselect All' : 'Select All'}
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2 mt-2">
+                    {lists.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        No lists available.
+                      </div>
+                    ) : (
+                      lists.map((list) => {
+                        const isSelected = selectedListsToCombine.includes(list.id);
+                        const kolCount = list.kols?.length || 0;
+
+                        const toggleSelection = () => {
+                          if (isSelected) {
+                            setSelectedListsToCombine(prev => prev.filter(id => id !== list.id));
+                          } else {
+                            setSelectedListsToCombine(prev => [...prev, list.id]);
+                          }
+                        };
+
+                        return (
+                          <div
+                            key={list.id}
+                            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                              isSelected ? 'border-[#3e8692] bg-[#3e8692]/5' : 'border-gray-200 hover:border-gray-300'
+                            }`}
+                            onClick={toggleSelection}
+                          >
+                            <div className="flex items-start space-x-3">
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={toggleSelection}
+                                  className="mt-1"
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between mb-1">
+                                  <div className="font-medium text-gray-900">{list.name}</div>
+                                  <Badge variant="outline" className="text-xs">
+                                    {kolCount} KOL{kolCount !== 1 ? 's' : ''}
+                                  </Badge>
+                                </div>
+                                {list.notes && (
+                                  <p className="text-sm text-gray-600 line-clamp-2">{list.notes}</p>
+                                )}
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Created: {formatDate(list.created_at)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {selectedListsToCombine.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
+                    <div className="font-medium text-blue-900 mb-1">Preview</div>
+                    <div className="text-blue-800">
+                      {(() => {
+                        const selectedLists = lists.filter(list => selectedListsToCombine.includes(list.id));
+                        const uniqueKolIds = new Set<string>();
+                        selectedLists.forEach(list => {
+                          list.kols?.forEach(kol => uniqueKolIds.add(kol.id));
+                        });
+                        return `Combining ${selectedLists.length} list${selectedLists.length !== 1 ? 's' : ''} will create a new list with ${uniqueKolIds.size} unique KOL${uniqueKolIds.size !== 1 ? 's' : ''}.`;
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsCombineListsDialogOpen(false);
+                    setSelectedListsToCombine([]);
+                    setCombinedListName('');
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isCombining || !combinedListName.trim() || selectedListsToCombine.length === 0}
+                  className="hover:opacity-90"
+                  style={{ backgroundColor: '#3e8692', color: 'white' }}
+                >
+                  {isCombining ? 'Combining...' : 'Combine Lists'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
