@@ -338,6 +338,102 @@ export const createKOLListTool: AgentTool = {
 };
 
 // ============================================================================
+// Tool 3b: Create KOL List from IDs
+// ============================================================================
+
+const createKOLListFromIDsSchema = z.object({
+  name: z.string().min(1).describe('Name for the KOL list'),
+  kol_ids: z.array(z.string().uuid()).min(1).describe('Array of KOL IDs to add to the list'),
+  description: z.string().optional().describe('Description of the list purpose'),
+});
+
+export const createKOLListFromIDsTool: AgentTool = {
+  name: 'create_kol_list_from_ids',
+  description: 'Create a KOL list from specific KOL IDs. Use this after searching for KOLs when user wants to save those specific results to a list.',
+  parameters: createKOLListFromIDsSchema,
+
+  async execute(params, context): Promise<ToolResult> {
+    try {
+      const { name, kol_ids, description } = createKOLListFromIDsSchema.parse(params);
+      const client = getSupabaseClient(context);
+
+      console.log('[create_kol_list_from_ids] Creating list with', kol_ids.length, 'KOLs');
+
+      // Verify KOLs exist
+      const { data: kols, error: kolError } = await client
+        .from('master_kols')
+        .select('id, name, region, platform')
+        .in('id', kol_ids);
+
+      if (kolError) {
+        console.error('[create_kol_list_from_ids] Error fetching KOLs:', kolError);
+        throw kolError;
+      }
+
+      if (!kols || kols.length === 0) {
+        return {
+          success: false,
+          error: 'No valid KOLs found with the provided IDs'
+        };
+      }
+
+      console.log('[create_kol_list_from_ids] Verified', kols.length, 'KOLs exist');
+
+      // Create the list
+      const { data: list, error: listError } = await client
+        .from('lists')
+        .insert({
+          name,
+          notes: description || `List created with ${kols.length} selected KOLs`,
+          status: 'curated',
+        })
+        .select()
+        .single();
+
+      if (listError) {
+        console.error('[create_kol_list_from_ids] Error creating list:', listError);
+        throw new Error(`Failed to create list: ${listError.message || JSON.stringify(listError)}`);
+      }
+
+      console.log('[create_kol_list_from_ids] List created:', list.id);
+
+      // Add KOLs to the list
+      const listItems = kols.map((kol: any) => ({
+        list_id: list.id,
+        master_kol_id: kol.id,
+        status: 'curated',
+        notes: null,
+      }));
+
+      const { error: itemsError } = await client
+        .from('list_kols')
+        .insert(listItems);
+
+      if (itemsError) {
+        console.error('[create_kol_list_from_ids] Error adding KOLs to list:', itemsError);
+        throw itemsError;
+      }
+
+      return {
+        success: true,
+        data: {
+          list,
+          kol_count: kols.length,
+          kols: kols
+        },
+        message: `Created list "${name}" with ${kols.length} KOL(s)`
+      };
+    } catch (error) {
+      console.error('Error in create_kol_list_from_ids:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create KOL list'
+      };
+    }
+  }
+};
+
+// ============================================================================
 // Tool 4: Add KOLs to Campaign
 // ============================================================================
 
@@ -360,7 +456,7 @@ export const addKOLsToCampaignTool: AgentTool = {
       const client = getSupabaseClient(context);
 
       // Verify campaign exists and user has access
-      const campaign = await CampaignService.getCampaignById(campaign_id);
+      const campaign = await CampaignService.getCampaignById(campaign_id, client);
       if (!campaign) {
         return {
           success: false,
@@ -400,8 +496,27 @@ export const addKOLsToCampaignTool: AgentTool = {
         };
       }
 
-      // Add KOLs to campaign
-      const campaignKOLs = kolsToAdd.map(master_kol_id => ({
+      // Check which KOLs are already in the campaign
+      const { data: existingKOLs } = await client
+        .from('campaign_kols')
+        .select('master_kol_id')
+        .eq('campaign_id', campaign_id)
+        .in('master_kol_id', kolsToAdd);
+
+      const existingIds = new Set((existingKOLs || []).map((k: any) => k.master_kol_id));
+      const newKolsToAdd = kolsToAdd.filter(id => !existingIds.has(id));
+
+      // If all KOLs are already in the campaign
+      if (newKolsToAdd.length === 0) {
+        return {
+          success: true,
+          data: [],
+          message: `All ${kolsToAdd.length} KOL(s) are already in campaign "${campaign.name}"`
+        };
+      }
+
+      // Add only new KOLs to campaign
+      const campaignKOLs = newKolsToAdd.map(master_kol_id => ({
         campaign_id,
         master_kol_id,
         hh_status: 'Curated' as const,
@@ -414,20 +529,18 @@ export const addKOLsToCampaignTool: AgentTool = {
         .select();
 
       if (error) {
-        // Handle duplicate entries gracefully
-        if (error.code === '23505') {
-          return {
-            success: false,
-            error: 'Some KOLs are already in this campaign'
-          };
-        }
         throw error;
       }
+
+      const skippedCount = kolsToAdd.length - newKolsToAdd.length;
+      const message = skippedCount > 0
+        ? `Added ${newKolsToAdd.length} KOL(s) to campaign "${campaign.name}" (${skippedCount} already in campaign)`
+        : `Added ${newKolsToAdd.length} KOL(s) to campaign "${campaign.name}"`;
 
       return {
         success: true,
         data: data,
-        message: `Added ${kolsToAdd.length} KOL(s) to campaign "${campaign.name}"`
+        message
       };
     } catch (error) {
       console.error('Error in add_kols_to_campaign:', error);
@@ -474,7 +587,7 @@ export const generateClientMessageTool: AgentTool = {
       // Get campaign details if provided
       let campaign = null;
       if (campaign_id) {
-        campaign = await CampaignService.getCampaignById(campaign_id);
+        campaign = await CampaignService.getCampaignById(campaign_id, client);
       }
 
       // Auto-populate variables from client and campaign data
@@ -584,7 +697,7 @@ export const saveMessageExampleTool: AgentTool = {
       // Get campaign details if provided
       let campaign = null;
       if (campaign_id) {
-        campaign = await CampaignService.getCampaignById(campaign_id);
+        campaign = await CampaignService.getCampaignById(campaign_id, client);
       }
 
       // Save the message example
@@ -663,7 +776,7 @@ export const analyzeCampaignPerformanceTool: AgentTool = {
       const client = getSupabaseClient(context);
 
       // Get campaign details
-      const campaign = await CampaignService.getCampaignById(campaign_id);
+      const campaign = await CampaignService.getCampaignById(campaign_id, client);
       if (!campaign) {
         return {
           success: false,
@@ -797,6 +910,12 @@ A brief 1-2 sentence summary of the campaign's health and outlook
       };
     } catch (error) {
       console.error('Error in analyze_campaign_performance:', error);
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('Error details:', {
+        campaign_id: params.campaign_id,
+        hasClient: !!context.supabaseClient,
+        userId: context.userId,
+      });
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to analyze campaign'
@@ -824,31 +943,97 @@ export const getBudgetRecommendationsTool: AgentTool = {
   async execute(params, context): Promise<ToolResult> {
     try {
       const { campaign_id, total_budget, regions, objectives } = getBudgetRecommendationsSchema.parse(params);
+      const client = getSupabaseClient(context);
 
       let campaign = null;
       if (campaign_id) {
-        campaign = await CampaignService.getCampaignById(campaign_id);
+        campaign = await CampaignService.getCampaignById(campaign_id, client);
       }
 
       // Get historical campaign data for insights
-      const userCampaigns = await CampaignService.getCampaignsForUser(context.userRole, context.userId);
+      const userCampaigns = await CampaignService.getCampaignsForUser(context.userRole, context.userId, client);
+
+      // Analyze existing campaigns for better insights
+      const campaignAnalysis = userCampaigns.length > 0 ? {
+        totalCampaigns: userCampaigns.length,
+        avgBudget: Math.round(userCampaigns.reduce((sum, c) => sum + c.total_budget, 0) / userCampaigns.length),
+        minBudget: Math.min(...userCampaigns.map(c => c.total_budget)),
+        maxBudget: Math.max(...userCampaigns.map(c => c.total_budget)),
+        activeCampaigns: userCampaigns.filter(c => c.status === 'Active').length,
+        completedCampaigns: userCampaigns.filter(c => c.status === 'Completed').length,
+        totalKOLs: userCampaigns.reduce((sum, c) => sum + (c.kol_count || 0), 0),
+        avgKOLsPerCampaign: Math.round(userCampaigns.reduce((sum, c) => sum + (c.kol_count || 0), 0) / userCampaigns.length),
+      } : null;
+
+      // Get detailed campaign breakdown for better context
+      const recentCampaigns = userCampaigns.slice(0, 5).map(c => ({
+        name: c.name,
+        budget: c.total_budget,
+        status: c.status,
+        kols: c.kol_count || 0,
+        client: c.client_name,
+      }));
 
       const contextPrompt = `
-Budget Allocation Request:
-- Total Budget: $${total_budget}
-${campaign ? `- Campaign: ${campaign.name}` : ''}
-${regions?.length ? `- Target Regions: ${regions.join(', ')}` : ''}
-${objectives ? `- Objectives: ${objectives}` : ''}
+You are analyzing a Web3 marketing campaign budget. Provide recommendations formatted in clear, structured sections.
 
-Historical Context:
-- User has ${userCampaigns.length} previous campaigns
-${userCampaigns.length > 0 ? `- Average campaign budget: $${Math.round(userCampaigns.reduce((sum, c) => sum + c.total_budget, 0) / userCampaigns.length)}` : ''}
+=== BUDGET REQUEST ===
+Total Budget: $${total_budget.toLocaleString()}
+${campaign ? `Campaign: ${campaign.name}` : 'New Campaign'}
+${regions?.length ? `Target Regions: ${regions.join(', ')}` : 'Global/Unspecified'}
+${objectives ? `Objectives: ${objectives}` : 'General Web3 marketing'}
 
-Please provide:
-1. Recommended budget allocation across regions/platforms
-2. Suggested spending breakdown (KOL fees, production, management, etc.)
-3. Rationale for the recommendations
-4. Risk factors to consider
+=== HISTORICAL PERFORMANCE ===
+${campaignAnalysis ? `
+Total Campaigns Run: ${campaignAnalysis.totalCampaigns}
+Budget Range: $${campaignAnalysis.minBudget.toLocaleString()} - $${campaignAnalysis.maxBudget.toLocaleString()}
+Average Budget: $${campaignAnalysis.avgBudget.toLocaleString()}
+Active Campaigns: ${campaignAnalysis.activeCampaigns}
+Completed Campaigns: ${campaignAnalysis.completedCampaigns}
+Total KOLs Worked With: ${campaignAnalysis.totalKOLs}
+Avg KOLs per Campaign: ${campaignAnalysis.avgKOLsPerCampaign}
+
+Recent Campaigns:
+${recentCampaigns.map(c => `- ${c.name}: $${c.budget.toLocaleString()} | ${c.kols} KOLs | ${c.status}`).join('\n')}
+` : 'No previous campaign history available - this appears to be a new account.'}
+
+=== REQUIRED OUTPUT FORMAT ===
+
+**📊 BUDGET ALLOCATION BREAKDOWN**
+Provide a clear breakdown using percentages and dollar amounts for:
+- KOL/Influencer Fees (by tier: Macro, Mid-tier, Micro)
+- Content Production & Creation
+- Platform/Ad Spend (Twitter/X, Discord, Telegram, etc.)
+- Community Management
+- Analytics & Tracking Tools
+- Contingency/Buffer
+
+**🌐 WEB3-SPECIFIC RECOMMENDATIONS**
+Consider Web3 marketing nuances:
+- NFT/Token giveaway budgets
+- Discord/Telegram community building
+- Twitter Spaces & AMA hosting costs
+- On-chain analytics tools
+- Crypto-native influencer rates
+- Cross-chain campaign considerations
+
+**📍 REGIONAL ALLOCATION**
+${regions?.length ? `Recommended split across: ${regions.join(', ')}` : 'Suggest optimal regional distribution'}
+
+**🎯 STRATEGIC RATIONALE**
+Explain WHY these allocations based on:
+- Historical performance data
+- Web3 marketing best practices
+- Current market conditions
+- Campaign objectives
+
+**⚠️ RISK FACTORS & CONSIDERATIONS**
+- Market volatility impacts
+- Regulatory considerations
+- Platform-specific risks
+- Budget optimization tips
+
+Format with clear headers, bullet points, and specific dollar amounts. Be concise but comprehensive.
 `;
 
       const response = await getOpenAI().chat.completions.create({
@@ -856,7 +1041,7 @@ Please provide:
         messages: [
           {
             role: 'system',
-            content: 'You are a marketing budget optimization specialist. Provide data-driven budget allocation recommendations with clear rationale.'
+            content: 'You are a Web3 marketing budget optimization specialist with deep expertise in crypto/blockchain influencer marketing, community building, and decentralized platform strategies. Provide data-driven, actionable budget recommendations specific to Web3 campaigns. Use clear formatting with headers, bullet points, and specific calculations.'
           },
           {
             role: 'user',
@@ -864,7 +1049,7 @@ Please provide:
           }
         ],
         temperature: 0.7,
-        max_tokens: 800,
+        max_tokens: 1500,
       });
 
       const recommendations = response.choices[0].message.content;
@@ -876,9 +1061,10 @@ Please provide:
           recommendations,
           campaign_name: campaign?.name,
           regions,
-          objectives
+          objectives,
+          historical_analysis: campaignAnalysis,
         },
-        message: 'Generated budget recommendations'
+        message: `Generated Web3 budget recommendations for $${total_budget.toLocaleString()}`
       };
     } catch (error) {
       console.error('Error in get_budget_recommendations:', error);
@@ -908,9 +1094,10 @@ export const updateCampaignStatusTool: AgentTool = {
   async execute(params, context): Promise<ToolResult> {
     try {
       const { campaign_id, status, reason } = updateCampaignStatusSchema.parse(params);
+      const client = getSupabaseClient(context);
 
-      // Update campaign status
-      const updatedCampaign = await CampaignService.updateCampaign(campaign_id, { status });
+      // Update campaign status with authenticated client
+      const updatedCampaign = await CampaignService.updateCampaign(campaign_id, { status }, client);
 
       // Log the status change
       const logMessage = reason
@@ -960,7 +1147,7 @@ export const getUserContextTool: AgentTool = {
 
       // Get campaigns
       if (include_campaigns) {
-        const campaigns = await CampaignService.getCampaignsForUser(context.userRole, context.userId);
+        const campaigns = await CampaignService.getCampaignsForUser(context.userRole, context.userId, client);
         userContext.campaigns = campaigns.slice(0, limit).map(c => ({
           id: c.id,
           name: c.name,
@@ -1097,6 +1284,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   searchKOLsTool,
   createCampaignTool,
   createKOLListTool,
+  createKOLListFromIDsTool,
   addKOLsToCampaignTool,
   generateClientMessageTool,
   saveMessageExampleTool,

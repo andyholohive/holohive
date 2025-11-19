@@ -364,21 +364,29 @@ export class FormService {
   /**
    * Submit a response to a form (public access)
    */
-  static async submitResponse(responseData: SubmitResponseData, publicSupabase: any): Promise<FormResponse> {
+  static async submitResponse(responseData: SubmitResponseData, publicSupabase?: any): Promise<FormResponse> {
     try {
-      const { data: response, error } = await publicSupabase
-        .from('form_responses')
-        .insert([{
+      // Use API route to submit form (bypasses RLS with service role)
+      const response = await fetch('/api/forms/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           form_id: responseData.form_id,
           response_data: responseData.response_data,
           submitted_by_email: responseData.submitted_by_email || null,
           submitted_by_name: responseData.submitted_by_name || null
-        }])
-        .select()
-        .single();
+        }),
+      });
 
-      if (error) throw error;
-      return response;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit form');
+      }
+
+      const { data } = await response.json();
+      return data;
     } catch (error) {
       console.error('Error submitting response:', error);
       throw error;

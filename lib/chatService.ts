@@ -240,7 +240,12 @@ export class ChatService {
 
     // Load conversation history from database for context
     const { ConversationMemoryManager } = await import('./agentOrchestrator');
-    const conversationHistory = await ConversationMemoryManager.loadConversation(sessionId);
+    const conversationHistory = await ConversationMemoryManager.loadConversation(sessionId, client);
+
+    console.log(`[ChatService] Loaded ${conversationHistory.length} messages from history for session ${sessionId}`);
+    if (conversationHistory.length > 0) {
+      console.log(`[ChatService] Last 3 messages:`, conversationHistory.slice(-3).map(m => ({ role: m.role, content: m.content.substring(0, 100) })));
+    }
 
     // Create orchestrator instance with loaded conversation history
     const orchestrator = new AgentOrchestrator(
@@ -355,6 +360,8 @@ export class ChatService {
       // Extract entity information
       const entityInfo = this.extractEntityInfo(step);
 
+      console.log(`[ChatService.trackAgentActions] Step: ${step.tool_name}, Reversible: ${isReversible}, Entity:`, entityInfo);
+
       if (isReversible && entityInfo) {
         const { data, error } = await (supabase as any)
           .from('agent_action_history')
@@ -375,8 +382,11 @@ export class ChatService {
           .select('id')
           .single();
 
-        if (!error && data) {
+        if (error) {
+          console.error(`[ChatService.trackAgentActions] Error tracking action ${step.tool_name}:`, error);
+        } else if (data) {
           actionIds.push(data.id);
+          console.log(`[ChatService.trackAgentActions] Tracked action ${step.tool_name} with ID:`, data.id);
         }
       }
     }

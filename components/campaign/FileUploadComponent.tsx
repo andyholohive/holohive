@@ -196,7 +196,17 @@ export function FileUploadComponent({ campaignId, onUploadSuccess }: FileUploadC
                 {uploadingFile.error ? (
                   <p className="text-xs text-red-600 mt-1">{uploadingFile.error}</p>
                 ) : (
-                  <Progress value={uploadingFile.progress} className="mt-2 h-2" />
+                  <div className="mt-2">
+                    <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                      <div
+                        className="h-full transition-all duration-300"
+                        style={{
+                          width: `${uploadingFile.progress}%`,
+                          backgroundColor: '#3e8692',
+                        }}
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
               <Button

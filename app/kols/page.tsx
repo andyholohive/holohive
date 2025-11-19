@@ -379,9 +379,31 @@ export default function KOLsPage() {
     try {
       const kolToUpdate = kols.find(k => k.id === editingCell.kolId);
       if (!kolToUpdate) return;
+
+      // Check for duplicate link
+      if (editingCell.field === 'link' && editingValue && editingValue.trim()) {
+        const duplicateKOL = kols.find(k =>
+          k.id !== editingCell.kolId &&
+          k.link &&
+          k.link.trim().toLowerCase() === editingValue.trim().toLowerCase()
+        );
+
+        if (duplicateKOL) {
+          toast({
+            title: 'Duplicate Link',
+            description: `This link is already used by "${duplicateKOL.name || 'another KOL'}"`,
+            variant: 'destructive',
+            duration: 5000,
+          });
+          setEditingCell(null);
+          setEditingValue(null);
+          return;
+        }
+      }
+
       const updatedKOL = { ...kolToUpdate, [editingCell.field]: editingValue };
       const kolId = editingCell.kolId;
-      setKols(prevKols => 
+      setKols(prevKols =>
         prevKols.map(k => k.id === kolId ? updatedKOL : k)
       );
       setEditingCell(null);
@@ -390,7 +412,7 @@ export default function KOLsPage() {
         await KOLService.updateKOL(updatedKOL);
       } catch (error) {
         console.error('Error updating KOL:', error);
-        setKols(prevKols => 
+        setKols(prevKols =>
           prevKols.map(k => k.id === kolId ? kolToUpdate : k)
         );
       }

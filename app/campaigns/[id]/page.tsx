@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { UserService } from "@/lib/userService";
 import { KOLService } from "@/lib/kolService";
 import { CampaignKOLService, CampaignKOLWithDetails } from "@/lib/campaignKolService";
+import { ClientService } from "@/lib/clientService";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -38,6 +39,7 @@ const CampaignDetailsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [allClients, setAllClients] = useState<any[]>([]);
   const regionOptions = KOLService.getFieldOptions().regions;
 
   // Campaign KOLs state
@@ -347,6 +349,7 @@ const CampaignDetailsPage = () => {
 
   useEffect(() => {
     UserService.getAllUsers().then(setAllUsers);
+    ClientService.getAllClients().then(setAllClients);
   }, []);
 
   useEffect(() => {
@@ -2774,6 +2777,52 @@ const CampaignDetailsPage = () => {
                       <div className="text-lg font-semibold text-gray-900">{displayRegion(campaign?.region)}</div>
                     )}
                   </div>
+                    </div>
+                  </div>
+
+                  {/* Client Information Section */}
+                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                        <Building2 className="h-5 w-5 text-white" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">Client Information</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Client</div>
+                        {editMode ? (
+                          <Select value={form?.client_id || ""} onValueChange={value => handleChange("client_id", value)}>
+                            <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
+                              <SelectValue placeholder="Select client" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allClients.map((client) => (
+                                <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          (() => {
+                            const clientName = campaign?.client_name || '-';
+                            const clientEmail = campaign?.client_email || '';
+                            const initials = clientName !== '-' ? clientName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : '?';
+                            return (
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-10 w-10 border-2 border-[#3e8692]">
+                                  <AvatarFallback className="bg-[#3e8692] text-white font-semibold">
+                                    {initials}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="font-semibold text-gray-900">{clientName}</div>
+                                  {clientEmail && <div className="text-xs text-gray-500">{clientEmail}</div>}
+                                </div>
+                              </div>
+                            );
+                          })()
+                        )}
+                      </div>
                     </div>
                   </div>
 

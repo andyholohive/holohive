@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2, ChevronDown, Star } from 'lucide-react';
+import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2, ChevronDown, Star, Copy, ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { KOLService } from '@/lib/kolService';
 import { useToast } from '@/hooks/use-toast';
@@ -1625,7 +1625,18 @@ export default function ListsPage() {
                       });
                     }}
                   >
-                    Copy
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-10"
+                    onClick={() => {
+                      if (sharingList?.id) {
+                        window.open(`${window.location.origin}/public/lists/${sharingList.id}`, '_blank');
+                      }
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4" />
                   </Button>
                 </div>
               </div>

@@ -465,7 +465,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
                   placeholder="your.email@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full"
+                  className="auth-input"
                   required
                 />
                 {emailError && (

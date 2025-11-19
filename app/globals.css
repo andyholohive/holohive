@@ -215,3 +215,9 @@
 .chat-content {
   height: 520px !important;
 }
+
+/* Text overflow utilities */
+.overflow-wrap-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}

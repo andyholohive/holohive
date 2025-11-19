@@ -18,11 +18,12 @@ export class CampaignService {
    * - Admins: See all campaigns
    * - Members: See only campaigns for clients they have access to
    */
-  static async getCampaignsForUser(userRole: 'admin' | 'member' | 'client', userId: string): Promise<CampaignWithDetails[]> {
+  static async getCampaignsForUser(userRole: 'admin' | 'member' | 'client', userId: string, supabaseClient?: any): Promise<CampaignWithDetails[]> {
     try {
+      const client = supabaseClient || supabase;
       if (userRole === 'admin') {
         // Admins can see all campaigns
-        const { data: campaigns, error } = await supabase
+        const { data: campaigns, error } = await client
           .from('campaigns')
           .select(`
             *,
@@ -43,7 +44,7 @@ export class CampaignService {
         })) || [];
       } else {
         // Members can only see campaigns for clients they have access to
-        const { data: campaignAccess, error } = await supabase
+        const { data: campaignAccess, error } = await client
           .from('client_access_members')
           .select(`
             campaigns!inner(
@@ -76,9 +77,10 @@ export class CampaignService {
   /**
    * Get a single campaign by ID with budget allocations
    */
-  static async getCampaignById(campaignId: string): Promise<CampaignWithDetails | null> {
+  static async getCampaignById(campaignId: string, supabaseClient?: any): Promise<CampaignWithDetails | null> {
     try {
-      const { data: campaign, error } = await supabase
+      const client = supabaseClient || supabase;
+      const { data: campaign, error } = await client
         .from('campaigns')
         .select(`
           *,
@@ -97,7 +99,7 @@ export class CampaignService {
         client_email: (campaign.clients as any)?.email,
         budget_allocations: campaign.campaign_budget_allocations || [],
         total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
-        
+
       };
     } catch (error) {
       console.error('Error fetching campaign:', error);
@@ -149,11 +151,13 @@ export class CampaignService {
    * Update campaign
    */
   static async updateCampaign(
-    id: string, 
-    updates: Partial<Pick<Campaign, 'name' | 'total_budget' | 'status' | 'start_date' | 'end_date' | 'description' | 'region' | 'intro_call' | 'intro_call_date' | 'manager' | 'call_support' | 'client_choosing_kols' | 'multi_activation' | 'proposal_sent' | 'nda_signed' | 'budget_type' | 'outline'>>
+    id: string,
+    updates: Partial<Pick<Campaign, 'name' | 'total_budget' | 'status' | 'start_date' | 'end_date' | 'description' | 'region' | 'intro_call' | 'intro_call_date' | 'manager' | 'call_support' | 'client_choosing_kols' | 'multi_activation' | 'proposal_sent' | 'nda_signed' | 'budget_type' | 'outline'>>,
+    supabaseClient?: any
   ): Promise<Campaign> {
     try {
-      const { data, error } = await supabase
+      const client = supabaseClient || supabase;
+      const { data, error } = await client
         .from('campaigns')
         .update(updates)
         .eq('id', id)

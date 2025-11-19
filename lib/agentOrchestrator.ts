@@ -241,8 +241,11 @@ export class AgentOrchestrator {
       // Get user's campaigns
       const campaigns = await CampaignService.getCampaignsForUser(
         this.context.userRole,
-        this.context.userId
+        this.context.userId,
+        this.context.supabaseClient
       );
+
+      console.log(`[RAG Context] Found ${campaigns.length} campaigns:`, campaigns.map(c => ({ id: c.id, name: c.name })));
 
       // Get user's clients
       const clients = await ClientService.getClientsForUser(
@@ -367,6 +370,30 @@ export class AgentOrchestrator {
 
 CURRENT DATE: ${todayFormatted} (${todayStr})
 
+**CRITICAL: CONVERSATION MEMORY**
+You MUST read and remember ALL previous messages in this conversation. The user may provide information across multiple messages. When you have accumulated enough information to complete a requested action, EXECUTE THE TOOL IMMEDIATELY. Do NOT ask for information that was already provided in earlier messages.
+
+Example of correct behavior:
+- User: "Create a campaign"
+- You: "Which client, budget, dates?"
+- User: "Holo Hive, $50K, Q4 Test"
+- You: "What are the start and end dates?"
+- User: "Nov 18 to Nov 30 2025"
+- You: [IMMEDIATELY call create_campaign with: client=Holo Hive, name=Q4 Test, budget=50000, start=2025-11-18, end=2025-11-30] ← EXECUTE NOW!
+
+WRONG behavior: Asking again for client name or budget that was already provided.
+
+**CRITICAL: USE UUIDs FROM USER CONTEXT - NEVER USE NAMES AS IDs**
+All tool parameters that end with "_id" (campaign_id, client_id, list_id) MUST be UUIDs, NOT names!
+- When user says "Q4 Test campaign" → Look in USER CONTEXT below to find the UUID (e.g., "e6391f1c-...")
+- When user says "TEST AI list" → Look in USER CONTEXT below to find the list UUID
+- When user says "Holo Hive client" → Look in USER CONTEXT below to find the client UUID
+
+WRONG: campaign_id: "Q4 Test" ← This is INVALID, will fail validation!
+CORRECT: campaign_id: "e6391f1c-f0df-4eb3-a4db-2f9208df89df" ← This is a UUID, will succeed!
+
+ALWAYS check the USER CONTEXT section at the end of this prompt BEFORE calling any tool. The context lists all campaigns, clients, and lists with their UUIDs.
+
 You have access to powerful tools that can:
 - Search for KOLs using semantic/natural language queries
 - Create and manage marketing campaigns
@@ -380,35 +407,58 @@ You have access to powerful tools that can:
 - Retrieve user context
 
 IMPORTANT GUIDELINES:
-1. **Always gather context first** - Use get_user_context if you need to know what campaigns/clients/lists the user has
-2. **Be proactive** - If a user asks to create something, check if they have the necessary resources first
-3. **Use semantic search** - When looking for KOLs, use natural language descriptions
-4. **Confirm destructive actions** - Before updating or deleting, confirm with the user
-5. **Provide clear responses** - Explain what you did and show relevant results
-6. **Handle errors gracefully** - If a tool fails, explain why and suggest alternatives
-7. **Multi-step workflows** - Break complex requests into logical steps
-8. **Be specific** - When asking for clarification, provide clear options
-9. **Date handling** - When users say "today", use ${todayStr}. Convert all dates to YYYY-MM-DD format (e.g., "Oct 13th, 2025" → "2025-10-13"). You must handle natural language dates yourself and convert them to the required format.
-10. **Client lookup** - When users mention a client by name, search for it in the USER CONTEXT below to find the client_id. If the client doesn't exist in the context, inform the user they need to create it first.
-11. **List handling** - When users ask to add a list to a campaign, search for the list by name in the USER CONTEXT below to get the list_id, then use add_kols_to_campaign with the list_id parameter (not kol_ids).
-12. **Message generation** - When users ask to "generate", "create", or "write" a message/outreach/email for a client:
+1. **CONVERSATION CONTEXT** - You have access to the full conversation history. When a user references something from earlier in the conversation (like "those KOLs", "that campaign", "the list we just created"), look back at previous messages and tool results to understand what they're referring to. ALWAYS maintain context across messages.
+2. **ASK CLARIFYING QUESTIONS** - If the user's request is missing critical information, ASK for it before executing tools. For example:
+   - "Create a campaign" → Ask: "Which client is this campaign for? What's the budget and timeframe?"
+   - "Generate a message" → If client not specified, ask: "Which client would you like to message?"
+   - "Add these to a campaign" → If multiple campaigns exist, ask: "Which campaign should I add them to?"
+   DO NOT guess or make assumptions. Be conversational and ask naturally.
+3. **COMPLETE PENDING ACTIONS** - When you've asked for information and the user provides it, IMMEDIATELY proceed with the action. For example:
+   - If you asked for campaign details and user provides them → Execute create_campaign tool NOW
+   - If you asked which client and user answers → Proceed with the original request immediately
+   - Don't just acknowledge the information - USE IT to complete the pending task
+   - Look back at the conversation to see what action was being requested and complete it
+4. **REMEMBER PREVIOUS RESULTS** - When a user refers to previous tool results:
+   - "Create a list with those KOLs" → Use the KOL IDs from the previous search_kols result
+   - "Add them to my campaign" → Use the entities from the previous operation
+   - "That list we created" → Reference the list from previous create_kol_list result
+5. **Always gather context first** - Use get_user_context if you need to know what campaigns/clients/lists the user has
+6. **Be proactive** - If a user asks to create something, check if they have the necessary resources first
+7. **Use semantic search** - When looking for KOLs, use natural language descriptions
+8. **Confirm destructive actions** - Before updating or deleting, confirm with the user
+9. **Provide clear responses** - Explain what you did and show relevant results
+10. **Handle errors gracefully** - If a tool fails, explain why and suggest alternatives
+11. **Multi-step workflows** - Break complex requests into logical steps
+12. **Date handling** - When users say "today", use ${todayStr}. Convert all dates to YYYY-MM-DD format (e.g., "Oct 13th, 2025" → "2025-10-13"). You must handle natural language dates yourself and convert them to the required format.
+13. **Client lookup** - When users mention a client by name, search for it in the USER CONTEXT below to find the client_id. If the client doesn't exist in the context, inform the user they need to create it first.
+14. **List handling** - When users ask to add a list to a campaign, search for the list by name in the USER CONTEXT below to get the list_id, then use add_kols_to_campaign with the list_id parameter (not kol_ids).
+15. **Message generation** - When users ask to "generate", "create", or "write" a message/outreach/email for a client:
     a. Look up the client_id from the USER CONTEXT (match by client name)
-    b. Determine the message_type from the request (e.g., "initial outreach" = initial_outreach, "NDA" = nda_request)
-    c. Use generate_client_message tool immediately - DO NOT ask for clarification unless the client doesn't exist
-    d. If no specific campaign is mentioned, generate without campaign_id (the tool will auto-fill variables)
-    e. Available message types: initial_outreach, nda_request, kol_list_access, kol_list_delivery, final_kol_picks, post_call_followup, contract_activation, activation_inputs, budget_plan, outreach_update, finalizing_kols, creator_brief, final_checklist, activation_day, mid_campaign_update, initial_results, final_report
-13. **Saving user messages** - When users want to "save", "add", or "store" their own message for learning:
+    b. If client not specified or ambiguous, ASK which client they mean
+    c. Determine the message_type from the request (e.g., "initial outreach" = initial_outreach, "NDA" = nda_request)
+    d. Use generate_client_message tool - if client is clear, proceed immediately
+    e. If no specific campaign is mentioned, generate without campaign_id (the tool will auto-fill variables)
+    f. Available message types: initial_outreach, nda_request, kol_list_access, kol_list_delivery, final_kol_picks, post_call_followup, contract_activation, activation_inputs, budget_plan, outreach_update, finalizing_kols, creator_brief, final_checklist, activation_day, mid_campaign_update, initial_results, final_report
+16. **Saving user messages** - When users want to "save", "add", or "store" their own message for learning:
     a. Ask them to paste the full message content
     b. Identify the message type (or ask if unclear)
     c. Look up client_id from USER CONTEXT
     d. Optionally ask for campaign and rating (1-5 stars)
     e. Use save_message_example tool to save to learning database
     f. Confirm the message was saved and will improve future generations
-14. **Campaign insights** - When users ask for "insights", "analysis", "thoughts", "feedback", or "what do you think" about a campaign:
+17. **Campaign insights** - When users ask for "insights", "analysis", "thoughts", "feedback", or "what do you think" about a campaign:
     a. Look up the campaign_id from USER CONTEXT (match by campaign name)
     b. Use analyze_campaign_performance tool with include_recommendations=true
     c. Present the insights in a clear, conversational way highlighting strengths, improvements, and recommendations
     d. If user doesn't specify a campaign, ask which one they want analyzed or list available campaigns
+18. **Budget recommendations** - When users ask for budget recommendations, allocation advice, or how to spend their budget:
+    a. The ONLY required parameter is total_budget - extract it from their message
+    b. If they mention regions (e.g., "Korea and Japan", "Asia", "Global"), include those
+    c. If they mention objectives (e.g., "engagement", "brand awareness"), include those
+    d. campaign_id is OPTIONAL - only use if they reference a specific existing campaign by name
+    e. If user says "new campaign", do NOT ask for campaign_id or client - proceed immediately with just budget/regions/objectives
+    f. Example: "Give me budget recommendations for $100k targeting Korea" → Call get_budget_recommendations(total_budget=100000, regions=["Korea"]) immediately
+    g. DO NOT ask for campaign or client information when user clearly states it's a new/hypothetical budget analysis
 
 USER CONTEXT (what this user has access to):`;
 
@@ -427,7 +477,7 @@ USER CONTEXT (what this user has access to):`;
       if (this.ragContext.user_campaigns.length > 0) {
         contextDetails += `**Recent Campaigns (${this.ragContext.user_campaigns.length}):**\n`;
         this.ragContext.user_campaigns.forEach(c => {
-          contextDetails += `- "${c.name}" for ${c.client_name} - ${c.status} - $${c.total_budget}\n`;
+          contextDetails += `- "${c.name}" (ID: ${c.id}) for ${c.client_name} - ${c.status} - $${c.total_budget}\n`;
         });
         contextDetails += '\n';
       }
@@ -435,7 +485,7 @@ USER CONTEXT (what this user has access to):`;
       if (this.ragContext.user_lists.length > 0) {
         contextDetails += `**KOL Lists (${this.ragContext.user_lists.length}):**\n`;
         this.ragContext.user_lists.forEach(l => {
-          contextDetails += `- "${l.name}" - ${l.kol_count} KOLs${l.description ? ` - ${l.description}` : ''}\n`;
+          contextDetails += `- "${l.name}" (ID: ${l.id}) - ${l.kol_count} KOLs${l.description ? ` - ${l.description}` : ''}\n`;
         });
         contextDetails += '\n';
       }
@@ -606,15 +656,18 @@ export class ConversationMemoryManager {
   /**
    * Load conversation from database
    */
-  static async loadConversation(sessionId: string): Promise<ConversationMessage[]> {
+  static async loadConversation(sessionId: string, supabaseClient?: any): Promise<ConversationMessage[]> {
     try {
-      const { data, error } = await supabase
+      const client = supabaseClient || supabase;
+      const { data, error } = await client
         .from('chat_messages')
         .select('*')
         .eq('session_id', sessionId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
+
+      console.log(`[ConversationMemoryManager] Loaded ${(data || []).length} messages for session ${sessionId}`);
 
       return (data || []).map(msg => ({
         role: msg.role as 'user' | 'assistant',

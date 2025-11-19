@@ -15,12 +15,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { AIService, CampaignSuggestion, ListSuggestion } from '@/lib/aiService';
 import AISuggestionCard from './AISuggestionCard';
-import { MessageTrainingService, MessageContext } from '@/lib/messageTrainingService';
-import { MessageTemplateManager } from './MessageTemplateManager';
 import { AdvancedAIService, PredictiveInsight } from '@/lib/advancedAIService';
 import { AdvancedInsightsCard } from './AdvancedInsightsCard';
 import { AgentStatusIndicator, AgentStatus } from './AgentStatusIndicator';
 import { AgentActionCard } from './AgentActionCard';
+import { supabase } from '@/lib/supabase';
 
 export default function FloatingChat() {
   const { userProfile } = useAuth();
@@ -38,8 +37,6 @@ export default function FloatingChat() {
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState('');
   const [aiSuggestion, setAiSuggestion] = useState<{ type: 'campaign' | 'list'; suggestion: CampaignSuggestion | ListSuggestion } | null>(null);
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [messageContext, setMessageContext] = useState<MessageContext>({});
   const [showAdvancedInsights, setShowAdvancedInsights] = useState(false);
   const [advancedInsights, setAdvancedInsights] = useState<PredictiveInsight[]>([]);
   const { toast } = useToast();
@@ -49,6 +46,12 @@ export default function FloatingChat() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
 
+  // Create list from search results
+  const [createListDialogOpen, setCreateListDialogOpen] = useState(false);
+  const [pendingListKOLs, setPendingListKOLs] = useState<string[]>([]);
+  const [newListName, setNewListName] = useState('');
+  const [creatingList, setCreatingList] = useState(false);
+
   // Agent-specific state
   const [agentStatus, setAgentStatus] = useState<AgentStatus>(null);
   const [currentToolStep, setCurrentToolStep] = useState<string>('');
@@ -56,6 +59,122 @@ export default function FloatingChat() {
   const [reversibleActions, setReversibleActions] = useState<any[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [feedbackStates, setFeedbackStates] = useState<Record<string, { sent: boolean; rating?: number }>>({});
+
+  // Format AI message content for better readability
+  const formatMessageContent = (content: string) => {
+    if (!content) return null;
+
+    // Split by double newlines to create paragraphs
+    const paragraphs = content.split(/\n\n+/);
+
+    return paragraphs.map((paragraph, pIndex) => {
+      const lines = paragraph.split('\n');
+
+      // Check if first line is a header
+      const firstLine = lines[0];
+      const headerMatch = firstLine?.match(/^(#{1,6})\s+(.+)$/);
+
+      if (headerMatch && lines.length === 1) {
+        // Single-line header
+        const level = headerMatch[1].length;
+        const headerText = headerMatch[2];
+        const HeaderTag = `h${Math.min(level, 6)}` as keyof JSX.IntrinsicElements;
+        const sizeClass = level === 1 ? 'text-lg' : level === 2 ? 'text-base' : 'text-sm';
+
+        return (
+          <HeaderTag key={pIndex} className={`font-bold ${sizeClass} my-2 text-gray-900`}>
+            {formatInlineText(headerText)}
+          </HeaderTag>
+        );
+      } else if (headerMatch && lines.length > 1) {
+        // Multi-line paragraph starting with header
+        const level = headerMatch[1].length;
+        const headerText = headerMatch[2];
+        const HeaderTag = `h${Math.min(level, 6)}` as keyof JSX.IntrinsicElements;
+        const sizeClass = level === 1 ? 'text-lg' : level === 2 ? 'text-base' : 'text-sm';
+        const remainingLines = lines.slice(1);
+
+        return (
+          <div key={pIndex}>
+            <HeaderTag className={`font-bold ${sizeClass} my-2 text-gray-900`}>
+              {formatInlineText(headerText)}
+            </HeaderTag>
+            <div className="text-sm leading-relaxed my-1">
+              {remainingLines.map((line, lIndex) => (
+                <React.Fragment key={lIndex}>
+                  {formatInlineText(line)}
+                  {lIndex < remainingLines.length - 1 && <br />}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      // Check if this is a list (starts with - or * or number.)
+      const isList = lines.some(line => /^[\s]*[-*•]\s|^[\s]*\d+\.\s/.test(line));
+
+      if (isList) {
+        return (
+          <ul key={pIndex} className="list-disc list-inside space-y-1 my-2">
+            {lines.map((line, lIndex) => {
+              // Remove list markers
+              const cleanLine = line.replace(/^[\s]*[-*•]\s/, '').replace(/^[\s]*\d+\.\s/, '').trim();
+              if (!cleanLine) return null;
+              return (
+                <li key={lIndex} className="text-sm leading-relaxed">
+                  {formatInlineText(cleanLine)}
+                </li>
+              );
+            }).filter(Boolean)}
+          </ul>
+        );
+      }
+
+      // Regular paragraph
+      return (
+        <p key={pIndex} className="text-sm leading-relaxed my-1">
+          {lines.map((line, lIndex) => (
+            <React.Fragment key={lIndex}>
+              {formatInlineText(line)}
+              {lIndex < lines.length - 1 && <br />}
+            </React.Fragment>
+          ))}
+        </p>
+      );
+    });
+  };
+
+  // Format inline text (bold, code, etc.)
+  const formatInlineText = (text: string) => {
+    // Split by code blocks first (backticks)
+    const parts = text.split(/(`[^`]+`)/g);
+
+    return parts.map((part, index) => {
+      if (part.startsWith('`') && part.endsWith('`')) {
+        // Code block
+        return (
+          <code key={index} className="bg-gray-200 text-gray-800 px-1 py-0.5 rounded text-xs font-mono">
+            {part.slice(1, -1)}
+          </code>
+        );
+      }
+
+      // Handle bold text (**text** or __text__)
+      const boldParts = part.split(/(\*\*[^*]+\*\*|__[^_]+__)/g);
+      return boldParts.map((boldPart, bIndex) => {
+        if ((boldPart.startsWith('**') && boldPart.endsWith('**')) ||
+            (boldPart.startsWith('__') && boldPart.endsWith('__'))) {
+          return (
+            <strong key={`${index}-${bIndex}`} className="font-semibold">
+              {boldPart.slice(2, -2)}
+            </strong>
+          );
+        }
+        return <span key={`${index}-${bIndex}`}>{boldPart}</span>;
+      });
+    });
+  };
 
   useEffect(() => {
     if (isOpen && !currentSession) {
@@ -109,6 +228,9 @@ export default function FloatingChat() {
       setCurrentSession(sessionWithMessages);
       setSessions(prev => [{ ...newSession, messages: [] }, ...prev]);
       setShowSessionSelector(false);
+      // Clear action card state when switching to new session
+      setLastAgentMessage(null);
+      setReversibleActions([]);
     } catch (error) {
       console.error('Error creating new session:', error);
       toast({
@@ -125,6 +247,9 @@ export default function FloatingChat() {
       if (sessionWithMessages) {
         setCurrentSession(sessionWithMessages);
         setShowSessionSelector(false);
+        // Clear action card state when switching sessions
+        setLastAgentMessage(null);
+        setReversibleActions([]);
       }
     } catch (error) {
       console.error("Error switching session:", error);
@@ -138,6 +263,9 @@ export default function FloatingChat() {
 
   const goBackToSessionList = () => {
     setCurrentSession(null);
+    // Clear action card state when going back to session list
+    setLastAgentMessage(null);
+    setReversibleActions([]);
   };
 
   const handleDeleteSession = async () => {
@@ -271,21 +399,8 @@ export default function FloatingChat() {
         }
       }
 
-      // Check if user wants to see templates
-      if (userMessage.toLowerCase().includes('template') || userMessage.toLowerCase().includes('message')) {
-        setShowTemplates(true);
-      }
-
-      // Check if user wants advanced insights
-      if (userMessage.toLowerCase().includes('insight') || userMessage.toLowerCase().includes('analyze') || userMessage.toLowerCase().includes('predict')) {
-        try {
-          const insights = await AdvancedAIService.generatePredictiveInsights(userProfile?.id || '');
-          setAdvancedInsights(insights);
-          setShowAdvancedInsights(true);
-        } catch (error) {
-          console.error('Error generating insights:', error);
-        }
-      }
+      // Advanced insights disabled - the agent tool handles campaign analysis properly
+      // The AdvancedAIService returns mock data and is not currently useful
       
       // Get final updated session
       const finalSession = await ChatService.getChatSession(currentSession.id);
@@ -356,11 +471,16 @@ export default function FloatingChat() {
   };
 
   const shouldGenerateSuggestion = (userMessage: string): boolean => {
-    const lowerMessage = userMessage.toLowerCase();
-    return (
-      (lowerMessage.includes('create campaign') || lowerMessage.includes('new campaign')) ||
-      (lowerMessage.includes('create list') || lowerMessage.includes('new list') || lowerMessage.includes('kol list'))
-    );
+    // DISABLED: Old suggestion system - now using Agent system with real data
+    // The Agent system handles campaign and list creation with actual KOL data
+    return false;
+
+    // Old code (kept for reference):
+    // const lowerMessage = userMessage.toLowerCase();
+    // return (
+    //   (lowerMessage.includes('create campaign') || lowerMessage.includes('new campaign')) ||
+    //   (lowerMessage.includes('create list') || lowerMessage.includes('new list') || lowerMessage.includes('kol list'))
+    // );
   };
 
   const generateSuggestion = async (userMessage: string) => {
@@ -390,6 +510,81 @@ export default function FloatingChat() {
 
   const handleDismissSuggestion = () => {
     setAiSuggestion(null);
+  };
+
+  const handleCreateListFromKOLs = async () => {
+    if (!newListName.trim() || pendingListKOLs.length === 0) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a list name',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setCreatingList(true);
+    try {
+      console.log('[CreateList] Starting to create list:', newListName);
+      console.log('[CreateList] KOL IDs:', pendingListKOLs);
+
+      // Create the list directly in Supabase
+      const { data: list, error: listError } = await (supabase as any)
+        .from('lists')
+        .insert({
+          name: newListName.trim(),
+          notes: `List created from AI search with ${pendingListKOLs.length} KOLs`,
+          status: 'curated',
+        })
+        .select()
+        .single();
+
+      if (listError) {
+        console.error('[CreateList] Error creating list:', listError);
+        throw new Error(`Failed to create list: ${listError.message || JSON.stringify(listError)}`);
+      }
+
+      console.log('[CreateList] List created:', list);
+
+      // Add KOLs to the list
+      const listItems = pendingListKOLs.map((kolId) => ({
+        list_id: list.id,
+        master_kol_id: kolId,
+        status: 'curated',
+        notes: null,
+      }));
+
+      console.log('[CreateList] Adding KOLs to list:', listItems.length);
+
+      const { error: itemsError } = await (supabase as any)
+        .from('list_kols')
+        .insert(listItems);
+
+      if (itemsError) {
+        console.error('[CreateList] Error adding KOLs:', itemsError);
+        throw new Error(`Failed to add KOLs to list: ${itemsError.message || JSON.stringify(itemsError)}`);
+      }
+
+      console.log('[CreateList] Successfully added KOLs to list');
+
+      toast({
+        title: 'List Created',
+        description: `Successfully created "${newListName}" with ${pendingListKOLs.length} KOLs`,
+      });
+
+      // Close dialog and reset
+      setCreateListDialogOpen(false);
+      setNewListName('');
+      setPendingListKOLs([]);
+    } catch (error) {
+      console.error('[CreateList] Error:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to create list',
+        variant: 'destructive',
+      });
+    } finally {
+      setCreatingList(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -661,6 +856,42 @@ export default function FloatingChat() {
                           action.tool_name === 'generate_client_message' && action.result?.success
                         );
 
+                      // Check if this is a KOL search result that should show the create list button
+                      // Only show button if:
+                      // 1. There's a successful search_kols action
+                      // 2. The message content mentions the search results (not just asking for criteria)
+                      const hasSearchResults = msg.role === 'assistant' &&
+                        Array.isArray(agentActions) && agentActions.some((action: any) =>
+                          action.tool_name === 'search_kols' && action.result?.success && action.result?.data?.length > 0
+                        );
+
+                      // Only show button if the message is presenting results, not asking for more criteria
+                      const isAskingQuestion = msg.content.toLowerCase().includes('could you') ||
+                        msg.content.toLowerCase().includes('should i proceed') ||
+                        msg.content.toLowerCase().includes('would you like') ||
+                        msg.content.toLowerCase().includes('please specify');
+
+                      const isPresentingResults = hasSearchResults && !isAskingQuestion && (
+                        msg.content.toLowerCase().includes('found') ||
+                        msg.content.toLowerCase().includes('result') ||
+                        msg.content.toLowerCase().includes('match') ||
+                        msg.content.toLowerCase().includes('here are')
+                      );
+
+                      const isKOLSearchResult = hasSearchResults && isPresentingResults;
+
+                      // Extract KOL IDs from search results
+                      let searchResultKOLIds: string[] = [];
+                      if (isKOLSearchResult && Array.isArray(agentActions)) {
+                        const searchAction = agentActions.find((a: any) =>
+                          a && typeof a === 'object' && a.tool_name === 'search_kols'
+                        ) as any;
+                        if (searchAction?.result?.data) {
+                          searchResultKOLIds = searchAction.result.data.map((kol: any) => kol.id);
+                          console.log('[FloatingChat] Found KOL search results:', searchResultKOLIds.length, 'KOLs');
+                        }
+                      }
+
                       // Extract the actual message content if it's a generated message
                       let displayContent = msg.content;
                       let generatedMessageContent = '';
@@ -680,7 +911,7 @@ export default function FloatingChat() {
                           className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} chat-message w-full`}
                         >
                           <div
-                            className={`${isGeneratedMessage ? 'w-full' : 'max-w-[280px]'} px-4 py-3 rounded-2xl text-sm message-bubble ${
+                            className={`${isGeneratedMessage ? 'w-full' : msg.role === 'user' ? 'max-w-[85%]' : 'max-w-[90%]'} px-4 py-3 rounded-2xl text-sm message-bubble ${
                               msg.role === 'user'
                                 ? 'bg-gradient-to-r from-[#3e8692] to-[#2d5a63] text-white shadow-md'
                                 : 'bg-gray-50 text-gray-900 border border-gray-200 shadow-sm'
@@ -692,10 +923,12 @@ export default function FloatingChat() {
                                   <Image src="/images/logo.png" alt="Logo" width={16} height={16} className="rounded-full" />
                                 </div>
                               )}
-                              <div className="flex-1">
-                                <p className={`text-sm leading-relaxed ${msg.role === 'user' ? 'text-white' : 'text-gray-900'}`}>
-                                  {displayContent}
-                                </p>
+                              <div className="flex-1 min-w-0 overflow-hidden">
+                                <div className={`break-words overflow-wrap-anywhere ${msg.role === 'user' ? 'text-white' : 'text-gray-900'}`}>
+                                  {msg.role === 'assistant' ? formatMessageContent(displayContent) : (
+                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{displayContent}</p>
+                                  )}
+                                </div>
 
                                 {/* Show generated message in a special box with copy button */}
                                 {isGeneratedMessage && generatedMessageContent && (() => {
@@ -790,6 +1023,24 @@ export default function FloatingChat() {
                                   );
                                 })()}
 
+                                {/* Create List button for KOL search results */}
+                                {isKOLSearchResult && searchResultKOLIds.length > 0 && (
+                                  <div className="mt-3">
+                                    <button
+                                      onClick={() => {
+                                        setPendingListKOLs(searchResultKOLIds);
+                                        setCreateListDialogOpen(true);
+                                      }}
+                                      className="w-full text-xs px-3 py-2 bg-[#3e8692] text-white rounded-lg hover:bg-[#2d5a63] transition-colors flex items-center justify-center gap-2"
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+                                      </svg>
+                                      Create List from {searchResultKOLIds.length} KOLs
+                                    </button>
+                                  </div>
+                                )}
+
                                 <p className={`text-xs mt-2 ${msg.role === 'user' ? 'text-blue-100' : 'text-gray-500'}`}>
                                   {formatTime(msg.created_at || '')}
                                 </p>
@@ -852,33 +1103,6 @@ export default function FloatingChat() {
                            onApply={handleApplySuggestion}
                            onDismiss={handleDismissSuggestion}
                          />
-                       </div>
-                     )}
-
-                     {/* Message Templates */}
-                     {showTemplates && (
-                       <div className="mt-4">
-                         <div className="bg-white border rounded-lg p-4 max-h-96 overflow-y-auto">
-                           <div className="flex items-center justify-between mb-4">
-                             <h3 className="text-sm font-semibold text-gray-900">Message Templates</h3>
-                             <Button
-                               variant="ghost"
-                               size="sm"
-                               onClick={() => setShowTemplates(false)}
-                               className="h-6 w-6 p-0"
-                             >
-                               <X className="h-3 w-3" />
-                             </Button>
-                           </div>
-                           <MessageTemplateManager
-                             context={messageContext}
-                             onTemplateSelected={(template) => {
-                               setMessage(template.content);
-                               setShowTemplates(false);
-                               MessageTrainingService.incrementUsageCount(template.id);
-                             }}
-                           />
-                         </div>
                        </div>
                      )}
 
@@ -968,6 +1192,52 @@ export default function FloatingChat() {
               style={{ backgroundColor: "#dc2626", color: "white" }}
             >
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create List from KOLs Dialog */}
+      <Dialog open={createListDialogOpen} onOpenChange={setCreateListDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create KOL List</DialogTitle>
+            <DialogDescription>
+              Create a new list with {pendingListKOLs.length} KOL(s) from your search results.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              placeholder="Enter list name..."
+              value={newListName}
+              onChange={(e) => setNewListName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !creatingList) {
+                  handleCreateListFromKOLs();
+                }
+              }}
+              className="auth-input"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCreateListDialogOpen(false);
+                setNewListName('');
+                setPendingListKOLs([]);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateListFromKOLs}
+              disabled={!newListName.trim() || creatingList}
+              className="hover:opacity-90"
+              style={{ backgroundColor: "#3e8692", color: "white" }}
+            >
+              {creatingList ? 'Creating...' : 'Create List'}
             </Button>
           </DialogFooter>
         </DialogContent>

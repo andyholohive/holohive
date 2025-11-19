@@ -435,12 +435,6 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                 {list.kols?.length || 0} KOL{(list.kols?.length || 0) !== 1 ? 's' : ''}
               </span>
             </div>
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4 text-gray-500" />
-              <span className="text-sm text-gray-600">
-                Created {formatDate(list.created_at)}
-              </span>
-            </div>
             {list.notes && (
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="font-semibold text-sm text-gray-700 mb-2">Notes:</h3>
@@ -477,14 +471,14 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                     <tr key={`${kol.id}-${index}`} className="hover:bg-gray-50 group">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div>
+                        <div className="flex items-center gap-2">
                           <div className="font-medium text-gray-900">{kol.name}</div>
                           {kol.link && (
-                            <a 
-                              href={kol.link} 
-                              target="_blank" 
+                            <a
+                              href={kol.link}
+                              target="_blank"
                               rel="noopener noreferrer"
-                              className="text-sm text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:ring-offset-1 rounded px-1 py-0.5 transition-all duration-200"
+                              className="text-sm text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:ring-offset-1 rounded px-1 py-0.5 transition-all duration-200 whitespace-nowrap"
                             >
                               View Profile
                             </a>
@@ -580,25 +574,7 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
           </div>
         )}
 
-        {/* Approve/Deny Buttons */}
-        <div className="bg-white rounded-lg shadow-sm border p-6 mt-6">
-          <div className="flex justify-center space-x-4">
-            <Button
-              onClick={() => handleUpdateListStatus('approved')}
-              className="bg-green-600 hover:bg-green-700 text-white px-6 py-2"
-              disabled={list.status === 'approved'}
-            >
-              Approve
-            </Button>
-            <Button
-              onClick={() => handleUpdateListStatus('denied')}
-              className="bg-red-600 hover:bg-red-700 text-white px-6 py-2"
-              disabled={list.status === 'denied'}
-            >
-              Deny
-            </Button>
-          </div>
-        </div>
+        {/* Approve/Deny Buttons - Hidden for public view */}
       </div>
     </div>
   );

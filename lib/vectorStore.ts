@@ -143,22 +143,95 @@ export class VectorStore {
   // ============================================================================
 
   /**
+   * Format follower count for better semantic search
+   */
+  private static formatFollowers(count: number | null): string {
+    if (!count) return '';
+    if (count >= 1000000) {
+      const millions = (count / 1000000).toFixed(1);
+      return `${millions}M followers, ${count} total followers, large audience, major influencer`;
+    }
+    if (count >= 100000) {
+      const k = Math.round(count / 1000);
+      return `${k}K followers, ${count} total followers, large following, popular creator`;
+    }
+    if (count >= 10000) {
+      const k = Math.round(count / 1000);
+      return `${k}K followers, ${count} total followers, medium following, growing creator`;
+    }
+    if (count >= 1000) {
+      const k = (count / 1000).toFixed(1);
+      return `${k}K followers, ${count} total followers, small following, micro influencer`;
+    }
+    return `${count} followers, small audience, nano influencer`;
+  }
+
+  /**
+   * Extract handle/username from link
+   */
+  private static extractHandle(link: string | null): string {
+    if (!link) return '';
+    try {
+      // Extract username from common social media URLs
+      const patterns = [
+        /twitter\.com\/(@?\w+)/i,
+        /x\.com\/(@?\w+)/i,
+        /youtube\.com\/@?([\w-]+)/i,
+        /instagram\.com\/([\w.]+)/i,
+        /tiktok\.com\/@?([\w.]+)/i,
+        /t\.me\/([\w_]+)/i,
+      ];
+      for (const pattern of patterns) {
+        const match = link.match(pattern);
+        if (match) {
+          return `Handle: @${match[1].replace('@', '')}`;
+        }
+      }
+    } catch {
+      // Ignore parsing errors
+    }
+    return '';
+  }
+
+  /**
    * Create searchable text representation of a KOL
+   * Enhanced with more fields and better semantic formatting
    */
   private static kolToText(kol: MasterKOL): string {
     const parts = [
-      kol.name,
-      kol.region ? `Region: ${kol.region}` : '',
-      kol.platform?.length ? `Platforms: ${kol.platform.join(', ')}` : '',
-      kol.followers ? `Followers: ${kol.followers}` : '',
-      kol.creator_type?.length ? `Creator Types: ${kol.creator_type.join(', ')}` : '',
-      kol.content_type?.length ? `Content Types: ${kol.content_type.join(', ')}` : '',
-      kol.deliverables?.length ? `Deliverables: ${kol.deliverables.join(', ')}` : '',
-      kol.pricing ? `Pricing: ${kol.pricing}` : '',
-      kol.community ? 'Has community' : '',
-      kol.group_chat ? 'Has group chat' : '',
-      kol.in_house ? `In-house: ${kol.in_house}` : '',
-      kol.description || '',
+      // Basic info
+      `Name: ${kol.name}`,
+      this.extractHandle(kol.link),
+
+      // Geographic info
+      kol.region ? `Region: ${kol.region}, Location: ${kol.region}, Based in ${kol.region}` : '',
+
+      // Platform presence
+      kol.platform?.length ? `Platforms: ${kol.platform.join(', ')}. Active on ${kol.platform.join(' and ')}` : '',
+
+      // Audience size with descriptive text
+      this.formatFollowers(kol.followers),
+
+      // Creator categorization
+      kol.creator_type?.length ? `Creator Type: ${kol.creator_type.join(', ')}. This creator is a ${kol.creator_type.join(', ')}` : '',
+      kol.content_type?.length ? `Content Focus: ${kol.content_type.join(', ')}. Creates content about ${kol.content_type.join(', ')}` : '',
+      kol.niche?.length ? `Niche: ${kol.niche.join(', ')}. Specializes in ${kol.niche.join(', ')}` : '',
+
+      // Services and pricing
+      kol.deliverables?.length ? `Services: ${kol.deliverables.join(', ')}. Can deliver ${kol.deliverables.join(', ')}` : '',
+      kol.pricing ? `Pricing: ${kol.pricing}. Costs ${kol.pricing}` : '',
+      kol.tier ? `Tier: ${kol.tier}. ${kol.tier} tier creator` : '',
+
+      // Engagement features
+      kol.community ? 'Has active community, community engagement, audience interaction' : '',
+      kol.group_chat ? 'Has group chat, direct communication channel, telegram group' : '',
+      kol.in_house ? `In-house status: ${kol.in_house}` : '',
+
+      // Quality indicators
+      kol.rating ? `Rating: ${kol.rating}/5 stars, ${kol.rating >= 4 ? 'highly rated' : kol.rating >= 3 ? 'good rating' : 'average rating'}` : '',
+
+      // Free-form description (most important for context)
+      kol.description ? `Description: ${kol.description}` : '',
     ];
 
     return parts.filter(Boolean).join('. ');
@@ -170,13 +243,20 @@ export class VectorStore {
   private static kolToMetadata(kol: MasterKOL): Record<string, any> {
     return {
       name: kol.name,
+      link: kol.link,
       region: kol.region,
       platform: kol.platform,
       followers: kol.followers,
       creator_type: kol.creator_type,
       content_type: kol.content_type,
+      niche: kol.niche,
+      deliverables: kol.deliverables,
       pricing: kol.pricing,
+      tier: kol.tier,
       rating: kol.rating,
+      community: kol.community,
+      group_chat: kol.group_chat,
+      in_house: kol.in_house,
     };
   }
 

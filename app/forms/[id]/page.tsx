@@ -1160,11 +1160,12 @@ export default function FormBuilderPage() {
 
   useEffect(() => {
     fetchForm();
+    fetchResponses(); // Fetch responses immediately to show count in tab
   }, [formId]);
 
   useEffect(() => {
     if (activeTab === 'responses') {
-      fetchResponses();
+      fetchResponses(); // Refresh when tab is clicked
     }
   }, [activeTab]);
 
@@ -2492,37 +2493,128 @@ export default function FormBuilderPage() {
 
         {/* Response Viewer Dialog */}
         <Dialog open={isResponseDialogOpen} onOpenChange={setIsResponseDialogOpen}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Response Details</DialogTitle>
+              <DialogTitle className="text-xl font-semibold">Response Details</DialogTitle>
             </DialogHeader>
             {selectedResponse && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 pb-4 border-b">
-                  <div>
-                    <Label className="text-gray-600">Submitted</Label>
-                    <p>{new Date(selectedResponse.submitted_at).toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <Label className="text-gray-600">Name</Label>
-                    <p>{selectedResponse.submitted_by_name || '-'}</p>
-                  </div>
-                  <div>
-                    <Label className="text-gray-600">Email</Label>
-                    <p>{selectedResponse.submitted_by_email || '-'}</p>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  {form?.fields.map((field) => (
-                    <div key={field.id}>
-                      <Label className="text-gray-600">{field.label}</Label>
-                      <p className="text-gray-900">
-                        {Array.isArray(selectedResponse.response_data[field.id])
-                          ? selectedResponse.response_data[field.id].join(', ')
-                          : selectedResponse.response_data[field.id] || '-'}
+              <div className="space-y-6">
+                {/* Submission Info */}
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-xs font-semibold text-gray-600 uppercase">Submitted</Label>
+                      <p className="text-sm font-medium text-gray-900 mt-1">
+                        {new Date(selectedResponse.submitted_at).toLocaleString()}
                       </p>
                     </div>
-                  ))}
+                    <div>
+                      <Label className="text-xs font-semibold text-gray-600 uppercase">Name</Label>
+                      <p className="text-sm font-medium text-gray-900 mt-1">
+                        {selectedResponse.submitted_by_name || '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold text-gray-600 uppercase">Email</Label>
+                      <p className="text-sm font-medium text-gray-900 mt-1">
+                        {selectedResponse.submitted_by_email || '-'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form Fields */}
+                <div className="space-y-4">
+                  {form?.fields
+                    .sort((a, b) => a.display_order - b.display_order)
+                    .map((field) => {
+                      const value = selectedResponse.response_data[field.id];
+                      const reasonKey = `${field.id}_reason`;
+                      const reason = selectedResponse.response_data[reasonKey];
+                      const attachmentsKey = `${field.id}_attachments`;
+                      const attachments = selectedResponse.response_data[attachmentsKey];
+
+                      // Skip display-only fields that don't collect responses
+                      const displayOnlyTypes = ['section', 'description'];
+                      const isDisplayOnly = displayOnlyTypes.includes(field.field_type);
+
+                      return (
+                        <div key={field.id} className="bg-white p-4 rounded-lg border border-gray-200">
+                          <div className="mb-3 flex items-start gap-1">
+                            <div
+                              className="text-sm text-gray-900 flex-1"
+                              dangerouslySetInnerHTML={{ __html: field.label }}
+                            />
+                            {field.required && !isDisplayOnly && <span className="text-red-500">*</span>}
+                          </div>
+
+                          {/* Value Display - Only show for actual input fields */}
+                          {!isDisplayOnly && (
+                            <div className="text-sm text-gray-900 mt-2">
+                              {field.field_type === 'file_upload' && attachments ? (
+                                <div className="space-y-2">
+                                  {Array.isArray(attachments) && attachments.length > 0 ? (
+                                    attachments.map((url: string, idx: number) => (
+                                      <a
+                                        key={idx}
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 text-blue-600 hover:text-blue-800 underline"
+                                      >
+                                        <Upload className="h-4 w-4" />
+                                        Attachment {idx + 1}
+                                      </a>
+                                    ))
+                                  ) : (
+                                    <span className="text-gray-400 italic">No files uploaded</span>
+                                  )}
+                                </div>
+                              ) : field.field_type === 'yes_no' ? (
+                                <div>
+                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                    value === 'Yes'
+                                      ? 'bg-green-100 text-green-800'
+                                      : value === 'No'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {value || '-'}
+                                  </span>
+                                  {reason && (
+                                    <div className="mt-2 pl-4 border-l-2 border-gray-300">
+                                      <Label className="text-xs text-gray-600">Reason:</Label>
+                                      <p className="text-sm text-gray-900 mt-1">{reason}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : Array.isArray(value) ? (
+                                <div className="space-y-1">
+                                  {value.length > 0 ? (
+                                    value.map((item: string, idx: number) => (
+                                      <div key={idx} className="flex gap-2">
+                                        <span className="font-medium text-gray-700">{idx + 1}.</span>
+                                        <span className="text-gray-900">{item}</span>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <span className="text-gray-400 italic">No selection</span>
+                                  )}
+                                </div>
+                              ) : field.field_type === 'long_text' ? (
+                                <p className="whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">
+                                  {value || <span className="text-gray-400 italic">No response</span>}
+                                </p>
+                              ) : (
+                                <p className="font-medium">
+                                  {value || <span className="text-gray-400 italic">No response</span>}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             )}

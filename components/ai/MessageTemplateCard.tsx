@@ -97,7 +97,7 @@ export function MessageTemplateCard({ template, onUseTemplate, onPreviewTemplate
       <CardContent className="pt-0">
         <div className="space-y-4">
           {/* Tags */}
-          {template.tags.length > 0 && (
+          {template.tags && template.tags.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {template.tags.map((tag, index) => (
                 <span
