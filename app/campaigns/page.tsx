@@ -204,9 +204,36 @@ export default function CampaignsPage() {
       );
       if (selectedKolIds.size > 0) {
         const ids = Array.from(selectedKolIds);
-        await Promise.all(ids.map((masterKolId) =>
+        // Add KOLs to the campaign
+        const addedKOLs = await Promise.all(ids.map((masterKolId) =>
           CampaignKOLService.addCampaignKOL(campaign.id, masterKolId, 'Curated')
         ));
+
+        // Automatically create payment records for each added KOL
+        await Promise.all(
+          addedKOLs.map(async (campaignKOL) => {
+            try {
+              const { error: paymentError } = await supabase
+                .from('payments')
+                .insert({
+                  campaign_id: campaign.id,
+                  campaign_kol_id: campaignKOL.id,
+                  amount: 0,
+                  payment_date: new Date().toISOString().split('T')[0],
+                  payment_method: 'Token',
+                  content_id: null,
+                  transaction_id: null,
+                  notes: 'Auto-created payment record'
+                });
+
+              if (paymentError) {
+                console.error('Error creating payment for KOL:', campaignKOL.id, paymentError);
+              }
+            } catch (err) {
+              console.error('Error creating payment:', err);
+            }
+          })
+        );
       }
     } catch (err) {
       console.error("Error creating campaign:", err);

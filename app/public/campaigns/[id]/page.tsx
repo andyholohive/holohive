@@ -1342,107 +1342,6 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 )}
                               </div>
                             </TableHead>
-                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                              <div className="flex items-center gap-1 cursor-pointer group">
-                                <span>Budget</span>
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <button className="opacity-50 group-hover:opacity-100 transition-opacity">
-                                      <ChevronDown className="h-3 w-3" />
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-[200px] p-0" align="start">
-                                    <div className="p-3">
-                                      <div className="text-xs font-semibold text-gray-600 mb-2">Filter Budget</div>
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <Select
-                                          value={kolFilters.budget_operator}
-                                          onValueChange={(value) => setKolFilters(prev => ({ ...prev, budget_operator: value }))}
-                                        >
-                                          <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
-                                            <SelectValue placeholder="=" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value=">">{'>'}</SelectItem>
-                                            <SelectItem value="<">{'<'}</SelectItem>
-                                            <SelectItem value="=">=</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                        <Input
-                                          type="number"
-                                          placeholder="Value"
-                                          value={kolFilters.budget_value}
-                                          onChange={(e) => setKolFilters(prev => ({ ...prev, budget_value: e.target.value }))}
-                                          className="h-8 text-xs auth-input"
-                                        />
-                                      </div>
-                                      {(kolFilters.budget_operator || kolFilters.budget_value) && (
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          className="w-full text-xs"
-                                          onClick={() => setKolFilters(prev => ({ ...prev, budget_operator: '', budget_value: '' }))}
-                                        >
-                                          Clear
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
-                                {(kolFilters.budget_operator && kolFilters.budget_value) && (
-                                  <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
-                                    1
-                                  </span>
-                                )}
-                              </div>
-                            </TableHead>
-                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                              <div className="flex items-center gap-1 cursor-pointer group">
-                                <span>Budget Type</span>
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <button className="opacity-50 group-hover:opacity-100 transition-opacity">
-                                      <ChevronDown className="h-3 w-3" />
-                                    </button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-[200px] p-0" align="start">
-                                    <div className="p-3">
-                                      <div className="text-xs font-semibold text-gray-600 mb-2">Filter Budget Type</div>
-                                      {['Token','Fiat','WL'].map((budgetType) => (
-                                        <div
-                                          key={budgetType}
-                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
-                                          onClick={() => {
-                                            const newBudgetTypes = kolFilters.budget_type.includes(budgetType)
-                                              ? kolFilters.budget_type.filter(bt => bt !== budgetType)
-                                              : [...kolFilters.budget_type, budgetType];
-                                            setKolFilters(prev => ({ ...prev, budget_type: newBudgetTypes }));
-                                          }}
-                                        >
-                                          <Checkbox checked={kolFilters.budget_type.includes(budgetType)} />
-                                          <span className="text-sm">{budgetType}</span>
-                                        </div>
-                                      ))}
-                                      {kolFilters.budget_type.length > 0 && (
-                                        <Button
-                                          size="sm"
-                                          variant="ghost"
-                                          className="w-full mt-2 text-xs"
-                                          onClick={() => setKolFilters(prev => ({ ...prev, budget_type: [] }))}
-                                        >
-                                          Clear
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </PopoverContent>
-                                </Popover>
-                                {kolFilters.budget_type.length > 0 && (
-                                  <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
-                                    {kolFilters.budget_type.length}
-                                  </span>
-                                )}
-                              </div>
-                            </TableHead>
                             <TableHead className="relative bg-gray-50 select-none">Content</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -1539,16 +1438,6 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                       {campaignKOL.hh_status || 'Curated'}
                                     </span>
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                    <div className="truncate min-h-[32px] flex items-center px-1 py-1" style={{ minHeight: 32 }}>
-                                      {campaignKOL.allocated_budget ? `$${Number(campaignKOL.allocated_budget).toLocaleString('en-US')}` : '-'}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                    <div className="truncate min-h-[32px] flex items-center px-1 py-1" style={{ minHeight: 32 }}>
-                                      {campaignKOL.budget_type || '-'}
-                                    </div>
-                                  </TableCell>
                                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden text-center`}>
                                     <div className="font-medium text-gray-900">
                                       {contents.filter(content => content.campaign_kols_id === campaignKOL.id).length}
@@ -1604,22 +1493,6 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                             <Badge className={getStatusColor(item.hh_status || 'curated')}>
                               {item.hh_status || 'No status'}
                             </Badge>
-                          </div>
-
-                          {/* Allocated Budget */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Allocated Budget</span>
-                            <span className="font-medium text-gray-900">
-                              {item.allocated_budget ? `$${item.allocated_budget}` : '-'}
-                            </span>
-                          </div>
-
-                          {/* Budget Type */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Budget Type</span>
-                            <span className="font-medium text-gray-900">
-                              {item.budget_type || '-'}
-                            </span>
                           </div>
 
                           {/* Content Types */}

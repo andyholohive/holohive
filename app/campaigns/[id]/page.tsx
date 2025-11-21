@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +84,27 @@ const CampaignDetailsPage = () => {
   // Track allocation edits
   const [allocations, setAllocations] = useState<any[]>([]);
   const [deletedAllocIds, setDeletedAllocIds] = useState<string[]>([]);
+
+  // Track cell selection for copy/paste
+  const [selectedCell, setSelectedCell] = useState<{ table: string; rowId: string; field: string; value: any } | null>(null);
+  const [copiedValue, setCopiedValue] = useState<string | null>(null);
+  const [copiedCell, setCopiedCell] = useState<{ table: string; rowId: string; field: string } | null>(null);
+
+  // Sticky scrollbar state
+  const [stickyScrollbar, setStickyScrollbar] = useState<{
+    visible: boolean;
+    width: number;
+    scrollWidth: number;
+    scrollLeft: number;
+    tableId: string;
+    opacity: number;
+  } | null>(null);
+  const kolTableRef = useRef<HTMLDivElement>(null);
+  const contentTableRef = useRef<HTMLDivElement>(null);
+  const paymentTableRef = useRef<HTMLDivElement>(null);
+  const kolScrollableRef = useRef<HTMLElement | null>(null);
+  const contentScrollableRef = useRef<HTMLElement | null>(null);
+  const paymentScrollableRef = useRef<HTMLElement | null>(null);
   
   // KOLs view toggle state
   const [kolViewMode, setKolViewMode] = useState<'overview' | 'table' | 'graph'>('overview');
@@ -369,6 +390,342 @@ const CampaignDetailsPage = () => {
     }
   }, [campaign]);
 
+  // Handle keyboard events for copy/paste
+  useEffect(() => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      // Check if Ctrl+C or Cmd+C (copy)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && selectedCell) {
+        e.preventDefault();
+        try {
+          const textToCopy = String(selectedCell.value || '');
+          await navigator.clipboard.writeText(textToCopy);
+          setCopiedValue(textToCopy);
+          setCopiedCell({ table: selectedCell.table, rowId: selectedCell.rowId, field: selectedCell.field });
+          toast({
+            title: 'Copied',
+            description: `Copied: ${textToCopy.substring(0, 50)}${textToCopy.length > 50 ? '...' : ''}`,
+            duration: 1500,
+          });
+        } catch (err) {
+          console.error('Failed to copy:', err);
+        }
+      }
+
+      // Check if Ctrl+V or Cmd+V (paste)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v' && selectedCell && copiedValue !== null) {
+        e.preventDefault();
+        try {
+          const text = copiedValue;
+          // Handle paste based on table type
+          if (selectedCell.table === 'kols') {
+            const kol = campaignKOLs.find(k => k.id === selectedCell.rowId);
+            if (kol) {
+              // Determine which table and field to update
+              const masterKolFields = ['name', 'followers'];
+              const campaignKolFieldMapping: { [key: string]: string } = {
+                'budget': 'allocated_budget',
+                'wallet': 'wallet',
+                'notes': 'notes'
+              };
+
+              // Skip read-only fields
+              if (selectedCell.field === 'paid') {
+                toast({
+                  title: 'Cannot paste',
+                  description: 'This field is read-only',
+                  variant: 'destructive',
+                  duration: 1500,
+                });
+                return;
+              }
+
+              if (masterKolFields.includes(selectedCell.field)) {
+                // Update master_kols table
+                const updateField = selectedCell.field;
+                const updateValue = selectedCell.field === 'followers' ? parseInt(text) || 0 : text;
+
+                await supabase
+                  .from('master_kols')
+                  .update({ [updateField]: updateValue })
+                  .eq('id', kol.master_kol.id);
+              } else if (campaignKolFieldMapping[selectedCell.field]) {
+                // Update campaign_kols table
+                const dbField = campaignKolFieldMapping[selectedCell.field];
+                const updateValue = selectedCell.field === 'budget' ? parseFloat(text) || null : text;
+
+                await supabase
+                  .from('campaign_kols')
+                  .update({ [dbField]: updateValue })
+                  .eq('id', selectedCell.rowId);
+              }
+
+              // Refresh data
+              fetchCampaignKOLs();
+
+              // Clear copied cell styling after paste
+              setCopiedCell(null);
+
+              toast({
+                title: 'Pasted',
+                description: 'Cell value updated',
+                duration: 1500,
+              });
+            }
+          } else if (selectedCell.table === 'contents') {
+            const content = contents.find(c => c.id === selectedCell.rowId);
+            if (content) {
+              // Determine the appropriate value type
+              const numberFields = ['impressions', 'likes', 'retweets', 'comments', 'bookmarks'];
+              let updateValue: any = text;
+
+              if (numberFields.includes(selectedCell.field)) {
+                updateValue = parseInt(text) || null;
+              } else if (selectedCell.field === 'activation_date') {
+                // Validate date format
+                updateValue = text;
+              }
+
+              await supabase
+                .from('contents')
+                .update({ [selectedCell.field]: updateValue })
+                .eq('id', selectedCell.rowId);
+
+              // Refresh contents
+              const { data, error } = await supabase
+                .from('contents')
+                .select('*')
+                .eq('campaign_id', id);
+              if (!error && data) {
+                setContents(data);
+              }
+
+              // Clear copied cell styling after paste
+              setCopiedCell(null);
+
+              toast({
+                title: 'Pasted',
+                description: 'Cell value updated',
+                duration: 1500,
+              });
+            }
+          } else if (selectedCell.table === 'payments') {
+            const payment = payments.find(p => p.id === selectedCell.rowId);
+            if (payment) {
+              // Skip read-only KOL name field
+              if (selectedCell.field === 'kol_name') {
+                toast({
+                  title: 'Cannot paste',
+                  description: 'KOL name is read-only',
+                  variant: 'destructive',
+                  duration: 1500,
+                });
+                return;
+              }
+
+              // Determine the appropriate value type
+              let updateValue: any = text;
+              if (selectedCell.field === 'amount') {
+                updateValue = parseFloat(text) || 0;
+              } else if (selectedCell.field === 'payment_date') {
+                // Validate date format
+                updateValue = text;
+              }
+
+              await supabase
+                .from('payments')
+                .update({ [selectedCell.field]: updateValue })
+                .eq('id', selectedCell.rowId);
+
+              fetchPayments();
+
+              // Clear copied cell styling after paste
+              setCopiedCell(null);
+
+              toast({
+                title: 'Pasted',
+                description: 'Cell value updated',
+                duration: 1500,
+              });
+            }
+          }
+        } catch (err) {
+          console.error('Failed to paste:', err);
+          toast({
+            title: 'Error',
+            description: 'Failed to paste value',
+            variant: 'destructive',
+          });
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selectedCell, copiedValue]);
+
+  // Handle horizontal scroll with Shift+Wheel and update sticky scrollbar
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent, tableRef: React.RefObject<HTMLDivElement>) => {
+      if (e.shiftKey && tableRef.current) {
+        e.preventDefault();
+        tableRef.current.scrollLeft += e.deltaY;
+      }
+    };
+
+    // Function to find the actual scrollable element
+    const findScrollableElement = (container: HTMLElement): HTMLElement | null => {
+      if (container.scrollWidth > container.clientWidth) {
+        return container;
+      }
+
+      const allElements = container.querySelectorAll('*');
+      for (const el of Array.from(allElements)) {
+        const htmlEl = el as HTMLElement;
+        if (htmlEl.scrollWidth > htmlEl.clientWidth) {
+          return htmlEl;
+        }
+      }
+
+      return null;
+    };
+
+    const updateStickyScrollbar = () => {
+      const tables = [
+        { ref: kolTableRef, scrollableRef: kolScrollableRef, id: 'kols' },
+        { ref: contentTableRef, scrollableRef: contentScrollableRef, id: 'contents' },
+        { ref: paymentTableRef, scrollableRef: paymentScrollableRef, id: 'payments' }
+      ];
+
+      let foundVisibleTable = false;
+
+      for (const table of tables) {
+        if (!table.ref.current) continue;
+
+        const container = table.ref.current;
+        const scrollableElement = findScrollableElement(container);
+
+        if (scrollableElement) {
+          table.scrollableRef.current = scrollableElement;
+
+          const rect = container.getBoundingClientRect();
+          const isInViewport = rect.top < window.innerHeight && rect.bottom > 0;
+
+          if (isInViewport) {
+            // Calculate opacity based on distance to bottom of page
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.documentElement.scrollHeight;
+            const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
+
+            // Check if page has scrollable content
+            const hasVerticalScroll = documentHeight > windowHeight + 10; // 10px threshold
+
+            const fadeThreshold = 100;
+            let opacity = 1; // Default to fully visible
+
+            // Only fade if page actually has vertical scrolling
+            if (hasVerticalScroll) {
+              if (distanceFromBottom < fadeThreshold && distanceFromBottom > 0) {
+                // Between 0 and threshold - proportional fade
+                opacity = distanceFromBottom / fadeThreshold;
+              } else if (distanceFromBottom <= 0) {
+                // At or past the bottom - fully faded
+                opacity = 0;
+              }
+            }
+
+            setStickyScrollbar({
+              visible: true,
+              width: scrollableElement.clientWidth,
+              scrollWidth: scrollableElement.scrollWidth,
+              scrollLeft: scrollableElement.scrollLeft,
+              tableId: table.id,
+              opacity: opacity
+            });
+            foundVisibleTable = true;
+            break;
+          }
+        }
+      }
+
+      if (!foundVisibleTable) {
+        setStickyScrollbar(null);
+      }
+    };
+
+    const kolWheel = (e: WheelEvent) => handleWheel(e, kolTableRef);
+    const contentWheel = (e: WheelEvent) => handleWheel(e, contentTableRef);
+    const paymentWheel = (e: WheelEvent) => handleWheel(e, paymentTableRef);
+
+    // Function to attach listeners when elements exist
+    const attachListeners = () => {
+      const kolEl = kolTableRef.current;
+      const contentEl = contentTableRef.current;
+      const paymentEl = paymentTableRef.current;
+
+      if (kolEl && !kolEl.hasAttribute('data-scroll-listeners')) {
+        kolEl.addEventListener('wheel', kolWheel, { passive: false });
+        kolEl.addEventListener('scroll', updateStickyScrollbar);
+        kolEl.setAttribute('data-scroll-listeners', 'true');
+        console.log('[Sticky Scrollbar] Attached listeners to kols table');
+      }
+      if (contentEl && !contentEl.hasAttribute('data-scroll-listeners')) {
+        contentEl.addEventListener('wheel', contentWheel, { passive: false });
+        contentEl.addEventListener('scroll', updateStickyScrollbar);
+        contentEl.setAttribute('data-scroll-listeners', 'true');
+        console.log('[Sticky Scrollbar] Attached listeners to contents table');
+      }
+      if (paymentEl && !paymentEl.hasAttribute('data-scroll-listeners')) {
+        paymentEl.addEventListener('wheel', paymentWheel, { passive: false });
+        paymentEl.addEventListener('scroll', updateStickyScrollbar);
+        paymentEl.setAttribute('data-scroll-listeners', 'true');
+        console.log('[Sticky Scrollbar] Attached listeners to payments table');
+      }
+    };
+
+    // Attach listeners immediately and on each check
+    attachListeners();
+
+    window.addEventListener('scroll', updateStickyScrollbar);
+    window.addEventListener('resize', updateStickyScrollbar);
+
+    // Combined check function
+    const checkAndAttach = () => {
+      attachListeners();
+      updateStickyScrollbar();
+    };
+
+    // Initial check with multiple attempts to catch when tables render
+    const timer1 = setTimeout(checkAndAttach, 100);
+    const timer2 = setTimeout(checkAndAttach, 500);
+    const timer3 = setTimeout(checkAndAttach, 1000);
+
+    // Periodic check to ensure we catch tables when they load
+    const interval = setInterval(checkAndAttach, 2000);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+      clearInterval(interval);
+
+      // Clean up listeners
+      const kolEl = kolTableRef.current;
+      const contentEl = contentTableRef.current;
+      const paymentEl = paymentTableRef.current;
+
+      kolEl?.removeEventListener('wheel', kolWheel);
+      contentEl?.removeEventListener('wheel', contentWheel);
+      paymentEl?.removeEventListener('wheel', paymentWheel);
+      kolEl?.removeEventListener('scroll', updateStickyScrollbar);
+      contentEl?.removeEventListener('scroll', updateStickyScrollbar);
+      paymentEl?.removeEventListener('scroll', updateStickyScrollbar);
+
+      window.removeEventListener('scroll', updateStickyScrollbar);
+      window.removeEventListener('resize', updateStickyScrollbar);
+    };
+  }, [activeTab, kolViewMode, contentsViewMode, paymentViewMode]); // Re-check when switching tabs or view modes
+
   const fetchCampaignKOLs = async () => {
     if (!campaign) return;
     try {
@@ -434,41 +791,41 @@ const CampaignDetailsPage = () => {
         )
       );
 
-      // If createPayment is checked, create payment records for each added KOL
-      if (newKOLData.createPayment) {
-        console.log('Creating payments for KOLs:', {
-          amount: newKOLData.payment_amount,
-          date: newKOLData.payment_date,
-          method: newKOLData.payment_method,
-          kolCount: addedKOLs.length
-        });
+      // Automatically create payment records for each added KOL
+      console.log('Creating payments for KOLs:', {
+        amount: newKOLData.createPayment ? newKOLData.payment_amount : 0,
+        date: newKOLData.createPayment && newKOLData.payment_date ? newKOLData.payment_date : new Date().toISOString().split('T')[0],
+        method: newKOLData.createPayment ? newKOLData.payment_method : 'Token',
+        kolCount: addedKOLs.length
+      });
 
-        const paymentResults = await Promise.all(
-          addedKOLs.map(async (campaignKOL) => {
-            try {
-              const { data: paymentData, error: paymentError } = await supabase
-                .from('payments')
-                .insert({
-                  campaign_id: campaign.id,
-                  campaign_kol_id: campaignKOL.id,
-                  amount: newKOLData.payment_amount || 0,
-                  payment_date: newKOLData.payment_date || new Date().toISOString().split('T')[0],
-                  payment_method: newKOLData.payment_method,
-                  content_id: null,
-                  transaction_id: null,
-                  notes: null
-                })
-                .select()
-                .single();
+      const paymentResults = await Promise.all(
+        addedKOLs.map(async (campaignKOL) => {
+          try {
+            const { data: paymentData, error: paymentError } = await supabase
+              .from('payments')
+              .insert({
+                campaign_id: campaign.id,
+                campaign_kol_id: campaignKOL.id,
+                amount: newKOLData.createPayment ? (newKOLData.payment_amount || 0) : 0,
+                payment_date: newKOLData.createPayment && newKOLData.payment_date ? newKOLData.payment_date : new Date().toISOString().split('T')[0],
+                payment_method: newKOLData.createPayment ? newKOLData.payment_method : 'Token',
+                content_id: null,
+                transaction_id: null,
+                notes: newKOLData.createPayment ? null : 'Auto-created payment record'
+              })
+              .select()
+              .single();
 
-              if (paymentError) {
-                console.error('Payment insert error:', paymentError);
-                throw paymentError;
-              }
+            if (paymentError) {
+              console.error('Payment insert error:', paymentError);
+              throw paymentError;
+            }
 
-              console.log('Payment created:', paymentData);
+            console.log('Payment created:', paymentData);
 
-              // Update the KOL's paid amount
+            // Update the KOL's paid amount if payment details were provided
+            if (newKOLData.createPayment && newKOLData.payment_amount > 0) {
               const paidAmount = newKOLData.payment_amount || 0;
               const { error: updateError } = await supabase
                 .from('campaign_kols')
@@ -479,23 +836,30 @@ const CampaignDetailsPage = () => {
                 console.error('KOL update error:', updateError);
                 throw updateError;
               }
-
-              return paymentData;
-            } catch (err) {
-              console.error('Error creating payment for KOL:', campaignKOL.id, err);
-              throw err;
             }
-          })
-        );
 
-        console.log('All payments created:', paymentResults.length);
+            return paymentData;
+          } catch (err) {
+            console.error('Error creating payment for KOL:', campaignKOL.id, err);
+            throw err;
+          }
+        })
+      );
 
-        // Refresh payments
-        await fetchPayments();
+      console.log('All payments created:', paymentResults.length);
 
+      // Refresh payments
+      await fetchPayments();
+
+      if (newKOLData.createPayment) {
         toast({
           title: 'Success',
-          description: `${paymentResults.length} payment(s) recorded successfully.`,
+          description: `${addedKOLs.length} KOL(s) added with ${paymentResults.length} payment(s) recorded.`,
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: `${addedKOLs.length} KOL(s) added with default payment records created.`,
         });
       }
 
@@ -1199,7 +1563,14 @@ const CampaignDetailsPage = () => {
           amount: payment.amount,
           payment_date: payment.payment_date || new Date().toISOString().split('T')[0],
           payment_method: payment.payment_method || 'Token',
-          content_id: payment.content_id === 'none' ? null : payment.content_id || null,
+          content_id: (() => {
+            // Handle array of content IDs
+            if (Array.isArray(payment.content_id)) {
+              return payment.content_id.length > 0 ? payment.content_id : null;
+            }
+            // Handle legacy single content_id
+            return payment.content_id === 'none' ? null : (payment.content_id ? [payment.content_id] : null);
+          })(),
           transaction_id: payment.transaction_id || null,
           notes: payment.notes || null
         }));
@@ -1309,7 +1680,14 @@ const CampaignDetailsPage = () => {
           amount: newAmount,
           payment_date: newPaymentData.payment_date,
           payment_method: newPaymentData.payment_method,
-          content_id: newPaymentData.content_id === 'none' ? null : newPaymentData.content_id,
+          content_id: (() => {
+            // Handle array of content IDs
+            if (Array.isArray(newPaymentData.content_id)) {
+              return newPaymentData.content_id.length > 0 ? newPaymentData.content_id : null;
+            }
+            // Handle legacy single content_id
+            return newPaymentData.content_id === 'none' ? null : (newPaymentData.content_id ? [newPaymentData.content_id] : null);
+          })(),
           transaction_id: newPaymentData.transaction_id || null,
           notes: newPaymentData.notes || null
         })
@@ -1414,36 +1792,31 @@ const CampaignDetailsPage = () => {
       );
     }
 
-    // Date field - double click to edit
+    // Date field - show as date picker (matching activation date style)
     if (dateFields.includes(field)) {
-      if (isEditing) {
-        return (
-          <Input
-            type="date"
-            value={editingPaymentValue ?? ''}
-            onChange={e => setEditingPaymentValue(e.target.value)}
-            onBlur={() => handlePaymentCellSave(payment, field, editingPaymentValue)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') handlePaymentCellSave(payment, field, editingPaymentValue);
-              if (e.key === 'Escape') { setEditingPaymentCell(null); setEditingPaymentValue(null); }
-            }}
-            className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
-            style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
-            autoFocus
-          />
-        );
-      }
       return (
-        <div
-          className="cursor-pointer w-full h-full flex items-center px-1 py-1"
-          onDoubleClick={() => {
-            setEditingPaymentCell({ paymentId: payment.id, field });
-            setEditingPaymentValue(value);
-          }}
-          title="Double-click to edit"
-        >
-          {value ? new Date(value).toLocaleDateString() : '-'}
-        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] w-full"
+              style={{ borderColor: "#e5e7eb", backgroundColor: "white", color: value ? "#111827" : "#9ca3af" }}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {value ? formatDisplayDate(value) : "Select payment date"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-50" align="start">
+            <CalendarComponent
+              mode="single"
+              selected={value ? new Date(value) : undefined}
+              onSelect={date => handlePaymentCellSave(payment, field, date ? formatDateLocal(date) : '')}
+              initialFocus
+              classNames={{ day_selected: "text-white hover:text-white focus:text-white" }}
+              modifiersStyles={{ selected: { backgroundColor: "#3e8692" } }}
+            />
+          </PopoverContent>
+        </Popover>
       );
     }
 
@@ -1607,6 +1980,41 @@ const CampaignDetailsPage = () => {
   function formatDateLocal(date: Date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }
+
+  // Helper to format date from YYYY-MM-DD to MM/DD/YYYY for display
+  function formatDisplayDate(dateStr: string) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${month}/${day}/${year}`;
+  }
+
+  // Helper to check if a cell is selected
+  const isCellSelected = (table: string, rowId: string, field: string) => {
+    return selectedCell?.table === table && selectedCell?.rowId === rowId && selectedCell?.field === field;
+  };
+
+  // Helper to check if a cell is the copied cell
+  const isCellCopied = (table: string, rowId: string, field: string) => {
+    return copiedCell?.table === table && copiedCell?.rowId === rowId && copiedCell?.field === field;
+  };
+
+  // Helper to get cell styling based on state
+  const getCellClassName = (baseClass: string, table: string, rowId: string, field: string) => {
+    if (isCellSelected(table, rowId, field)) {
+      return `${baseClass} ring-2 ring-blue-500 bg-blue-50`;
+    } else if (isCellCopied(table, rowId, field)) {
+      return `${baseClass} ring-2 ring-dashed ring-green-500 bg-green-50`;
+    }
+    return baseClass;
+  };
+
+  // Helper to handle cell selection
+  const handleCellSelect = (table: string, rowId: string, field: string, value: any) => {
+    setSelectedCell({ table, rowId, field, value });
+  };
 
   const [isAddingContent, setIsAddingContent] = useState(false);
 
@@ -1903,7 +2311,7 @@ const CampaignDetailsPage = () => {
               style={{ borderColor: "#e5e7eb", backgroundColor: "white", color: value ? "#111827" : "#9ca3af" }}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {value ? value : "Select activation date"}
+              {value ? formatDisplayDate(value) : "Select activation date"}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-50" align="start">
@@ -3384,11 +3792,19 @@ const CampaignDetailsPage = () => {
                                      <TableCell>
                                        {Array.isArray(kol.deliverables) ? (
                                          <div className="flex flex-wrap gap-1">
-                                           {kol.deliverables.map((deliverable: string, index: number) => (
-                                             <span key={index} className={`px-2 py-1 rounded-md text-xs font-medium ${getNewContentTypeColor(deliverable)}`}>
-                                               {deliverable}
-                                             </span>
-                                           ))}
+                                           {(() => {
+                                             // Count occurrences of each deliverable type
+                                             const counts = kol.deliverables.reduce((acc: { [key: string]: number }, deliverable: string) => {
+                                               acc[deliverable] = (acc[deliverable] || 0) + 1;
+                                               return acc;
+                                             }, {});
+
+                                             return Object.entries(counts).map(([deliverable, count], index) => (
+                                               <span key={index} className={`px-2 py-1 rounded-md text-xs font-medium ${getNewContentTypeColor(deliverable)}`}>
+                                                 {count > 1 ? `${count} ${deliverable}s` : deliverable}
+                                               </span>
+                                             ));
+                                           })()}
                                          </div>
                                        ) : '-'}
                                      </TableCell>
@@ -3472,7 +3888,7 @@ const CampaignDetailsPage = () => {
                                      style={{ borderColor: "#e5e7eb", backgroundColor: "white" }}
                                    >
                                      <CalendarIcon className="mr-2 h-4 w-4" />
-                                     {newKOLData.payment_date || "Select payment date"}
+                                     {newKOLData.payment_date ? formatDisplayDate(newKOLData.payment_date) : "Select payment date"}
                                    </Button>
                                  </PopoverTrigger>
                                  <PopoverContent className="!bg-white border shadow-md w-auto p-0 z-50" align="start">
@@ -4027,7 +4443,7 @@ const CampaignDetailsPage = () => {
                     <p className="text-sm text-gray-400">Add KOLs to this campaign to get started.</p>
                   </div>
                 ) : (
-                  <div className="border rounded-lg overflow-auto" style={{ position: 'relative' }}>
+                  <div ref={kolTableRef} className="border rounded-lg" style={{ position: 'relative', overflow: 'auto', overflowX: 'auto', overflowY: 'auto' }}>
                     <Table className="min-w-full" style={{
                       tableLayout: 'auto',
                       width: 'auto',
@@ -4302,7 +4718,7 @@ const CampaignDetailsPage = () => {
                           </TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Budget</span>
+                              <span>Budget <span className="text-gray-500 text-xs">(Internal)</span></span>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -4356,7 +4772,7 @@ const CampaignDetailsPage = () => {
                           </TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Budget Type</span>
+                              <span>Budget Type <span className="text-gray-500 text-xs">(Internal)</span></span>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -4403,7 +4819,7 @@ const CampaignDetailsPage = () => {
                           </TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Paid</span>
+                              <span>Paid <span className="text-gray-500 text-xs">(Internal)</span></span>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -4455,7 +4871,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Wallet</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Wallet <span className="text-gray-500 text-xs">(Internal)</span></TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Notes</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Add Content</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content</TableHead>
@@ -4525,16 +4941,21 @@ const CampaignDetailsPage = () => {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className={`sticky z-10 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden text-gray-600 group`} style={{ left: '60px', verticalAlign: 'middle', fontWeight: 'bold', width: '20%', boxShadow: 'inset -1px 0 0 0 #d1d5db' }}>
+                              <TableCell
+                                className={getCellClassName(`sticky z-10 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden text-gray-600 group cursor-pointer`, 'kols', campaignKOL.id, 'name')}
+                                style={{ left: '60px', verticalAlign: 'middle', fontWeight: 'bold', width: '20%', boxShadow: 'inset -1px 0 0 0 #d1d5db' }}
+                                onClick={() => handleCellSelect('kols', campaignKOL.id, 'name', campaignKOL.master_kol.name)}
+                              >
                                 <div className="flex items-center w-full h-full">
                                   <div className="truncate font-bold">{campaignKOL.master_kol.name}</div>
                                   {campaignKOL.master_kol.link && (
-                                    <a 
-                                      href={campaignKOL.master_kol.link} 
-                                      target="_blank" 
+                                    <a
+                                      href={campaignKOL.master_kol.link}
+                                      target="_blank"
                                       rel="noopener noreferrer"
                                       className="text-sm ml-2 underline hover:no-underline font-normal"
                                       style={{ color: 'inherit' }}
+                                      onClick={(e) => e.stopPropagation()}
                                     >
                                       View Profile
                                     </a>
@@ -4586,7 +5007,12 @@ const CampaignDetailsPage = () => {
                                 />
                               </TableCell>
                                   <TableCell
-                                    className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}
+                                    className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'followers')}
+                                    onClick={() => {
+                                      if (editingCell?.row !== campaignKOL.id || editingCell?.field !== 'followers') {
+                                        handleCellSelect('kols', campaignKOL.id, 'followers', campaignKOL.master_kol.followers);
+                                      }
+                                    }}
                                     onDoubleClick={() => {
                                       setEditingCell({ row: campaignKOL.id, field: 'followers' });
                                       setEditingValue(campaignKOL.master_kol.followers);
@@ -4729,7 +5155,18 @@ const CampaignDetailsPage = () => {
                                   </SelectContent>
                                 </Select>
                               </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                  <TableCell
+                                    className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'budget')}
+                                    onClick={() => {
+                                      if (editingBudgetId !== campaignKOL.id) {
+                                        handleCellSelect('kols', campaignKOL.id, 'budget', campaignKOL.allocated_budget);
+                                      }
+                                    }}
+                                    onDoubleClick={() => {
+                                      setEditingBudgetId(campaignKOL.id);
+                                      setEditingBudget((prev) => ({ ...prev, [campaignKOL.id]: campaignKOL.allocated_budget ?? '' }));
+                                    }}
+                                  >
                                     {editingBudgetId === campaignKOL.id ? (
                                       <Input
                                         type="number"
@@ -4742,8 +5179,8 @@ const CampaignDetailsPage = () => {
                                         autoFocus
                                       />
                                     ) : (
-                                      <div className="truncate min-h-[32px] cursor-pointer flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.allocated_budget} onClick={() => { setEditingBudgetId(campaignKOL.id); setEditingBudget((prev) => ({ ...prev, [campaignKOL.id]: campaignKOL.allocated_budget ?? '' })); }}>
-                                        {campaignKOL.allocated_budget ? `$${Number(campaignKOL.allocated_budget).toLocaleString('en-US')}` : <span className="text-gray-400 italic">Click to add</span>}
+                                      <div className="truncate min-h-[32px] flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.allocated_budget}>
+                                        {campaignKOL.allocated_budget ? `$${Number(campaignKOL.allocated_budget).toLocaleString('en-US')}` : <span className="text-gray-400 italic">Double-click to add</span>}
                                       </div>
                                     )}
                                   </TableCell>
@@ -4765,12 +5202,27 @@ const CampaignDetailsPage = () => {
                                       </SelectContent>
                                     </Select>
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                  <TableCell
+                                    className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'paid')}
+                                    onClick={() => handleCellSelect('kols', campaignKOL.id, 'paid', campaignKOL.paid)}
+                                  >
                                     <div className="truncate min-h-[32px] flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.paid?.toString()}>
                                       {campaignKOL.paid != null ? `$${campaignKOL.paid.toLocaleString()}` : <span className="text-gray-400 italic">No payments</span>}
                                     </div>
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 align-middle overflow-hidden`} style={{ width: '20%' }}>
+                                  <TableCell
+                                    className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 align-middle overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'wallet')}
+                                    style={{ width: '20%' }}
+                                    onClick={() => {
+                                      if (editingWalletId !== campaignKOL.id) {
+                                        handleCellSelect('kols', campaignKOL.id, 'wallet', campaignKOL.wallet);
+                                      }
+                                    }}
+                                    onDoubleClick={() => {
+                                      setEditingWalletId(campaignKOL.id);
+                                      setEditingWallet((prev) => ({ ...prev, [campaignKOL.id]: campaignKOL.wallet ?? '' }));
+                                    }}
+                                  >
                                     {editingWalletId === campaignKOL.id ? (
                                       <Input
                                         value={editingWallet[campaignKOL.id] ?? campaignKOL.wallet ?? ''}
@@ -4782,12 +5234,24 @@ const CampaignDetailsPage = () => {
                                         autoFocus
                                       />
                                     ) : (
-                                      <div className="truncate min-h-[32px] cursor-pointer flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.wallet} onClick={() => { setEditingWalletId(campaignKOL.id); setEditingWallet((prev) => ({ ...prev, [campaignKOL.id]: campaignKOL.wallet ?? '' })); }}>
-                                        {campaignKOL.wallet || <span className="text-gray-400 italic">Click to add</span>}
+                                      <div className="truncate min-h-[32px] flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.wallet}>
+                                        {campaignKOL.wallet || <span className="text-gray-400 italic">Double-click to add</span>}
                                       </div>
                                     )}
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 align-middle overflow-hidden`} style={{ width: '20%' }}>
+                                  <TableCell
+                                    className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 align-middle overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'notes')}
+                                    style={{ width: '20%' }}
+                                    onClick={() => {
+                                      if (editingNotesId !== campaignKOL.id) {
+                                        handleCellSelect('kols', campaignKOL.id, 'notes', campaignKOL.notes);
+                                      }
+                                    }}
+                                    onDoubleClick={() => {
+                                      setEditingNotesId(campaignKOL.id);
+                                      setEditingNotes((prev) => ({ ...prev, [campaignKOL.id]: campaignKOL.notes ?? '' }));
+                                    }}
+                                  >
                                 {editingNotesId === campaignKOL.id ? (
                                   <Input
                                     value={editingNotes[campaignKOL.id] ?? campaignKOL.notes ?? ''}
@@ -4799,40 +5263,48 @@ const CampaignDetailsPage = () => {
                                     autoFocus
                                   />
                                 ) : (
-                                      <div className="truncate min-h-[32px] cursor-pointer flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.notes || ''} onClick={() => { setEditingNotesId(campaignKOL.id); setEditingNotes((prev) => ({ ...prev, [campaignKOL.id]: campaignKOL.notes ?? '' })); }}>
-                                    {campaignKOL.notes || <span className="text-gray-400 italic">Click to add notes</span>}
+                                      <div className="truncate min-h-[32px] flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.notes || ''}>
+                                    {campaignKOL.notes || <span className="text-gray-400 italic">Double-click to add notes</span>}
                                   </div>
                                 )}
                               </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                                 <div className="flex flex-wrap gap-1 items-center">
-                                  {contents
-                                    .filter(content => content.campaign_kols_id === campaignKOL.id)
-                                    .map((content, idx) => {
-                                      // Different colors for different content types
-                                      const getContentColor = (type: string) => {
-                                        const colors: {[key: string]: string} = {
-                                          'Post': 'bg-blue-100 text-blue-800',
-                                          'Tweet': 'bg-cyan-100 text-cyan-800',
-                                          'Story': 'bg-purple-100 text-purple-800',
-                                          'Reel': 'bg-pink-100 text-pink-800',
-                                          'Video': 'bg-red-100 text-red-800',
-                                          'Article': 'bg-green-100 text-green-800',
-                                          'Review': 'bg-yellow-100 text-yellow-800',
-                                          'Thread': 'bg-indigo-100 text-indigo-800',
-                                        };
-                                        return colors[type] || 'bg-gray-100 text-gray-800';
-                                      };
+                                  {(() => {
+                                    // Get all content types for this KOL
+                                    const kolContents = contents.filter(content => content.campaign_kols_id === campaignKOL.id);
 
-                                      return (
-                                        <span
-                                          key={idx}
-                                          className={`px-2 py-1 rounded-md text-xs font-medium ${getContentColor(content.type || '')}`}
-                                        >
-                                          {content.type || 'No Type'}
-                                        </span>
-                                      );
-                                    })}
+                                    // Count occurrences of each content type
+                                    const typeCounts = kolContents.reduce((acc: { [key: string]: number }, content) => {
+                                      const type = content.type || 'No Type';
+                                      acc[type] = (acc[type] || 0) + 1;
+                                      return acc;
+                                    }, {});
+
+                                    // Different colors for different content types
+                                    const getContentColor = (type: string) => {
+                                      const colors: {[key: string]: string} = {
+                                        'Post': 'bg-blue-100 text-blue-800',
+                                        'Tweet': 'bg-cyan-100 text-cyan-800',
+                                        'Story': 'bg-purple-100 text-purple-800',
+                                        'Reel': 'bg-pink-100 text-pink-800',
+                                        'Video': 'bg-red-100 text-red-800',
+                                        'Article': 'bg-green-100 text-green-800',
+                                        'Review': 'bg-yellow-100 text-yellow-800',
+                                        'Thread': 'bg-indigo-100 text-indigo-800',
+                                      };
+                                      return colors[type] || 'bg-gray-100 text-gray-800';
+                                    };
+
+                                    return Object.entries(typeCounts).map(([type, count], idx) => (
+                                      <span
+                                        key={idx}
+                                        className={`px-2 py-1 rounded-md text-xs font-medium ${getContentColor(type)}`}
+                                      >
+                                        {count > 1 ? `${count} ${type}s` : type}
+                                      </span>
+                                    ));
+                                  })()}
                                   <Popover
                                     open={quickAddContentKolId === campaignKOL.id}
                                     onOpenChange={(open) => setQuickAddContentKolId(open ? campaignKOL.id : null)}
@@ -5457,7 +5929,7 @@ const CampaignDetailsPage = () => {
                                 }}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {addContentData.activation_date ? addContentData.activation_date : "Select activation date"}
+                                {addContentData.activation_date ? formatDisplayDate(addContentData.activation_date) : "Select activation date"}
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="!bg-white border shadow-md w-auto p-0 z-50" align="start">
@@ -6495,7 +6967,7 @@ const CampaignDetailsPage = () => {
                     <p className="text-sm text-gray-400">Content created for this campaign will appear here.</p>
                   </div>
                 ) : (
-                  <div className="border rounded-lg overflow-auto">
+                  <div ref={contentTableRef} className="border rounded-lg" style={{ overflow: 'auto', overflowX: 'auto', overflowY: 'auto' }}>
                     <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                       <TableHeader>
                         <TableRow className="bg-gray-50 border-b border-gray-200">
@@ -7005,25 +7477,75 @@ const CampaignDetailsPage = () => {
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                                 {renderEditableContentCell(content.status, 'status', content)}
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                              <TableCell
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'activation_date')}
+                                onClick={(e) => {
+                                  // Don't select if clicking on input during edit
+                                  if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'activation_date') {
+                                    handleCellSelect('contents', content.id, 'activation_date', content.activation_date);
+                                  }
+                                }}
+                              >
                                 {renderEditableContentCell(content.activation_date, 'activation_date', content)}
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                              <TableCell
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'content_link')}
+                                onClick={(e) => {
+                                  if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'content_link') {
+                                    handleCellSelect('contents', content.id, 'content_link', content.content_link);
+                                  }
+                                }}
+                              >
                                 {renderEditableContentCell(content.content_link, 'content_link', content)}
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                              <TableCell
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'impressions')}
+                                onClick={(e) => {
+                                  if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'impressions') {
+                                    handleCellSelect('contents', content.id, 'impressions', content.impressions);
+                                  }
+                                }}
+                              >
                                 {renderEditableContentCell(content.impressions, 'impressions', content)}
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                              <TableCell
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'likes')}
+                                onClick={(e) => {
+                                  if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'likes') {
+                                    handleCellSelect('contents', content.id, 'likes', content.likes);
+                                  }
+                                }}
+                              >
                                 {renderEditableContentCell(content.likes, 'likes', content)}
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                              <TableCell
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'retweets')}
+                                onClick={(e) => {
+                                  if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'retweets') {
+                                    handleCellSelect('contents', content.id, 'retweets', content.retweets);
+                                  }
+                                }}
+                              >
                                 {renderEditableContentCell(content.retweets, 'retweets', content)}
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                              <TableCell
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'comments')}
+                                onClick={(e) => {
+                                  if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'comments') {
+                                    handleCellSelect('contents', content.id, 'comments', content.comments);
+                                  }
+                                }}
+                              >
                                 {renderEditableContentCell(content.comments, 'comments', content)}
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                              <TableCell
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'bookmarks')}
+                                onClick={(e) => {
+                                  if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'bookmarks') {
+                                    handleCellSelect('contents', content.id, 'bookmarks', content.bookmarks);
+                                  }
+                                }}
+                              >
                                 {renderEditableContentCell(content.bookmarks, 'bookmarks', content)}
                               </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
@@ -7211,7 +7733,7 @@ const CampaignDetailsPage = () => {
                                             }}
                                           >
                                             <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {payment.payment_date ? payment.payment_date : "Select payment date"}
+                                            {payment.payment_date ? formatDisplayDate(payment.payment_date) : "Select payment date"}
                                           </Button>
                                         </PopoverTrigger>
                                         <PopoverContent className="!bg-white border shadow-md w-auto p-0 z-50" align="start">
@@ -7267,35 +7789,45 @@ const CampaignDetailsPage = () => {
                                     </div>
 
                                     <div className="grid gap-2">
-                                      <Label>Content (Optional)</Label>
-                                      <Select
-                                        value={payment.content_id || 'none'}
-                                        onValueChange={(value) => {
+                                      <Label>Content (Optional - Multi-select)</Label>
+                                      <MultiSelect
+                                        options={contents
+                                          .filter(content => content.campaign_kols_id === kolId)
+                                          .map(content => content.id)}
+                                        selected={Array.isArray(payment.content_id) ? payment.content_id : (payment.content_id ? [payment.content_id] : [])}
+                                        onSelectedChange={(selectedIds) => {
                                           setMultiKOLPayments(prev => {
                                             const newPayments = [...(prev[kolId]?.payments || [])];
-                                            newPayments[paymentIndex] = { ...newPayments[paymentIndex], content_id: value };
+                                            newPayments[paymentIndex] = { ...newPayments[paymentIndex], content_id: selectedIds };
                                             return {
                                               ...prev,
                                               [kolId]: { ...prev[kolId], payments: newPayments }
                                             };
                                           });
                                         }}
-                                      >
-                                        <SelectTrigger className="auth-input">
-                                          <SelectValue placeholder="Select content" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="none">No content linked</SelectItem>
-                                          {contents
-                                            .filter(content => content.campaign_kols_id === kolId)
-                                            .map(content => (
-                                              <SelectItem key={content.id} value={content.id}>
-                                                {content.type || 'Content'} - {content.platform || 'Unknown'}
-                                                {content.activation_date && ` (${new Date(content.activation_date).toLocaleDateString()})`}
-                                              </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                      </Select>
+                                        className="auth-input"
+                                        triggerContent={
+                                          <div>
+                                            {(() => {
+                                              const selectedIds = Array.isArray(payment.content_id) ? payment.content_id : (payment.content_id ? [payment.content_id] : []);
+                                              if (selectedIds.length === 0) {
+                                                return <span className="text-gray-400">Select content</span>;
+                                              }
+                                              const selectedContents = contents.filter(c => selectedIds.includes(c.id));
+                                              return (
+                                                <span className="text-sm">
+                                                  {selectedContents.length} content{selectedContents.length !== 1 ? 's' : ''} selected
+                                                </span>
+                                              );
+                                            })()}
+                                          </div>
+                                        }
+                                        renderOption={(contentId) => {
+                                          const content = contents.find(c => c.id === contentId);
+                                          if (!content) return contentId;
+                                          return `${content.type || 'Content'} - ${content.platform || 'Unknown'}${content.activation_date ? ` (${formatDisplayDate(content.activation_date)})` : ''}`;
+                                        }}
+                                      />
                                     </div>
                                   </div>
 
@@ -7507,7 +8039,7 @@ const CampaignDetailsPage = () => {
                         <p className="text-sm text-gray-400">Payments recorded for this campaign will appear here.</p>
                       </div>
                     ) : (
-                      <div className="border rounded-lg overflow-auto">
+                      <div ref={paymentTableRef} className="border rounded-lg" style={{ overflow: 'auto', overflowX: 'auto', overflowY: 'auto' }}>
                         <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                           <TableHeader>
                             <TableRow className="bg-gray-50 border-b border-gray-200">
@@ -7761,33 +8293,57 @@ const CampaignDetailsPage = () => {
                                     )}
                                   </div>
                                 </TableCell>
-                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-gray-600`} style={{ verticalAlign: 'middle', fontWeight: 'bold' }}>
+                                <TableCell
+                                  className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-gray-600 cursor-pointer`, 'payments', payment.id, 'kol_name')}
+                                  style={{ verticalAlign: 'middle', fontWeight: 'bold' }}
+                                  onClick={() => {
+                                    const kolName = campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.name || 'Unknown KOL';
+                                    handleCellSelect('payments', payment.id, 'kol_name', kolName);
+                                  }}
+                                >
                                   <div className="flex items-center w-full h-full">
                                     {campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.name || 'Unknown KOL'}
                                   </div>
                                 </TableCell>
-                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                <TableCell
+                                  className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'payments', payment.id, 'amount')}
+                                  onClick={() => {
+                                    if (editingPaymentCell?.paymentId !== payment.id || editingPaymentCell?.field !== 'amount') {
+                                      handleCellSelect('payments', payment.id, 'amount', payment.amount);
+                                    }
+                                  }}
+                                >
                                   {renderEditablePaymentCell(payment.amount, 'amount', payment)}
                                 </TableCell>
-                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                <TableCell
+                                  className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'payments', payment.id, 'payment_date')}
+                                  onClick={() => {
+                                    if (editingPaymentCell?.paymentId !== payment.id || editingPaymentCell?.field !== 'payment_date') {
+                                      handleCellSelect('payments', payment.id, 'payment_date', payment.payment_date);
+                                    }
+                                  }}
+                                >
                                   {renderEditablePaymentCell(payment.payment_date, 'payment_date', payment)}
                                 </TableCell>
                                 <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                                   {renderEditablePaymentCell(payment.payment_method, 'payment_method', payment)}
                                 </TableCell>
                                 <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                                  <Select
-                                    value={payment.content_id || 'none'}
-                                    onValueChange={async (value) => {
+                                  <MultiSelect
+                                    options={contents
+                                      .filter(content => content.campaign_kols_id === payment.campaign_kol_id)
+                                      .map(content => content.id)}
+                                    selected={Array.isArray(payment.content_id) ? payment.content_id : (payment.content_id ? [payment.content_id] : [])}
+                                    onSelectedChange={async (selectedIds) => {
                                       try {
-                                        const newContentId = value === 'none' ? null : value;
+                                        const newContentIds = selectedIds.length > 0 ? selectedIds : null;
                                         await supabase
                                           .from('payments')
-                                          .update({ content_id: newContentId })
+                                          .update({ content_id: newContentIds })
                                           .eq('id', payment.id);
 
                                         setPayments(prev => prev.map(p =>
-                                          p.id === payment.id ? { ...p, content_id: newContentId } : p
+                                          p.id === payment.id ? { ...p, content_id: newContentIds } : p
                                         ));
 
                                         toast({
@@ -7803,40 +8359,39 @@ const CampaignDetailsPage = () => {
                                         });
                                       }
                                     }}
-                                  >
-                                    <SelectTrigger
-                                      className="border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
-                                      style={{ outline: 'none', boxShadow: 'none', minWidth: 150 }}
-                                    >
-                                      <SelectValue>
-                                        {payment.content_id ? (
-                                          (() => {
-                                            const content = contents.find(c => c.id === payment.content_id);
+                                    className="border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 text-xs font-medium"
+                                    triggerContent={
+                                      <div className="min-w-[150px]">
+                                        {(() => {
+                                          const contentIds = Array.isArray(payment.content_id) ? payment.content_id : (payment.content_id ? [payment.content_id] : []);
+                                          if (contentIds.length === 0) {
+                                            return <span className="text-gray-400 italic">No content linked</span>;
+                                          }
+                                          if (contentIds.length === 1) {
+                                            const content = contents.find(c => c.id === contentIds[0]);
                                             return content ?
-                                              `${content.type || 'Content'} - ${content.platform || 'Unknown'}` :
-                                              'Content not found';
-                                          })()
-                                        ) : (
-                                          <span className="text-gray-400 italic">No content linked</span>
-                                        )}
-                                      </SelectValue>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="none">
-                                        <span className="text-gray-400 italic">No content linked</span>
-                                      </SelectItem>
-                                      {contents
-                                        .filter(content => content.campaign_kols_id === payment.campaign_kol_id)
-                                        .map(content => (
-                                          <SelectItem key={content.id} value={content.id}>
-                                            {content.type || 'Content'} - {content.platform || 'Unknown'}
-                                            {content.activation_date && ` (${new Date(content.activation_date).toLocaleDateString()})`}
-                                          </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                  </Select>
+                                              <span className="text-xs">{content.type || 'Content'} - {content.platform || 'Unknown'}</span> :
+                                              <span className="text-xs">Content not found</span>;
+                                          }
+                                          return <span className="text-xs">{contentIds.length} contents linked</span>;
+                                        })()}
+                                      </div>
+                                    }
+                                    renderOption={(contentId) => {
+                                      const content = contents.find(c => c.id === contentId);
+                                      if (!content) return contentId;
+                                      return `${content.type || 'Content'} - ${content.platform || 'Unknown'}${content.activation_date ? ` (${formatDisplayDate(content.activation_date)})` : ''}`;
+                                    }}
+                                  />
                                 </TableCell>
-                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                <TableCell
+                                  className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'payments', payment.id, 'notes')}
+                                  onClick={() => {
+                                    if (editingPaymentCell?.paymentId !== payment.id || editingPaymentCell?.field !== 'notes') {
+                                      handleCellSelect('payments', payment.id, 'notes', payment.notes);
+                                    }
+                                  }}
+                                >
                                   {renderEditablePaymentCell(payment.notes, 'notes', payment)}
                                 </TableCell>
                                 <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
@@ -8373,9 +8928,52 @@ const CampaignDetailsPage = () => {
               onUploadSuccess={fetchReportFiles}
             />
           </TabsContent>
+
         </Tabs>
         </div>
       </div>
+
+      {/* Sticky Horizontal Scrollbar */}
+      {stickyScrollbar && (
+        <div
+          className="fixed bottom-4 bg-white border border-gray-200 shadow-lg z-40 flex items-center rounded-lg transition-opacity duration-300"
+          style={{
+            height: '32px',
+            opacity: stickyScrollbar.opacity,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: `${stickyScrollbar.width}px`
+          }}
+        >
+          <div
+            className="overflow-x-scroll hover:overflow-x-scroll rounded-lg"
+            style={{
+              width: '100%',
+              height: '100%',
+              scrollbarWidth: 'thin',
+              scrollbarColor: '#3e8692 #f3f4f6'
+            }}
+            onScroll={(e) => {
+              const scrollLeft = e.currentTarget.scrollLeft;
+              const scrollableRef =
+                stickyScrollbar.tableId === 'kols' ? kolScrollableRef :
+                stickyScrollbar.tableId === 'contents' ? contentScrollableRef :
+                paymentScrollableRef;
+
+              if (scrollableRef.current) {
+                scrollableRef.current.scrollLeft = scrollLeft;
+              }
+            }}
+            ref={(el) => {
+              if (el && stickyScrollbar) {
+                el.scrollLeft = stickyScrollbar.scrollLeft;
+              }
+            }}
+          >
+            <div style={{ width: `${stickyScrollbar.scrollWidth}px`, height: '1px' }}></div>
+          </div>
+        </div>
+      )}
       {/* Delete confirmation dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
@@ -8583,7 +9181,7 @@ const CampaignDetailsPage = () => {
                     }}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {newPaymentData.payment_date ? newPaymentData.payment_date : "Select payment date"}
+                    {newPaymentData.payment_date ? formatDisplayDate(newPaymentData.payment_date) : "Select payment date"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="!bg-white border shadow-md w-auto p-0 z-50" align="start">
@@ -8622,26 +9220,36 @@ const CampaignDetailsPage = () => {
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-content">Content (Optional)</Label>
-              <Select
-                value={newPaymentData.content_id}
-                onValueChange={(value) => setNewPaymentData(prev => ({ ...prev, content_id: value }))}
-              >
-                <SelectTrigger className="auth-input">
-                  <SelectValue placeholder="Select content" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No content linked</SelectItem>
-                  {contents
-                    .filter(content => content.campaign_kols_id === newPaymentData.campaign_kol_id)
-                    .map(content => (
-                      <SelectItem key={content.id} value={content.id}>
-                        {content.type || 'Content'} - {content.platform || 'Unknown'} 
-                        {content.activation_date && ` (${new Date(content.activation_date).toLocaleDateString()})`}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="edit-content">Content (Optional - Multi-select)</Label>
+              <MultiSelect
+                options={contents
+                  .filter(content => content.campaign_kols_id === newPaymentData.campaign_kol_id)
+                  .map(content => content.id)}
+                selected={Array.isArray(newPaymentData.content_id) ? newPaymentData.content_id : (newPaymentData.content_id && newPaymentData.content_id !== 'none' ? [newPaymentData.content_id] : [])}
+                onSelectedChange={(selectedIds) => setNewPaymentData(prev => ({ ...prev, content_id: selectedIds }))}
+                className="auth-input"
+                triggerContent={
+                  <div>
+                    {(() => {
+                      const selectedIds = Array.isArray(newPaymentData.content_id) ? newPaymentData.content_id : (newPaymentData.content_id && newPaymentData.content_id !== 'none' ? [newPaymentData.content_id] : []);
+                      if (selectedIds.length === 0) {
+                        return <span className="text-gray-400">Select content</span>;
+                      }
+                      const selectedContents = contents.filter(c => selectedIds.includes(c.id));
+                      return (
+                        <span className="text-sm">
+                          {selectedContents.length} content{selectedContents.length !== 1 ? 's' : ''} selected
+                        </span>
+                      );
+                    })()}
+                  </div>
+                }
+                renderOption={(contentId) => {
+                  const content = contents.find(c => c.id === contentId);
+                  if (!content) return contentId;
+                  return `${content.type || 'Content'} - ${content.platform || 'Unknown'}${content.activation_date ? ` (${formatDisplayDate(content.activation_date)})` : ''}`;
+                }}
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-transaction-id">Transaction ID (Optional)</Label>
@@ -8829,6 +9437,7 @@ const CampaignDetailsPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
 
     </div>
   );
