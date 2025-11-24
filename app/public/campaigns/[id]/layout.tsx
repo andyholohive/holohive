@@ -26,8 +26,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     .eq('id', params.id)
     .single();
 
-  console.log('Campaign metadata:', { campaign, error });
-
   // Extract client name - handle both possible response structures
   const clientName = campaign?.clients?.name || 'Client';
 
@@ -39,8 +37,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = 'Holo Hive Partner Portal';
   const description = `${clientName} Campaign Tracker`;
 
-  console.log('Metadata generated:', { title, description, logoUrl, baseUrl });
-
   return {
     title,
     description,
@@ -51,23 +47,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       images: [
         {
           url: logoUrl,
-          width: 1200,
-          height: 630,
+          width: 500,
+          height: 500,
           alt: 'Holo Hive Logo',
         },
       ],
       type: 'website',
     },
     twitter: {
-      card: 'summary_large_image',
+      card: 'summary',
       title,
       description,
       images: [logoUrl],
     },
     other: {
       'og:image': logoUrl,
-      'og:image:width': '1200',
-      'og:image:height': '630',
+      'og:image:width': '500',
+      'og:image:height': '500',
+      'og:image:type': 'image/png',
     },
   };
 }
