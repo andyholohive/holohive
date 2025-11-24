@@ -9,8 +9,8 @@ import { ChunkErrorHandler } from '@/components/ChunkErrorHandler';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Campaign Manager - SaaS Platform',
-  description: 'Manage your marketing campaigns and client relationships',
+  title: 'Holo Hive Partner Portal',
+  description: 'Manage your marketing campaigns and client relationships with Holo Hive',
   icons: {
     icon: '/images/logo.png',
     shortcut: '/images/logo.png',
