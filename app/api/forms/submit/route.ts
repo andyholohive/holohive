@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
+import { TelegramService } from '@/lib/telegramService';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,6 +56,27 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Fetch form details for Telegram notification
+    const { data: form } = await supabaseAdmin
+      .from('forms')
+      .select('name')
+      .eq('id', form_id)
+      .single();
+
+    // Send Telegram notification (non-blocking - don't wait for it)
+    TelegramService.sendFormSubmissionNotification(
+      form?.name || 'Unknown Form',
+      form_id,
+      {
+        name: submitted_by_name,
+        email: submitted_by_email,
+      },
+      response_data
+    ).catch(err => {
+      console.error('Failed to send Telegram notification:', err);
+      // Don't fail the request if Telegram notification fails
+    });
 
     return NextResponse.json(
       { success: true, data: response },
