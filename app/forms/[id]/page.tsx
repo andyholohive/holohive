@@ -2112,20 +2112,23 @@ export default function FormBuilderPage() {
 
                       if (field.field_type === 'link') {
                         const linkUrl = field.options?.[0] || '';
+                        const linkTitle = field.label ? String(field.label).replace(/<[^>]*>/g, '') : 'Embedded content';
                         return (
                           <div key={field.id} className="space-y-2">
                             {field.label && (
                               <div className="font-medium text-gray-900" dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
                             )}
-                            <div className="w-full border rounded-lg overflow-hidden bg-gray-50">
-                              <iframe
-                                src={linkUrl}
-                                className="w-full"
-                                style={{ height: '600px', border: 'none' }}
-                                title={field.label?.replace(/<[^>]*>/g, '') || 'Embedded content'}
-                                allowFullScreen
-                              />
-                            </div>
+                            {linkUrl && (
+                              <div className="w-full border rounded-lg overflow-hidden bg-gray-50">
+                                <iframe
+                                  src={linkUrl}
+                                  className="w-full"
+                                  style={{ height: '600px', border: 'none' }}
+                                  title={linkTitle}
+                                  allowFullScreen
+                                />
+                              </div>
+                            )}
                           </div>
                         );
                       }
