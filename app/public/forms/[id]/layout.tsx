@@ -23,8 +23,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description = 'Form';
 
   // Construct the base URL for the logo
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ||
-                  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+    ? (process.env.NEXT_PUBLIC_BASE_URL.startsWith('http')
+        ? process.env.NEXT_PUBLIC_BASE_URL
+        : `https://${process.env.NEXT_PUBLIC_BASE_URL}`)
+    : (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
   const logoUrl = `${baseUrl}/images/logo.png`;
 
   return {
