@@ -2111,14 +2111,19 @@ export default function FormBuilderPage() {
                       }
 
                       if (field.field_type === 'link') {
-                        const linkUrl = field.options?.[0] || '';
-                        const linkTitle = field.label ? String(field.label).replace(/<[^>]*>/g, '') : 'Embedded content';
-                        return (
-                          <div key={field.id} className="space-y-2">
-                            {field.label && (
-                              <div className="font-medium text-gray-900" dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-                            )}
-                            {linkUrl && (
+                        try {
+                          const linkUrl = (Array.isArray(field.options) && field.options.length > 0) ? field.options[0] : '';
+                          const linkTitle = field.label ? String(field.label).replace(/<[^>]*>/g, '').trim() || 'Embedded content' : 'Embedded content';
+
+                          if (!linkUrl) {
+                            return null;
+                          }
+
+                          return (
+                            <div key={field.id} className="space-y-2">
+                              {field.label && typeof field.label === 'string' && (
+                                <div className="font-medium text-gray-900" dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
+                              )}
                               <div className="w-full border rounded-lg overflow-hidden bg-gray-50">
                                 <iframe
                                   src={linkUrl}
@@ -2128,9 +2133,12 @@ export default function FormBuilderPage() {
                                   allowFullScreen
                                 />
                               </div>
-                            )}
-                          </div>
-                        );
+                            </div>
+                          );
+                        } catch (error) {
+                          console.error('Error rendering link field:', error);
+                          return null;
+                        }
                       }
 
                       if (field.field_type === 'text' || field.field_type === 'email' || field.field_type === 'number') {
