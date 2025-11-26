@@ -899,7 +899,7 @@ export default function CampaignsPage() {
                   </Button>
                   <Button
                     type="submit"
-                    disabled={isSubmittingCampaign || !newCampaign.client_id || !newCampaign.name.trim() || !newCampaign.total_budget || !newCampaign.start_date || !newCampaign.end_date}
+                    disabled={isSubmittingCampaign || !newCampaign.client_id || !newCampaign.name.trim() || !newCampaign.total_budget || !newCampaign.start_date}
                     className="hover:opacity-90"
                     style={{ backgroundColor: "#3e8692", color: "white" }}
                   >

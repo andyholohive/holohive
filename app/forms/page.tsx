@@ -27,6 +27,10 @@ export default function FormsPage() {
   const [copiedFormId, setCopiedFormId] = useState<string | null>(null);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [sharingForm, setSharingForm] = useState<FormWithStats | null>(null);
+  const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
+  const [duplicatingForm, setDuplicatingForm] = useState<FormWithStats | null>(null);
+  const [duplicateFormName, setDuplicateFormName] = useState('');
+  const [isDuplicating, setIsDuplicating] = useState(false);
 
   // New form data
   const [newFormName, setNewFormName] = useState('');
@@ -141,6 +145,83 @@ export default function FormsPage() {
   const handleShareForm = (form: FormWithStats) => {
     setSharingForm(form);
     setIsShareDialogOpen(true);
+  };
+
+  const handleOpenDuplicateDialog = (form: FormWithStats) => {
+    setDuplicatingForm(form);
+    setDuplicateFormName(`${form.name} (Copy)`);
+    setIsDuplicateDialogOpen(true);
+  };
+
+  const handleDuplicateForm = async () => {
+    if (!duplicatingForm || !duplicateFormName.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter a form name',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setIsDuplicating(true);
+
+      // Create new form
+      const newForm = await FormService.createForm({
+        name: duplicateFormName,
+        description: duplicatingForm.description || undefined,
+        status: 'draft', // Always create duplicates as draft
+      });
+
+      // Get original form fields
+      const originalFormWithFields = await FormService.getFormById(duplicatingForm.id);
+
+      // Duplicate all fields
+      if (originalFormWithFields?.fields) {
+        for (const field of originalFormWithFields.fields) {
+          await FormService.createField({
+            form_id: newForm.id,
+            field_type: field.field_type,
+            label: field.label,
+            required: field.required,
+            options: field.options || undefined,
+            allow_multiple: field.allow_multiple || undefined,
+            include_other: field.include_other || undefined,
+            allow_attachments: field.allow_attachments || undefined,
+            is_yes_no_dropdown: field.is_yes_no_dropdown || undefined,
+            require_yes_reason: field.require_yes_reason || undefined,
+            require_no_reason: field.require_no_reason || undefined,
+            display_order: field.display_order,
+            page_number: field.page_number,
+          });
+        }
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Form duplicated successfully',
+      });
+
+      // Reset and close dialog
+      setDuplicateFormName('');
+      setDuplicatingForm(null);
+      setIsDuplicateDialogOpen(false);
+
+      // Refresh forms list
+      await fetchForms();
+
+      // Navigate to the new form
+      router.push(`/forms/${newForm.id}`);
+    } catch (error) {
+      console.error('Error duplicating form:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to duplicate form',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDuplicating(false);
+    }
   };
 
   // Filter forms
@@ -343,6 +424,14 @@ export default function FormsPage() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => handleOpenDuplicateDialog(form)}
+                        title="Duplicate form"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => handleDeleteForm(form.id, form.name)}
                         title="Delete form"
                       >
@@ -436,6 +525,59 @@ export default function FormsPage() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsShareDialogOpen(false)}>
                 Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Duplicate Form Dialog */}
+        <Dialog open={isDuplicateDialogOpen} onOpenChange={setIsDuplicateDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Duplicate Form</DialogTitle>
+              <DialogDescription>
+                Create a copy of this form with all fields. Responses will not be copied.
+              </DialogDescription>
+            </DialogHeader>
+            {duplicatingForm && (
+              <div className="space-y-4">
+                {/* Original Form Info */}
+                <div className="border-l-4 border-[#3e8692] bg-gray-50 p-4 rounded">
+                  <p className="text-sm text-gray-600 mb-1">Duplicating from:</p>
+                  <h4 className="font-semibold text-gray-900">{duplicatingForm.name}</h4>
+                </div>
+
+                {/* New Form Name */}
+                <div>
+                  <Label htmlFor="duplicate-name">New Form Name</Label>
+                  <Input
+                    id="duplicate-name"
+                    value={duplicateFormName}
+                    onChange={(e) => setDuplicateFormName(e.target.value)}
+                    placeholder="Enter name for duplicated form"
+                    className="auth-input"
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsDuplicateDialogOpen(false);
+                  setDuplicateFormName('');
+                  setDuplicatingForm(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleDuplicateForm}
+                disabled={isDuplicating || !duplicateFormName.trim()}
+                className="hover:opacity-90"
+                style={{ backgroundColor: '#3e8692', color: 'white' }}
+              >
+                {isDuplicating ? 'Duplicating...' : 'Duplicate Form'}
               </Button>
             </DialogFooter>
           </DialogContent>

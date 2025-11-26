@@ -632,6 +632,52 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
     );
   }
 
+  // Link field (embedded content)
+  if (field.field_type === 'link') {
+    const linkUrl = field.options?.[0] || '';
+    return (
+      <div ref={setNodeRef} style={style} className="group relative">
+        <div className="absolute -left-8 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+          <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600">
+            <GripVertical className="h-4 w-4" />
+          </div>
+        </div>
+        <div className="space-y-2 p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              {field.label && (
+                <div className="font-medium text-gray-900 mb-2" dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
+              )}
+              <div className="text-sm text-gray-600 bg-white rounded p-3 border">
+                <p className="font-medium mb-1">Embedded Content</p>
+                <p className="text-xs text-gray-500 mb-2">URL: {linkUrl || 'No URL set'}</p>
+                <p className="text-xs italic">View the embedded content in the Preview tab</p>
+              </div>
+            </div>
+            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleOpenFieldDialog(field)}
+                className="hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300"
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleDeleteField(field.id, field.label)}
+                className="hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // All other field types with input fields
   return (
     <div ref={setNodeRef} style={style} className="group relative space-y-2">
@@ -802,6 +848,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
               <SelectContent>
                 <SelectItem value="section">Section Header</SelectItem>
                 <SelectItem value="description">Description Text</SelectItem>
+                <SelectItem value="link">Link</SelectItem>
                 <SelectItem value="text">Short Text</SelectItem>
                 <SelectItem value="textarea">Long Text</SelectItem>
                 <SelectItem value="email">Email</SelectItem>
@@ -848,7 +895,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
               <Label className="text-sm">Yes/No dropdown</Label>
             </div>
           )}
-          {editFieldType === 'select' && !isYesNoDropdown && (
+          {(editFieldType === 'select' || editFieldType === 'checkbox') && !isYesNoDropdown && (
             <div className="flex items-center gap-2">
               <Checkbox checked={editIncludeOther} onCheckedChange={(checked) => setEditIncludeOther(checked as boolean)} />
               <Label className="text-sm">Include "Other" option</Label>
@@ -1025,6 +1072,12 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
               <Label className="text-sm font-normal">{option}</Label>
             </div>
           ))}
+          {field.include_other && (
+            <div className="flex items-center space-x-2">
+              <Checkbox disabled />
+              <Label className="text-sm font-normal">Other</Label>
+            </div>
+          )}
         </div>
       )}
         </>
@@ -1881,7 +1934,12 @@ export default function FormBuilderPage() {
                       <Plus className="h-4 w-4 mr-1" />
                       Add Page
                     </Button>
-                    <Button onClick={() => handleOpenFieldDialog()} size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                    <Button
+                      onClick={() => handleOpenFieldDialog()}
+                      size="sm"
+                      className="hover:opacity-90"
+                      style={{ backgroundColor: '#3e8692', color: 'white' }}
+                    >
                       <Plus className="h-4 w-4 mr-1" />
                       Add Field
                     </Button>
@@ -1889,6 +1947,39 @@ export default function FormBuilderPage() {
                 </div>
               </CardHeader>
               <CardContent>
+                {/* Thank You Page Section - Only show on last page */}
+                {currentPage === totalPages && totalPages > 1 && (
+                  <div className="mb-6 pb-6 border-b">
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        checked={form.enable_thank_you_page || false}
+                        onCheckedChange={async (checked) => {
+                          try {
+                            await FormService.updateForm({
+                              id: formId,
+                              enable_thank_you_page: checked as boolean,
+                            });
+                            setForm(prev => prev ? { ...prev, enable_thank_you_page: checked as boolean } : null);
+                            toast({
+                              title: 'Success',
+                              description: checked ? 'Thank you page enabled - submit button will appear on the previous page' : 'Thank you page disabled',
+                            });
+                          } catch (error) {
+                            toast({
+                              title: 'Error',
+                              description: 'Failed to update thank you page setting',
+                              variant: 'destructive',
+                            });
+                          }
+                        }}
+                      />
+                      <div>
+                        <Label className="text-base font-semibold">Make this a Thank You Page</Label>
+                        <p className="text-sm text-gray-500">Submit form on previous page and show this page after submission</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-6">
                   {(() => {
                     const fieldsOnCurrentPage = form.fields
@@ -1956,7 +2047,9 @@ export default function FormBuilderPage() {
                       style={{ backgroundColor: '#3e8692', color: 'white' }}
                       className="hover:opacity-90"
                     >
-                      {currentPage === totalPages ? 'Submit' : 'Next'}
+                      {form.enable_thank_you_page
+                        ? (currentPage === totalPages - 1 ? 'Submit' : currentPage === totalPages ? 'Done' : 'Next')
+                        : (currentPage === totalPages ? 'Submit' : 'Next')}
                     </Button>
                   </div>
                 )}
@@ -2013,6 +2106,26 @@ export default function FormBuilderPage() {
                         return (
                           <div key={field.id}>
                             <div className="text-gray-600" style={{ whiteSpace: 'pre-wrap' }} dangerouslySetInnerHTML={{ __html: field.label }} />
+                          </div>
+                        );
+                      }
+
+                      if (field.field_type === 'link') {
+                        const linkUrl = field.options?.[0] || '';
+                        return (
+                          <div key={field.id} className="space-y-2">
+                            {field.label && (
+                              <div className="font-medium text-gray-900" dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
+                            )}
+                            <div className="w-full border rounded-lg overflow-hidden bg-gray-50">
+                              <iframe
+                                src={linkUrl}
+                                className="w-full"
+                                style={{ height: '600px', border: 'none' }}
+                                title={field.label?.replace(/<[^>]*>/g, '') || 'Embedded content'}
+                                allowFullScreen
+                              />
+                            </div>
                           </div>
                         );
                       }
@@ -2162,6 +2275,12 @@ export default function FormBuilderPage() {
                                   <Label className="text-sm font-normal">{option}</Label>
                                 </div>
                               ))}
+                              {field.include_other && (
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox disabled />
+                                  <Label className="text-sm font-normal">Other</Label>
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
@@ -2203,7 +2322,9 @@ export default function FormBuilderPage() {
                       style={{ backgroundColor: '#3e8692', color: 'white' }}
                       className="hover:opacity-90"
                     >
-                      {currentPage === totalPages ? 'Submit' : 'Next'}
+                      {form.enable_thank_you_page
+                        ? (currentPage === totalPages - 1 ? 'Submit' : currentPage === totalPages ? 'Done' : 'Next')
+                        : (currentPage === totalPages ? 'Submit' : 'Next')}
                     </Button>
                   </div>
                 )}
@@ -2289,6 +2410,7 @@ export default function FormBuilderPage() {
                   <SelectContent>
                     <SelectItem value="section">Section Header</SelectItem>
                     <SelectItem value="description">Description Text</SelectItem>
+                    <SelectItem value="link">Link</SelectItem>
                     <SelectItem value="text">Short Text</SelectItem>
                     <SelectItem value="textarea">Long Text</SelectItem>
                     <SelectItem value="email">Email</SelectItem>
@@ -2456,10 +2578,23 @@ export default function FormBuilderPage() {
                   </SelectContent>
                 </Select>
               </div>
-              {!['section', 'description'].includes(fieldForm.field_type) && (
+              {!['section', 'description', 'link'].includes(fieldForm.field_type) && (
                 <div className="flex items-center gap-2">
                   <Checkbox checked={fieldForm.required} onCheckedChange={(checked) => setFieldForm(prev => ({ ...prev, required: checked as boolean }))} />
                   <Label>Required field</Label>
+                </div>
+              )}
+              {fieldForm.field_type === 'link' && (
+                <div>
+                  <Label>URL</Label>
+                  <Input
+                    value={fieldForm.options[0] || ''}
+                    onChange={(e) => setFieldForm(prev => ({ ...prev, options: [e.target.value] }))}
+                    placeholder="https://example.com"
+                    className="auth-input"
+                    type="url"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">The URL this link should point to</p>
                 </div>
               )}
               {['select', 'radio', 'checkbox'].includes(fieldForm.field_type) && (
@@ -2535,7 +2670,7 @@ export default function FormBuilderPage() {
                       const attachments = selectedResponse.response_data[attachmentsKey];
 
                       // Skip display-only fields that don't collect responses
-                      const displayOnlyTypes = ['section', 'description'];
+                      const displayOnlyTypes = ['section', 'description', 'link'];
                       const isDisplayOnly = displayOnlyTypes.includes(field.field_type);
 
                       return (

@@ -258,6 +258,11 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
         },
         supabasePublic
       );
+
+      // If thank you page is enabled, navigate to last page instead of showing full-page success
+      if (form?.enable_thank_you_page) {
+        setCurrentPage(totalPages);
+      }
       setSubmitted(true);
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -773,6 +778,34 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                   </Label>
                 </div>
               ))}
+              {field.include_other && (
+                <>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`${field.id}-__OTHER__`}
+                      checked={formData[field.id]?.includes('__OTHER__') || false}
+                      onCheckedChange={(checked) => {
+                        handleCheckboxChange(field.id, '__OTHER__', checked as boolean);
+                        if (!checked) {
+                          // Clear the other field value when unchecked
+                          setOtherFieldValues(prev => ({ ...prev, [field.id]: '' }));
+                        }
+                      }}
+                    />
+                    <Label htmlFor={`${field.id}-__OTHER__`} className="font-normal cursor-pointer">
+                      Other
+                    </Label>
+                  </div>
+                  {formData[field.id]?.includes('__OTHER__') && (
+                    <Input
+                      placeholder="Please specify..."
+                      value={otherFieldValues[field.id] || ''}
+                      onChange={(e) => setOtherFieldValues(prev => ({ ...prev, [field.id]: e.target.value }))}
+                      className="ml-6"
+                    />
+                  )}
+                </>
+              )}
             </div>
             {hasError && <p className="text-sm text-red-500">{hasError}</p>}
           </div>
@@ -789,6 +822,25 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
         return (
           <div key={field.id} className="py-2">
             <div className="text-gray-600" style={{ whiteSpace: 'pre-wrap' }} dangerouslySetInnerHTML={{ __html: field.label }} />
+          </div>
+        );
+
+      case 'link':
+        const linkUrl = field.options?.[0] || '';
+        return (
+          <div key={field.id} className="space-y-2">
+            {field.label && (
+              <div className="font-medium text-gray-900" dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
+            )}
+            <div className="w-full border rounded-lg overflow-hidden bg-gray-50">
+              <iframe
+                src={linkUrl}
+                className="w-full"
+                style={{ height: '600px', border: 'none' }}
+                title={field.label?.replace(/<[^>]*>/g, '') || 'Embedded content'}
+                allowFullScreen
+              />
+            </div>
           </div>
         );
 
@@ -827,8 +879,8 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
     );
   }
 
-  // Success state
-  if (submitted) {
+  // Success state - only show full-page success if thank you page is NOT enabled
+  if (submitted && !form?.enable_thank_you_page) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center px-6">
         <div className="text-center max-w-md">
@@ -888,47 +940,51 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                 .filter(field => field.page_number === currentPage)
                 .map(field => renderField(field))}
 
-              {/* Navigation buttons */}
-              <div className="pt-8 flex gap-4 justify-center items-center">
-                {currentPage > 1 && (
-                  <Button
-                    type="button"
-                    onClick={handlePreviousPage}
-                    className="px-6 h-12 text-base font-medium rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all flex items-center gap-2"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                    Previous
-                  </Button>
-                )}
-                {currentPage < totalPages ? (
-                  <Button
-                    type="button"
-                    onClick={handleNextPage}
-                    className="px-6 h-12 text-base font-medium rounded-lg bg-[#3e8692] hover:bg-[#2d6570] text-white transition-all flex items-center gap-2"
-                  >
-                    Next
-                    <ChevronRight className="h-5 w-5" />
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    disabled={submitting}
-                    className="px-6 h-12 text-base font-medium rounded-lg bg-[#3e8692] hover:bg-[#2d6570] text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader className="h-5 w-5 animate-spin" />
-                        Submitting...
-                      </>
-                    ) : (
-                      <>
-                        Submit
-                        <ChevronRight className="h-5 w-5" />
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
+              {/* Navigation buttons - hide when on thank you page after submission */}
+              {!(form?.enable_thank_you_page && currentPage === totalPages && submitted) && (
+                <div className="pt-8 flex gap-4 justify-center items-center">
+                  {currentPage > 1 && !submitted && (
+                    <Button
+                      type="button"
+                      onClick={handlePreviousPage}
+                      className="px-6 h-12 text-base font-medium rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all flex items-center gap-2"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                      Previous
+                    </Button>
+                  )}
+                  {/* Show Next button or Submit button based on current page and thank you page setting */}
+                  {(form?.enable_thank_you_page && currentPage < totalPages - 1) || (!form?.enable_thank_you_page && currentPage < totalPages) ? (
+                    <Button
+                      type="button"
+                      onClick={handleNextPage}
+                      className="px-6 h-12 text-base font-medium rounded-lg bg-[#3e8692] hover:bg-[#2d6570] text-white transition-all flex items-center gap-2"
+                    >
+                      Next
+                      <ChevronRight className="h-5 w-5" />
+                    </Button>
+                  ) : !submitted && (
+                    <Button
+                      type="submit"
+                      disabled={submitting}
+                      className="px-6 h-12 text-base font-medium rounded-lg bg-[#3e8692] hover:bg-[#2d6570] text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {submitting ? (
+                        <>
+                          <Loader className="h-5 w-5 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          Submit
+                          <ChevronRight className="h-5 w-5" />
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
+
             </form>
           </div>
         </div>
