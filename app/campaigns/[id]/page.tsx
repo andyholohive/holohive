@@ -2202,6 +2202,33 @@ const CampaignDetailsPage = () => {
   };
 
   // 5. Render editable cell
+  // Helper function to move to the next editable cell when Tab is pressed
+  const moveToNextContentCell = async (currentContent: any, currentField: string) => {
+    // Define the order of editable fields (left to right in the table)
+    const editableFields = [
+      'campaign_kols_id', 'platform', 'type', 'status',
+      'content_link', 'impressions', 'likes', 'retweets', 'comments', 'bookmarks'
+    ];
+
+    const currentFieldIndex = editableFields.indexOf(currentField);
+
+    // If we're at the last field in the row, move to the first field of the next row
+    if (currentFieldIndex === editableFields.length - 1) {
+      const currentContentIndex = filteredContents.findIndex(c => c.id === currentContent.id);
+      if (currentContentIndex < filteredContents.length - 1) {
+        // Move to first field of next row
+        const nextContent = filteredContents[currentContentIndex + 1];
+        setEditingContentCell({ contentId: nextContent.id, field: editableFields[0] });
+        setEditingContentValue(nextContent[editableFields[0]]);
+      }
+    } else {
+      // Move to next field in the same row
+      const nextField = editableFields[currentFieldIndex + 1];
+      setEditingContentCell({ contentId: currentContent.id, field: nextField });
+      setEditingContentValue(currentContent[nextField]);
+    }
+  };
+
   const renderEditableContentCell = (value: any, field: string, content: any) => {
     const isEditing = editingContentCell?.contentId === content.id && editingContentCell?.field === field;
     const textFields = ["content_link", "activation_date", "impressions", "likes", "retweets", "comments", "bookmarks"];
@@ -2272,9 +2299,20 @@ const CampaignDetailsPage = () => {
             value={editingContentValue ?? ''}
             onChange={e => setEditingContentValue(e.target.value)}
             onBlur={handleContentCellSave}
-            onKeyDown={e => {
-              if (e.key === 'Enter') handleContentCellSave();
-              if (e.key === 'Escape') handleContentCellCancel();
+            onKeyDown={async (e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                await handleContentCellSave();
+              }
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                handleContentCellCancel();
+              }
+              if (e.key === 'Tab') {
+                e.preventDefault();
+                await handleContentCellSave();
+                await moveToNextContentCell(content, field);
+              }
             }}
             className="w-full border-none shadow-none p-0 h-auto bg-transparent text-blue-600 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
             style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
@@ -2336,9 +2374,20 @@ const CampaignDetailsPage = () => {
           value={editingContentValue ?? ''}
           onChange={e => setEditingContentValue(e.target.value)}
           onBlur={handleContentCellSave}
-          onKeyDown={e => {
-            if (e.key === 'Enter') handleContentCellSave();
-            if (e.key === 'Escape') handleContentCellCancel();
+          onKeyDown={async (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              await handleContentCellSave();
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              handleContentCellCancel();
+            }
+            if (e.key === 'Tab') {
+              e.preventDefault();
+              await handleContentCellSave();
+              await moveToNextContentCell(content, field);
+            }
           }}
           className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
           style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
