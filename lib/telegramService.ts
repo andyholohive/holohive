@@ -8,11 +8,13 @@ interface TelegramMessage {
   text: string;
   parse_mode?: 'HTML' | 'Markdown' | 'MarkdownV2';
   disable_web_page_preview?: boolean;
+  message_thread_id?: number;
 }
 
 export class TelegramService {
   private static botToken = process.env.TELEGRAM_BOT_TOKEN;
   private static chatId = process.env.TELEGRAM_TERMINAL_CHAT_ID;
+  private static threadId = process.env.TELEGRAM_TERMINAL_THREAD_ID;
 
   /**
    * Send a message to the configured Telegram chat
@@ -36,8 +38,14 @@ export class TelegramService {
         disable_web_page_preview: false,
       };
 
+      // Add thread ID if configured (for sending to specific topics in groups)
+      if (this.threadId) {
+        message.message_thread_id = parseInt(this.threadId);
+      }
+
       console.log('[Telegram] Sending message:', {
         chatId: this.chatId,
+        threadId: this.threadId,
         messageLength: text.length,
         parseMode
       });
