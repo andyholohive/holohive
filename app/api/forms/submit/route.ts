@@ -64,19 +64,34 @@ export async function POST(request: NextRequest) {
       .eq('id', form_id)
       .single();
 
-    // Send Telegram notification (non-blocking - don't wait for it)
-    TelegramService.sendFormSubmissionNotification(
-      form?.name || 'Unknown Form',
-      form_id,
-      {
-        name: submitted_by_name,
-        email: submitted_by_email,
-      },
-      response_data
-    ).catch(err => {
-      console.error('Failed to send Telegram notification:', err);
-      // Don't fail the request if Telegram notification fails
+    console.log('[Form Submit] Sending Telegram notification for form:', {
+      formId: form_id,
+      formName: form?.name,
+      hasSubmitterName: !!submitted_by_name,
+      hasSubmitterEmail: !!submitted_by_email
     });
+
+    // Send Telegram notification (wait for it but don't fail if it errors)
+    try {
+      const telegramSuccess = await TelegramService.sendFormSubmissionNotification(
+        form?.name || 'Unknown Form',
+        form_id,
+        {
+          name: submitted_by_name,
+          email: submitted_by_email,
+        },
+        response_data
+      );
+
+      if (telegramSuccess) {
+        console.log('[Form Submit] Telegram notification sent successfully');
+      } else {
+        console.warn('[Form Submit] Telegram notification failed (returned false)');
+      }
+    } catch (err) {
+      console.error('[Form Submit] Exception while sending Telegram notification:', err);
+      // Don't fail the request if Telegram notification fails
+    }
 
     return NextResponse.json(
       { success: true, data: response },

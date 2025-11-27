@@ -19,7 +19,12 @@ export class TelegramService {
    */
   static async sendMessage(text: string, parseMode: 'HTML' | 'Markdown' = 'HTML'): Promise<boolean> {
     if (!this.botToken || !this.chatId) {
-      console.warn('Telegram bot token or chat ID not configured. Skipping notification.');
+      console.error('[Telegram] Configuration missing:', {
+        hasToken: !!this.botToken,
+        hasChatId: !!this.chatId,
+        tokenPrefix: this.botToken ? this.botToken.substring(0, 10) + '...' : 'missing',
+        chatId: this.chatId || 'missing'
+      });
       return false;
     }
 
@@ -28,8 +33,14 @@ export class TelegramService {
         chat_id: this.chatId,
         text,
         parse_mode: parseMode,
-        disable_web_page_preview: true,
+        disable_web_page_preview: false,
       };
+
+      console.log('[Telegram] Sending message:', {
+        chatId: this.chatId,
+        messageLength: text.length,
+        parseMode
+      });
 
       const response = await fetch(
         `https://api.telegram.org/bot${this.botToken}/sendMessage`,
@@ -44,13 +55,22 @@ export class TelegramService {
 
       if (!response.ok) {
         const error = await response.json();
-        console.error('Telegram API error:', error);
+        console.error('[Telegram] API error:', {
+          status: response.status,
+          error
+        });
         return false;
       }
 
+      const result = await response.json();
+      console.log('[Telegram] Message sent successfully:', {
+        messageId: result.result?.message_id,
+        chatId: result.result?.chat?.id
+      });
+
       return true;
     } catch (error) {
-      console.error('Error sending Telegram message:', error);
+      console.error('[Telegram] Error sending message:', error);
       return false;
     }
   }
@@ -73,7 +93,7 @@ export class TelegramService {
 
     const formUrl = `${baseUrl}/forms/${formId}`;
 
-    const message = `${formName} Form has been submitted.\n<a href="${formUrl}">${formUrl}</a>`;
+    const message = `${formName} Form has been submitted.\n<a href="${formUrl}">View Form</a>`;
 
     return this.sendMessage(message);
   }
