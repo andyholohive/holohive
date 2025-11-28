@@ -2697,26 +2697,8 @@ export default function FormBuilderPage() {
                           {/* Value Display - Only show for actual input fields */}
                           {!isDisplayOnly && (
                             <div className="text-sm text-gray-900 mt-2">
-                              {field.field_type === 'file_upload' && attachments ? (
-                                <div className="space-y-2">
-                                  {Array.isArray(attachments) && attachments.length > 0 ? (
-                                    attachments.map((url: string, idx: number) => (
-                                      <a
-                                        key={idx}
-                                        href={url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="flex items-center gap-2 text-blue-600 hover:text-blue-800 underline"
-                                      >
-                                        <Upload className="h-4 w-4" />
-                                        Attachment {idx + 1}
-                                      </a>
-                                    ))
-                                  ) : (
-                                    <span className="text-gray-400 italic">No files uploaded</span>
-                                  )}
-                                </div>
-                              ) : field.field_type === 'yes_no' ? (
+                              {/* Show the main field value */}
+                              {field.field_type === 'yes_no' ? (
                                 <div>
                                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                                     value === 'Yes'
@@ -2755,6 +2737,49 @@ export default function FormBuilderPage() {
                                 <p className="font-medium">
                                   {value || <span className="text-gray-400 italic">No response</span>}
                                 </p>
+                              )}
+
+                              {/* Display attachments if any exist for this field */}
+                              {attachments && Array.isArray(attachments) && attachments.length > 0 && (
+                                <div className="mt-3 space-y-2">
+                                  <p className="text-xs font-medium text-gray-500 uppercase">Attachments:</p>
+                                  {attachments.map((url: string, idx: number) => (
+                                    <div key={idx} className="flex items-center gap-2">
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 text-blue-600 hover:text-blue-800 underline text-sm"
+                                      >
+                                        <Upload className="h-4 w-4" />
+                                        Attachment {idx + 1}
+                                      </a>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={async () => {
+                                          try {
+                                            const response = await fetch(url);
+                                            const blob = await response.blob();
+                                            const downloadUrl = window.URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = downloadUrl;
+                                            a.download = `attachment-${idx + 1}`;
+                                            document.body.appendChild(a);
+                                            a.click();
+                                            document.body.removeChild(a);
+                                            window.URL.revokeObjectURL(downloadUrl);
+                                          } catch (error) {
+                                            console.error('Error downloading file:', error);
+                                          }
+                                        }}
+                                        className="h-7 px-2"
+                                      >
+                                        <Download className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
                               )}
                             </div>
                           )}

@@ -462,7 +462,6 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Region</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Platform</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
                   </tr>
                 </thead>
@@ -518,25 +517,6 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                           </div>
                         ) : '-'}
                       </td>
-                                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <Select 
-                            value={kol.status || 'curated'} 
-                            onValueChange={(value) => handleUpdateKOLStatus(kol.id, value)}
-                          >
-                            <SelectTrigger 
-                              className={`border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none ${getStatusColor(kol.status || 'curated')}`}
-                              style={{ outline: 'none', boxShadow: 'none', minWidth: 90 }}
-                            >
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="curated">Curated</SelectItem>
-                              <SelectItem value="interested">Interested</SelectItem>
-                              <SelectItem value="onboarded">Onboarded</SelectItem>
-                              <SelectItem value="concluded">Concluded</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {editingKolNotes?.kolId === kol.id ? (
                             <Input
