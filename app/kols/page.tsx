@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -26,6 +26,7 @@ export default function KOLsPage() {
   const [kols, setKols] = useState<MasterKOL[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<{kolId: string, field: string} | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [editingCell, setEditingCell] = useState<{kolId: string, field: keyof MasterKOL} | null>(null);
@@ -120,15 +121,17 @@ export default function KOLsPage() {
     updateColumnVisibilityInURL(newVisibleColumns);
   };
 
-  // Multi-select dropdown component
-  const MultiSelect = ({ 
-    options, 
-    selected, 
-    onSelectedChange, 
+  // Multi-select dropdown component - CUSTOM IMPLEMENTATION (no Popover)
+  const MultiSelect = ({
+    options,
+    selected,
+    onSelectedChange,
     placeholder = "Select options...",
     renderOption = (option: string) => option,
     className = "",
-    triggerContent = null
+    triggerContent = null,
+    isOpen = false,
+    onOpenChange
   }: {
     options: string[];
     selected: string[];
@@ -137,41 +140,63 @@ export default function KOLsPage() {
     renderOption?: (option: string) => React.ReactNode;
     className?: string;
     triggerContent?: React.ReactNode;
+    isOpen?: boolean;
+    onOpenChange?: (open: boolean) => void;
   }) => {
-    const [open, setOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const containerRef = useRef<HTMLDivElement>(null);
 
     // Add safety checks
     const safeOptions = Array.isArray(options) ? options : [];
     const safeSelected = Array.isArray(selected) ? selected : [];
 
     // Filter options based on search term
-    const filteredOptions = safeOptions.filter(option => 
+    const filteredOptions = safeOptions.filter(option =>
       option.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     try {
       return (
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            {triggerContent ? (
-              <div className={`cursor-pointer w-full ${className}`}>
-                {triggerContent}
-              </div>
-            ) : (
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={open}
-                className={`h-auto border-none shadow-none p-1 bg-transparent hover:bg-transparent text-xs font-medium inline-flex items-center ${className}`}
+        <>
+          {/* Backdrop - covers entire screen, closes on click */}
+          {isOpen && (
+            <div
+              className="fixed inset-0 z-[9998]"
+              onClick={() => onOpenChange?.(false)}
+            />
+          )}
+
+          <div ref={containerRef} className={`relative ${className}`}>
+            {/* Trigger */}
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenChange?.(!isOpen);
+              }}
+              className="cursor-pointer w-full"
+            >
+              {triggerContent ? (
+                <div className="w-full">{triggerContent}</div>
+              ) : (
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={isOpen}
+                  className="h-auto border-none shadow-none p-1 bg-transparent hover:bg-transparent text-xs font-medium inline-flex items-center"
+                >
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </Button>
+              )}
+            </div>
+
+            {/* Dropdown */}
+            {isOpen && (
+              <div
+                className="absolute z-[9999] w-[200px] bg-white border border-gray-200 rounded-md shadow-lg mt-1 left-0"
+                onClick={(e) => e.stopPropagation()}
               >
-                <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </Button>
-            )}
-          </PopoverTrigger>
-          <PopoverContent className="w-[200px] p-0" align="start">
             <div className="flex items-center border-b px-3 py-2">
               <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
               <Input
@@ -179,6 +204,7 @@ export default function KOLsPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="border-0 p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
+                onClick={(e) => e.stopPropagation()}
               />
             </div>
             <div className="max-h-[300px] overflow-auto">
@@ -188,16 +214,13 @@ export default function KOLsPage() {
                 filteredOptions.map((option) => (
                   <div
                     key={option}
-                    className="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
-                    onClick={() => {
-                      try {
-                        const newSelected = safeSelected.includes(option)
-                          ? safeSelected.filter(item => item !== option)
-                          : [...safeSelected, option];
-                        onSelectedChange(newSelected);
-                      } catch (error) {
-                        console.error('Error in onSelect:', error);
-                      }
+                    className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-gray-100"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const newSelected = safeSelected.includes(option)
+                        ? safeSelected.filter(item => item !== option)
+                        : [...safeSelected, option];
+                      onSelectedChange(newSelected);
                     }}
                   >
                     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
@@ -214,8 +237,10 @@ export default function KOLsPage() {
                 ))
               )}
             </div>
-          </PopoverContent>
-        </Popover>
+            </div>
+            )}
+          </div>
+        </>
       );
     } catch (error) {
       console.error('MultiSelect render error:', error);
@@ -1068,6 +1093,14 @@ export default function KOLsPage() {
                 }}
                 placeholder={placeholder}
                 className="w-full"
+                isOpen={openDropdown?.kolId === kolId && openDropdown?.field === field}
+                onOpenChange={(open) => {
+                  if (open) {
+                    setOpenDropdown({ kolId, field: field as string });
+                  } else {
+                    setOpenDropdown(null);
+                  }
+                }}
                 triggerContent={
                   <div className="w-full flex items-center h-7 min-h-[28px]">
                     {currentValues.length > 0 ? (
@@ -2076,7 +2109,9 @@ export default function KOLsPage() {
                             <div
                               key={platform}
                               className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 const newPlatforms = filters.platform.includes(platform)
                                   ? filters.platform.filter(p => p !== platform)
                                   : [...filters.platform, platform];
@@ -2183,7 +2218,9 @@ export default function KOLsPage() {
                             <div
                               key={region}
                               className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 const newRegions = filters.region.includes(region)
                                   ? filters.region.filter(r => r !== region)
                                   : [...filters.region, region];
@@ -2235,7 +2272,9 @@ export default function KOLsPage() {
                             <div
                               key={type}
                               className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 const newTypes = filters.creator_type.includes(type)
                                   ? filters.creator_type.filter(t => t !== type)
                                   : [...filters.creator_type, type];
@@ -2284,7 +2323,9 @@ export default function KOLsPage() {
                             <div
                               key={type}
                               className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 const newTypes = filters.content_type.includes(type)
                                   ? filters.content_type.filter(t => t !== type)
                                   : [...filters.content_type, type];
@@ -2333,7 +2374,9 @@ export default function KOLsPage() {
                             <div
                               key={deliverable}
                               className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 const newDeliverables = filters.deliverables.includes(deliverable)
                                   ? filters.deliverables.filter(d => d !== deliverable)
                                   : [...filters.deliverables, deliverable];
@@ -2382,7 +2425,9 @@ export default function KOLsPage() {
                             <div
                               key={pricing}
                               className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 const newPricing = filters.pricing.includes(pricing)
                                   ? filters.pricing.filter(p => p !== pricing)
                                   : [...filters.pricing, pricing];
@@ -2487,7 +2532,9 @@ export default function KOLsPage() {
                             <div
                               key={option}
                               className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 setFilters(prev => ({ ...prev, community: prev.community === option ? '' : option }));
                               }}
                             >
@@ -2533,7 +2580,9 @@ export default function KOLsPage() {
                             <div
                               key={option}
                               className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 setFilters(prev => ({ ...prev, group_chat: prev.group_chat === option ? '' : option }));
                               }}
                             >
@@ -2579,7 +2628,9 @@ export default function KOLsPage() {
                             <div
                               key={option}
                               className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
                                 const newInHouse = filters.in_house.includes(option)
                                   ? filters.in_house.filter(h => h !== option)
                                   : [...filters.in_house, option];
@@ -2680,8 +2731,8 @@ export default function KOLsPage() {
                   </TableCell>
                   )}
                   {visibleColumns.platform && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                    <div className="truncate">{renderEditableCell(kol.platform, 'platform', kol.id, 'multiselect')}</div>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-visible`}>
+                    <div>{renderEditableCell(kol.platform, 'platform', kol.id, 'multiselect')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.followers && (
@@ -2695,18 +2746,18 @@ export default function KOLsPage() {
                   </TableCell>
                   )}
                   {visibleColumns.creator_type && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                      <div className="truncate">{renderEditableCell(kol.creator_type, 'creator_type', kol.id, 'multiselect')}</div>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-visible`}>
+                      <div>{renderEditableCell(kol.creator_type, 'creator_type', kol.id, 'multiselect')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.content_type && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                    <div className="truncate">{renderEditableCell(kol.content_type, 'content_type', kol.id, 'multiselect')}</div>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-visible`}>
+                    <div>{renderEditableCell(kol.content_type, 'content_type', kol.id, 'multiselect')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.deliverables && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                      <div className="truncate">{renderEditableCell(kol.deliverables, 'deliverables', kol.id, 'multiselect')}</div>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-visible`}>
+                      <div>{renderEditableCell(kol.deliverables, 'deliverables', kol.id, 'multiselect')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.pricing && (

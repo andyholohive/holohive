@@ -20,11 +20,18 @@ import { supabase } from '@/lib/supabase';
 import { KOLService } from '@/lib/kolService';
 import { useToast } from '@/hooks/use-toast';
 
+interface SavedSortOrder {
+  field: string;
+  direction: 'asc' | 'desc';
+}
+
 interface ListItem {
   id: string;
   name: string;
   notes: string | null;
   status?: string | null;
+  approved_emails?: string[] | null;
+  sort_order?: SavedSortOrder | null;
   created_at: string;
   updated_at: string;
   kols?: {
@@ -34,7 +41,8 @@ interface ListItem {
     followers: number | null;
     region: string | null;
     link: string | null;
-    content_type: string[] | null;
+    creator_type: string[] | null;
+    rating?: number | null;
     status?: string | null;
     notes?: string | null;
   }[];
@@ -98,18 +106,25 @@ const getPlatformIcon = (platform: string) => {
   }
 };
 
-const getContentTypeColor = (type: string) => {
+const getCreatorTypeColor = (type: string) => {
   const colorMap: { [key: string]: string } = {
-    'Meme': 'bg-yellow-100 text-yellow-800',
-    'News': 'bg-blue-100 text-blue-800',
+    'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
+    'Drama-Forward': 'bg-red-100 text-red-800',
+    'Skeptic': 'bg-orange-100 text-orange-800',
+    'Educator': 'bg-blue-100 text-blue-800',
+    'Bridge Builder': 'bg-green-100 text-green-800',
+    'Visionary': 'bg-indigo-100 text-indigo-800',
+    'Onboarder': 'bg-teal-100 text-teal-800',
+    'General': 'bg-gray-100 text-gray-800',
+    'Gaming': 'bg-pink-100 text-pink-800',
+    'Crypto': 'bg-yellow-100 text-yellow-800',
+    'Memecoin': 'bg-orange-100 text-orange-800',
+    'NFT': 'bg-purple-100 text-purple-800',
     'Trading': 'bg-green-100 text-green-800',
-    'Deep Dive': 'bg-purple-100 text-purple-800',
-    'Meme/Cultural Narrative': 'bg-pink-100 text-pink-800',
-    'Drama Queen': 'bg-red-100 text-red-800',
-    'Sceptics': 'bg-orange-100 text-orange-800',
-    'Technical Educator': 'bg-indigo-100 text-indigo-800',
-    'Bridge Builders': 'bg-teal-100 text-teal-800',
-    'Visionaries': 'bg-cyan-100 text-cyan-800'
+    'AI': 'bg-blue-100 text-blue-800',
+    'Research': 'bg-indigo-100 text-indigo-800',
+    'Airdrop': 'bg-teal-100 text-teal-800',
+    'Art': 'bg-pink-100 text-pink-800'
   };
   return colorMap[type] || 'bg-gray-100 text-gray-800';
 };
@@ -144,8 +159,8 @@ export default function ListsPage() {
   const [regionFilter, setRegionFilter] = useState<string[]>([]);
   const [platformFilterSearch, setPlatformFilterSearch] = useState('');
   const [regionFilterSearch, setRegionFilterSearch] = useState('');
-  const [contentTypeFilter, setContentTypeFilter] = useState<string[]>([]);
-  const [contentTypeFilterSearch, setContentTypeFilterSearch] = useState('');
+  const [creatorTypeFilter, setCreatorTypeFilter] = useState<string[]>([]);
+  const [creatorTypeFilterSearch, setCreatorTypeFilterSearch] = useState('');
   const [followersOperator, setFollowersOperator] = useState('');
   const [followersValue, setFollowersValue] = useState('');
   const [ratingOperator, setRatingOperator] = useState('');
@@ -180,7 +195,14 @@ export default function ListsPage() {
     name: '',
     notes: '',
     selectedKOLs: [] as string[],
+    approved_emails: [] as string[],
   });
+
+  // View list sort order state
+  const [viewListSortOrder, setViewListSortOrder] = useState<SavedSortOrder | null>(null);
+
+  // Email input state
+  const [emailInput, setEmailInput] = useState('');
 
   // Filter KOLs based on search term + dropdown filters
   const filteredAvailableKOLs = allKOLs.filter((kol: any) => {
@@ -194,8 +216,8 @@ export default function ListsPage() {
 
     const matchesRegion = regionFilter.length === 0 || (kol.region && regionFilter.includes(kol.region));
 
-    const matchesContentType =
-      contentTypeFilter.length === 0 || (Array.isArray(kol.content_type) && contentTypeFilter.some(ct => kol.content_type.includes(ct)));
+    const matchesCreatorType =
+      creatorTypeFilter.length === 0 || (Array.isArray(kol.creator_type) && creatorTypeFilter.some(ct => kol.creator_type.includes(ct)));
 
     const matchesFollowers = (() => {
       if (!followersOperator || !followersValue) return true;
@@ -233,7 +255,7 @@ export default function ListsPage() {
       }
     })();
 
-    return matchesSearch && matchesPlatform && matchesRegion && matchesContentType && matchesFollowers && matchesRating;
+    return matchesSearch && matchesPlatform && matchesRegion && matchesCreatorType && matchesFollowers && matchesRating;
   });
 
   const { toast } = useToast();
@@ -349,6 +371,8 @@ export default function ListsPage() {
           name,
           notes,
           status,
+          approved_emails,
+          sort_order,
           created_at,
           updated_at
         `)
@@ -371,7 +395,7 @@ export default function ListsPage() {
                 followers,
                 region,
                 link,
-                content_type
+                creator_type
               )
             `)
             .eq('list_id', list.id);
@@ -403,7 +427,7 @@ export default function ListsPage() {
     try {
       const { data, error } = await supabase
         .from('master_kols')
-        .select('id, name, platform, followers, region, link, content_type, rating')
+        .select('id, name, platform, followers, region, link, creator_type, rating')
         .order('name');
 
       if (error) throw error;
@@ -430,6 +454,7 @@ export default function ListsPage() {
       name: list.name,
       notes: list.notes || '',
       selectedKOLs: list.kols?.map(kol => kol.id) || [],
+      approved_emails: (list as any).approved_emails || [],
     });
     setIsEditMode(true);
     setIsNewListOpen(true);
@@ -439,15 +464,18 @@ export default function ListsPage() {
     setIsNewListOpen(false);
     setIsEditMode(false);
     setEditingList(null);
-    setNewList({ 
-      name: '', 
-      notes: '', 
+    setNewList({
+      name: '',
+      notes: '',
       selectedKOLs: [],
+      approved_emails: [],
     });
+    setEmailInput('');
   };
 
   const handleViewList = (list: ListItem) => {
     setViewingList(list);
+    setViewListSortOrder(list.sort_order || null);
     setIsViewListDialogOpen(true);
   };
 
@@ -456,15 +484,106 @@ export default function ListsPage() {
     setIsShareListDialogOpen(true);
   };
 
+  // Handle sorting in View List dialog
+  const handleViewListSort = (field: string) => {
+    setViewListSortOrder(prev => {
+      if (prev?.field === field) {
+        // Toggle direction if same field
+        return { field, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      // Default to ascending for new field
+      return { field, direction: 'asc' };
+    });
+  };
+
+  // Save sort order to database
+  const handleSaveSortOrder = async () => {
+    if (!viewingList?.id || !viewListSortOrder) return;
+
+    try {
+      const { error } = await supabase
+        .from('lists')
+        .update({ sort_order: viewListSortOrder })
+        .eq('id', viewingList.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setLists(prev => prev.map(list =>
+        list.id === viewingList.id ? { ...list, sort_order: viewListSortOrder } : list
+      ));
+      setViewingList(prev => prev ? { ...prev, sort_order: viewListSortOrder } : null);
+
+      toast({
+        title: "Sort order saved",
+        description: "The sort order will be applied when viewers access the public list.",
+      });
+    } catch (error) {
+      console.error('Error saving sort order:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save sort order.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Get sorted KOLs for viewing
+  const getSortedKols = (kols: ListItem['kols'], sortOrder: SavedSortOrder | null) => {
+    if (!kols || !sortOrder) return kols;
+
+    return [...kols].sort((a, b) => {
+      let aVal: any;
+      let bVal: any;
+
+      switch (sortOrder.field) {
+        case 'name':
+          aVal = a.name?.toLowerCase() || '';
+          bVal = b.name?.toLowerCase() || '';
+          break;
+        case 'followers':
+          aVal = a.followers || 0;
+          bVal = b.followers || 0;
+          break;
+        case 'region':
+          aVal = a.region?.toLowerCase() || '';
+          bVal = b.region?.toLowerCase() || '';
+          break;
+        case 'platform':
+          aVal = a.platform?.join(',').toLowerCase() || '';
+          bVal = b.platform?.join(',').toLowerCase() || '';
+          break;
+        case 'creator_type':
+          aVal = a.creator_type?.join(',').toLowerCase() || '';
+          bVal = b.creator_type?.join(',').toLowerCase() || '';
+          break;
+        case 'status':
+          aVal = a.status?.toLowerCase() || '';
+          bVal = b.status?.toLowerCase() || '';
+          break;
+        case 'rating':
+          aVal = a.rating || 0;
+          bVal = b.rating || 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aVal < bVal) return sortOrder.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortOrder.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
   const handleCreateList = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newList.name.trim()) return;
-    
+
     try {
       setIsSubmitting(true);
-      
+
       let listId: string;
-      
+
       if (isEditMode && editingList) {
         // Update existing list
         const { error: updateError } = await supabase
@@ -472,6 +591,7 @@ export default function ListsPage() {
           .update({
             name: newList.name.trim(),
             notes: newList.notes.trim() || null,
+            approved_emails: newList.approved_emails.length > 0 ? newList.approved_emails : null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', editingList.id);
@@ -493,6 +613,7 @@ export default function ListsPage() {
           .insert({
             name: newList.name.trim(),
             notes: newList.notes.trim() || null,
+            approved_emails: newList.approved_emails.length > 0 ? newList.approved_emails : null,
           })
           .select()
           .single();
@@ -959,6 +1080,72 @@ export default function ListsPage() {
                       />
                     </div>
 
+                    <div className="grid gap-2">
+                      <Label htmlFor="approved-emails">Approved Emails (Optional)</Label>
+                      <p className="text-sm text-gray-600 mb-2">
+                        Add email addresses that can access this list via public link. Leave empty for public access.
+                      </p>
+                      <div className="flex gap-2">
+                        <Input
+                          id="approved-emails"
+                          type="email"
+                          value={emailInput}
+                          onChange={(e) => setEmailInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const email = emailInput.trim().toLowerCase();
+                              if (email && !newList.approved_emails.includes(email)) {
+                                setNewList({ ...newList, approved_emails: [...newList.approved_emails, email] });
+                                setEmailInput('');
+                              }
+                            }
+                          }}
+                          placeholder="Enter email address"
+                          className="auth-input flex-1"
+                        />
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            const email = emailInput.trim().toLowerCase();
+                            if (email && !newList.approved_emails.includes(email)) {
+                              setNewList({ ...newList, approved_emails: [...newList.approved_emails, email] });
+                              setEmailInput('');
+                            }
+                          }}
+                          disabled={!emailInput.trim()}
+                          className="hover:opacity-90"
+                          style={{ backgroundColor: '#3e8692', color: 'white' }}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                      {newList.approved_emails.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {newList.approved_emails.map((email, index) => (
+                            <div
+                              key={index}
+                              className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm"
+                            >
+                              <span>{email}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setNewList({
+                                    ...newList,
+                                    approved_emails: newList.approved_emails.filter((_, i) => i !== index)
+                                  });
+                                }}
+                                className="ml-1 text-gray-500 hover:text-gray-700"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     <div className="border-t pt-4 mt-2"></div>
 
                     <div className="grid gap-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -1211,7 +1398,7 @@ export default function ListsPage() {
                               </TableHead>
                               <TableHead className="relative bg-gray-50 select-none">
                                 <div className="flex items-center gap-1 cursor-pointer group">
-                                  <span>Content Type</span>
+                                  <span>Creator Type</span>
                                   <Popover>
                                     <PopoverTrigger asChild>
                                       <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -1220,28 +1407,28 @@ export default function ListsPage() {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[250px] p-0" align="start">
                                       <div className="p-3">
-                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Content Type</div>
-                                        {['Meme','News','Trading','Deep Dive','Meme/Cultural Narrative','Drama Queen','Sceptics','Technical Educator','Bridge Builders','Visionaries'].map((type) => (
+                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Creator Type</div>
+                                        {['Native (Meme/Culture)','Drama-Forward','Skeptic','Educator','Bridge Builder','Visionary','Onboarder','General','Gaming','Crypto','Memecoin','NFT','Trading','AI','Research','Airdrop','Art'].map((type) => (
                                           <div
                                             key={type}
                                             className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
                                             onClick={() => {
-                                              const newTypes = contentTypeFilter.includes(type)
-                                                ? contentTypeFilter.filter(t => t !== type)
-                                                : [...contentTypeFilter, type];
-                                              setContentTypeFilter(newTypes);
+                                              const newTypes = creatorTypeFilter.includes(type)
+                                                ? creatorTypeFilter.filter(t => t !== type)
+                                                : [...creatorTypeFilter, type];
+                                              setCreatorTypeFilter(newTypes);
                                             }}
                                           >
-                                            <Checkbox checked={contentTypeFilter.includes(type)} />
+                                            <Checkbox checked={creatorTypeFilter.includes(type)} />
                                             <span className="text-sm">{type}</span>
                                           </div>
                                         ))}
-                                        {contentTypeFilter.length > 0 && (
+                                        {creatorTypeFilter.length > 0 && (
                                           <Button
                                             size="sm"
                                             variant="ghost"
                                             className="w-full mt-2 text-xs"
-                                            onClick={() => setContentTypeFilter([])}
+                                            onClick={() => setCreatorTypeFilter([])}
                                           >
                                             Clear
                                           </Button>
@@ -1249,9 +1436,9 @@ export default function ListsPage() {
                                       </div>
                                     </PopoverContent>
                                   </Popover>
-                                  {contentTypeFilter.length > 0 && (
+                                  {creatorTypeFilter.length > 0 && (
                                     <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
-                                      {contentTypeFilter.length}
+                                      {creatorTypeFilter.length}
                                     </span>
                                   )}
                                 </div>
@@ -1336,10 +1523,10 @@ export default function ListsPage() {
                                     ) : '-'}
                                   </TableCell>
                                   <TableCell>
-                                    {Array.isArray(kol.content_type) ? (
+                                    {Array.isArray(kol.creator_type) ? (
                                       <div className="flex flex-wrap gap-1">
-                                        {kol.content_type.map((type: string, index: number) => (
-                                          <span key={index} className={`px-2 py-1 rounded-md text-xs font-medium ${getContentTypeColor(type)}`}>
+                                        {kol.creator_type.map((type: string, index: number) => (
+                                          <span key={index} className={`px-2 py-1 rounded-md text-xs font-medium ${getCreatorTypeColor(type)}`}>
                                             {type}
                                           </span>
                                         ))}
@@ -1445,22 +1632,99 @@ export default function ListsPage() {
                     <h4 className="font-semibold text-sm text-gray-700">
                       KOLs in this list ({viewingList.kols.length})
                     </h4>
+                    <div className="flex items-center gap-2">
+                      {viewListSortOrder && (
+                        <span className="text-xs text-gray-500">
+                          Sorted by: {viewListSortOrder.field} ({viewListSortOrder.direction})
+                        </span>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSaveSortOrder}
+                        disabled={!viewListSortOrder}
+                        className="text-xs"
+                      >
+                        Save Sort Order
+                      </Button>
+                    </div>
                   </div>
+                  <p className="text-xs text-gray-500 mb-2">Click on column headers to sort. Save the sort order to apply it to the public list view.</p>
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-gray-50">
-                          <TableHead>Name</TableHead>
-                          <TableHead>Followers</TableHead>
-                          <TableHead>Region</TableHead>
-                          <TableHead>Platform</TableHead>
-                          <TableHead>Content Type</TableHead>
-                          <TableHead>Status</TableHead>
+                          <TableHead
+                            className="cursor-pointer hover:bg-gray-100 select-none"
+                            onClick={() => handleViewListSort('name')}
+                          >
+                            <div className="flex items-center gap-1">
+                              Name
+                              {viewListSortOrder?.field === 'name' && (
+                                <span>{viewListSortOrder.direction === 'asc' ? '↑' : '↓'}</span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="cursor-pointer hover:bg-gray-100 select-none"
+                            onClick={() => handleViewListSort('followers')}
+                          >
+                            <div className="flex items-center gap-1">
+                              Followers
+                              {viewListSortOrder?.field === 'followers' && (
+                                <span>{viewListSortOrder.direction === 'asc' ? '↑' : '↓'}</span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="cursor-pointer hover:bg-gray-100 select-none"
+                            onClick={() => handleViewListSort('region')}
+                          >
+                            <div className="flex items-center gap-1">
+                              Region
+                              {viewListSortOrder?.field === 'region' && (
+                                <span>{viewListSortOrder.direction === 'asc' ? '↑' : '↓'}</span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="cursor-pointer hover:bg-gray-100 select-none"
+                            onClick={() => handleViewListSort('platform')}
+                          >
+                            <div className="flex items-center gap-1">
+                              Platform
+                              {viewListSortOrder?.field === 'platform' && (
+                                <span>{viewListSortOrder.direction === 'asc' ? '↑' : '↓'}</span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="cursor-pointer hover:bg-gray-100 select-none"
+                            onClick={() => handleViewListSort('creator_type')}
+                          >
+                            <div className="flex items-center gap-1">
+                              Creator Type
+                              {viewListSortOrder?.field === 'creator_type' && (
+                                <span>{viewListSortOrder.direction === 'asc' ? '↑' : '↓'}</span>
+                              )}
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="cursor-pointer hover:bg-gray-100 select-none"
+                            onClick={() => handleViewListSort('status')}
+                          >
+                            <div className="flex items-center gap-1">
+                              Status
+                              {viewListSortOrder?.field === 'status' && (
+                                <span>{viewListSortOrder.direction === 'asc' ? '↑' : '↓'}</span>
+                              )}
+                            </div>
+                          </TableHead>
                           <TableHead>Notes</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {viewingList.kols.map((kol) => (
+                        {getSortedKols(viewingList.kols, viewListSortOrder)?.map((kol) => (
                           <TableRow key={kol.id}>
                             <TableCell>
                               <div>
@@ -1500,10 +1764,10 @@ export default function ListsPage() {
                               ) : '-'}
                             </TableCell>
                             <TableCell>
-                              {Array.isArray(kol.content_type) ? (
+                              {Array.isArray(kol.creator_type) ? (
                                 <div className="flex flex-wrap gap-1">
-                                  {kol.content_type.map((type: string, index: number) => (
-                                    <span key={index} className={`px-2 py-1 rounded-md text-xs font-medium ${getContentTypeColor(type)}`}>
+                                  {kol.creator_type.map((type: string, index: number) => (
+                                    <span key={index} className={`px-2 py-1 rounded-md text-xs font-medium ${getCreatorTypeColor(type)}`}>
                                       {type}
                                     </span>
                                   ))}
@@ -1511,8 +1775,8 @@ export default function ListsPage() {
                               ) : '-'}
                             </TableCell>
                             <TableCell>
-                              <Select 
-                                value={kol.status || 'curated'} 
+                              <Select
+                                value={kol.status || 'curated'}
                                 onValueChange={(value) => handleUpdateKOLStatus(kol.id, value)}
                               >
                                 <SelectTrigger 
@@ -1820,7 +2084,7 @@ export default function ListsPage() {
             </div>
           ) : (
             filteredLists.map((list) => (
-              <Card key={list.id} className="transition-shadow group">
+              <Card key={list.id} className="transition-shadow group h-full flex flex-col">
                 <CardHeader className="pb-4">
                   <div className="mb-3">
                     <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
@@ -1869,7 +2133,7 @@ export default function ListsPage() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-4 border-t border-gray-100">
+                <CardContent className="pt-4 border-t border-gray-100 flex flex-col flex-1">
                   {list.notes && (
                     <div className="mb-4">
                       <h4 className="font-semibold text-sm text-gray-700 mb-2">Notes:</h4>
@@ -1878,33 +2142,35 @@ export default function ListsPage() {
                       </div>
                     </div>
                   )}
-                  <div className="flex gap-2 mb-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                  <div className="mt-auto">
+                    <div className="flex gap-2 mb-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => handleEditList(list)}
+                      >
+                        Edit List
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => handleViewList(list)}
+                      >
+                        View List
+                      </Button>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="w-full"
-                      onClick={() => handleEditList(list)}
+                      onClick={() => handleShareList(list)}
                     >
-                      Edit List
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full"
-                      onClick={() => handleViewList(list)}
-                    >
-                      View List
+                      <Share2 className="h-4 w-4 mr-2" />
+                      Share List
                     </Button>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full"
-                    onClick={() => handleShareList(list)}
-                  >
-                    <Share2 className="h-4 w-4 mr-2" />
-                    Share List
-                  </Button>
                 </CardContent>
               </Card>
             ))

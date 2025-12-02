@@ -15,11 +15,18 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 const supabasePublic = createClient(supabaseUrl, supabaseAnonKey);
 
+interface SavedSortOrder {
+  field: string;
+  direction: 'asc' | 'desc';
+}
+
 interface SharedListItem {
   id: string;
   name: string;
   notes: string | null;
   status: string;
+  approved_emails?: string[] | null;
+  sort_order?: SavedSortOrder | null;
   created_at: string;
   updated_at: string;
   kols?: {
@@ -29,7 +36,8 @@ interface SharedListItem {
     followers: number | null;
     region: string | null;
     link: string | null;
-    content_type: string[] | null;
+    creator_type: string[] | null;
+    rating?: number | null;
     status?: string | null;
     notes?: string | null;
   }[];
@@ -117,14 +125,25 @@ const getPlatformIcon = (platform: string) => {
   }
 };
 
-const getContentTypeColor = (type: string) => {
+const getCreatorTypeColor = (type: string) => {
   const colorMap: { [key: string]: string } = {
-    'Post': 'bg-blue-100 text-blue-800',
-    'Video': 'bg-red-100 text-red-800',
-    'Article': 'bg-green-100 text-green-800',
-    'AMA': 'bg-purple-100 text-purple-800',
-    'Ambassadorship': 'bg-orange-100 text-orange-800',
-    'Alpha': 'bg-yellow-100 text-yellow-800'
+    'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
+    'Drama-Forward': 'bg-red-100 text-red-800',
+    'Skeptic': 'bg-orange-100 text-orange-800',
+    'Educator': 'bg-blue-100 text-blue-800',
+    'Bridge Builder': 'bg-green-100 text-green-800',
+    'Visionary': 'bg-indigo-100 text-indigo-800',
+    'Onboarder': 'bg-teal-100 text-teal-800',
+    'General': 'bg-gray-100 text-gray-800',
+    'Gaming': 'bg-pink-100 text-pink-800',
+    'Crypto': 'bg-yellow-100 text-yellow-800',
+    'Memecoin': 'bg-orange-100 text-orange-800',
+    'NFT': 'bg-purple-100 text-purple-800',
+    'Trading': 'bg-green-100 text-green-800',
+    'AI': 'bg-blue-100 text-blue-800',
+    'Research': 'bg-indigo-100 text-indigo-800',
+    'Airdrop': 'bg-teal-100 text-teal-800',
+    'Art': 'bg-pink-100 text-pink-800'
   };
   return colorMap[type] || 'bg-gray-100 text-gray-800';
 };
@@ -151,10 +170,134 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
   const [error, setError] = useState<string | null>(null);
   const [editingKolNotes, setEditingKolNotes] = useState<{kolId: string, notes: string} | null>(null);
 
+  // Email authentication state
+  const [email, setEmail] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [listApprovedEmails, setListApprovedEmails] = useState<string[] | null>(null);
+
+  // Get sorted KOLs based on saved sort order
+  const getSortedKols = (kols: SharedListItem['kols'], sortOrder: SavedSortOrder | null | undefined) => {
+    if (!kols) return [];
+    if (!sortOrder) return kols;
+
+    return [...kols].sort((a, b) => {
+      let aVal: any;
+      let bVal: any;
+
+      switch (sortOrder.field) {
+        case 'name':
+          aVal = a.name?.toLowerCase() || '';
+          bVal = b.name?.toLowerCase() || '';
+          break;
+        case 'followers':
+          aVal = a.followers || 0;
+          bVal = b.followers || 0;
+          break;
+        case 'region':
+          aVal = a.region?.toLowerCase() || '';
+          bVal = b.region?.toLowerCase() || '';
+          break;
+        case 'platform':
+          aVal = a.platform?.join(',').toLowerCase() || '';
+          bVal = b.platform?.join(',').toLowerCase() || '';
+          break;
+        case 'creator_type':
+          aVal = a.creator_type?.join(',').toLowerCase() || '';
+          bVal = b.creator_type?.join(',').toLowerCase() || '';
+          break;
+        case 'status':
+          aVal = a.status?.toLowerCase() || '';
+          bVal = b.status?.toLowerCase() || '';
+          break;
+        case 'rating':
+          aVal = a.rating || 0;
+          bVal = b.rating || 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aVal < bVal) return sortOrder.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortOrder.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  // Get sorted KOLs based on saved sort order
+  const sortedKols = list?.kols ? getSortedKols(list.kols, list.sort_order) : [];
+
   useEffect(() => {
     console.log('Component mounted, listId:', listId);
+    checkCachedAuth();
     fetchSharedList();
   }, [listId]);
+
+  // Check localStorage for cached authentication
+  const checkCachedAuth = () => {
+    const cacheKey = `list_auth_${listId}`;
+    const cached = localStorage.getItem(cacheKey);
+
+    if (cached) {
+      try {
+        const { email: cachedEmail, timestamp } = JSON.parse(cached);
+        const now = Date.now();
+        const twentyFourHours = 24 * 60 * 60 * 1000;
+
+        // Check if cache is still valid (24 hours)
+        if (now - timestamp < twentyFourHours) {
+          setEmail(cachedEmail);
+          setIsAuthenticated(true);
+          console.log('Using cached authentication:', cachedEmail);
+        } else {
+          // Cache expired, remove it
+          localStorage.removeItem(cacheKey);
+        }
+      } catch (err) {
+        console.error('Error parsing cached auth:', err);
+        localStorage.removeItem(cacheKey);
+      }
+    }
+  };
+
+  // Save authentication to localStorage
+  const saveAuthToCache = (userEmail: string) => {
+    const cacheKey = `list_auth_${listId}`;
+    const cacheData = {
+      email: userEmail,
+      timestamp: Date.now()
+    };
+    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+  };
+
+  // Handle email submission for authentication
+  const handleEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setEmailError('');
+
+    const submittedEmail = email.trim().toLowerCase();
+
+    if (!submittedEmail) {
+      setEmailError('Please enter your email address');
+      return;
+    }
+
+    // Check if email is in approved list (case-insensitive)
+    if (listApprovedEmails && listApprovedEmails.length > 0) {
+      const approvedEmailsLower = listApprovedEmails.map(e => e.toLowerCase());
+
+      if (approvedEmailsLower.includes(submittedEmail)) {
+        setIsAuthenticated(true);
+        saveAuthToCache(submittedEmail);
+        console.log('Email authenticated:', submittedEmail);
+      } else {
+        setEmailError('This email is not authorized to view this list');
+      }
+    } else {
+      // No approved emails means public access
+      setIsAuthenticated(true);
+    }
+  };
 
   async function fetchSharedList() {
     try {
@@ -177,6 +320,9 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
 
       console.log('List data found:', listData);
 
+      // Set approved emails for authentication
+      setListApprovedEmails(listData.approved_emails || null);
+
       // Get KOLs for this list
       const { data: kolsData, error: kolsError } = await supabasePublic
         .from('list_kols')
@@ -190,7 +336,8 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
             followers,
             region,
             link,
-            content_type
+            creator_type,
+            rating
           )
         `)
         .eq('list_id', listId);
@@ -353,6 +500,56 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
     );
   }
 
+  // Email gate - show if there are approved emails and user is not authenticated
+  if (!loading && listApprovedEmails && listApprovedEmails.length > 0 && !isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg border p-8 max-w-md w-full">
+          <div className="text-center mb-6">
+            <div className="bg-gray-100 p-3 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <List className="h-8 w-8 text-gray-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Email Verification Required</h2>
+            <p className="text-gray-600">
+              This list requires email verification to access. Please enter your authorized email address.
+            </p>
+          </div>
+
+          <form onSubmit={handleEmailSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
+              </label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setEmailError('');
+                }}
+                placeholder="Enter your email"
+                className="auth-input"
+                required
+              />
+              {emailError && (
+                <p className="mt-2 text-sm text-red-600">{emailError}</p>
+              )}
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full hover:opacity-90"
+              style={{ backgroundColor: '#3e8692', color: 'white' }}
+            >
+              Verify Email
+            </Button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   if (error || !list) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -445,11 +642,11 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
         </div>
 
         {/* KOLs Table - Exactly matching view list popup */}
-        {list.kols && list.kols.length > 0 ? (
+        {sortedKols && sortedKols.length > 0 ? (
           <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
             <div className="px-6 py-4 border-b">
               <h4 className="font-semibold text-sm text-gray-700">
-                KOLs in this list ({list.kols.length})
+                KOLs in this list ({sortedKols.length})
               </h4>
             </div>
             <div className="overflow-x-auto">
@@ -461,12 +658,12 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Followers</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Region</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Platform</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Content Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creator Type</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {list.kols.map((kol, index) => (
+                  {sortedKols.map((kol, index) => (
                     <tr key={`${kol.id}-${index}`} className="hover:bg-gray-50 group">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{index + 1}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -507,10 +704,10 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                         ) : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {Array.isArray(kol.content_type) ? (
+                        {Array.isArray(kol.creator_type) ? (
                           <div className="flex flex-wrap gap-1">
-                            {kol.content_type.map((type: string, idx: number) => (
-                              <span key={idx} className={`px-2 py-1 rounded-md text-xs font-medium ${getContentTypeColor(type)}`}>
+                            {kol.creator_type.map((type: string, idx: number) => (
+                              <span key={idx} className={`px-2 py-1 rounded-md text-xs font-medium ${getCreatorTypeColor(type)}`}>
                                 {type}
                               </span>
                             ))}
