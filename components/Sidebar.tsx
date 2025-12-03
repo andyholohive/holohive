@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Bell, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Bell, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -163,6 +163,52 @@ export default function Sidebar({ children }: SidebarProps) {
                     </span>
                   </Button>
                 </Link>
+              </div>
+
+              {/* CRM Section */}
+              {!isSidebarCollapsed && (
+                <div className="flex items-center space-x-2">
+                  <DollarSign className="h-4 w-4 text-gray-400" />
+                  <div className="flex-1 h-px bg-gray-200"></div>
+                </div>
+              )}
+              <div className="space-y-2">
+                {/* Pipeline tab (disabled) */}
+                <Button
+                  variant="ghost"
+                  className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} opacity-50 cursor-not-allowed`}
+                  title={isSidebarCollapsed ? 'Pipeline' : undefined}
+                  disabled
+                >
+                  <div className={`flex items-center whitespace-nowrap ${isSidebarCollapsed ? '' : ''}`}>
+                    <TrendingUp className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                    {!isSidebarCollapsed && <span>Pipeline</span>}
+                  </div>
+                </Button>
+                {/* Network tab (disabled) */}
+                <Button
+                  variant="ghost"
+                  className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} opacity-50 cursor-not-allowed`}
+                  title={isSidebarCollapsed ? 'Network' : undefined}
+                  disabled
+                >
+                  <div className={`flex items-center whitespace-nowrap ${isSidebarCollapsed ? '' : ''}`}>
+                    <Handshake className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                    {!isSidebarCollapsed && <span>Network</span>}
+                  </div>
+                </Button>
+                {/* Contacts tab (disabled) */}
+                <Button
+                  variant="ghost"
+                  className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} opacity-50 cursor-not-allowed`}
+                  title={isSidebarCollapsed ? 'Contacts' : undefined}
+                  disabled
+                >
+                  <div className={`flex items-center whitespace-nowrap ${isSidebarCollapsed ? '' : ''}`}>
+                    <UserPlus className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                    {!isSidebarCollapsed && <span>Contacts</span>}
+                  </div>
+                </Button>
               </div>
 
               {/* Documents Section */}

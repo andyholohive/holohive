@@ -1,24 +1,37 @@
 -- CRM Database Schema
--- Core CRM Objects: Leads, Deals, Partners, Affiliates, Contacts
+-- Core Tables: Opportunities (Leads+Deals), Partners, Affiliates, Contacts
+-- Supporting: Stage History for analytics
 
 -- ============================================
--- 1. CONTACTS TABLE (Base table - individuals)
+-- 1. AFFILIATES TABLE (created first for FK reference)
+-- KOLs, referrers with rev-share or commission
+-- Lifecycle: New → Active → Inactive
 -- ============================================
-CREATE TABLE IF NOT EXISTS crm_contacts (
+CREATE TABLE IF NOT EXISTS crm_affiliates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Basic Info
   name TEXT NOT NULL,
-  email TEXT,
-  telegram_id TEXT,
-  x_id TEXT,
+  affiliation TEXT, -- Their affiliation/company
+  category TEXT, -- Type of affiliate
 
-  -- Classification
-  role TEXT, -- Their role/title
-  category TEXT, -- Contact category
+  -- Lifecycle
+  status TEXT NOT NULL DEFAULT 'new', -- 'new', 'active', 'inactive'
+
+  -- Commission
+  commission_model TEXT, -- Description of commission/rev-share structure
+  commission_rate DECIMAL, -- Percentage if applicable
+
+  -- Tracking
+  last_contacted_at TIMESTAMP WITH TIME ZONE,
 
   -- Ownership
   owner_id UUID REFERENCES auth.users(id),
+
+  -- Point of Contact (inline)
+  poc_name TEXT,
+  poc_email TEXT,
+  poc_telegram TEXT,
 
   -- Notes
   notes TEXT,
@@ -29,76 +42,40 @@ CREATE TABLE IF NOT EXISTS crm_contacts (
 );
 
 -- ============================================
--- 2. LEADS TABLE
+-- 2. OPPORTUNITIES TABLE (Unified Leads + Deals)
+-- Single pipeline: New → Contacted → Qualified → Proposal → Contract → Closed
 -- ============================================
-CREATE TABLE IF NOT EXISTS crm_leads (
+CREATE TABLE IF NOT EXISTS crm_opportunities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Basic Info
   name TEXT NOT NULL,
 
-  -- Pipeline
-  status TEXT NOT NULL DEFAULT 'new', -- 'new', 'contacted', 'qualified', 'unqualified', 'nurture'
+  -- Pipeline Stage (unified lead + deal stages)
+  stage TEXT NOT NULL DEFAULT 'new',
+  -- Lead stages: 'new', 'contacted', 'qualified', 'unqualified', 'nurture'
+  -- Deal stages: 'proposal', 'contract', 'closed_won', 'closed_lost'
+
+  -- Classification
+  account_type TEXT, -- 'general', 'channel', 'campaign', 'lite', 'ad_hoc' (set when qualified)
+
+  -- Value (set when becomes a deal)
+  deal_value DECIMAL,
+  currency TEXT DEFAULT 'USD',
 
   -- Tracking
   last_contacted_at TIMESTAMP WITH TIME ZONE,
 
   -- Ownership & Source
   owner_id UUID REFERENCES auth.users(id),
-  source TEXT, -- 'referral', 'inbound', 'event', 'cold_outreach', etc.
+  source TEXT, -- 'referral', 'inbound', 'event', 'cold_outreach'
   referrer TEXT, -- Who referred them
 
   -- Communication
   gc TEXT, -- Group Chat link/info
 
-  -- Notes
-  notes TEXT,
-
-  -- Timestamps
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-
-  -- For tracking when moved to deals or inactive
-  converted_to_deal_id UUID, -- Reference to deal if qualified
-  converted_at TIMESTAMP WITH TIME ZONE,
-  inactive_at TIMESTAMP WITH TIME ZONE,
-  inactive_reason TEXT
-);
-
--- ============================================
--- 3. DEALS TABLE
--- ============================================
-CREATE TABLE IF NOT EXISTS crm_deals (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-  -- Basic Info
-  name TEXT NOT NULL,
-
-  -- Pipeline
-  status TEXT NOT NULL DEFAULT 'qualified', -- 'qualified', 'proposal', 'contract', 'closed_won', 'closed_lost', 'nurture'
-  sales_stage TEXT, -- More granular stages from ClickUp
-
-  -- Classification
-  account_type TEXT, -- 'general', 'channel', 'campaign', 'lite', 'ad_hoc'
-
-  -- Tracking
-  last_contacted_at TIMESTAMP WITH TIME ZONE,
-
-  -- Ownership & Source
-  owner_id UUID REFERENCES auth.users(id),
-  source TEXT, -- 'referral', 'inbound', 'event', etc.
-  referrer TEXT,
-
-  -- Communication
-  gc TEXT, -- Group Chat link/info
-
-  -- Relationships
-  affiliate_id UUID REFERENCES crm_affiliates(id), -- Inter-connection to affiliate
-  lead_id UUID, -- Original lead if converted from lead
-
-  -- Value
-  deal_value DECIMAL,
-  currency TEXT DEFAULT 'USD',
+  -- Affiliate connection (for commission tracking)
+  affiliate_id UUID REFERENCES crm_affiliates(id),
 
   -- Notes
   notes TEXT,
@@ -106,15 +83,14 @@ CREATE TABLE IF NOT EXISTS crm_deals (
   -- Timestamps
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  closed_at TIMESTAMP WITH TIME ZONE,
-
-  -- For tracking when moved to inactive
-  inactive_at TIMESTAMP WITH TIME ZONE,
-  inactive_reason TEXT
+  qualified_at TIMESTAMP WITH TIME ZONE, -- When moved from lead to deal stage
+  closed_at TIMESTAMP WITH TIME ZONE -- When won or lost
 );
 
 -- ============================================
--- 4. PARTNERS TABLE
+-- 3. PARTNERS TABLE
+-- BD relationships, cross-partnerships
+-- Lifecycle: Active / Inactive
 -- ============================================
 CREATE TABLE IF NOT EXISTS crm_partners (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -135,11 +111,12 @@ CREATE TABLE IF NOT EXISTS crm_partners (
   -- Ownership
   owner_id UUID REFERENCES auth.users(id),
 
-  -- Point of Contact
-  poc_contact_id UUID REFERENCES crm_contacts(id),
-  poc_name TEXT, -- Quick reference if no linked contact
+  -- Point of Contact (inline)
+  poc_name TEXT,
+  poc_email TEXT,
+  poc_telegram TEXT,
 
-  -- Affiliate connection
+  -- Affiliate connection (if partner is also an affiliate)
   is_affiliate BOOLEAN DEFAULT FALSE,
   affiliate_id UUID REFERENCES crm_affiliates(id),
 
@@ -148,90 +125,72 @@ CREATE TABLE IF NOT EXISTS crm_partners (
 
   -- Timestamps
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  inactive_at TIMESTAMP WITH TIME ZONE
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- ============================================
--- 5. AFFILIATES TABLE
+-- 4. CONTACTS TABLE
+-- Individual people linked to opportunities/partners/affiliates
 -- ============================================
-CREATE TABLE IF NOT EXISTS crm_affiliates (
+CREATE TABLE IF NOT EXISTS crm_contacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Basic Info
   name TEXT NOT NULL,
-
-  -- Classification
-  affiliation TEXT, -- Their affiliation/company
-  category TEXT, -- Type of affiliate
-
-  -- Lifecycle
-  status TEXT NOT NULL DEFAULT 'new', -- 'new', 'active', 'inactive'
-
-  -- Commission
-  commission_model TEXT, -- Description of commission/rev-share structure
-  commission_rate DECIMAL, -- Percentage if applicable
-
-  -- Tracking
-  last_contacted_at TIMESTAMP WITH TIME ZONE,
+  email TEXT,
+  telegram_id TEXT,
+  x_id TEXT,
+  role TEXT, -- Their role/title
+  category TEXT, -- Contact category
 
   -- Ownership
   owner_id UUID REFERENCES auth.users(id),
-
-  -- Point of Contact
-  poc_contact_id UUID REFERENCES crm_contacts(id),
-  poc_name TEXT, -- Quick reference if no linked contact
 
   -- Notes
   notes TEXT,
 
   -- Timestamps
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  activated_at TIMESTAMP WITH TIME ZONE,
-  inactive_at TIMESTAMP WITH TIME ZONE
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- ============================================
--- 6. JUNCTION TABLE: Contact-Object Links
--- Contacts can be linked to multiple objects
+-- 5. CONTACT LINKS (Junction Table)
+-- Links contacts to opportunities/partners/affiliates
 -- ============================================
 CREATE TABLE IF NOT EXISTS crm_contact_links (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   contact_id UUID NOT NULL REFERENCES crm_contacts(id) ON DELETE CASCADE,
 
-  -- Linked object (only one should be set)
-  linked_type TEXT NOT NULL, -- 'lead', 'deal', 'partner', 'affiliate'
-  lead_id UUID REFERENCES crm_leads(id) ON DELETE CASCADE,
-  deal_id UUID REFERENCES crm_deals(id) ON DELETE CASCADE,
+  -- Linked object type and ID
+  linked_type TEXT NOT NULL, -- 'opportunity', 'partner', 'affiliate'
+  opportunity_id UUID REFERENCES crm_opportunities(id) ON DELETE CASCADE,
   partner_id UUID REFERENCES crm_partners(id) ON DELETE CASCADE,
   affiliate_id UUID REFERENCES crm_affiliates(id) ON DELETE CASCADE,
 
   -- Role in this relationship
-  role TEXT, -- Their role in this specific relationship
-  is_primary BOOLEAN DEFAULT FALSE, -- Primary contact for this object
+  role TEXT,
+  is_primary BOOLEAN DEFAULT FALSE,
 
-  -- Timestamps
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
   -- Ensure only one link type is set
   CONSTRAINT check_single_link CHECK (
-    (CASE WHEN lead_id IS NOT NULL THEN 1 ELSE 0 END +
-     CASE WHEN deal_id IS NOT NULL THEN 1 ELSE 0 END +
+    (CASE WHEN opportunity_id IS NOT NULL THEN 1 ELSE 0 END +
      CASE WHEN partner_id IS NOT NULL THEN 1 ELSE 0 END +
      CASE WHEN affiliate_id IS NOT NULL THEN 1 ELSE 0 END) = 1
   )
 );
 
 -- ============================================
--- 7. STAGE HISTORY TABLE (For Analytics)
--- Track all status/stage changes
+-- 6. STAGE HISTORY (For Analytics)
+-- Tracks all stage changes for conversion/velocity analysis
 -- ============================================
 CREATE TABLE IF NOT EXISTS crm_stage_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Object reference
-  object_type TEXT NOT NULL, -- 'lead', 'deal', 'partner', 'affiliate'
+  object_type TEXT NOT NULL, -- 'opportunity', 'partner', 'affiliate'
   object_id UUID NOT NULL,
 
   -- Stage change
@@ -242,90 +201,51 @@ CREATE TABLE IF NOT EXISTS crm_stage_history (
   changed_by UUID REFERENCES auth.users(id),
   changed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 
-  -- Additional context
   notes TEXT
 );
 
 -- ============================================
--- 8. ACTIVITIES TABLE
--- Track all interactions/activities
--- ============================================
-CREATE TABLE IF NOT EXISTS crm_activities (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-  -- Object reference (can be linked to any CRM object)
-  object_type TEXT NOT NULL, -- 'lead', 'deal', 'partner', 'affiliate', 'contact'
-  object_id UUID NOT NULL,
-
-  -- Activity details
-  type TEXT NOT NULL, -- 'email', 'call', 'meeting', 'note', 'task', 'message'
-  subject TEXT,
-  description TEXT,
-
-  -- Scheduling (for tasks/meetings)
-  scheduled_at TIMESTAMP WITH TIME ZONE,
-  completed_at TIMESTAMP WITH TIME ZONE,
-
-  -- Who
-  created_by UUID REFERENCES auth.users(id),
-  assigned_to UUID REFERENCES auth.users(id),
-
-  -- Timestamps
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- ============================================
--- INDEXES for Performance
+-- INDEXES
 -- ============================================
 
--- Leads indexes
-CREATE INDEX idx_crm_leads_status ON crm_leads(status);
-CREATE INDEX idx_crm_leads_owner ON crm_leads(owner_id);
-CREATE INDEX idx_crm_leads_source ON crm_leads(source);
-CREATE INDEX idx_crm_leads_created ON crm_leads(created_at);
+-- Opportunities
+CREATE INDEX idx_crm_opportunities_stage ON crm_opportunities(stage);
+CREATE INDEX idx_crm_opportunities_owner ON crm_opportunities(owner_id);
+CREATE INDEX idx_crm_opportunities_source ON crm_opportunities(source);
+CREATE INDEX idx_crm_opportunities_affiliate ON crm_opportunities(affiliate_id);
+CREATE INDEX idx_crm_opportunities_created ON crm_opportunities(created_at);
 
--- Deals indexes
-CREATE INDEX idx_crm_deals_status ON crm_deals(status);
-CREATE INDEX idx_crm_deals_owner ON crm_deals(owner_id);
-CREATE INDEX idx_crm_deals_account_type ON crm_deals(account_type);
-CREATE INDEX idx_crm_deals_affiliate ON crm_deals(affiliate_id);
-CREATE INDEX idx_crm_deals_created ON crm_deals(created_at);
-
--- Partners indexes
+-- Partners
 CREATE INDEX idx_crm_partners_status ON crm_partners(status);
 CREATE INDEX idx_crm_partners_category ON crm_partners(category);
 CREATE INDEX idx_crm_partners_owner ON crm_partners(owner_id);
 
--- Affiliates indexes
+-- Affiliates
 CREATE INDEX idx_crm_affiliates_status ON crm_affiliates(status);
 CREATE INDEX idx_crm_affiliates_category ON crm_affiliates(category);
 CREATE INDEX idx_crm_affiliates_owner ON crm_affiliates(owner_id);
 
--- Contact links indexes
+-- Contacts
+CREATE INDEX idx_crm_contacts_owner ON crm_contacts(owner_id);
+CREATE INDEX idx_crm_contacts_email ON crm_contacts(email);
+
+-- Contact links
 CREATE INDEX idx_crm_contact_links_contact ON crm_contact_links(contact_id);
-CREATE INDEX idx_crm_contact_links_lead ON crm_contact_links(lead_id);
-CREATE INDEX idx_crm_contact_links_deal ON crm_contact_links(deal_id);
+CREATE INDEX idx_crm_contact_links_opportunity ON crm_contact_links(opportunity_id);
 CREATE INDEX idx_crm_contact_links_partner ON crm_contact_links(partner_id);
 CREATE INDEX idx_crm_contact_links_affiliate ON crm_contact_links(affiliate_id);
 
--- Stage history indexes
+-- Stage history
 CREATE INDEX idx_crm_stage_history_object ON crm_stage_history(object_type, object_id);
 CREATE INDEX idx_crm_stage_history_changed ON crm_stage_history(changed_at);
 
--- Activities indexes
-CREATE INDEX idx_crm_activities_object ON crm_activities(object_type, object_id);
-CREATE INDEX idx_crm_activities_type ON crm_activities(type);
-CREATE INDEX idx_crm_activities_created ON crm_activities(created_at);
-
 -- ============================================
--- COMMENTS for Documentation
+-- COMMENTS
 -- ============================================
 
-COMMENT ON TABLE crm_contacts IS 'Individual people who may be associated with leads, deals, partners, or affiliates';
-COMMENT ON TABLE crm_leads IS 'People/companies from cold outreach. Pipeline: New → Contacted → Qualified/Unqualified → Nurture';
-COMMENT ON TABLE crm_deals IS 'Qualified opportunities with pipeline and value. Pipeline: Qualified → Proposal → Contract → Closed Won/Lost → Nurture';
-COMMENT ON TABLE crm_partners IS 'BD relationships and cross-partnerships. Lifecycle: Active/Inactive';
-COMMENT ON TABLE crm_affiliates IS 'KOLs, referrers with rev-share or commission. Lifecycle: New → Active → Inactive';
-COMMENT ON TABLE crm_contact_links IS 'Junction table linking contacts to leads, deals, partners, or affiliates';
-COMMENT ON TABLE crm_stage_history IS 'Tracks all status/stage changes for analytics and reporting';
-COMMENT ON TABLE crm_activities IS 'Tracks all interactions and activities across CRM objects';
+COMMENT ON TABLE crm_opportunities IS 'Unified sales pipeline: Leads (new/contacted/qualified) → Deals (proposal/contract/closed). Single entity journey.';
+COMMENT ON TABLE crm_partners IS 'BD relationships. Categories: service_provider, investor_vc, project, individual. Can also be affiliates.';
+COMMENT ON TABLE crm_affiliates IS 'KOLs and referrers with commission/rev-share. Lifecycle: new → active → inactive.';
+COMMENT ON TABLE crm_contacts IS 'Individual people who can be linked to multiple CRM objects.';
+COMMENT ON TABLE crm_contact_links IS 'Links contacts to opportunities, partners, or affiliates with role info.';
+COMMENT ON TABLE crm_stage_history IS 'Audit trail of all stage changes for analytics (conversion rates, velocity).';
