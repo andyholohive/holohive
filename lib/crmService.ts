@@ -6,8 +6,9 @@ import { supabase } from './supabase';
 
 // Opportunity Stages
 export type OpportunityStage =
-  | 'new' | 'contacted' | 'qualified' | 'unqualified' | 'nurture'  // Lead stages
-  | 'proposal' | 'contract' | 'closed_won' | 'closed_lost';        // Deal stages
+  | 'new' | 'contacted' | 'qualified' | 'unqualified' | 'nurture' | 'dead'  // Lead stages
+  | 'deal_qualified' | 'proposal' | 'negotiation' | 'contract' | 'closed_won' | 'closed_lost'  // Deal stages
+  | 'account_active' | 'account_at_risk' | 'account_churned';  // Account stages
 
 export type AccountType = 'general' | 'channel' | 'campaign' | 'lite' | 'ad_hoc';
 export type OpportunitySource = 'referral' | 'inbound' | 'event' | 'cold_outreach';
@@ -54,6 +55,7 @@ export interface CRMOpportunity {
   gc: string | null;
   affiliate_id: string | null;
   notes: string | null;
+  position: number;
   created_at: string;
   updated_at: string;
   qualified_at: string | null;
@@ -153,6 +155,7 @@ export interface CreateOpportunityData {
   gc?: string;
   affiliate_id?: string;
   notes?: string;
+  position?: number;
 }
 
 export interface CreatePartnerData {
@@ -266,9 +269,13 @@ export class CRMService {
         *,
         affiliate:crm_affiliates(*)
       `)
+      .order('position', { ascending: true })
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('Error fetching opportunities:', error);
+      throw error;
+    }
     return data || [];
   }
 
@@ -359,6 +366,23 @@ export class CRMService {
       .eq('id', id);
 
     if (error) throw error;
+  }
+
+  static async updateOpportunityPositions(positions: { id: string; position: number }[]): Promise<void> {
+    // Update each opportunity's position
+    const updates = positions.map(({ id, position }) =>
+      supabase
+        .from('crm_opportunities')
+        .update({ position, updated_at: new Date().toISOString() })
+        .eq('id', id)
+    );
+
+    const results = await Promise.all(updates);
+    const errors = results.filter(r => r.error);
+    if (errors.length > 0) {
+      console.error('Errors updating positions:', errors);
+      throw errors[0].error;
+    }
   }
 
   // ----------------------------------------
@@ -600,6 +624,19 @@ export class CRMService {
     if (error) throw error;
   }
 
+  static async getAllContactLinks(): Promise<CRMContactLink[]> {
+    const { data, error } = await supabase
+      .from('crm_contact_links')
+      .select(`
+        *,
+        contact:crm_contacts(*)
+      `)
+      .order('is_primary', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  }
+
   // ----------------------------------------
   // STAGE HISTORY
   // ----------------------------------------
@@ -675,13 +712,21 @@ export class CRMService {
         { value: 'contacted', label: 'Contacted' },
         { value: 'qualified', label: 'Qualified' },
         { value: 'unqualified', label: 'Unqualified' },
-        { value: 'nurture', label: 'Nurture' }
+        { value: 'nurture', label: 'Nurture' },
+        { value: 'dead', label: 'Dead' }
       ],
       deal: [
+        { value: 'deal_qualified', label: 'Qualified' },
         { value: 'proposal', label: 'Proposal' },
+        { value: 'negotiation', label: 'Negotiation' },
         { value: 'contract', label: 'Contract' },
         { value: 'closed_won', label: 'Closed Won' },
         { value: 'closed_lost', label: 'Closed Lost' }
+      ],
+      account: [
+        { value: 'account_active', label: 'Active' },
+        { value: 'account_at_risk', label: 'At Risk' },
+        { value: 'account_churned', label: 'Churned' }
       ]
     };
   }
@@ -740,8 +785,8 @@ export class CRMService {
     wonValue: number;
     conversionRate: number;
   }> {
-    const leadStages: OpportunityStage[] = ['new', 'contacted', 'qualified', 'unqualified', 'nurture'];
-    const dealStages: OpportunityStage[] = ['proposal', 'contract', 'closed_won', 'closed_lost'];
+    const leadStages: OpportunityStage[] = ['new', 'contacted', 'qualified', 'unqualified', 'nurture', 'dead'];
+    const dealStages: OpportunityStage[] = ['deal_qualified', 'proposal', 'negotiation', 'contract', 'closed_won', 'closed_lost'];
 
     const { data: opportunities, error } = await supabase
       .from('crm_opportunities')

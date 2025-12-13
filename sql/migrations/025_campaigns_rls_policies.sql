@@ -1,0 +1,48 @@
+-- Campaigns Row Level Security Policies
+-- Applied via Supabase MCP migrations:
+-- - add_created_by_to_campaigns
+-- - campaigns_rls_access_control
+--
+-- Access Control Rules:
+-- ============================================
+-- SELECT:
+--   - Admins: can view ALL campaigns
+--   - Members: can view campaigns where created_by = user OR manager = user
+--
+-- INSERT:
+--   - All authenticated users can create campaigns
+--   - created_by is automatically set to current user in campaignService.ts
+--
+-- UPDATE:
+--   - Admins: can update ALL campaigns
+--   - Members: can update campaigns where created_by = user OR manager = user
+--
+-- DELETE:
+--   - Admins: can delete ALL campaigns
+--   - Members: can ONLY delete campaigns they created (created_by = user)
+--   - Note: Members CANNOT delete campaigns they only manage (but didn't create)
+-- ============================================
+
+-- The following SQL was applied to add the created_by column:
+-- ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES auth.users(id);
+-- UPDATE campaigns SET created_by = manager WHERE created_by IS NULL AND manager IS NOT NULL;
+-- CREATE INDEX IF NOT EXISTS idx_campaigns_created_by ON campaigns(created_by);
+-- CREATE INDEX IF NOT EXISTS idx_campaigns_manager ON campaigns(manager);
+
+-- The following RLS policies were created:
+--
+-- SELECT POLICIES:
+-- "Admins can view all campaigns" - FOR SELECT using users.role = 'admin'
+-- "Members can view own or managed campaigns" - FOR SELECT using created_by = auth.uid() OR manager = auth.uid()
+-- "public_campaigns_anon_select" - FOR SELECT (anonymous access for public reports)
+--
+-- INSERT POLICIES:
+-- "Users can create campaigns" - FOR INSERT with check true (all authenticated)
+--
+-- UPDATE POLICIES:
+-- "Admins can update all campaigns" - FOR UPDATE using users.role = 'admin'
+-- "Members can update own or managed campaigns" - FOR UPDATE using created_by = auth.uid() OR manager = auth.uid()
+--
+-- DELETE POLICIES:
+-- "Admins can delete all campaigns" - FOR DELETE using users.role = 'admin'
+-- "Members can delete own campaigns" - FOR DELETE using created_by = auth.uid()

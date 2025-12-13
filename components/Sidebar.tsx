@@ -173,42 +173,51 @@ export default function Sidebar({ children }: SidebarProps) {
                 </div>
               )}
               <div className="space-y-2">
-                {/* Pipeline tab (disabled) */}
-                <Button
-                  variant="ghost"
-                  className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} opacity-50 cursor-not-allowed`}
-                  title={isSidebarCollapsed ? 'Pipeline' : undefined}
-                  disabled
-                >
-                  <div className={`flex items-center whitespace-nowrap ${isSidebarCollapsed ? '' : ''}`}>
-                    <TrendingUp className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                    {!isSidebarCollapsed && <span>Pipeline</span>}
-                  </div>
-                </Button>
-                {/* Network tab (disabled) */}
-                <Button
-                  variant="ghost"
-                  className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} opacity-50 cursor-not-allowed`}
-                  title={isSidebarCollapsed ? 'Network' : undefined}
-                  disabled
-                >
-                  <div className={`flex items-center whitespace-nowrap ${isSidebarCollapsed ? '' : ''}`}>
-                    <Handshake className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                    {!isSidebarCollapsed && <span>Network</span>}
-                  </div>
-                </Button>
-                {/* Contacts tab (disabled) */}
-                <Button
-                  variant="ghost"
-                  className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} opacity-50 cursor-not-allowed`}
-                  title={isSidebarCollapsed ? 'Contacts' : undefined}
-                  disabled
-                >
-                  <div className={`flex items-center whitespace-nowrap ${isSidebarCollapsed ? '' : ''}`}>
-                    <UserPlus className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                    {!isSidebarCollapsed && <span>Contacts</span>}
-                  </div>
-                </Button>
+                {/* Pipeline tab */}
+                <Link href="/crm/pipeline" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/crm/pipeline') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/crm/pipeline') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Pipeline' : undefined}
+                  >
+                    <span>
+                      <TrendingUp className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Pipeline'}
+                    </span>
+                  </Button>
+                </Link>
+                {/* Network tab */}
+                <Link href="/crm/network" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/crm/network') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/crm/network') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Network' : undefined}
+                  >
+                    <span>
+                      <Handshake className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Network'}
+                    </span>
+                  </Button>
+                </Link>
+                {/* Contacts tab */}
+                <Link href="/crm/contacts" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/crm/contacts') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/crm/contacts') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Contacts' : undefined}
+                  >
+                    <span>
+                      <UserPlus className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Contacts'}
+                    </span>
+                  </Button>
+                </Link>
               </div>
 
               {/* Documents Section */}

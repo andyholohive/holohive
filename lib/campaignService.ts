@@ -14,60 +14,35 @@ export interface CampaignWithDetails extends Campaign {
 
 export class CampaignService {
   /**
-   * Get campaigns based on user role
+   * Get campaigns based on user role (RLS enforced at database level)
    * - Admins: See all campaigns
-   * - Members: See only campaigns for clients they have access to
+   * - Members: See campaigns they created (created_by) or are assigned to (manager)
    */
   static async getCampaignsForUser(userRole: 'admin' | 'member' | 'client', userId: string, supabaseClient?: any): Promise<CampaignWithDetails[]> {
     try {
       const client = supabaseClient || supabase;
-      if (userRole === 'admin') {
-        // Admins can see all campaigns
-        const { data: campaigns, error } = await client
-          .from('campaigns')
-          .select(`
-            *,
-            clients!campaigns_client_id_fkey(name, email),
-            campaign_budget_allocations(*)
-          `)
-          .order('created_at', { ascending: false });
 
-        if (error) throw error;
+      // RLS policies handle access control:
+      // - Admins: can see all campaigns
+      // - Members: can see campaigns they created (created_by) or are assigned to (manager)
+      const { data: campaigns, error } = await client
+        .from('campaigns')
+        .select(`
+          *,
+          clients!campaigns_client_id_fkey(name, email),
+          campaign_budget_allocations(*)
+        `)
+        .order('created_at', { ascending: false });
 
-        return campaigns?.map(campaign => ({
-          ...campaign,
-          client_name: (campaign.clients as any)?.name,
-          client_email: (campaign.clients as any)?.email,
-          budget_allocations: campaign.campaign_budget_allocations || [],
-          total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
+      if (error) throw error;
 
-        })) || [];
-      } else {
-        // Members can only see campaigns for clients they have access to
-        const { data: campaignAccess, error } = await client
-          .from('client_access_members')
-          .select(`
-            campaigns!inner(
-              *,
-              clients!campaigns_client_id_fkey(name, email),
-              campaign_budget_allocations(*)
-            )
-          `)
-          .eq('user_id', userId);
-
-        if (error) throw error;
-
-        return campaignAccess?.map(access => {
-          const campaign = (access as any).campaigns;
-          return {
-            ...campaign,
-            client_name: campaign.clients?.name,
-            client_email: campaign.clients?.email,
-            budget_allocations: campaign.campaign_budget_allocations || [],
-            total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0
-          };
-        }).filter(Boolean) || [];
-      }
+      return campaigns?.map(campaign => ({
+        ...campaign,
+        client_name: (campaign.clients as any)?.name,
+        client_email: (campaign.clients as any)?.email,
+        budget_allocations: campaign.campaign_budget_allocations || [],
+        total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
+      })) || [];
     } catch (error) {
       console.error('Error fetching campaigns:', error);
       throw error;
@@ -129,14 +104,25 @@ export class CampaignService {
       proposal_sent?: boolean;
       nda_signed?: boolean;
       budget_type?: string[];
+      created_by?: string;
     },
     supabaseClient?: any
   ): Promise<Campaign> {
     try {
       const client = supabaseClient || supabase;
+
+      // Get current user ID for created_by if not provided
+      let dataToInsert = { ...campaignData };
+      if (!dataToInsert.created_by) {
+        const { data: { user } } = await client.auth.getUser();
+        if (user) {
+          dataToInsert.created_by = user.id;
+        }
+      }
+
       const { data, error } = await client
         .from('campaigns')
-        .insert(campaignData)
+        .insert(dataToInsert)
         .select()
         .single();
       if (error) throw error;

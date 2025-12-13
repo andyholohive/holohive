@@ -85,7 +85,7 @@ export default function CampaignsPage() {
 
   // Open dialog if add=1 is present
   useEffect(() => {
-    if (addParam === '1' && userProfile?.role === 'admin') {
+    if (addParam === '1' && (userProfile?.role === 'admin' || userProfile?.role === 'member')) {
       setIsNewCampaignOpen(true);
       if (clientIdParam) {
         setNewCampaign((prev) => ({ ...prev, client_id: clientIdParam }));
@@ -167,7 +167,7 @@ export default function CampaignsPage() {
         total_budget: parseFloat(newCampaign.total_budget),
         status: newCampaign.status,
         start_date: newCampaign.start_date,
-        end_date: newCampaign.end_date,
+        end_date: newCampaign.end_date || undefined,
         description: newCampaign.description.trim() || undefined,
         region: newCampaign.region,
         client_choosing_kols: newCampaign.clientChoosingKols,
@@ -401,8 +401,12 @@ export default function CampaignsPage() {
             <h2 className="text-2xl font-bold text-gray-900">Campaigns</h2>
             <p className="text-gray-600">Track and manage your marketing campaigns</p>
           </div>
-          {userProfile?.role === "admin" && (
-            <Button className="hover:opacity-90" style={{ backgroundColor: "#3e8692", color: "white" }}>
+          {(userProfile?.role === "admin" || userProfile?.role === "member") && (
+            <Button
+              className="hover:opacity-90"
+              style={{ backgroundColor: "#3e8692", color: "white" }}
+              onClick={() => setIsNewCampaignOpen(true)}
+            >
               <Plus className="h-4 w-4 mr-2" />
               New Campaign
             </Button>
@@ -973,7 +977,7 @@ export default function CampaignsPage() {
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
                     <CalendarIcon className="h-4 w-4 mr-2 text-gray-600" />
-                    <span className="text-gray-600">{formatDate(campaign.start_date)} - {formatDate(campaign.end_date)}</span>
+                    <span className="text-gray-600">{formatDate(campaign.start_date)}{campaign.end_date ? ` - ${formatDate(campaign.end_date)}` : ' - TBD'}</span>
                   </div>
                 </div>
               </CardHeader>
@@ -1051,7 +1055,7 @@ export default function CampaignsPage() {
                 </div>
                 <div className="flex justify-between mb-2">
                   <span className="font-medium">Dates:</span>
-                  <span>{sharingCampaign ? new Date(sharingCampaign.start_date).toLocaleDateString() : ''} - {sharingCampaign ? new Date(sharingCampaign.end_date).toLocaleDateString() : ''}</span>
+                  <span>{sharingCampaign ? new Date(sharingCampaign.start_date).toLocaleDateString() : ''}{sharingCampaign?.end_date ? ` - ${new Date(sharingCampaign.end_date).toLocaleDateString()}` : ' - TBD'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium">Status:</span>
