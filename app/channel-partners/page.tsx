@@ -219,8 +219,8 @@ export default function PartnersPage() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Partners</h2>
-              <p className="text-gray-600">Manage your partner relationships</p>
+              <h2 className="text-2xl font-bold text-gray-900">Channel Partners</h2>
+              <p className="text-gray-600">Manage your channel partner relationships</p>
             </div>
             <div className="flex space-x-3">
               <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} disabled>
@@ -250,8 +250,8 @@ export default function PartnersPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Partners</h2>
-            <p className="text-gray-600">Manage your partner relationships</p>
+            <h2 className="text-2xl font-bold text-gray-900">Channel Partners</h2>
+            <p className="text-gray-600">Manage your channel partner relationships</p>
           </div>
           {userProfile?.role === 'admin' && (
             <div>

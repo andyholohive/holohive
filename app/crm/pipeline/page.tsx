@@ -24,6 +24,9 @@ import {
   Mail, MessageSquare, Filter, Phone, ArrowUpDown, Handshake
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import {
   DndContext,
   DragOverlay,
@@ -56,6 +59,7 @@ import {
   CreateContactData,
   OpportunityStage
 } from '@/lib/crmService';
+import { UserService } from '@/lib/userService';
 
 export default function PipelinePage() {
   const { user } = useAuth();
@@ -64,6 +68,7 @@ export default function PipelinePage() {
   const [opportunities, setOpportunities] = useState<CRMOpportunity[]>([]);
   const [affiliates, setAffiliates] = useState<CRMAffiliate[]>([]);
   const [contacts, setContacts] = useState<CRMContact[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string | null; email: string }[]>([]);
   const [allContactLinks, setAllContactLinks] = useState<CRMContactLink[]>([]);
   const [isNewOpportunityOpen, setIsNewOpportunityOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -83,6 +88,9 @@ export default function PipelinePage() {
   // Inline editing state
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
   const [editingValue, setEditingValue] = useState<string>('');
+
+  // Affiliate combobox state
+  const [affiliatePopoverOpen, setAffiliatePopoverOpen] = useState<string | null>(null);
 
   // Contact linking state
   const [isContactLinkOpen, setIsContactLinkOpen] = useState(false);
@@ -299,18 +307,20 @@ export default function PipelinePage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [opps, affs, conts, metricsData, contactLinks] = await Promise.all([
+      const [opps, affs, conts, metricsData, contactLinks, allUsers] = await Promise.all([
         CRMService.getAllOpportunities(),
         CRMService.getAllAffiliates(),
         CRMService.getAllContacts(),
         CRMService.getOpportunityMetrics(),
-        CRMService.getAllContactLinks()
+        CRMService.getAllContactLinks(),
+        UserService.getAllUsers()
       ]);
       setOpportunities(opps);
       setAffiliates(affs);
       setContacts(conts);
       setMetrics(metricsData);
       setAllContactLinks(contactLinks);
+      setUsers(allUsers);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -1142,48 +1152,73 @@ export default function PipelinePage() {
     const stageValue = isDeal
       ? opps.reduce((sum, o) => sum + (o.deal_value || 0), 0)
       : null;
+    const isCollapsed = collapsedStages.has(stage);
 
     return (
       <div
         key={stage}
-        className="flex-1 min-w-[280px] max-w-[320px] flex flex-col h-full"
+        className={`${isCollapsed ? 'w-12' : 'flex-1 min-w-[280px] max-w-[320px]'} flex flex-col h-full transition-all duration-200`}
       >
         {/* Column Header */}
-        <div className={`rounded-t-lg px-4 py-3 ${colors.bg} border ${colors.border} border-b-0 flex-shrink-0`}>
+        <div
+          className={`${isCollapsed ? 'rounded-lg' : 'rounded-t-lg'} px-4 py-3 ${colors.bg} border ${colors.border} ${isCollapsed ? '' : 'border-b-0'} flex-shrink-0 cursor-pointer select-none`}
+          onClick={() => toggleStageCollapse(stage)}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h4 className={`font-semibold ${colors.text}`}>{stageLabels[stage]}</h4>
-              <Badge variant="secondary" className="text-xs font-medium">
-                {opps.length}
-              </Badge>
+              {isCollapsed ? (
+                <ChevronRight className={`w-4 h-4 ${colors.text}`} />
+              ) : (
+                <ChevronDown className={`w-4 h-4 ${colors.text}`} />
+              )}
+              {!isCollapsed && (
+                <>
+                  <h4 className={`font-semibold ${colors.text}`}>{stageLabels[stage]}</h4>
+                  <Badge variant="secondary" className="text-xs font-medium">
+                    {opps.length}
+                  </Badge>
+                </>
+              )}
             </div>
           </div>
-          {isDeal && stageValue !== null && stageValue > 0 && (
+          {!isCollapsed && isDeal && stageValue !== null && stageValue > 0 && (
             <p className="text-sm font-medium text-gray-600 mt-1">
               {formatCurrency(stageValue)}
             </p>
           )}
+          {isCollapsed && (
+            <div className="mt-2 flex flex-col items-center gap-1">
+              <span className={`font-semibold ${colors.text}`} style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
+                {stageLabels[stage]}
+              </span>
+              <Badge variant="secondary" className="text-xs font-medium mt-1">
+                {opps.length}
+              </Badge>
+            </div>
+          )}
         </div>
 
         {/* Column Content - Droppable Area */}
-        <div
-          ref={setNodeRef}
-          className={`flex-1 bg-gray-50/50 border border-gray-200 border-t-0 rounded-b-lg p-3 space-y-3 overflow-y-auto transition-colors ${
-            isOver ? 'bg-blue-50 border-blue-300' : ''
-          }`}
-        >
-          <SortableContext items={opps.map(o => o.id)} strategy={verticalListSortingStrategy}>
-            {opps.length === 0 ? (
-              <div className={`flex items-center justify-center h-24 text-sm ${isOver ? 'text-blue-500' : 'text-gray-400'}`}>
-                {isOver ? 'Drop here' : 'No opportunities'}
-              </div>
-            ) : (
-              opps.map((opp) => (
-                <DraggableCard key={opp.id} opp={opp} isDeal={isDeal} />
-              ))
-            )}
-          </SortableContext>
-        </div>
+        {!isCollapsed && (
+          <div
+            ref={setNodeRef}
+            className={`flex-1 bg-gray-50/50 border border-gray-200 border-t-0 rounded-b-lg p-3 space-y-3 overflow-y-auto transition-colors ${
+              isOver ? 'bg-blue-50 border-blue-300' : ''
+            }`}
+          >
+            <SortableContext items={opps.map(o => o.id)} strategy={verticalListSortingStrategy}>
+              {opps.length === 0 ? (
+                <div className={`flex items-center justify-center h-24 text-sm ${isOver ? 'text-blue-500' : 'text-gray-400'}`}>
+                  {isOver ? 'Drop here' : 'No opportunities'}
+                </div>
+              ) : (
+                opps.map((opp) => (
+                  <DraggableCard key={opp.id} opp={opp} isDeal={isDeal} />
+                ))
+              )}
+            </SortableContext>
+          </div>
+        )}
       </div>
     );
   };
@@ -1321,6 +1356,26 @@ export default function PipelinePage() {
           </TableCell>
           <TableCell>
             <Select
+              value={opp.owner_id || 'none'}
+              onValueChange={(v) => handleInlineUpdate(opp.id, 'owner_id', v === 'none' ? null : v)}
+            >
+              <SelectTrigger className="w-32 h-8 text-xs auth-input">
+                <SelectValue placeholder="Select">
+                  {opp.owner_id ? (users.find(u => u.id === opp.owner_id)?.name || users.find(u => u.id === opp.owner_id)?.email || '-') : <span className="text-gray-400">-</span>}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {users.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name || u.email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </TableCell>
+          <TableCell>
+            <Select
               value={opp.source || 'none'}
               onValueChange={(v) => handleInlineUpdate(opp.id, 'source', v === 'none' ? null : v)}
             >
@@ -1362,30 +1417,58 @@ export default function PipelinePage() {
             </TableCell>
           )}
           <TableCell>
-            <Select
-              value={opp.affiliate_id || 'none'}
-              onValueChange={(v) => handleInlineUpdate(opp.id, 'affiliate_id', v === 'none' ? null : v)}
-            >
-              <SelectTrigger className="w-32 h-8 text-xs auth-input">
-                <SelectValue placeholder="Select">
+            <Popover open={affiliatePopoverOpen === opp.id} onOpenChange={(open) => setAffiliatePopoverOpen(open ? opp.id : null)}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={affiliatePopoverOpen === opp.id}
+                  className="w-32 h-8 justify-between text-xs auth-input"
+                >
                   {opp.affiliate ? (
-                    <Badge className="text-xs" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                    <Badge className="text-xs truncate" style={{ backgroundColor: '#3e8692', color: 'white' }}>
                       {opp.affiliate.name}
                     </Badge>
                   ) : (
                     <span className="text-gray-400">-</span>
                   )}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {affiliates.map((aff) => (
-                  <SelectItem key={aff.id} value={aff.id}>
-                    {aff.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Search affiliate..." className="h-9" />
+                  <CommandList>
+                    <CommandEmpty>No affiliate found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="none"
+                        onSelect={() => {
+                          handleInlineUpdate(opp.id, 'affiliate_id', null);
+                          setAffiliatePopoverOpen(null);
+                        }}
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${!opp.affiliate_id ? 'opacity-100' : 'opacity-0'}`} />
+                        None
+                      </CommandItem>
+                      {affiliates.map((aff) => (
+                        <CommandItem
+                          key={aff.id}
+                          value={aff.name}
+                          onSelect={() => {
+                            handleInlineUpdate(opp.id, 'affiliate_id', aff.id);
+                            setAffiliatePopoverOpen(null);
+                          }}
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${opp.affiliate_id === aff.id ? 'opacity-100' : 'opacity-0'}`} />
+                          {aff.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </TableCell>
           <TableCell>
             {(() => {
@@ -1537,6 +1620,7 @@ export default function PipelinePage() {
                     <TableHead className="w-10">#</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Stage</TableHead>
+                    <TableHead>Owner</TableHead>
                     <TableHead>Source</TableHead>
                     {isDeal && <TableHead>Account Type</TableHead>}
                     <TableHead>Affiliate</TableHead>
@@ -1574,6 +1658,7 @@ export default function PipelinePage() {
                         </span>
                       </TableCell>
                       <TableCell><span className="text-gray-400">-</span></TableCell>
+                      <TableCell><span className="text-gray-400">-</span></TableCell>
                       {isDeal && <TableCell><span className="text-gray-400">-</span></TableCell>}
                       <TableCell><span className="text-gray-400">-</span></TableCell>
                       <TableCell><span className="text-gray-400">-</span></TableCell>
@@ -1598,7 +1683,7 @@ export default function PipelinePage() {
                   )}
                   {stageOpps.length === 0 && addingToStage !== stage ? (
                     <TableRow>
-                      <TableCell colSpan={isDeal ? 11 : 10} className="text-center py-6 text-gray-400 text-sm">
+                      <TableCell colSpan={isDeal ? 13 : 12} className="text-center py-6 text-gray-400 text-sm">
                         {isOver ? 'Drop here to move to this stage' : `No ${activeTab} in this stage`}
                       </TableCell>
                     </TableRow>
@@ -1618,7 +1703,7 @@ export default function PipelinePage() {
     };
 
     return (
-      <div className="pb-8 space-y-2">
+      <div className="pb-8">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -1728,7 +1813,7 @@ export default function PipelinePage() {
   }
 
   return (
-    <div className="flex flex-col h-full gap-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -1898,8 +1983,6 @@ export default function PipelinePage() {
             <SelectItem value="created_asc">Oldest First</SelectItem>
             <SelectItem value="name_asc">Name A-Z</SelectItem>
             <SelectItem value="name_desc">Name Z-A</SelectItem>
-            <SelectItem value="value_desc">Value High-Low</SelectItem>
-            <SelectItem value="value_asc">Value Low-High</SelectItem>
           </SelectContent>
         </Select>
         {hasActiveFilters && (
@@ -1911,7 +1994,7 @@ export default function PipelinePage() {
       </div>
 
       {/* Tabs for Outreach, Leads, Deals, and Accounts */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'outreach' | 'leads' | 'deals' | 'accounts')} className="flex-1 flex flex-col min-h-0">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'outreach' | 'leads' | 'deals' | 'accounts')}>
         <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <TabsList>
             <TabsTrigger value="outreach" className="flex items-center gap-2">
@@ -1955,22 +2038,22 @@ export default function PipelinePage() {
           </div>
         </div>
 
-        <TabsContent value="outreach" className="mt-0 flex-1 min-h-0 overflow-auto">
+        <TabsContent value="outreach" className="mt-0">
           {outreachViewMode === 'kanban' && renderKanbanView()}
           {outreachViewMode === 'table' && renderTableView()}
         </TabsContent>
 
-        <TabsContent value="leads" className="mt-0 flex-1 min-h-0 overflow-auto">
+        <TabsContent value="leads" className="mt-0">
           {leadsViewMode === 'kanban' && renderKanbanView()}
           {leadsViewMode === 'table' && renderTableView()}
         </TabsContent>
 
-        <TabsContent value="deals" className="mt-0 flex-1 min-h-0 overflow-auto">
+        <TabsContent value="deals" className="mt-0">
           {dealsViewMode === 'kanban' && renderKanbanView()}
           {dealsViewMode === 'table' && renderTableView()}
         </TabsContent>
 
-        <TabsContent value="accounts" className="mt-0 flex-1 min-h-0 overflow-auto">
+        <TabsContent value="accounts" className="mt-0">
           {accountsViewMode === 'kanban' && renderKanbanView()}
           {accountsViewMode === 'table' && renderTableView()}
         </TabsContent>

@@ -707,7 +707,6 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
               <div className="mt-2">
                 <Textarea
                   id={`${field.id}-yes-reason`}
-                  placeholder="Please provide a reason..."
                   value={yesNoReasons[field.id] || ''}
                   onChange={(e) => {
                     setYesNoReasons(prev => ({ ...prev, [field.id]: e.target.value }));
@@ -721,7 +720,6 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
               <div className="mt-2">
                 <Textarea
                   id={`${field.id}-no-reason`}
-                  placeholder="Please provide a reason..."
                   value={yesNoReasons[field.id] || ''}
                   onChange={(e) => {
                     setYesNoReasons(prev => ({ ...prev, [field.id]: e.target.value }));

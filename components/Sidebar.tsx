@@ -119,18 +119,18 @@ export default function Sidebar({ children }: SidebarProps) {
                     </span>
                   </Button>
                 </Link>
-                {/* Partners tab */}
-                <Link href="/partners" legacyBehavior>
+                {/* Channel Partners tab */}
+                <Link href="/channel-partners" legacyBehavior>
                   <Button
                     asChild
-                    variant={pathname.startsWith('/partners') ? 'default' : 'ghost'}
+                    variant={pathname.startsWith('/channel-partners') ? 'default' : 'ghost'}
                     className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/partners') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Partners' : undefined}
+                    style={pathname.startsWith('/channel-partners') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Channel Partners' : undefined}
                   >
                     <span>
                       <Building2 className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Partners'}
+                      {!isSidebarCollapsed && 'Channel Partners'}
                     </span>
                   </Button>
                 </Link>
@@ -272,21 +272,23 @@ export default function Sidebar({ children }: SidebarProps) {
                     </span>
                   </Button>
                 </Link>
-                {/* Forms tab */}
-                <Link href="/forms" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/forms') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/forms') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Forms' : undefined}
-                  >
-                    <span>
-                      <ClipboardList className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Forms'}
-                    </span>
-                  </Button>
-                </Link>
+                {/* Forms tab - Admin only */}
+                {userProfile?.role === 'admin' && (
+                  <Link href="/forms" legacyBehavior>
+                    <Button
+                      asChild
+                      variant={pathname.startsWith('/forms') ? 'default' : 'ghost'}
+                      className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                      style={pathname.startsWith('/forms') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                      title={isSidebarCollapsed ? 'Forms' : undefined}
+                    >
+                      <span>
+                        <ClipboardList className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                        {!isSidebarCollapsed && 'Forms'}
+                      </span>
+                    </Button>
+                  </Link>
+                )}
                 {/* AI Insights tab (disabled) */}
                 <Button
                   variant="ghost"

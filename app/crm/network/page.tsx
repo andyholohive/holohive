@@ -681,7 +681,7 @@ export default function NetworkPage() {
   }
 
   return (
-    <div className="flex flex-col h-full gap-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -840,7 +840,7 @@ export default function NetworkPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as NetworkTab)} className="flex-1 flex flex-col min-h-0">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as NetworkTab)}>
         <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <TabsList>
             <TabsTrigger value="partners" className="flex items-center gap-2">
@@ -875,7 +875,7 @@ export default function NetworkPage() {
         </div>
 
         {/* Partners Tab */}
-        <TabsContent value="partners" className="mt-0 flex-1 min-h-0 overflow-auto">
+        <TabsContent value="partners" className="mt-0">
           {partnersViewMode === 'table' ? (
             /* Partners Table View */
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -1176,7 +1176,7 @@ export default function NetworkPage() {
         </TabsContent>
 
         {/* Affiliates Tab */}
-        <TabsContent value="affiliates" className="mt-0 flex-1 min-h-0 overflow-auto">
+        <TabsContent value="affiliates" className="mt-0">
           {affiliatesViewMode === 'table' ? (
             /* Affiliates Table View */
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
