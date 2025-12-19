@@ -30,8 +30,22 @@ export default function ResetPasswordPage() {
         console.log('Hash:', window.location.hash)
         console.log('Search:', window.location.search)
 
-        // Check for token_hash in query params (from email template)
+        // Check for error parameters first (from expired/invalid links)
         const queryParams = new URLSearchParams(window.location.search)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1))
+
+        const errorCode = queryParams.get('error_code') || hashParams.get('error_code')
+        const errorDescription = queryParams.get('error_description') || hashParams.get('error_description')
+
+        if (errorCode) {
+          console.log('Error detected:', errorCode, errorDescription)
+          const decodedDescription = errorDescription ? decodeURIComponent(errorDescription.replace(/\+/g, ' ')) : 'Unknown error'
+          setError(`${decodedDescription}. Please request a new password reset link.`)
+          setCheckingSession(false)
+          return
+        }
+
+        // Check for token_hash in query params (from email template)
         const tokenHash = queryParams.get('token_hash')
         const queryType = queryParams.get('type')
 
@@ -65,7 +79,6 @@ export default function ResetPasswordPage() {
         }
 
         // Check if we have hash params (newer Supabase sends tokens as hash fragments)
-        const hashParams = new URLSearchParams(window.location.hash.substring(1))
         const accessToken = hashParams.get('access_token')
         const type = hashParams.get('type')
 

@@ -353,7 +353,8 @@ const CampaignDetailsPage = () => {
     const fetchCampaign = async () => {
       try {
         setLoading(true);
-        const fetchedCampaign = await CampaignService.getCampaignById(id);
+        // Support both UUID and slug in URL
+        const fetchedCampaign = await CampaignService.getCampaignByIdOrSlug(id);
         setCampaign(fetchedCampaign);
         if (fetchedCampaign) {
           setShareReportPublicly(fetchedCampaign.share_report_publicly || false);

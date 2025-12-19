@@ -16,10 +16,10 @@ export class ClientService {
    * - Admins: See all clients
    * - Members: See only clients they have access to via client_access_members
    */
-  static async getClientsForUser(userRole: 'admin' | 'member' | 'client', userId: string): Promise<ClientWithAccess[]> {
+  static async getClientsForUser(userRole: 'super_admin' | 'admin' | 'member' | 'client', userId: string): Promise<ClientWithAccess[]> {
     try {
-      if (userRole === 'admin') {
-        // Admins can see all clients
+      if (userRole === 'admin' || userRole === 'super_admin') {
+        // Admins and super admins can see all non-archived clients
         const { data: clients, error } = await supabase
           .from('clients')
           .select(`
@@ -28,6 +28,7 @@ export class ClientService {
             campaigns!campaigns_client_id_fkey(count),
             whitelist_partner:partners!clients_whitelist_partner_id_fkey(name)
           `)
+          .is('archived_at', null)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -39,7 +40,7 @@ export class ClientService {
           whitelist_partner_name: (client.whitelist_partner as any)?.name
         })) || [];
       } else {
-        // Members can only see clients they have access to
+        // Members can only see non-archived clients they have access to
         const { data: clientAccess, error } = await supabase
           .from('client_access_members')
           .select(`
@@ -49,6 +50,7 @@ export class ClientService {
               email,
               location,
               is_active,
+              archived_at,
               created_at,
               updated_at,
               campaigns!campaigns_client_id_fkey(count),
@@ -66,7 +68,7 @@ export class ClientService {
             campaign_count: client.campaigns?.[0]?.count || 0,
             whitelist_partner_name: (client.whitelist_partner as any)?.name
           };
-        }).filter(Boolean) || [];
+        }).filter(c => c && !c.archived_at) || [];
       }
     } catch (error) {
       console.error('Error fetching clients:', error);
@@ -75,13 +77,14 @@ export class ClientService {
   }
 
   /**
-   * Get all clients (admin only)
+   * Get all non-archived clients (admin only)
    */
   static async getAllClients(): Promise<Client[]> {
     try {
       const { data, error } = await supabase
         .from('clients')
         .select('*')
+        .is('archived_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

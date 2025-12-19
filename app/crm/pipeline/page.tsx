@@ -994,17 +994,25 @@ export default function PipelinePage() {
                   </div>
                 )}
                 {opp.gc && (
-                  <div className="flex items-center gap-1.5">
-                    <LinkIcon className="h-3 w-3 flex-shrink-0" />
-                    <a
-                      href={opp.gc}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline truncate"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      Group Chat
-                    </a>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-1.5">
+                      <MessageSquare className="h-3 w-3 flex-shrink-0 text-blue-500" />
+                      <span className="font-medium">TG Connected</span>
+                    </div>
+                    <div className="ml-4 text-xs space-y-0.5">
+                      <div className="flex items-center gap-1 text-gray-500">
+                        <span>Their msg:</span>
+                        <span className={opp.last_message_at ? 'text-gray-700' : 'text-gray-400'}>
+                          {opp.last_message_at ? formatShortDate(opp.last_message_at) : 'No messages yet'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-gray-500">
+                        <span>Our reply:</span>
+                        <span className={opp.last_reply_at ? 'text-gray-700' : 'text-gray-400'}>
+                          {opp.last_reply_at ? formatShortDate(opp.last_reply_at) : 'No replies yet'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
                 {opp.notes && (
@@ -2218,14 +2226,17 @@ export default function PipelinePage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="opp-gc">Group Chat</Label>
+                <Label htmlFor="opp-gc">Telegram Chat ID</Label>
                 <Input
                   id="opp-gc"
                   value={opportunityForm.gc || ''}
                   onChange={(e) => setOpportunityForm({ ...opportunityForm, gc: e.target.value })}
-                  placeholder="Group chat link"
+                  placeholder="-1001234567890"
                   className="auth-input"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Enter the Telegram group chat ID to track message activity
+                </p>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="opp-notes">Notes</Label>

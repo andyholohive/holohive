@@ -37,14 +37,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const loadUserProfile = async (userId: string) => {
-    const profile = await UserService.getUserProfile(userId)
+  const loadUserProfile = async (authUser: User) => {
+    // Use getOrCreateUserProfile to handle OAuth users who don't have a profile yet
+    const name = authUser.user_metadata?.full_name ||
+                 authUser.user_metadata?.name ||
+                 authUser.email?.split('@')[0]
+    const profile = await UserService.getOrCreateUserProfile(
+      authUser.id,
+      authUser.email || '',
+      name,
+      'member' // Default role for OAuth users
+    )
     setUserProfile(profile)
   }
 
   const refreshUserProfile = async () => {
     if (user) {
-      await loadUserProfile(user.id)
+      await loadUserProfile(user)
     }
   }
 
@@ -54,7 +63,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
-        loadUserProfile(session.user.id)
+        loadUserProfile(session.user)
       } else {
         setUserProfile(null)
       }
@@ -68,7 +77,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(session)
       setUser(session?.user ?? null)
       if (session?.user) {
-        loadUserProfile(session.user.id)
+        loadUserProfile(session.user)
       } else {
         setUserProfile(null)
       }

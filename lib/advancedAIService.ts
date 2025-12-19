@@ -85,8 +85,8 @@ export class AdvancedAIService {
       // Get recent campaigns with error handling - use the correct approach based on user role
       let recentCampaigns: any[] = [];
       try {
-        if (userProfile?.role === 'admin') {
-          // Admins can see all campaigns
+        if (userProfile?.role === 'admin' || userProfile?.role === 'super_admin') {
+          // Admins and super admins can see all campaigns
           const { data: campaigns, error: campaignError } = await supabase
             .from('campaigns')
             .select('*')

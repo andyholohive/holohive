@@ -90,8 +90,8 @@ export default function FormsPage() {
       // Refresh forms list
       await fetchForms();
 
-      // Navigate to the new form
-      router.push(`/forms/${form.id}`);
+      // Navigate to the new form (use slug if available)
+      router.push(`/forms/${form.slug || form.id}`);
     } catch (error) {
       console.error('Error creating form:', error);
       toast({
@@ -105,31 +105,32 @@ export default function FormsPage() {
   };
 
   const handleDeleteForm = async (formId: string, formName: string) => {
-    if (!confirm(`Are you sure you want to delete "${formName}"? This will also delete all responses.`)) {
+    if (!confirm(`Are you sure you want to archive "${formName}"? You can restore it later from the Archive page.`)) {
       return;
     }
 
     try {
-      await FormService.deleteForm(formId);
+      await FormService.archiveForm(formId);
       toast({
         title: 'Success',
-        description: 'Form deleted successfully',
+        description: 'Form archived successfully. You can restore it from the Archive page.',
       });
       await fetchForms();
     } catch (error) {
-      console.error('Error deleting form:', error);
+      console.error('Error archiving form:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete form',
+        description: 'Failed to archive form',
         variant: 'destructive',
       });
     }
   };
 
-  const handleCopyShareLink = (formId: string) => {
-    const shareUrl = `${window.location.origin}/public/forms/${formId}`;
+  const handleCopyShareLink = (form: FormWithStats) => {
+    const identifier = form.slug || form.id;
+    const shareUrl = `${window.location.origin}/public/forms/${identifier}`;
     navigator.clipboard.writeText(shareUrl);
-    setCopiedFormId(formId);
+    setCopiedFormId(form.id);
     toast({
       title: 'Copied!',
       description: 'Share link copied to clipboard',
@@ -137,8 +138,9 @@ export default function FormsPage() {
     setTimeout(() => setCopiedFormId(null), 2000);
   };
 
-  const handleOpenShareLink = (formId: string) => {
-    const shareUrl = `${window.location.origin}/public/forms/${formId}`;
+  const handleOpenShareLink = (form: FormWithStats) => {
+    const identifier = form.slug || form.id;
+    const shareUrl = `${window.location.origin}/public/forms/${identifier}`;
     window.open(shareUrl, '_blank');
   };
 
@@ -210,8 +212,8 @@ export default function FormsPage() {
       // Refresh forms list
       await fetchForms();
 
-      // Navigate to the new form
-      router.push(`/forms/${newForm.id}`);
+      // Navigate to the new form (use slug if available)
+      router.push(`/forms/${newForm.slug || newForm.id}`);
     } catch (error) {
       console.error('Error duplicating form:', error);
       toast({
@@ -416,7 +418,7 @@ export default function FormsPage() {
                         variant="outline"
                         size="sm"
                         className="flex-1"
-                        onClick={() => router.push(`/forms/${form.id}`)}
+                        onClick={() => router.push(`/forms/${form.slug || form.id}`)}
                       >
                         <Edit className="h-4 w-4 mr-1" />
                         Edit
@@ -491,14 +493,14 @@ export default function FormsPage() {
                   </Label>
                   <div className="flex gap-2">
                     <Input
-                      value={`${window.location.origin}/public/forms/${sharingForm.id}`}
+                      value={`${window.location.origin}/public/forms/${sharingForm.slug || sharingForm.id}`}
                       readOnly
                       className="auth-input flex-1"
                     />
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => handleCopyShareLink(sharingForm.id)}
+                      onClick={() => handleCopyShareLink(sharingForm)}
                       title="Copy link"
                     >
                       {copiedFormId === sharingForm.id ? (
@@ -510,7 +512,7 @@ export default function FormsPage() {
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => handleOpenShareLink(sharingForm.id)}
+                      onClick={() => handleOpenShareLink(sharingForm)}
                       title="Open in new tab"
                     >
                       <ExternalLink className="h-4 w-4" />

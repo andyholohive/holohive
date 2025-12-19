@@ -377,12 +377,19 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     try {
       setLoadingClientEmail(true);
       setError(null);
-      
-      const { data: campaignData, error: campaignError } = await supabasePublic
+
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(campaignId);
+      let query = supabasePublic
         .from('campaigns')
-        .select('client_id')
-        .eq('id', campaignId)
-        .single();
+        .select('client_id');
+
+      if (isUUID) {
+        query = query.eq('id', campaignId);
+      } else {
+        query = query.eq('slug', campaignId);
+      }
+
+      const { data: campaignData, error: campaignError } = await query.single();
       
       if (campaignError) {
         console.error('Campaign fetch error:', campaignError);
@@ -421,11 +428,18 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   // Fetch client email directly (returns the email instead of only setting state)
   async function getClientEmail(): Promise<string | null> {
     try {
-      const { data: campaignData, error: campaignError } = await supabasePublic
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(campaignId);
+      let query = supabasePublic
         .from('campaigns')
-        .select('client_id')
-        .eq('id', campaignId)
-        .single();
+        .select('client_id');
+
+      if (isUUID) {
+        query = query.eq('id', campaignId);
+      } else {
+        query = query.eq('slug', campaignId);
+      }
+
+      const { data: campaignData, error: campaignError } = await query.single();
       if (campaignError || !campaignData?.client_id) return null;
 
       const { data: clientData, error: clientError } = await supabasePublic
@@ -475,11 +489,18 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       setError(null);
 
       // Campaign
-      const { data: campaignData, error: campaignError } = await supabasePublic
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(campaignId);
+      let campaignQuery = supabasePublic
         .from('campaigns')
-        .select(`*, clients!campaigns_client_id_fkey(name), campaign_budget_allocations(*)`)
-        .eq('id', campaignId)
-        .single();
+        .select(`*, clients!campaigns_client_id_fkey(name), campaign_budget_allocations(*)`);
+
+      if (isUUID) {
+        campaignQuery = campaignQuery.eq('id', campaignId);
+      } else {
+        campaignQuery = campaignQuery.eq('slug', campaignId);
+      }
+
+      const { data: campaignData, error: campaignError } = await campaignQuery.single();
       
       if (campaignError) {
         console.error('Campaign fetch error:', campaignError);

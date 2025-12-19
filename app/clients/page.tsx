@@ -41,6 +41,8 @@ export default function ClientsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientWithAccess | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<ClientWithAccess | null>(null);
   const [isStartClientOpen, setIsStartClientOpen] = useState(false);
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [allClients, setAllClients] = useState<ClientWithAccess[]>([]);
@@ -133,7 +135,7 @@ export default function ClientsPage() {
   const [startClientError, setStartClientError] = useState<string | null>(null);
   useEffect(() => {
     fetchClients();
-    if (userProfile?.role === 'admin') {
+    if (userProfile?.role === 'admin' || userProfile?.role === 'super_admin') {
       UserService.getAllUsers().then(setAllUsers);
     }
     fetchPartners();
@@ -241,6 +243,30 @@ export default function ClientsPage() {
         is_whitelisted: false,
         whitelist_partner_id: null,
       });
+  };
+  const handleDeleteClient = (client: ClientWithAccess) => {
+    setClientToDelete(client);
+    setIsDeleteDialogOpen(true);
+  };
+  const confirmDeleteClient = async () => {
+    if (!clientToDelete) return;
+
+    try {
+      // Soft delete - set archived_at timestamp
+      const { error } = await supabase
+        .from('clients')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', clientToDelete.id);
+
+      if (error) throw error;
+      await fetchClients();
+    } catch (err) {
+      console.error('Error archiving client:', err);
+      setError('Failed to archive client');
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setClientToDelete(null);
+    }
   };
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -416,7 +442,7 @@ export default function ClientsPage() {
               <h2 className="text-2xl font-bold text-gray-900">Clients</h2>
               <p className="text-gray-600">Manage your client relationships</p>
             </div>
-            {userProfile?.role === 'admin' && (
+            {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
               <div className="flex space-x-3">
                 <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} disabled>
                   <Plus className="h-4 w-4 mr-2" />
@@ -484,7 +510,7 @@ export default function ClientsPage() {
               </Button>
             )}
           </div>
-          {userProfile?.role === 'admin' && (
+          {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
             <div className="flex space-x-3">
               <Dialog open={isStartClientOpen} onOpenChange={setIsStartClientOpen}>
                 <DialogTrigger asChild>
@@ -1270,7 +1296,7 @@ export default function ClientsPage() {
                   : 'No clients found.'
                 }
               </p>
-              {userProfile?.role === 'admin' && !searchTerm && !filteredPartnerName && (
+              {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && !searchTerm && !filteredPartnerName && (
                 <Button className="mt-4 hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={() => { setIsEditMode(false); setIsNewClientOpen(true); }}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Your First Client
@@ -1291,10 +1317,15 @@ export default function ClientsPage() {
                           </div>
                           {client.name}
                         </div>
-                        {userProfile?.role === 'admin' && (
-                          <Button variant="ghost" size="sm" onClick={() => handleEditClient(client)} className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2" title="Edit client">
-                            <Edit className="h-4 w-4 text-gray-600" />
-                          </Button>
+                        {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
+                          <div className="flex items-center space-x-1">
+                            <Button variant="ghost" size="sm" onClick={() => handleEditClient(client)} className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2" title="Edit client">
+                              <Edit className="h-4 w-4 text-gray-600" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleDeleteClient(client)} className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-50 w-auto px-2" title="Delete client">
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                       <div className="flex gap-2">
@@ -1387,6 +1418,29 @@ export default function ClientsPage() {
             })
           )}
         </div>
+
+        {/* Archive Confirmation Dialog */}
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Archive Client</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to archive <span className="font-semibold">{clientToDelete?.name}</span>? The client and its data will be moved to the Archive and can be restored later.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmDeleteClient}
+              >
+                Archive Client
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </ProtectedRoute>
   );

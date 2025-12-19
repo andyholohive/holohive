@@ -15,10 +15,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2, ChevronDown, Star, Copy, ExternalLink } from 'lucide-react';
+import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2, ChevronDown, Star, Copy, ExternalLink, Eye } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { KOLService } from '@/lib/kolService';
 import { useToast } from '@/hooks/use-toast';
+import { generateUniqueSlug } from '@/lib/slugUtils';
 
 interface SavedSortOrder {
   field: string;
@@ -28,6 +29,7 @@ interface SavedSortOrder {
 interface ListItem {
   id: string;
   name: string;
+  slug?: string | null;
   notes: string | null;
   status?: string | null;
   approved_emails?: string[] | null;
@@ -183,6 +185,17 @@ export default function ListsPage() {
   // Share list dialog state
   const [isShareListDialogOpen, setIsShareListDialogOpen] = useState(false);
   const [sharingList, setSharingList] = useState<ListItem | null>(null);
+
+  // Email views dialog state
+  const [isEmailViewsDialogOpen, setIsEmailViewsDialogOpen] = useState(false);
+  const [emailViewsList, setEmailViewsList] = useState<ListItem | null>(null);
+  const [emailViews, setEmailViews] = useState<Array<{
+    id: string;
+    email: string;
+    viewed_at: string;
+    user_agent: string | null;
+  }>>([]);
+  const [loadingEmailViews, setLoadingEmailViews] = useState(false);
 
   // Combine lists dialog state
   const [isCombineListsDialogOpen, setIsCombineListsDialogOpen] = useState(false);
@@ -363,7 +376,7 @@ export default function ListsPage() {
       setLoading(true);
       setError(null);
       
-      // First, get all lists with whitelist company info
+      // First, get all non-archived lists
       const { data: listsData, error: listsError } = await supabase
         .from('lists')
         .select(`
@@ -376,6 +389,7 @@ export default function ListsPage() {
           created_at,
           updated_at
         `)
+        .is('archived_at', null)
         .order('created_at', { ascending: false });
 
       if (listsError) throw listsError;
@@ -482,6 +496,33 @@ export default function ListsPage() {
   const handleShareList = (list: ListItem) => {
     setSharingList(list);
     setIsShareListDialogOpen(true);
+  };
+
+  // Handle showing email views for a list
+  const handleShowEmailViews = async (list: ListItem) => {
+    setEmailViewsList(list);
+    setIsEmailViewsDialogOpen(true);
+    setLoadingEmailViews(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('list_email_views')
+        .select('id, email, viewed_at, user_agent')
+        .eq('list_id', list.id)
+        .order('viewed_at', { ascending: false });
+
+      if (error) throw error;
+      setEmailViews(data || []);
+    } catch (err) {
+      console.error('Error fetching email views:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to load email views',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingEmailViews(false);
+    }
   };
 
   // Handle sorting in View List dialog
@@ -607,11 +648,12 @@ export default function ListsPage() {
 
         if (deleteError) throw deleteError;
       } else {
-        // Create new list
+        // Create new list with auto-generated slug
         const { data: newListData, error: insertError } = await supabase
           .from('lists')
           .insert({
             name: newList.name.trim(),
+            slug: generateUniqueSlug(newList.name.trim()),
             notes: newList.notes.trim() || null,
             approved_emails: newList.approved_emails.length > 0 ? newList.approved_emails : null,
           })
@@ -665,25 +707,26 @@ export default function ListsPage() {
 
   const confirmDeleteList = async () => {
     if (!listToDelete) return;
-    
+
     try {
+      // Soft delete - set archived_at timestamp
       const { error } = await supabase
         .from('lists')
-        .delete()
+        .update({ archived_at: new Date().toISOString() })
         .eq('id', listToDelete);
 
       if (error) throw error;
       await fetchLists();
-      
+
       toast({
-        title: "List Deleted",
-        description: "The list has been deleted successfully.",
+        title: "List Archived",
+        description: "The list has been archived. You can restore it from the Archive page.",
       });
     } catch (err) {
-      console.error('Error deleting list:', err);
+      console.error('Error archiving list:', err);
       toast({
         title: "Error",
-        description: "Failed to delete list. Please try again.",
+        description: "Failed to archive list. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -856,11 +899,12 @@ export default function ListsPage() {
         });
       });
 
-      // Create new list
+      // Create new list with auto-generated slug
       const { data: newListData, error: insertError } = await supabase
         .from('lists')
         .insert({
           name: combinedListName.trim(),
+          slug: generateUniqueSlug(combinedListName.trim()),
           notes: `Combined from: ${selectedLists.map(l => l.name).join(', ')}`,
         })
         .select()
@@ -1083,41 +1127,36 @@ export default function ListsPage() {
                     <div className="grid gap-2">
                       <Label htmlFor="approved-emails">Approved Emails (Optional)</Label>
                       <p className="text-sm text-gray-600 mb-2">
-                        Add email addresses that can access this list via public link. Leave empty for public access.
+                        Add email addresses that can access this list via public link. Separate multiple emails with commas or new lines. Leave empty for public access.
                       </p>
-                      <div className="flex gap-2">
-                        <Input
+                      <div className="flex flex-col gap-2">
+                        <Textarea
                           id="approved-emails"
-                          type="email"
                           value={emailInput}
                           onChange={(e) => setEmailInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const email = emailInput.trim().toLowerCase();
-                              if (email && !newList.approved_emails.includes(email)) {
-                                setNewList({ ...newList, approved_emails: [...newList.approved_emails, email] });
-                                setEmailInput('');
-                              }
-                            }
-                          }}
-                          placeholder="Enter email address"
-                          className="auth-input flex-1"
+                          placeholder="Enter email addresses (comma or newline separated)&#10;e.g. email1@example.com, email2@example.com&#10;or one per line"
+                          className="auth-input min-h-[80px]"
+                          rows={3}
                         />
                         <Button
                           type="button"
                           onClick={() => {
-                            const email = emailInput.trim().toLowerCase();
-                            if (email && !newList.approved_emails.includes(email)) {
-                              setNewList({ ...newList, approved_emails: [...newList.approved_emails, email] });
+                            // Parse input for multiple emails (comma or newline separated)
+                            const emails = emailInput
+                              .split(/[\n,]+/)
+                              .map(email => email.trim().toLowerCase())
+                              .filter(email => email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+                            const newEmails = emails.filter(email => !newList.approved_emails.includes(email));
+                            if (newEmails.length > 0) {
+                              setNewList({ ...newList, approved_emails: [...newList.approved_emails, ...newEmails] });
                               setEmailInput('');
                             }
                           }}
                           disabled={!emailInput.trim()}
-                          className="hover:opacity-90"
+                          className="hover:opacity-90 w-fit"
                           style={{ backgroundColor: '#3e8692', color: 'white' }}
                         >
-                          Add
+                          Add Emails
                         </Button>
                       </div>
                       {newList.approved_emails.length > 0 && (
@@ -1561,26 +1600,26 @@ export default function ListsPage() {
           </div>
         </div>
 
-        {/* Delete List Confirmation Dialog */}
+        {/* Archive List Confirmation Dialog */}
         <Dialog open={isDeleteListDialogOpen} onOpenChange={setIsDeleteListDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Delete List</DialogTitle>
+              <DialogTitle>Archive List</DialogTitle>
             </DialogHeader>
             <div className="py-4">
               <p className="text-gray-600">
-                Are you sure you want to delete this list? This action cannot be undone.
+                Are you sure you want to archive this list? You can restore it later from the Archive page.
               </p>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDeleteListDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={confirmDeleteList}
               >
-                Delete List
+                Archive List
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1873,7 +1912,7 @@ export default function ListsPage() {
                 <div className="flex gap-2">
                   <Input
                     id="share-link"
-                    value={`${window.location.origin}/public/lists/${sharingList?.id}`}
+                    value={`${window.location.origin}/public/lists/${sharingList?.slug || sharingList?.id}`}
                     readOnly
                     className="flex-1 auth-input"
                   />
@@ -1881,7 +1920,7 @@ export default function ListsPage() {
                     variant="outline"
                     className="h-10"
                     onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/public/lists/${sharingList?.id}`);
+                      navigator.clipboard.writeText(`${window.location.origin}/public/lists/${sharingList?.slug || sharingList?.id}`);
                       toast({
                         title: "Link copied!",
                         description: "Share link has been copied to clipboard.",
@@ -1896,7 +1935,7 @@ export default function ListsPage() {
                     className="h-10"
                     onClick={() => {
                       if (sharingList?.id) {
-                        window.open(`${window.location.origin}/public/lists/${sharingList.id}`, '_blank');
+                        window.open(`${window.location.origin}/public/lists/${sharingList.slug || sharingList.id}`, '_blank');
                       }
                     }}
                   >
@@ -1907,6 +1946,64 @@ export default function ListsPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsShareListDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Email Views Dialog */}
+        <Dialog open={isEmailViewsDialogOpen} onOpenChange={setIsEmailViewsDialogOpen}>
+          <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Email Views: {emailViewsList?.name}
+              </DialogTitle>
+              <DialogDescription>
+                Emails that have accessed this list via the public link.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              {loadingEmailViews ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#3e8692]"></div>
+                </div>
+              ) : emailViews.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <Eye className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>No email views recorded yet.</p>
+                  <p className="text-sm mt-2">Views will appear here when users access the list via the public link.</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  <div className="text-sm text-gray-500 mb-3">
+                    {emailViews.length} view{emailViews.length !== 1 ? 's' : ''} recorded
+                  </div>
+                  {emailViews.map((view) => (
+                    <div
+                      key={view.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{view.email}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(view.viewed_at).toLocaleString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEmailViewsDialogOpen(false)}>
                 Close
               </Button>
             </DialogFooter>
@@ -2161,15 +2258,27 @@ export default function ListsPage() {
                         View List
                       </Button>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => handleShareList(list)}
-                    >
-                      <Share2 className="h-4 w-4 mr-2" />
-                      Share List
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleShareList(list)}
+                      >
+                        <Share2 className="h-4 w-4 mr-2" />
+                        Share
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleShowEmailViews(list)}
+                        title="View emails that accessed this list"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Views
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

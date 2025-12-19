@@ -21,6 +21,8 @@ import { CustomColorPicker } from '@/components/ui/custom-color-picker';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 // Sortable Field Item Component
 interface SortableFieldItemProps {
@@ -1225,7 +1227,8 @@ export default function FormBuilderPage() {
   const fetchForm = async () => {
     try {
       setLoading(true);
-      const data = await FormService.getFormById(formId);
+      // Support both UUID and slug in URL
+      const data = await FormService.getFormByIdOrSlug(formId);
       if (!data) {
         toast({
           title: 'Error',
@@ -1268,7 +1271,9 @@ export default function FormBuilderPage() {
   const fetchResponses = async () => {
     try {
       setLoadingResponses(true);
-      const data = await FormService.getResponses(formId);
+      // Use the actual form ID (UUID), not the URL parameter which could be a slug
+      const actualFormId = form?.id || formId;
+      const data = await FormService.getResponses(actualFormId);
       setResponses(data);
     } catch (error) {
       console.error('Error fetching responses:', error);
@@ -1444,7 +1449,9 @@ export default function FormBuilderPage() {
   };
 
   const handleCopyShareLink = () => {
-    const shareUrl = `${window.location.origin}/public/forms/${formId}`;
+    // Use slug for shorter URL if available
+    const identifier = form?.slug || form?.id || formId;
+    const shareUrl = `${window.location.origin}/public/forms/${identifier}`;
     navigator.clipboard.writeText(shareUrl);
     setCopiedLink(true);
     toast({
@@ -1455,13 +1462,17 @@ export default function FormBuilderPage() {
   };
 
   const handleOpenShareLink = () => {
-    const shareUrl = `${window.location.origin}/public/forms/${formId}`;
+    // Use slug for shorter URL if available
+    const identifier = form?.slug || form?.id || formId;
+    const shareUrl = `${window.location.origin}/public/forms/${identifier}`;
     window.open(shareUrl, '_blank');
   };
 
   const handleExportCSV = async () => {
     try {
-      const csv = await FormService.exportResponsesToCSV(formId);
+      // Use actual form ID for API call
+      const actualFormId = form?.id || formId;
+      const csv = await FormService.exportResponsesToCSV(actualFormId);
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1505,6 +1516,172 @@ export default function FormBuilderPage() {
         description: 'Failed to delete response',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleDownloadPDF = async (response: FormResponse) => {
+    if (!form) return;
+
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pdfWidth - (margin * 2);
+      const htmlWidth = 550; // Fixed HTML width for rendering
+      let currentY = margin;
+
+      // Extract URLs from text
+      const extractUrls = (text: string): string[] => {
+        const urlRegex = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g;
+        return text.match(urlRegex) || [];
+      };
+
+      // Check for new page
+      const checkNewPage = (height: number) => {
+        if (currentY + height > pdfHeight - margin) {
+          pdf.addPage();
+          currentY = margin;
+        }
+      };
+
+      // Render HTML and get link positions
+      const renderCardWithLinks = async (html: string, linkData: { url: string; selector: string }[]) => {
+        const container = document.createElement('div');
+        container.style.cssText = `position:absolute;left:-9999px;top:0;width:${htmlWidth}px;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;`;
+        container.innerHTML = html;
+        document.body.appendChild(container);
+
+        // Get positions of all link elements
+        const linkPositions: { url: string; x: number; y: number; width: number; height: number }[] = [];
+        const linkElements = container.querySelectorAll('[data-link]');
+        const containerRect = container.getBoundingClientRect();
+
+        linkElements.forEach((el) => {
+          const rect = el.getBoundingClientRect();
+          const url = el.getAttribute('data-url') || '';
+          linkPositions.push({
+            url,
+            x: rect.left - containerRect.left,
+            y: rect.top - containerRect.top,
+            width: rect.width,
+            height: rect.height
+          });
+        });
+
+        // Render to canvas
+        const canvas = await html2canvas(container, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff'
+        });
+
+        document.body.removeChild(container);
+
+        return { canvas, linkPositions, containerHeight: containerRect.height };
+      };
+
+      // === HEADER ===
+      const headerHtml = `
+        <div style="padding-bottom: 12px; border-bottom: 2px solid #e5e7eb;">
+          <div style="font-size: 20px; font-weight: 700; color: #111827; margin-bottom: 4px;">${form.name}</div>
+          <div style="font-size: 11px; color: #6b7280;">Submitted on ${new Date(response.submitted_at).toLocaleString()}</div>
+        </div>
+      `;
+      const { canvas: headerCanvas } = await renderCardWithLinks(headerHtml, []);
+      const headerH = (headerCanvas.height * contentWidth) / headerCanvas.width;
+      pdf.addImage(headerCanvas.toDataURL('image/png'), 'PNG', margin, currentY, contentWidth, headerH);
+      currentY += headerH + 8;
+
+      // === FIELDS ===
+      const sortedFields = [...form.fields].sort((a, b) => a.display_order - b.display_order);
+
+      for (const field of sortedFields) {
+        if (['section', 'description', 'link'].includes(field.field_type)) continue;
+
+        const value = response.response_data[field.id];
+        const reason = response.response_data[`${field.id}_reason`];
+        const attachments = response.response_data[`${field.id}_attachments`] as string[] | undefined;
+
+        const cleanValue = (Array.isArray(value) ? value.join(', ') : String(value || '')).replace(/\t/g, ' ');
+        const cleanReason = reason ? String(reason).replace(/\t/g, ' ') : '';
+        const urls = extractUrls(cleanValue);
+        const attachmentUrls = attachments || [];
+
+        // Format value for HTML display - wrap URLs in data-link spans
+        let displayValue = '';
+        if (!cleanValue || cleanValue === 'undefined' || cleanValue === 'null' || cleanValue === '') {
+          displayValue = '<span style="color: #9ca3af; font-style: italic;">No response</span>';
+        } else {
+          let escaped = cleanValue
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br>');
+
+          // Wrap URLs with data-link attribute for position tracking
+          urls.forEach((url, idx) => {
+            const escapedUrl = url.replace(/&/g, '&amp;');
+            escaped = escaped.replace(
+              escapedUrl,
+              `<span data-link="url-${idx}" data-url="${url}" style="color: #2563eb; cursor: pointer;">${escapedUrl}</span>`
+            );
+          });
+          displayValue = escaped;
+        }
+
+        // Build reason HTML
+        const reasonHtml = cleanReason ? `
+          <div style="margin-top: 10px; padding: 8px 10px; background: #f3f4f6; border-radius: 4px; border-left: 3px solid #9ca3af;">
+            <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 3px;">Reason:</div>
+            <div style="font-size: 11px; color: #374151; line-height: 1.5;">${cleanReason.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>
+          </div>
+        ` : '';
+
+        // Build attachments HTML with data-link for tracking
+        const attachmentsHtml = attachmentUrls.length > 0 ? `
+          <div style="margin-top: 10px;">
+            <div style="font-size: 10px; color: #6b7280; font-weight: 600; margin-bottom: 4px;">Attachments:</div>
+            ${attachmentUrls.map((url, idx) => {
+              const name = decodeURIComponent(url.split('/').pop() || 'Attachment');
+              return `<div data-link="attach-${idx}" data-url="${url}" style="font-size: 11px; color: #2563eb; margin-bottom: 2px; cursor: pointer;">${name}</div>`;
+            }).join('')}
+          </div>
+        ` : '';
+
+        // Build complete card HTML - field.label contains HTML with styled content
+        const cardHtml = `<div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;"><div style="padding: 10px 14px; background: #f9fafb; border-bottom: 1px solid #e5e7eb;"><div style="font-size: 12px; font-weight: 600; color: #374151; line-height: 1.5; word-wrap: break-word;">${field.label}${field.required ? '<span style="color: #ef4444;"> *</span>' : ''}</div></div><div style="padding: 12px 14px; background: white;"><div style="font-size: 12px; color: #1f2937; line-height: 1.6; word-wrap: break-word;">${displayValue}</div>${reasonHtml}${attachmentsHtml}</div></div>`;
+
+        // Render card and get link positions
+        const { canvas: cardCanvas, linkPositions, containerHeight } = await renderCardWithLinks(cardHtml, []);
+        const cardH = (cardCanvas.height * contentWidth) / cardCanvas.width;
+
+        checkNewPage(cardH + 6);
+
+        // Add card image
+        pdf.addImage(cardCanvas.toDataURL('image/png'), 'PNG', margin, currentY, contentWidth, cardH);
+
+        // Add clickable link annotations at exact positions
+        const scale = contentWidth / htmlWidth;
+        for (const link of linkPositions) {
+          const pdfX = margin + (link.x * scale);
+          const pdfY = currentY + (link.y * scale);
+          const pdfW = link.width * scale;
+          const pdfH = link.height * scale;
+          pdf.link(pdfX, pdfY, pdfW, pdfH, { url: link.url });
+        }
+
+        currentY += cardH + 6;
+      }
+
+      const fileName = `${form.name.replace(/[^a-z0-9]/gi, '_')}_response_${new Date(response.submitted_at).toISOString().split('T')[0]}.pdf`;
+      pdf.save(fileName);
+
+      toast({ title: 'Success', description: 'PDF downloaded successfully' });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({ title: 'Error', description: 'Failed to generate PDF', variant: 'destructive' });
     }
   };
 
@@ -2387,10 +2564,13 @@ export default function FormBuilderPage() {
                           <TableCell>{response.submitted_by_email || '-'}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
-                              <Button variant="outline" size="sm" onClick={() => handleViewResponse(response)}>
+                              <Button variant="outline" size="sm" onClick={() => handleViewResponse(response)} title="View response">
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button variant="outline" size="sm" onClick={() => handleDeleteResponse(response.id)}>
+                              <Button variant="outline" size="sm" onClick={() => handleDownloadPDF(response)} title="Download PDF">
+                                <Download className="h-4 w-4" />
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => handleDeleteResponse(response.id)} title="Delete response">
                                 <Trash2 className="h-4 w-4 text-red-600" />
                               </Button>
                             </div>

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { supabase } from '@/lib/supabase'
 import { Loader2 } from 'lucide-react'
+import { GoogleSignInButton } from './GoogleSignInButton'
 
 interface LoginFormProps {
   onToggleMode: () => void
@@ -83,16 +84,27 @@ export function LoginForm({ onToggleMode, onForgotPassword }: LoginFormProps) {
             />
           </div>
           
-          <Button 
-            type="submit" 
-            className="w-full hover:opacity-90" 
+          <Button
+            type="submit"
+            className="w-full hover:opacity-90"
             disabled={loading}
             style={{ backgroundColor: '#3e8692', color: 'white' }}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Sign In
           </Button>
-          
+
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-gray-500">or</span>
+            </div>
+          </div>
+
+          <GoogleSignInButton mode="signin" />
+
           <div className="text-center">
             <button
               type="button"

@@ -41,10 +41,10 @@ export class CampaignTemplateService {
   /**
    * Get templates based on user role and permissions
    */
-  static async getTemplatesForUser(userRole: 'admin' | 'member' | 'client', userId: string): Promise<CampaignTemplateWithDetails[]> {
+  static async getTemplatesForUser(userRole: 'super_admin' | 'admin' | 'member' | 'client', userId: string): Promise<CampaignTemplateWithDetails[]> {
     try {
-      if (userRole === 'admin') {
-        // Admins can see all templates
+      if (userRole === 'admin' || userRole === 'super_admin') {
+        // Admins and super admins can see all templates
         const { data: templates, error } = await supabase
           .from('campaign_templates')
           .select(`
@@ -281,7 +281,7 @@ export class CampaignTemplateService {
   /**
    * Search templates by name or description
    */
-  static async searchTemplates(query: string, userRole: 'admin' | 'member' | 'client', userId: string): Promise<CampaignTemplateWithDetails[]> {
+  static async searchTemplates(query: string, userRole: 'super_admin' | 'admin' | 'member' | 'client', userId: string): Promise<CampaignTemplateWithDetails[]> {
     try {
       let queryBuilder = supabase
         .from('campaign_templates')
@@ -291,7 +291,7 @@ export class CampaignTemplateService {
         `)
         .or(`name.ilike.%${query}%,description.ilike.%${query}%`);
 
-      if (userRole !== 'admin') {
+      if (userRole !== 'admin' && userRole !== 'super_admin') {
         queryBuilder = queryBuilder.or(`is_public.eq.true,created_by.eq.${userId}`);
       }
 
@@ -313,7 +313,7 @@ export class CampaignTemplateService {
   /**
    * Get templates by region
    */
-  static async getTemplatesByRegion(region: string, userRole: 'admin' | 'member' | 'client', userId: string): Promise<CampaignTemplateWithDetails[]> {
+  static async getTemplatesByRegion(region: string, userRole: 'super_admin' | 'admin' | 'member' | 'client', userId: string): Promise<CampaignTemplateWithDetails[]> {
     try {
       let queryBuilder = supabase
         .from('campaign_templates')
@@ -323,7 +323,7 @@ export class CampaignTemplateService {
         `)
         .eq('region', region);
 
-      if (userRole !== 'admin') {
+      if (userRole !== 'admin' && userRole !== 'super_admin') {
         queryBuilder = queryBuilder.or(`is_public.eq.true,created_by.eq.${userId}`);
       }
 

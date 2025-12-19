@@ -49,10 +49,12 @@ export interface CRMOpportunity {
   deal_value: number | null;
   currency: string;
   last_contacted_at: string | null;
+  last_message_at: string | null;  // When they last messaged in TG group
+  last_reply_at: string | null;    // When we last messaged in TG group
   owner_id: string | null;
   source: OpportunitySource | null;
   referrer: string | null;
-  gc: string | null;
+  gc: string | null;               // Telegram group chat ID
   affiliate_id: string | null;
   notes: string | null;
   position: number;
@@ -810,5 +812,91 @@ export class CRMService {
       wonValue,
       conversionRate
     };
+  }
+
+  // ----------------------------------------
+  // TELEGRAM INTEGRATION
+  // ----------------------------------------
+
+  /**
+   * Send a message to an opportunity's Telegram group chat
+   * and update the last_reply_at timestamp
+   */
+  static async sendTelegramMessage(
+    opportunityId: string,
+    message: string
+  ): Promise<{ success: boolean; error?: string }> {
+    // Get the opportunity to find the gc (chat ID)
+    const opportunity = await this.getOpportunityById(opportunityId);
+    if (!opportunity) {
+      return { success: false, error: 'Opportunity not found' };
+    }
+
+    if (!opportunity.gc) {
+      return { success: false, error: 'No Telegram group chat ID configured for this opportunity' };
+    }
+
+    // Send message via Telegram API
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) {
+      return { success: false, error: 'Telegram bot not configured' };
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${botToken}/sendMessage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: opportunity.gc,
+            text: message,
+            parse_mode: 'HTML'
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('[CRM] Telegram send error:', error);
+        return { success: false, error: error.description || 'Failed to send message' };
+      }
+
+      // Update last_reply_at
+      await supabase
+        .from('crm_opportunities')
+        .update({
+          last_reply_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', opportunityId);
+
+      return { success: true };
+    } catch (error) {
+      console.error('[CRM] Error sending Telegram message:', error);
+      return { success: false, error: 'Failed to send message' };
+    }
+  }
+
+  /**
+   * Get opportunities that haven't been contacted recently
+   */
+  static async getStaleOpportunities(daysThreshold: number = 7): Promise<CRMOpportunity[]> {
+    const thresholdDate = new Date();
+    thresholdDate.setDate(thresholdDate.getDate() - daysThreshold);
+
+    const { data, error } = await supabase
+      .from('crm_opportunities')
+      .select(`
+        *,
+        affiliate:crm_affiliates(*)
+      `)
+      .not('gc', 'is', null)
+      .or(`last_message_at.is.null,last_message_at.lt.${thresholdDate.toISOString()}`)
+      .not('stage', 'in', '(closed_won,closed_lost,dead,account_churned)')
+      .order('last_message_at', { ascending: true, nullsFirst: true });
+
+    if (error) throw error;
+    return data || [];
   }
 }

@@ -72,6 +72,7 @@ export class KOLService {
       const { data: kols, error } = await supabase
         .from('master_kols')
         .select('*')
+        .is('archived_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -182,7 +183,24 @@ export class KOLService {
   }
 
   /**
-   * Delete a KOL
+   * Archive a KOL (soft delete)
+   */
+  static async archiveKOL(kolId: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('master_kols')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', kolId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error archiving KOL:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Permanently delete a KOL
    */
   static async deleteKOL(kolId: string): Promise<void> {
     try {

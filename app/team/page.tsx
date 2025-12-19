@@ -5,9 +5,12 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Shield } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search, Shield, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { UserService } from '@/lib/userService';
 
 interface TeamMember {
   id: string;
@@ -26,11 +29,59 @@ export default function TeamPage() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
   const { toast } = useToast();
+  const { userProfile } = useAuth();
 
   useEffect(() => {
     fetchTeamMembers();
+    checkSuperAdminStatus();
   }, []);
+
+  const checkSuperAdminStatus = async () => {
+    const isSuper = await UserService.isCurrentUserSuperAdmin();
+    setIsSuperAdmin(isSuper);
+  };
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    if (!isSuperAdmin) return;
+
+    setUpdatingRoleId(userId);
+    try {
+      const success = await UserService.updateUserRole(
+        userId,
+        newRole as 'super_admin' | 'admin' | 'member' | 'client'
+      );
+
+      if (success) {
+        setTeamMembers(prev =>
+          prev.map(member =>
+            member.id === userId ? { ...member, role: newRole } : member
+          )
+        );
+        toast({
+          title: 'Role updated',
+          description: 'User role has been updated successfully.',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to update user role.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error updating role:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update user role.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingRoleId(null);
+    }
+  };
 
   const fetchTeamMembers = async () => {
     try {
@@ -220,9 +271,40 @@ export default function TeamPage() {
                         <p className="text-sm text-gray-500">{member.email}</p>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
-                        </span>
+                        {isSuperAdmin && member.id !== userProfile?.id ? (
+                          <div className="relative">
+                            {updatingRoleId === member.id && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded z-10">
+                                <Loader2 className="h-4 w-4 animate-spin text-[#3e8692]" />
+                              </div>
+                            )}
+                            <Select
+                              value={member.role}
+                              onValueChange={(value) => handleRoleChange(member.id, value)}
+                              disabled={updatingRoleId === member.id}
+                            >
+                              <SelectTrigger className="h-7 text-xs w-[120px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="super_admin">Super Admin</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="member">Member</SelectItem>
+                                <SelectItem value="client">Client</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : (
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                            member.role === 'super_admin'
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {member.role === 'super_admin'
+                              ? 'Super Admin'
+                              : member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </CardHeader>

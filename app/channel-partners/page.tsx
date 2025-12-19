@@ -253,11 +253,11 @@ export default function PartnersPage() {
             <h2 className="text-2xl font-bold text-gray-900">Channel Partners</h2>
             <p className="text-gray-600">Manage your channel partner relationships</p>
           </div>
-          {userProfile?.role === 'admin' && (
+          {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
             <div>
-              <Button 
-                className="hover:opacity-90" 
-                style={{ backgroundColor: '#3e8692', color: 'white' }} 
+              <Button
+                className="hover:opacity-90"
+                style={{ backgroundColor: '#3e8692', color: 'white' }}
                 onClick={() => { setIsEditMode(false); setIsNewPartnerOpen(true); }}
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -285,10 +285,10 @@ export default function PartnersPage() {
               <p className="text-gray-600">
                 {searchTerm ? 'No partners found matching your search.' : 'No partners found.'}
               </p>
-              {userProfile?.role === 'admin' && !searchTerm && (
-                <Button 
-                  className="mt-4 hover:opacity-90" 
-                  style={{ backgroundColor: '#3e8692', color: 'white' }} 
+              {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && !searchTerm && (
+                <Button
+                  className="mt-4 hover:opacity-90"
+                  style={{ backgroundColor: '#3e8692', color: 'white' }}
                   onClick={() => { setIsEditMode(false); setIsNewPartnerOpen(true); }}
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -308,25 +308,25 @@ export default function PartnersPage() {
                         </div>
                         {partner.name}
                       </div>
-                      {userProfile?.role === 'admin' && (
+                      {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                         <div className="flex items-center space-x-1">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => handleEditPartner(partner)} 
-                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditPartner(partner)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2"
                             title="Edit partner"
                           >
                             <Edit className="h-4 w-4 text-gray-600" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => handleDeletePartner(partner.id)} 
-                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeletePartner(partner.id)}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-50 w-auto px-2"
                             title="Delete partner"
                           >
-                            <Trash2 className="h-4 w-4 text-gray-600" />
+                            <Trash2 className="h-4 w-4 text-red-600" />
                           </Button>
                         </div>
                       )}

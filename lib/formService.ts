@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { generateUniqueSlug } from './slugUtils';
 
 // TypeScript types for Forms
 export type FormStatus = 'draft' | 'published' | 'closed';
@@ -8,6 +9,7 @@ export interface Form {
   id: string;
   user_id: string;
   name: string;
+  slug: string | null;
   description: string | null;
   status: FormStatus;
   created_at: string;
@@ -51,6 +53,7 @@ export interface FormWithStats extends Form {
 
 export interface CreateFormData {
   name: string;
+  slug?: string;
   description?: string;
   status?: FormStatus;
 }
@@ -58,6 +61,7 @@ export interface CreateFormData {
 export interface UpdateFormData {
   id: string;
   name?: string;
+  slug?: string | null;
   description?: string | null;
   status?: FormStatus;
 }
@@ -113,6 +117,7 @@ export class FormService {
           *,
           response_count:form_responses(count)
         `)
+        .is('archived_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -162,17 +167,73 @@ export class FormService {
   }
 
   /**
-   * Get a published form by ID (public access, no auth required)
-   * Use the public supabase client for this
+   * Get a single form by slug with fields
    */
-  static async getPublicForm(formId: string, publicSupabase: any): Promise<FormWithFields | null> {
+  static async getFormBySlug(slug: string): Promise<FormWithFields | null> {
     try {
-      const { data: form, error: formError } = await publicSupabase
+      const { data: form, error: formError } = await (supabase as any)
         .from('forms')
         .select('*')
-        .eq('id', formId)
-        .eq('status', 'published')
+        .eq('slug', slug)
         .single();
+
+      if (formError) throw formError;
+      if (!form) return null;
+
+      const { data: fields, error: fieldsError } = await (supabase as any)
+        .from('form_fields')
+        .select('*')
+        .eq('form_id', form.id)
+        .order('page_number', { ascending: true })
+        .order('display_order', { ascending: true });
+
+      if (fieldsError) throw fieldsError;
+
+      return {
+        ...form,
+        fields: fields || []
+      };
+    } catch (error) {
+      console.error('Error fetching form by slug:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a form by ID or slug with fields
+   */
+  static async getFormByIdOrSlug(idOrSlug: string): Promise<FormWithFields | null> {
+    // Check if it's a UUID format
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+
+    if (isUUID) {
+      return this.getFormById(idOrSlug);
+    } else {
+      return this.getFormBySlug(idOrSlug);
+    }
+  }
+
+  /**
+   * Get a published form by ID or slug (public access, no auth required)
+   * Use the public supabase client for this
+   */
+  static async getPublicForm(idOrSlug: string, publicSupabase: any): Promise<FormWithFields | null> {
+    try {
+      // Check if it's a UUID format
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+
+      let query = publicSupabase
+        .from('forms')
+        .select('*')
+        .eq('status', 'published');
+
+      if (isUUID) {
+        query = query.eq('id', idOrSlug);
+      } else {
+        query = query.eq('slug', idOrSlug);
+      }
+
+      const { data: form, error: formError } = await query.single();
 
       if (formError) throw formError;
       if (!form) return null;
@@ -180,7 +241,7 @@ export class FormService {
       const { data: fields, error: fieldsError } = await publicSupabase
         .from('form_fields')
         .select('*')
-        .eq('form_id', formId)
+        .eq('form_id', form.id)
         .order('page_number', { ascending: true })
         .order('display_order', { ascending: true });
 
@@ -204,11 +265,15 @@ export class FormService {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Generate slug if not provided
+      const slug = formData.slug || generateUniqueSlug(formData.name);
+
       const { data: form, error } = await (supabase as any)
         .from('forms')
         .insert([{
           user_id: user.id,
           name: formData.name,
+          slug: slug,
           description: formData.description || null,
           status: formData.status || 'draft'
         }])
@@ -247,7 +312,24 @@ export class FormService {
   }
 
   /**
-   * Delete a form
+   * Archive a form (soft delete)
+   */
+  static async archiveForm(formId: string): Promise<void> {
+    try {
+      const { error } = await (supabase as any)
+        .from('forms')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', formId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error archiving form:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a form permanently
    */
   static async deleteForm(formId: string): Promise<void> {
     try {

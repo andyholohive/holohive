@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { Database } from './database.types';
+import { generateUniqueSlug } from './slugUtils';
 
 type Campaign = Database['public']['Tables']['campaigns']['Row'];
 type CampaignBudgetAllocation = Database['public']['Tables']['campaign_budget_allocations']['Row'];
@@ -10,6 +11,7 @@ export interface CampaignWithDetails extends Campaign {
   budget_allocations?: CampaignBudgetAllocation[];
   total_allocated?: number;
   share_creator_type?: boolean;
+  slug?: string | null;
 }
 
 export class CampaignService {
@@ -18,13 +20,14 @@ export class CampaignService {
    * - Admins: See all campaigns
    * - Members: See campaigns they created (created_by) or are assigned to (manager)
    */
-  static async getCampaignsForUser(userRole: 'admin' | 'member' | 'client', userId: string, supabaseClient?: any): Promise<CampaignWithDetails[]> {
+  static async getCampaignsForUser(userRole: 'super_admin' | 'admin' | 'member' | 'client', userId: string, supabaseClient?: any): Promise<CampaignWithDetails[]> {
     try {
       const client = supabaseClient || supabase;
 
       // RLS policies handle access control:
       // - Admins: can see all campaigns
       // - Members: can see campaigns they created (created_by) or are assigned to (manager)
+      // Filter out archived campaigns
       const { data: campaigns, error } = await client
         .from('campaigns')
         .select(`
@@ -32,6 +35,7 @@ export class CampaignService {
           clients!campaigns_client_id_fkey(name, email),
           campaign_budget_allocations(*)
         `)
+        .is('archived_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -105,6 +109,7 @@ export class CampaignService {
       nda_signed?: boolean;
       budget_type?: string[];
       created_by?: string;
+      slug?: string;
     },
     supabaseClient?: any
   ): Promise<Campaign> {
@@ -112,12 +117,17 @@ export class CampaignService {
       const client = supabaseClient || supabase;
 
       // Get current user ID for created_by if not provided
-      let dataToInsert = { ...campaignData };
+      let dataToInsert: any = { ...campaignData };
       if (!dataToInsert.created_by) {
         const { data: { user } } = await client.auth.getUser();
         if (user) {
           dataToInsert.created_by = user.id;
         }
+      }
+
+      // Generate slug if not provided
+      if (!dataToInsert.slug) {
+        dataToInsert.slug = generateUniqueSlug(campaignData.name);
       }
 
       const { data, error } = await client
@@ -134,11 +144,57 @@ export class CampaignService {
   }
 
   /**
+   * Get a single campaign by slug with budget allocations
+   */
+  static async getCampaignBySlug(slug: string, supabaseClient?: any): Promise<CampaignWithDetails | null> {
+    try {
+      const client = supabaseClient || supabase;
+      const { data: campaign, error } = await client
+        .from('campaigns')
+        .select(`
+          *,
+          clients!campaigns_client_id_fkey(name, email),
+          campaign_budget_allocations(*)
+        `)
+        .eq('slug', slug)
+        .single();
+
+      if (error) throw error;
+      if (!campaign) return null;
+
+      return {
+        ...campaign,
+        client_name: (campaign.clients as any)?.name,
+        client_email: (campaign.clients as any)?.email,
+        budget_allocations: campaign.campaign_budget_allocations || [],
+        total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
+      };
+    } catch (error) {
+      console.error('Error fetching campaign by slug:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a campaign by ID or slug with budget allocations
+   */
+  static async getCampaignByIdOrSlug(idOrSlug: string, supabaseClient?: any): Promise<CampaignWithDetails | null> {
+    // Check if it's a UUID format
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+
+    if (isUUID) {
+      return this.getCampaignById(idOrSlug, supabaseClient);
+    } else {
+      return this.getCampaignBySlug(idOrSlug, supabaseClient);
+    }
+  }
+
+  /**
    * Update campaign
    */
   static async updateCampaign(
     id: string,
-    updates: Partial<Pick<Campaign, 'name' | 'total_budget' | 'status' | 'start_date' | 'end_date' | 'description' | 'region' | 'intro_call' | 'intro_call_date' | 'manager' | 'call_support' | 'client_choosing_kols' | 'multi_activation' | 'proposal_sent' | 'nda_signed' | 'budget_type' | 'outline'>>,
+    updates: Partial<Pick<Campaign, 'name' | 'total_budget' | 'status' | 'start_date' | 'end_date' | 'description' | 'region' | 'intro_call' | 'intro_call_date' | 'manager' | 'call_support' | 'client_choosing_kols' | 'multi_activation' | 'proposal_sent' | 'nda_signed' | 'budget_type' | 'outline'>> & { slug?: string },
     supabaseClient?: any
   ): Promise<Campaign> {
     try {
@@ -159,7 +215,24 @@ export class CampaignService {
   }
 
   /**
-   * Delete campaign
+   * Archive campaign (soft delete)
+   */
+  static async archiveCampaign(id: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('campaigns')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error archiving campaign:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete campaign permanently
    */
   static async deleteCampaign(id: string): Promise<void> {
     try {
@@ -269,7 +342,8 @@ export class CampaignService {
     const { data, error } = await supabase
       .from('campaigns')
       .select('*')
-      .in('client_id', clientIds);
+      .in('client_id', clientIds)
+      .is('archived_at', null);
     if (error) throw error;
     return data || [];
   }

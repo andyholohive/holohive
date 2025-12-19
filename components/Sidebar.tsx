@@ -2,10 +2,10 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Bell, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Bell, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -16,6 +16,7 @@ interface SidebarProps {
 
 export default function Sidebar({ children }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { userProfile, signOut } = useAuth();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(() => {
     if (typeof window !== 'undefined') {
@@ -76,7 +77,7 @@ export default function Sidebar({ children }: SidebarProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => {}}>
+                <DropdownMenuItem onClick={() => router.push('/settings')}>
                   <Settings className="h-4 w-4 mr-2" />
                   Settings
                 </DropdownMenuItem>
@@ -273,7 +274,7 @@ export default function Sidebar({ children }: SidebarProps) {
                   </Button>
                 </Link>
                 {/* Forms tab - Admin only */}
-                {userProfile?.role === 'admin' && (
+                {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                   <Link href="/forms" legacyBehavior>
                     <Button
                       asChild
@@ -323,6 +324,21 @@ export default function Sidebar({ children }: SidebarProps) {
                     <span>
                       <Sliders className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
                       {!isSidebarCollapsed && 'Field Options'}
+                    </span>
+                  </Button>
+                </Link>
+                {/* Archive tab */}
+                <Link href="/archive" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/archive') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/archive') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Archive' : undefined}
+                  >
+                    <span>
+                      <Archive className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Archive'}
                     </span>
                   </Button>
                 </Link>

@@ -263,135 +263,148 @@ export default function FieldOptionsPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+      <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
+        <div className="w-full">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Field Options</h2>
+                <p className="text-gray-600">Manage dynamic dropdown options for KOL fields</p>
+              </div>
+            </div>
+            <div className="animate-pulse">
+              <div className="h-64 bg-gray-200 rounded"></div>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Field Options Management</h2>
-          <p className="text-gray-600 mt-2">Manage dynamic dropdown options for KOL fields</p>
-        </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Option
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Field Option</DialogTitle>
-              <DialogDescription>
-                Add a new option for the in-house field dropdown.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="field_name">Field Name</Label>
-                <Input
-                  id="field_name"
-                  value={newOption.field_name}
-                  onChange={(e) => setNewOption(prev => ({ ...prev, field_name: e.target.value }))}
-                  disabled
-                  className="auth-input"
-                />
-              </div>
-              <div>
-                <Label htmlFor="option_value">Option Value</Label>
-                <Input
-                  id="option_value"
-                  value={newOption.option_value}
-                  onChange={(e) => setNewOption(prev => ({ ...prev, option_value: e.target.value }))}
-                  placeholder="e.g., Yes, No, Contractor"
-                  className="auth-input"
-                />
-              </div>
-              <div>
-                <Label htmlFor="display_order">Display Order</Label>
-                <Input
-                  id="display_order"
-                  type="number"
-                  value={newOption.display_order}
-                  onChange={(e) => setNewOption(prev => ({ ...prev, display_order: parseInt(e.target.value) || 0 }))}
-                  className="auth-input"
-                />
-              </div>
+    <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
+      <div className="w-full">
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Field Options</h2>
+              <p className="text-gray-600">Manage dynamic dropdown options for KOL fields</p>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleAddOption} style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
-                Add Option
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>In-House Field Options</CardTitle>
-          <CardDescription>
-            Manage the dropdown options for the in-house field. These options will appear in the KOLs table and forms.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12"></TableHead>
-                  <TableHead>Option Value</TableHead>
-                  <TableHead>Display Order</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <SortableContext
-                items={inHouseOptions.map(o => o.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <TableBody>
-                  {inHouseOptions.map((option) => (
-                    <SortableRow
-                      key={option.id}
-                      option={option}
-                      onToggleActive={handleToggleActive}
-                      onDelete={handleDeleteOption}
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Option
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Field Option</DialogTitle>
+                  <DialogDescription>
+                    Add a new option for the in-house field dropdown.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="field_name">Field Name</Label>
+                    <Input
+                      id="field_name"
+                      value={newOption.field_name}
+                      onChange={(e) => setNewOption(prev => ({ ...prev, field_name: e.target.value }))}
+                      disabled
+                      className="auth-input"
                     />
-                  ))}
-                </TableBody>
-              </SortableContext>
-            </Table>
-          </DndContext>
-          
-          {inHouseOptions.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              No field options found. Add your first option to get started.
-            </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="option_value">Option Value</Label>
+                    <Input
+                      id="option_value"
+                      value={newOption.option_value}
+                      onChange={(e) => setNewOption(prev => ({ ...prev, option_value: e.target.value }))}
+                      placeholder="e.g., Yes, No, Contractor"
+                      className="auth-input"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="display_order">Display Order</Label>
+                    <Input
+                      id="display_order"
+                      type="number"
+                      value={newOption.display_order}
+                      onChange={(e) => setNewOption(prev => ({ ...prev, display_order: parseInt(e.target.value) || 0 }))}
+                      className="auth-input"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddOption} style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+                    Add Option
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
-        </CardContent>
-      </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>In-House Field Options</CardTitle>
+              <CardDescription>
+                Manage the dropdown options for the in-house field. These options will appear in the KOLs table and forms.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12"></TableHead>
+                      <TableHead>Option Value</TableHead>
+                      <TableHead>Display Order</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <SortableContext
+                    items={inHouseOptions.map(o => o.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <TableBody>
+                      {inHouseOptions.map((option) => (
+                        <SortableRow
+                          key={option.id}
+                          option={option}
+                          onToggleActive={handleToggleActive}
+                          onDelete={handleDeleteOption}
+                        />
+                      ))}
+                    </TableBody>
+                  </SortableContext>
+                </Table>
+              </DndContext>
+
+              {inHouseOptions.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  No field options found. Add your first option to get started.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

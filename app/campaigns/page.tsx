@@ -85,7 +85,7 @@ export default function CampaignsPage() {
 
   // Open dialog if add=1 is present
   useEffect(() => {
-    if (addParam === '1' && (userProfile?.role === 'admin' || userProfile?.role === 'member')) {
+    if (addParam === '1' && (userProfile?.role === 'super_admin' || userProfile?.role === 'admin' || userProfile?.role === 'member')) {
       setIsNewCampaignOpen(true);
       if (clientIdParam) {
         setNewCampaign((prev) => ({ ...prev, client_id: clientIdParam }));
@@ -401,7 +401,7 @@ export default function CampaignsPage() {
             <h2 className="text-2xl font-bold text-gray-900">Campaigns</h2>
             <p className="text-gray-600">Track and manage your marketing campaigns</p>
           </div>
-          {(userProfile?.role === "admin" || userProfile?.role === "member") && (
+          {(userProfile?.role === "super_admin" || userProfile?.role === "admin" || userProfile?.role === "member") && (
             <Button
               className="hover:opacity-90"
               style={{ backgroundColor: "#3e8692", color: "white" }}
@@ -461,7 +461,7 @@ export default function CampaignsPage() {
           <h2 className="text-2xl font-bold text-gray-900">Campaigns</h2>
           <p className="text-gray-600">Track and manage your marketing campaigns</p>
         </div>
-        {userProfile?.role === "admin" && (
+        {(userProfile?.role === "super_admin" || userProfile?.role === "admin") && (
           <Dialog open={isNewCampaignOpen} onOpenChange={setIsNewCampaignOpen}>
             <DialogTrigger asChild>
               <Button className="hover:opacity-90" style={{ backgroundColor: "#3e8692", color: "white" }}>
@@ -934,7 +934,7 @@ export default function CampaignsPage() {
                 ? "No campaigns found matching your search."
                 : "No campaigns found."}
             </p>
-            {userProfile?.role === "admin" && !searchTerm && (
+            {(userProfile?.role === "super_admin" || userProfile?.role === "admin") && !searchTerm && (
               <Button
                 className="mt-4 hover:opacity-90"
                 style={{ backgroundColor: "#3e8692", color: "white" }}
@@ -1012,7 +1012,8 @@ export default function CampaignsPage() {
                       console.error('Campaign ID is missing!', campaign);
                       return;
                     }
-                    router.push(`/campaigns/${campaign.id}`);
+                    // Use slug for shorter URL if available
+                    router.push(`/campaigns/${campaign.slug || campaign.id}`);
                   }}
                 >
                   View Campaign
@@ -1101,7 +1102,7 @@ export default function CampaignsPage() {
               <div className="flex gap-2">
                 <Input
                   id="share-campaign-link"
-                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/public/campaigns/${sharingCampaign?.id}`}
+                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/public/campaigns/${sharingCampaign?.slug || sharingCampaign?.id}`}
                   readOnly
                   className="flex-1 auth-input"
                 />
@@ -1110,7 +1111,7 @@ export default function CampaignsPage() {
                   className="h-10"
                   onClick={() => {
                     if (typeof window !== 'undefined' && sharingCampaign?.id) {
-                      navigator.clipboard.writeText(`${window.location.origin}/public/campaigns/${sharingCampaign.id}`);
+                      navigator.clipboard.writeText(`${window.location.origin}/public/campaigns/${sharingCampaign.slug || sharingCampaign.id}`);
                     }
                   }}
                 >
@@ -1121,7 +1122,7 @@ export default function CampaignsPage() {
                   className="h-10"
                   onClick={() => {
                     if (typeof window !== 'undefined' && sharingCampaign?.id) {
-                      window.open(`${window.location.origin}/public/campaigns/${sharingCampaign.id}`, '_blank');
+                      window.open(`${window.location.origin}/public/campaigns/${sharingCampaign.slug || sharingCampaign.id}`, '_blank');
                     }
                   }}
                 >

@@ -99,6 +99,17 @@ export default function KOLsPage() {
   // 2. Add state for bulk delete dialog
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
 
+  // Sticky scrollbar state
+  const [stickyScrollbar, setStickyScrollbar] = useState<{
+    visible: boolean;
+    width: number;
+    scrollWidth: number;
+    scrollLeft: number;
+    opacity: number;
+  } | null>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const scrollableRef = useRef<HTMLElement | null>(null);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
@@ -375,6 +386,100 @@ export default function KOLsPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearchTerm, filters]);
+
+  // Sticky scrollbar effect
+  useEffect(() => {
+    // Function to find the actual scrollable element
+    const findScrollableElement = (container: HTMLElement): HTMLElement | null => {
+      if (container.scrollWidth > container.clientWidth) {
+        return container;
+      }
+      const allElements = container.querySelectorAll('*');
+      for (const el of Array.from(allElements)) {
+        const htmlEl = el as HTMLElement;
+        if (htmlEl.scrollWidth > htmlEl.clientWidth) {
+          return htmlEl;
+        }
+      }
+      return null;
+    };
+
+    const updateStickyScrollbar = () => {
+      if (!tableContainerRef.current) {
+        setStickyScrollbar(null);
+        return;
+      }
+
+      const container = tableContainerRef.current;
+      const scrollableElement = findScrollableElement(container);
+
+      if (scrollableElement) {
+        scrollableRef.current = scrollableElement;
+
+        const rect = container.getBoundingClientRect();
+        const isInViewport = rect.top < window.innerHeight && rect.bottom > 0;
+
+        if (isInViewport) {
+          // Calculate opacity based on distance to bottom of page
+          const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+          const windowHeight = window.innerHeight;
+          const documentHeight = document.documentElement.scrollHeight;
+          const distanceFromBottom = documentHeight - (scrollTop + windowHeight);
+
+          // Check if page has scrollable content
+          const hasVerticalScroll = documentHeight > windowHeight + 10;
+
+          const fadeThreshold = 100;
+          let opacity = 1;
+
+          if (hasVerticalScroll) {
+            if (distanceFromBottom < fadeThreshold && distanceFromBottom > 0) {
+              opacity = distanceFromBottom / fadeThreshold;
+            } else if (distanceFromBottom <= 0) {
+              opacity = 0;
+            }
+          }
+
+          setStickyScrollbar({
+            visible: true,
+            width: scrollableElement.clientWidth,
+            scrollWidth: scrollableElement.scrollWidth,
+            scrollLeft: scrollableElement.scrollLeft,
+            opacity: opacity
+          });
+          return;
+        }
+      }
+
+      setStickyScrollbar(null);
+    };
+
+    const handleScroll = () => {
+      updateStickyScrollbar();
+    };
+
+    // Attach listeners
+    const container = tableContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll, true);
+    }
+    window.addEventListener('scroll', updateStickyScrollbar);
+    window.addEventListener('resize', updateStickyScrollbar);
+
+    // Initial check with delay to ensure table is rendered
+    const timer1 = setTimeout(updateStickyScrollbar, 100);
+    const timer2 = setTimeout(updateStickyScrollbar, 500);
+
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', handleScroll, true);
+      }
+      window.removeEventListener('scroll', updateStickyScrollbar);
+      window.removeEventListener('resize', updateStickyScrollbar);
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }, [filteredKOLs, currentPage, visibleColumns]);
 
   // Pagination calculations (memoized for performance)
   const paginationData = useMemo(() => {
@@ -2081,8 +2186,8 @@ export default function KOLsPage() {
         </div>
       </div>
 
-      <div className="border rounded-lg overflow-auto">
-        <Table className="min-w-full" style={{ 
+      <div ref={tableContainerRef} className="border rounded-lg overflow-auto">
+        <Table className="min-w-full" style={{
           tableLayout: 'auto',
           borderCollapse: 'collapse',
           whiteSpace: 'nowrap'
@@ -2877,9 +2982,9 @@ export default function KOLsPage() {
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm Delete</DialogTitle>
+            <DialogTitle>Archive KOL</DialogTitle>
           </DialogHeader>
-          <div className="text-sm text-gray-600 mt-2 mb-2">Are you sure you want to delete this KOL?</div>
+          <div className="text-sm text-gray-600 mt-2 mb-2">Are you sure you want to archive this KOL? You can restore it later from the Archive page.</div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
             <Button variant="destructive" onClick={async () => {
@@ -2889,19 +2994,18 @@ export default function KOLsPage() {
               if (!kolToDeleteObj) return;
               setKols(prevKols => prevKols.filter(k => k.id !== kolToDelete));
               try {
-                await KOLService.deleteKOL(kolToDelete);
+                await KOLService.archiveKOL(kolToDelete);
                 toast({
-                  title: 'KOL deleted',
-                  description: 'KOL deleted successfully.',
-                  variant: 'destructive',
+                  title: 'KOL archived',
+                  description: 'KOL archived successfully. You can restore it from the Archive page.',
                   duration: 3000,
                 });
               } catch (error) {
-                console.error('Error deleting KOL:', error);
+                console.error('Error archiving KOL:', error);
                 setKols(prevKols => [...prevKols, kolToDeleteObj]);
               }
               setKolToDelete(null);
-            }}>Delete</Button>
+            }}>Archive</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2909,27 +3013,63 @@ export default function KOLsPage() {
       <Dialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm Bulk Delete</DialogTitle>
+            <DialogTitle>Archive KOLs</DialogTitle>
           </DialogHeader>
-          <div className="text-sm text-gray-600 mt-2 mb-2">Are you sure you want to delete {selectedKOLs.length} KOL{selectedKOLs.length !== 1 ? 's' : ''}?</div>
+          <div className="text-sm text-gray-600 mt-2 mb-2">Are you sure you want to archive {selectedKOLs.length} KOL{selectedKOLs.length !== 1 ? 's' : ''}? You can restore them from the Archive page.</div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)}>Cancel</Button>
             <Button variant="destructive" onClick={async () => {
               setShowBulkDeleteDialog(false);
-              const toDelete = selectedKOLs;
-              setKols(prev => prev.filter(kol => !toDelete.includes(kol.id)));
-              await Promise.all(toDelete.map(kolId => KOLService.deleteKOL(kolId)));
+              const toArchive = selectedKOLs;
+              setKols(prev => prev.filter(kol => !toArchive.includes(kol.id)));
+              await Promise.all(toArchive.map(kolId => KOLService.archiveKOL(kolId)));
               toast({
-                title: 'KOLs deleted',
-                description: `${toDelete.length} KOL${toDelete.length !== 1 ? 's' : ''} deleted successfully.`,
-                variant: 'destructive',
+                title: 'KOLs archived',
+                description: `${toArchive.length} KOL${toArchive.length !== 1 ? 's' : ''} archived successfully.`,
                 duration: 3000,
               });
               setSelectedKOLs([]);
-            }}>Delete</Button>
+            }}>Archive</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Sticky Horizontal Scrollbar */}
+      {stickyScrollbar && (
+        <div
+          className="fixed bottom-4 bg-white border border-gray-200 shadow-lg z-40 flex items-center rounded-lg transition-opacity duration-300"
+          style={{
+            height: '32px',
+            opacity: stickyScrollbar.opacity,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: `${stickyScrollbar.width}px`
+          }}
+        >
+          <div
+            className="overflow-x-scroll hover:overflow-x-scroll rounded-lg"
+            style={{
+              width: '100%',
+              height: '100%',
+              scrollbarWidth: 'thin',
+              scrollbarColor: '#3e8692 #f3f4f6'
+            }}
+            onScroll={(e) => {
+              const scrollLeft = e.currentTarget.scrollLeft;
+              if (scrollableRef.current) {
+                scrollableRef.current.scrollLeft = scrollLeft;
+              }
+            }}
+            ref={(el) => {
+              if (el && stickyScrollbar) {
+                el.scrollLeft = stickyScrollbar.scrollLeft;
+              }
+            }}
+          >
+            <div style={{ width: `${stickyScrollbar.scrollWidth}px`, height: '1px' }}></div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

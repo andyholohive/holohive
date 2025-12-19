@@ -40,7 +40,7 @@ export interface AgentTool {
  */
 export interface ToolContext {
   userId: string;
-  userRole: 'admin' | 'member' | 'client';
+  userRole: 'super_admin' | 'admin' | 'member' | 'client';
   sessionId?: string;
   supabaseClient?: any; // Authenticated Supabase client for server-side operations
 }
@@ -175,7 +175,7 @@ export const createCampaignTool: AgentTool = {
       const clients = await ClientService.getClientsForUser(context.userRole, context.userId);
       const hasAccess = clients.some(c => c.id === campaignData.client_id);
 
-      if (!hasAccess && context.userRole !== 'admin') {
+      if (!hasAccess && context.userRole !== 'admin' && context.userRole !== 'super_admin') {
         return {
           success: false,
           error: 'You do not have access to this client'

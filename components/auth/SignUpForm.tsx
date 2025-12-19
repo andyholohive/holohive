@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { supabase } from '@/lib/supabase'
 import { Loader2 } from 'lucide-react'
+import { GoogleSignInButton } from './GoogleSignInButton'
 
 interface SignUpFormProps {
   onToggleMode: () => void
@@ -18,9 +19,8 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [firstName, setFirstName] = useState('')
-  const [lastName, setLastName] = useState('')
-  const [role, setRole] = useState<'admin' | 'member' | 'client'>('member')
+  const [name, setName] = useState('')
+  const [role, setRole] = useState<'super_admin' | 'admin' | 'member' | 'client'>('member')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -43,15 +43,12 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
     }
 
     try {
-      const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            first_name: firstName,
-            last_name: lastName,
-            name: fullName,
+            name: name.trim(),
             role: role,
           },
         },
@@ -107,29 +104,16 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
             </Alert>
           )}
           
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
-              <Input
-                id="firstName"
-                placeholder="John"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-                className="focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input
-                id="lastName"
-                placeholder="Doe"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-                className="focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input"
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              placeholder="Enter your name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input"
+            />
           </div>
           
           <div className="space-y-2">
@@ -173,7 +157,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
           
           <div className="space-y-2">
             <Label htmlFor="role">Role</Label>
-            <Select value={role} onValueChange={(value) => setRole(value as 'admin' | 'member' | 'client')}>
+            <Select value={role} onValueChange={(value) => setRole(value as 'super_admin' | 'admin' | 'member' | 'client')}>
               <SelectTrigger className="focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
                 <SelectValue placeholder="Select your role" />
               </SelectTrigger>
@@ -185,16 +169,27 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
             </Select>
           </div>
           
-          <Button 
-            type="submit" 
-            className="w-full hover:opacity-90" 
+          <Button
+            type="submit"
+            className="w-full hover:opacity-90"
             disabled={loading}
             style={{ backgroundColor: '#3e8692', color: 'white' }}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create Account
           </Button>
-          
+
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-gray-500">or</span>
+            </div>
+          </div>
+
+          <GoogleSignInButton mode="signup" />
+
           <div className="text-center text-sm text-gray-600">
             Already have an account?{' '}
             <button

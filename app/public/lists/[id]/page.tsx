@@ -175,6 +175,7 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [listApprovedEmails, setListApprovedEmails] = useState<string[] | null>(null);
+  const [listUuid, setListUuid] = useState<string | null>(null);
 
   // Get sorted KOLs based on saved sort order
   const getSortedKols = (kols: SharedListItem['kols'], sortOrder: SavedSortOrder | null | undefined) => {
@@ -270,8 +271,25 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
     localStorage.setItem(cacheKey, JSON.stringify(cacheData));
   };
 
+  // Log email view to database
+  const logEmailView = async (userEmail: string, listUuid: string) => {
+    try {
+      await supabasePublic
+        .from('list_email_views')
+        .insert({
+          list_id: listUuid,
+          email: userEmail,
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null
+        });
+      console.log('Email view logged:', userEmail);
+    } catch (err) {
+      console.error('Error logging email view:', err);
+      // Don't block authentication if logging fails
+    }
+  };
+
   // Handle email submission for authentication
-  const handleEmailSubmit = (e: React.FormEvent) => {
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailError('');
 
@@ -290,6 +308,11 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
         setIsAuthenticated(true);
         saveAuthToCache(submittedEmail);
         console.log('Email authenticated:', submittedEmail);
+
+        // Log the email view
+        if (listUuid) {
+          await logEmailView(submittedEmail, listUuid);
+        }
       } else {
         setEmailError('This email is not authorized to view this list');
       }
@@ -301,16 +324,22 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
 
   async function fetchSharedList() {
     try {
-      console.log('Fetching shared list for ID:', listId);
+      console.log('Fetching shared list for ID/slug:', listId);
       setLoading(true);
       setError(null);
 
-      // Get the list details
-      const { data: listData, error: listError } = await supabasePublic
-        .from('lists')
-        .select('*')
-        .eq('id', listId)
-        .single();
+      // Check if it's a UUID format or a slug
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(listId);
+
+      // Get the list details - query by ID or slug
+      let query = supabasePublic.from('lists').select('*');
+      if (isUUID) {
+        query = query.eq('id', listId);
+      } else {
+        query = query.eq('slug', listId);
+      }
+
+      const { data: listData, error: listError } = await query.single();
 
       if (listError) {
         console.error('List error:', listError);
@@ -320,10 +349,12 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
 
       console.log('List data found:', listData);
 
-      // Set approved emails for authentication
+      // Set approved emails and list UUID for authentication
       setListApprovedEmails(listData.approved_emails || null);
+      setListUuid(listData.id);
 
-      // Get KOLs for this list
+      // Get KOLs for this list (use the actual UUID id for the kols query)
+      const actualListId = listData.id;
       const { data: kolsData, error: kolsError } = await supabasePublic
         .from('list_kols')
         .select(`
@@ -340,7 +371,7 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
             rating
           )
         `)
-        .eq('list_id', listId);
+        .eq('list_id', actualListId);
 
       if (kolsError) {
         console.error('KOLs error:', kolsError);

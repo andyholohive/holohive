@@ -195,7 +195,7 @@ export class ChatService {
     userMessage: string,
     options?: {
       userId?: string;
-      userRole?: 'admin' | 'member' | 'client';
+      userRole?: 'super_admin' | 'admin' | 'member' | 'client';
       useStreaming?: boolean;
       onStatus?: (status: 'thinking' | 'executing' | 'completed' | 'error') => void;
       onToolExecution?: (toolName: string, step: number) => void;
@@ -204,7 +204,7 @@ export class ChatService {
   ): Promise<AgentChatMessage> {
     // Use provided user info or get from session
     let userId: string;
-    let userRole: 'admin' | 'member' | 'client';
+    let userRole: 'super_admin' | 'admin' | 'member' | 'client';
 
     if (options?.userId && options?.userRole) {
       userId = options.userId;
@@ -224,7 +224,7 @@ export class ChatService {
         .single();
 
       userId = user.id;
-      userRole = (userData?.role || 'member') as 'admin' | 'member' | 'client';
+      userRole = (userData?.role || 'member') as 'super_admin' | 'admin' | 'member' | 'client';
     }
 
     // Get the supabase client to use (server-side or client-side)

@@ -114,4 +114,142 @@ export class TelegramService {
       '<b>✅ Telegram Bot Connected!</b>\n\nYour Holo Hive form submission notifications are now active.'
     );
   }
+
+  // ============================================
+  // WEBHOOK MANAGEMENT
+  // ============================================
+
+  /**
+   * Register the webhook URL with Telegram
+   * Call this once after deploying to set up message tracking
+   */
+  static async registerWebhook(webhookUrl: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.botToken) {
+      return { success: false, error: 'TELEGRAM_BOT_TOKEN not configured' };
+    }
+
+    try {
+      const params: any = {
+        url: webhookUrl,
+        allowed_updates: ['message', 'edited_message'],
+        drop_pending_updates: true // Don't process old messages
+      };
+
+      // Add secret token for webhook verification if configured
+      const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+      if (webhookSecret) {
+        params.secret_token = webhookSecret;
+      }
+
+      const response = await fetch(
+        `https://api.telegram.org/bot${this.botToken}/setWebhook`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(params)
+        }
+      );
+
+      const result = await response.json();
+
+      if (!result.ok) {
+        console.error('[Telegram] Webhook registration failed:', result);
+        return { success: false, error: result.description };
+      }
+
+      console.log('[Telegram] Webhook registered successfully:', webhookUrl);
+      return { success: true };
+    } catch (error) {
+      console.error('[Telegram] Error registering webhook:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  /**
+   * Remove the webhook (stop receiving updates)
+   */
+  static async deleteWebhook(): Promise<{ success: boolean; error?: string }> {
+    if (!this.botToken) {
+      return { success: false, error: 'TELEGRAM_BOT_TOKEN not configured' };
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${this.botToken}/deleteWebhook`,
+        { method: 'POST' }
+      );
+
+      const result = await response.json();
+
+      if (!result.ok) {
+        return { success: false, error: result.description };
+      }
+
+      console.log('[Telegram] Webhook deleted successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('[Telegram] Error deleting webhook:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  /**
+   * Get current webhook info
+   */
+  static async getWebhookInfo(): Promise<any> {
+    if (!this.botToken) {
+      return { error: 'TELEGRAM_BOT_TOKEN not configured' };
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${this.botToken}/getWebhookInfo`
+      );
+
+      return await response.json();
+    } catch (error) {
+      console.error('[Telegram] Error getting webhook info:', error);
+      return { error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  /**
+   * Send a message to a specific chat (for CRM integration)
+   */
+  static async sendToChat(
+    chatId: string,
+    text: string,
+    parseMode: 'HTML' | 'Markdown' = 'HTML'
+  ): Promise<boolean> {
+    if (!this.botToken) {
+      console.error('[Telegram] Bot token not configured');
+      return false;
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${this.botToken}/sendMessage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text,
+            parse_mode: parseMode
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('[Telegram] Send to chat error:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('[Telegram] Error sending to chat:', error);
+      return false;
+    }
+  }
 }
