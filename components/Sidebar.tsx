@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Bell, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Bell, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -96,7 +96,7 @@ export default function Sidebar({ children }: SidebarProps) {
         <aside className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 flex-shrink-0 transition-all duration-300 ease-in-out`}>
           <div className="flex flex-col h-full">
             {/* Navigation */}
-            <nav className="p-4 space-y-4 flex-1">
+            <nav className="p-4 space-y-4 flex-1 overflow-y-auto">
               {/* People Section */}
               {!isSidebarCollapsed && (
                 <div className="flex items-center space-x-2">
@@ -219,6 +219,21 @@ export default function Sidebar({ children }: SidebarProps) {
                     </span>
                   </Button>
                 </Link>
+                {/* Telegram Chats tab */}
+                <Link href="/crm/telegram" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/crm/telegram') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/crm/telegram') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'TG Chats' : undefined}
+                  >
+                    <span>
+                      <MessageSquare className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'TG Chats'}
+                    </span>
+                  </Button>
+                </Link>
               </div>
 
               {/* Documents Section */}
@@ -327,6 +342,23 @@ export default function Sidebar({ children }: SidebarProps) {
                     </span>
                   </Button>
                 </Link>
+                {/* Changelog tab - Super Admin only */}
+                {userProfile?.role === 'super_admin' && (
+                  <Link href="/admin/changelog" legacyBehavior>
+                    <Button
+                      asChild
+                      variant={pathname.startsWith('/admin/changelog') ? 'default' : 'ghost'}
+                      className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                      style={pathname.startsWith('/admin/changelog') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                      title={isSidebarCollapsed ? 'Changelog' : undefined}
+                    >
+                      <span>
+                        <Sparkles className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                        {!isSidebarCollapsed && 'Changelog'}
+                      </span>
+                    </Button>
+                  </Link>
+                )}
                 {/* Archive tab */}
                 <Link href="/archive" legacyBehavior>
                   <Button

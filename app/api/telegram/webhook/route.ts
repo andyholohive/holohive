@@ -58,8 +58,14 @@ export async function POST(request: NextRequest) {
  */
 async function handleMessage(message: any) {
   const chatId = message.chat?.id?.toString();
+  const chatTitle = message.chat?.title;
   const chatType = message.chat?.type; // 'group', 'supergroup', 'private'
+  const messageId = message.message_id?.toString();
   const fromId = message.from?.id?.toString();
+  const fromFirstName = message.from?.first_name;
+  const fromLastName = message.from?.last_name;
+  const fromUsername = message.from?.username;
+  const messageText = message.text || message.caption || '[Media]';
   const messageDate = new Date(message.date * 1000); // Telegram sends Unix timestamp
 
   if (!chatId) {
@@ -73,6 +79,13 @@ async function handleMessage(message: any) {
     return;
   }
 
+  // Track/update chat in telegram_chats table
+  await trackChat(chatId, chatTitle, chatType, messageDate);
+
+  // Store the message for chat identification
+  const fromName = [fromFirstName, fromLastName].filter(Boolean).join(' ') || 'Unknown';
+  await storeMessage(chatId, messageId, fromId, fromName, fromUsername, messageText, messageDate);
+
   // Check if this chat ID matches any opportunity's gc field
   const { data: opportunities, error } = await supabaseAdmin
     .from('crm_opportunities')
@@ -84,39 +97,119 @@ async function handleMessage(message: any) {
     return;
   }
 
-  if (!opportunities || opportunities.length === 0) {
-    console.log('[Telegram Webhook] No matching opportunity for chat:', chatId);
-    return;
-  }
-
   // Check if the message is from our bot
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const botId = botToken ? botToken.split(':')[0] : null;
   const isFromBot = fromId === botId;
 
   // Update all matching opportunities
-  for (const opportunity of opportunities) {
-    const updateField = isFromBot ? 'last_reply_at' : 'last_message_at';
+  if (opportunities && opportunities.length > 0) {
+    for (const opportunity of opportunities) {
+      const updateField = isFromBot ? 'last_reply_at' : 'last_message_at';
 
-    const { error: updateError } = await supabaseAdmin
-      .from('crm_opportunities')
-      .update({
-        [updateField]: messageDate.toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', opportunity.id);
+      const { error: updateError } = await supabaseAdmin
+        .from('crm_opportunities')
+        .update({
+          [updateField]: messageDate.toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', opportunity.id);
 
-    if (updateError) {
-      console.error('[Telegram Webhook] Error updating opportunity:', updateError);
-    } else {
-      console.log(`[Telegram Webhook] Updated ${updateField} for opportunity:`, {
-        id: opportunity.id,
-        name: opportunity.name,
-        chatId,
-        timestamp: messageDate.toISOString(),
-        isFromBot
-      });
+      if (updateError) {
+        console.error('[Telegram Webhook] Error updating opportunity:', updateError);
+      } else {
+        console.log(`[Telegram Webhook] Updated ${updateField} for opportunity:`, {
+          id: opportunity.id,
+          name: opportunity.name,
+          chatId,
+          timestamp: messageDate.toISOString(),
+          isFromBot
+        });
+      }
     }
+  }
+}
+
+/**
+ * Track/update chat info in telegram_chats table
+ */
+async function trackChat(chatId: string, title: string | null, chatType: string, messageDate: Date) {
+  try {
+    // Check if chat already exists
+    const { data: existingChat } = await supabaseAdmin
+      .from('telegram_chats')
+      .select('id, message_count')
+      .eq('chat_id', chatId)
+      .single();
+
+    if (existingChat) {
+      // Update existing chat
+      await supabaseAdmin
+        .from('telegram_chats')
+        .update({
+          title: title || undefined,
+          chat_type: chatType,
+          last_message_at: messageDate.toISOString(),
+          message_count: (existingChat.message_count || 0) + 1,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingChat.id);
+
+      console.log('[Telegram Webhook] Updated chat tracking:', { chatId, title });
+    } else {
+      // Insert new chat
+      await supabaseAdmin
+        .from('telegram_chats')
+        .insert({
+          chat_id: chatId,
+          title: title,
+          chat_type: chatType,
+          last_message_at: messageDate.toISOString(),
+          message_count: 1
+        });
+
+      console.log('[Telegram Webhook] New chat discovered:', { chatId, title });
+    }
+  } catch (error) {
+    console.error('[Telegram Webhook] Error tracking chat:', error);
+    // Don't throw - chat tracking is non-critical
+  }
+}
+
+/**
+ * Store message for chat identification
+ */
+async function storeMessage(
+  chatId: string,
+  messageId: string,
+  fromUserId: string | null,
+  fromUserName: string,
+  fromUsername: string | null,
+  text: string,
+  messageDate: Date
+) {
+  try {
+    // Truncate long messages
+    const truncatedText = text.length > 500 ? text.substring(0, 500) + '...' : text;
+
+    await supabaseAdmin
+      .from('telegram_messages')
+      .upsert({
+        chat_id: chatId,
+        message_id: messageId,
+        from_user_id: fromUserId,
+        from_user_name: fromUserName,
+        from_username: fromUsername,
+        text: truncatedText,
+        message_date: messageDate.toISOString()
+      }, {
+        onConflict: 'chat_id,message_id'
+      });
+
+    console.log('[Telegram Webhook] Stored message:', { chatId, messageId, from: fromUserName });
+  } catch (error) {
+    console.error('[Telegram Webhook] Error storing message:', error);
+    // Don't throw - message storage is non-critical
   }
 }
 
