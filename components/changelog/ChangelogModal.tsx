@@ -15,51 +15,35 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
-import { ChangelogService, Changelog } from '@/lib/changelogService';
+import { Changelog } from '@/lib/changelogService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useChangelog } from '@/contexts/ChangelogContext';
 
 export default function ChangelogModal() {
   const { user } = useAuth();
+  const { unreadChangelogs, loading, markAsViewed } = useChangelog();
   const [isOpen, setIsOpen] = useState(false);
-  const [unreadChangelogs, setUnreadChangelogs] = useState<Changelog[]>([]);
+  const [displayedChangelogs, setDisplayedChangelogs] = useState<Changelog[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [markAsRead, setMarkAsRead] = useState(true);
 
+  // Show modal when there are unread changelogs
   useEffect(() => {
-    if (user) {
-      checkForUnreadChangelogs();
+    if (user && !loading && unreadChangelogs.length > 0 && displayedChangelogs.length === 0) {
+      setDisplayedChangelogs(unreadChangelogs);
+      setCurrentIndex(0);
+      setIsOpen(true);
     }
-  }, [user]);
-
-  const checkForUnreadChangelogs = async () => {
-    try {
-      setLoading(true);
-      const changelogs = await ChangelogService.getUnreadChangelogs();
-      if (changelogs.length > 0) {
-        setUnreadChangelogs(changelogs);
-        setCurrentIndex(0);
-        setIsOpen(true);
-      }
-    } catch (error) {
-      console.error('Error checking for unread changelogs:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [user, loading, unreadChangelogs, displayedChangelogs.length]);
 
   const handleDismiss = async () => {
-    try {
-      // Only mark as viewed if checkbox is checked
-      if (markAsRead) {
-        const ids = unreadChangelogs.map(c => c.id);
-        await ChangelogService.markMultipleAsViewed(ids);
-      }
-    } catch (error) {
-      console.error('Error marking changelogs as viewed:', error);
+    // Only mark as viewed if checkbox is checked
+    if (markAsRead) {
+      const ids = displayedChangelogs.map(c => c.id);
+      await markAsViewed(ids);
     }
     setIsOpen(false);
-    setUnreadChangelogs([]);
+    setDisplayedChangelogs([]);
     setMarkAsRead(true); // Reset for next time
   };
 
@@ -68,15 +52,15 @@ export default function ChangelogModal() {
   };
 
   const handleNext = () => {
-    setCurrentIndex(prev => Math.min(unreadChangelogs.length - 1, prev + 1));
+    setCurrentIndex(prev => Math.min(displayedChangelogs.length - 1, prev + 1));
   };
 
-  if (!user || unreadChangelogs.length === 0) {
+  if (!user || displayedChangelogs.length === 0) {
     return null;
   }
 
-  const currentChangelog = unreadChangelogs[currentIndex];
-  const hasMultiple = unreadChangelogs.length > 1;
+  const currentChangelog = displayedChangelogs[currentIndex];
+  const hasMultiple = displayedChangelogs.length > 1;
 
   // Format date
   const formatDate = (dateString: string | null) => {
@@ -188,13 +172,13 @@ export default function ChangelogModal() {
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <span className="text-sm text-gray-500">
-                  {currentIndex + 1} of {unreadChangelogs.length}
+                  {currentIndex + 1} of {displayedChangelogs.length}
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleNext}
-                  disabled={currentIndex === unreadChangelogs.length - 1}
+                  disabled={currentIndex === displayedChangelogs.length - 1}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>

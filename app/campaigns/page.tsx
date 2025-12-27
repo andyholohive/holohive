@@ -85,13 +85,13 @@ export default function CampaignsPage() {
 
   // Open dialog if add=1 is present
   useEffect(() => {
-    if (addParam === '1' && (userProfile?.role === 'super_admin' || userProfile?.role === 'admin' || userProfile?.role === 'member')) {
+    if (addParam === '1' && userProfile) {
       setIsNewCampaignOpen(true);
       if (clientIdParam) {
         setNewCampaign((prev) => ({ ...prev, client_id: clientIdParam }));
       }
     }
-  }, [addParam, clientIdParam, userProfile?.role]);
+  }, [addParam, clientIdParam, userProfile]);
 
   const fetchAvailableClients = async () => {
     try {
@@ -401,16 +401,14 @@ export default function CampaignsPage() {
             <h2 className="text-2xl font-bold text-gray-900">Campaigns</h2>
             <p className="text-gray-600">Track and manage your marketing campaigns</p>
           </div>
-          {(userProfile?.role === "super_admin" || userProfile?.role === "admin" || userProfile?.role === "member") && (
-            <Button
-              className="hover:opacity-90"
-              style={{ backgroundColor: "#3e8692", color: "white" }}
-              onClick={() => setIsNewCampaignOpen(true)}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              New Campaign
-            </Button>
-          )}
+          <Button
+            className="hover:opacity-90"
+            style={{ backgroundColor: "#3e8692", color: "white" }}
+            onClick={() => setIsNewCampaignOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Campaign
+          </Button>
         </div>
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
@@ -461,14 +459,13 @@ export default function CampaignsPage() {
           <h2 className="text-2xl font-bold text-gray-900">Campaigns</h2>
           <p className="text-gray-600">Track and manage your marketing campaigns</p>
         </div>
-        {(userProfile?.role === "super_admin" || userProfile?.role === "admin") && (
-          <Dialog open={isNewCampaignOpen} onOpenChange={setIsNewCampaignOpen}>
-            <DialogTrigger asChild>
-              <Button className="hover:opacity-90" style={{ backgroundColor: "#3e8692", color: "white" }}>
-                <Plus className="h-4 w-4 mr-2" />
-                New Campaign
-              </Button>
-            </DialogTrigger>
+        <Dialog open={isNewCampaignOpen} onOpenChange={setIsNewCampaignOpen}>
+          <DialogTrigger asChild>
+            <Button className="hover:opacity-90" style={{ backgroundColor: "#3e8692", color: "white" }}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Campaign
+            </Button>
+          </DialogTrigger>
                             <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-hidden">
               <DialogHeader>
                 <DialogTitle>Create New Campaign</DialogTitle>
@@ -913,7 +910,6 @@ export default function CampaignsPage() {
               </form>
             </DialogContent>
           </Dialog>
-        )}
       </div>
       <div className="flex items-center space-x-4">
         <div className="relative flex-1 max-w-sm">

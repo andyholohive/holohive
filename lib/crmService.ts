@@ -56,6 +56,8 @@ export interface CRMOpportunity {
   referrer: string | null;
   gc: string | null;               // Telegram group chat ID
   affiliate_id: string | null;
+  client_id: string | null;        // Links account-stage opportunities to clients
+  scope: string | null;            // Scope for accounts: fundraising, advisory, kol_activation, gtm, bd_partnerships, apac
   notes: string | null;
   position: number;
   created_at: string;
@@ -65,6 +67,7 @@ export interface CRMOpportunity {
   // Joined data
   affiliate?: CRMAffiliate | null;
   contacts?: CRMContact[];
+  client?: { id: string; name: string } | null;
 }
 
 export interface CRMPartner {
@@ -156,6 +159,8 @@ export interface CreateOpportunityData {
   referrer?: string;
   gc?: string;
   affiliate_id?: string;
+  client_id?: string;
+  scope?: string;
   notes?: string;
   position?: number;
 }
@@ -269,7 +274,8 @@ export class CRMService {
       .from('crm_opportunities')
       .select(`
         *,
-        affiliate:crm_affiliates(*)
+        affiliate:crm_affiliates(*),
+        client:clients!crm_opportunities_client_id_fkey(id, name)
       `)
       .order('position', { ascending: true })
       .order('created_at', { ascending: false });
@@ -286,7 +292,8 @@ export class CRMService {
       .from('crm_opportunities')
       .select(`
         *,
-        affiliate:crm_affiliates(*)
+        affiliate:crm_affiliates(*),
+        client:clients!crm_opportunities_client_id_fkey(id, name)
       `)
       .in('stage', stages)
       .order('created_at', { ascending: false });
@@ -300,7 +307,8 @@ export class CRMService {
       .from('crm_opportunities')
       .select(`
         *,
-        affiliate:crm_affiliates(*)
+        affiliate:crm_affiliates(*),
+        client:clients!crm_opportunities_client_id_fkey(id, name)
       `)
       .eq('id', id)
       .single();

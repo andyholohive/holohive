@@ -17,10 +17,11 @@ import { ClientService, ClientWithAccess } from '@/lib/clientService';
 import { UserService } from '@/lib/userService';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck } from 'lucide-react';
+import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { KOLService } from '@/lib/kolService';
 import { CampaignService } from '@/lib/campaignService';
+import { CRMService, CRMOpportunity } from '@/lib/crmService';
 
 type CampaignStatus = 'Planning' | 'Active' | 'Paused' | 'Completed';
 type ClientWithStatus = ClientWithAccess & {
@@ -48,6 +49,7 @@ export default function ClientsPage() {
   const [allClients, setAllClients] = useState<ClientWithAccess[]>([]);
   const [allPartners, setAllPartners] = useState<any[]>([]);
   const [filteredPartnerName, setFilteredPartnerName] = useState<string | null>(null);
+  const [linkedAccounts, setLinkedAccounts] = useState<Record<string, CRMOpportunity[]>>({});
   // New client form state
   const [newClient, setNewClient] = useState({
     name: '',
@@ -194,6 +196,19 @@ export default function ClientsPage() {
           campaignsByStatus: statusMap[client.id],
         }))
       );
+
+      // Fetch linked accounts (opportunities with client_id)
+      const allOpportunities = await CRMService.getAllOpportunities();
+      const accountsMap: Record<string, CRMOpportunity[]> = {};
+      for (const opp of allOpportunities) {
+        if (opp.client_id) {
+          if (!accountsMap[opp.client_id]) {
+            accountsMap[opp.client_id] = [];
+          }
+          accountsMap[opp.client_id].push(opp);
+        }
+      }
+      setLinkedAccounts(accountsMap);
     } catch (err) {
       setError('Failed to load clients');
     } finally {
@@ -1311,11 +1326,24 @@ export default function ClientsPage() {
                   <CardHeader className="pb-4">
                     <div className="mb-3">
                       <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
-                        <div className="flex items-center">
-                          <div className="bg-gray-100 p-1.5 rounded-lg mr-2">
+                        <div className="flex items-center gap-2">
+                          <div className="bg-gray-100 p-1.5 rounded-lg">
                             <Building2 className="h-5 w-5 text-gray-600" />
                           </div>
-                          {client.name}
+                          <span>{client.name}</span>
+                          {linkedAccounts[client.id] && linkedAccounts[client.id].length > 0 && (
+                            linkedAccounts[client.id].map((account) => (
+                              <Badge
+                                key={account.id}
+                                variant="outline"
+                                className="text-xs cursor-pointer hover:bg-gray-100"
+                                onClick={() => router.push('/crm/pipeline?tab=accounts')}
+                              >
+                                <LinkIcon className="h-3 w-3 mr-1" />
+                                <span className="font-semibold">{account.name}</span>
+                              </Badge>
+                            ))
+                          )}
                         </div>
                         {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                           <div className="flex items-center space-x-1">

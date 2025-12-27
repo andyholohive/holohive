@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     : (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
   const logoUrl = `${baseUrl}/images/logo.png`;
 
-  const title = 'Holo Hive Partner Portal';
+  const title = 'Holo Hive Portal';
   const description = `${clientName} Campaign Tracker`;
 
   return {

@@ -60,6 +60,7 @@ import {
   OpportunityStage
 } from '@/lib/crmService';
 import { UserService } from '@/lib/userService';
+import { ClientService, ClientWithAccess } from '@/lib/clientService';
 
 export default function PipelinePage() {
   const { user } = useAuth();
@@ -69,6 +70,7 @@ export default function PipelinePage() {
   const [affiliates, setAffiliates] = useState<CRMAffiliate[]>([]);
   const [contacts, setContacts] = useState<CRMContact[]>([]);
   const [users, setUsers] = useState<{ id: string; name: string | null; email: string }[]>([]);
+  const [clients, setClients] = useState<ClientWithAccess[]>([]);
   const [allContactLinks, setAllContactLinks] = useState<CRMContactLink[]>([]);
   const [isNewOpportunityOpen, setIsNewOpportunityOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -149,6 +151,10 @@ export default function PipelinePage() {
   const [addingToStage, setAddingToStage] = useState<OpportunityStage | null>(null);
   const [newRowName, setNewRowName] = useState('');
   const savedScrollPositionRef = useRef<number>(0);
+
+  // Bulk edit state
+  const [selectedOpportunities, setSelectedOpportunities] = useState<string[]>([]);
+  const [bulkEdit, setBulkEdit] = useState<Partial<CRMOpportunity>>({});
 
   // Helper to get scroll container
   const getScrollContainer = () => {
@@ -260,9 +266,17 @@ export default function PipelinePage() {
   const outreachStages: OpportunityStage[] = ['new'];  // Outreach shows only 'new' stage with source 'cold_outreach'
   const leadStages: OpportunityStage[] = ['new', 'contacted', 'qualified', 'unqualified', 'nurture', 'dead'];
   const dealStages: OpportunityStage[] = ['deal_qualified', 'proposal', 'negotiation', 'contract', 'closed_won', 'closed_lost'];
-  const accountStages: OpportunityStage[] = ['account_active', 'account_at_risk', 'account_churned'];
+  const accountStages: OpportunityStage[] = ['account_active', 'account_churned'];
   const sourceOptions = ['referral', 'inbound', 'event', 'cold_outreach'];
   const accountTypeOptions = ['general', 'channel', 'campaign', 'lite', 'ad_hoc'];
+  const scopeOptions = [
+    { value: 'fundraising', label: 'Fundraising' },
+    { value: 'advisory', label: 'Advisory' },
+    { value: 'kol_activation', label: 'KOL Activation' },
+    { value: 'gtm', label: 'GTM' },
+    { value: 'bd_partnerships', label: 'BD/Partnerships' },
+    { value: 'apac', label: 'APAC' },
+  ];
 
   const stageLabels: Record<OpportunityStage, string> = {
     new: 'New',
@@ -307,13 +321,14 @@ export default function PipelinePage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [opps, affs, conts, metricsData, contactLinks, allUsers] = await Promise.all([
+      const [opps, affs, conts, metricsData, contactLinks, allUsers, allClients] = await Promise.all([
         CRMService.getAllOpportunities(),
         CRMService.getAllAffiliates(),
         CRMService.getAllContacts(),
         CRMService.getOpportunityMetrics(),
         CRMService.getAllContactLinks(),
-        UserService.getAllUsers()
+        UserService.getAllUsers(),
+        ClientService.getAllClients()
       ]);
       setOpportunities(opps);
       setAffiliates(affs);
@@ -321,6 +336,7 @@ export default function PipelinePage() {
       setMetrics(metricsData);
       setAllContactLinks(contactLinks);
       setUsers(allUsers);
+      setClients(allClients);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -353,7 +369,7 @@ export default function PipelinePage() {
 
   const handleEditOpportunity = (opp: CRMOpportunity) => {
     setEditingOpportunity(opp);
-    const isDeal = dealStages.includes(opp.stage);
+    const isDeal = dealStages.includes(opp.stage) || accountStages.includes(opp.stage);
     setOpportunityType(isDeal ? 'deal' : 'lead');
     setOpportunityForm({
       name: opp.name,
@@ -365,6 +381,8 @@ export default function PipelinePage() {
       referrer: opp.referrer || undefined,
       gc: opp.gc || undefined,
       affiliate_id: opp.affiliate_id || undefined,
+      client_id: opp.client_id || undefined,
+      scope: opp.scope || undefined,
       notes: opp.notes || undefined
     });
     setIsNewOpportunityOpen(true);
@@ -472,7 +490,22 @@ export default function PipelinePage() {
 
     try {
       setOpportunities(prev =>
-        prev.map(o => o.id === oppId ? { ...o, [field]: value || null } : o)
+        prev.map(o => {
+          if (o.id !== oppId) return o;
+
+          const updates: Partial<CRMOpportunity> = { [field]: value || null };
+
+          // Handle related object updates for display
+          if (field === 'client_id') {
+            const selectedClient = clients.find(c => c.id === value);
+            updates.client = selectedClient ? { id: selectedClient.id, name: selectedClient.name } : null;
+          } else if (field === 'affiliate_id') {
+            const selectedAffiliate = affiliates.find(a => a.id === value);
+            updates.affiliate = selectedAffiliate || null;
+          }
+
+          return { ...o, ...updates };
+        })
       );
 
       // Restore scroll position after React re-render
@@ -488,6 +521,39 @@ export default function PipelinePage() {
     }
     setEditingCell(null);
     setEditingValue('');
+  };
+
+  // Bulk update handler
+  const handleBulkUpdate = async () => {
+    if (selectedOpportunities.length === 0 || Object.keys(bulkEdit).length === 0) return;
+
+    // Filter out undefined values
+    const updates: Record<string, any> = {};
+    Object.entries(bulkEdit).forEach(([key, value]) => {
+      if (value !== undefined) {
+        updates[key] = value;
+      }
+    });
+
+    if (Object.keys(updates).length === 0) return;
+
+    try {
+      // Optimistic update
+      setOpportunities(prev =>
+        prev.map(o => selectedOpportunities.includes(o.id) ? { ...o, ...updates } : o)
+      );
+
+      // Update in database
+      await Promise.all(
+        selectedOpportunities.map(id => CRMService.updateOpportunity(id, updates))
+      );
+
+      // Clear selection and bulk edit
+      setSelectedOpportunities([]);
+      setBulkEdit({});
+    } catch (error) {
+      console.error('Error bulk updating:', error);
+    }
   };
 
   const startEditing = (id: string, field: string, currentValue: string | number | null | undefined) => {
@@ -1236,6 +1302,8 @@ export default function PipelinePage() {
   // ============================================
   const renderTableView = () => {
     const isDeal = activeTab === 'deals' || activeTab === 'accounts';
+    const isAccount = activeTab === 'accounts';
+    const currentStages = isAccount ? accountStages : isDeal ? dealStages : leadStages;
 
     const renderEditableText = (opp: CRMOpportunity, field: string, value: string | null | undefined, className?: string) => {
       const isEditing = editingCell?.id === opp.id && editingCell?.field === field;
@@ -1324,7 +1392,41 @@ export default function PipelinePage() {
               <GripVertical className="h-4 w-4 text-gray-400" />
             </div>
           </TableCell>
-          <TableCell className="text-gray-500 text-sm w-10">{index + 1}</TableCell>
+          <TableCell className="text-gray-500 text-sm w-10">
+            {(() => {
+              const isChecked = selectedOpportunities.includes(opp.id);
+              return (
+                <div className="flex items-center justify-center">
+                  {isChecked ? (
+                    <Checkbox
+                      checked={true}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedOpportunities(prev => [...prev, opp.id]);
+                        } else {
+                          setSelectedOpportunities(prev => prev.filter(id => id !== opp.id));
+                        }
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <span className="block group-hover:hidden">{index + 1}</span>
+                      <span className="hidden group-hover:flex">
+                        <Checkbox
+                          checked={false}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedOpportunities(prev => [...prev, opp.id]);
+                            }
+                          }}
+                        />
+                      </span>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+          </TableCell>
           <TableCell>
             {editingCell?.id === opp.id && editingCell?.field === 'name' ? (
               <Input
@@ -1354,7 +1456,7 @@ export default function PipelinePage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {(isDeal ? dealStages : leadStages).map((stage) => (
+                {currentStages.map((stage) => (
                   <SelectItem key={stage} value={stage}>
                     {stageLabels[stage]}
                   </SelectItem>
@@ -1478,6 +1580,58 @@ export default function PipelinePage() {
               </PopoverContent>
             </Popover>
           </TableCell>
+          {isAccount && (
+            <TableCell>
+              <Select
+                value={opp.client_id || 'none'}
+                onValueChange={(v) => handleInlineUpdate(opp.id, 'client_id', v === 'none' ? null : v)}
+              >
+                <SelectTrigger className="w-32 h-8 text-xs auth-input">
+                  <SelectValue placeholder="Select">
+                    {opp.client ? (
+                      <span className="truncate">{opp.client.name}</span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </TableCell>
+          )}
+          {isAccount && (
+            <TableCell>
+              <Select
+                value={opp.scope || 'none'}
+                onValueChange={(v) => handleInlineUpdate(opp.id, 'scope', v === 'none' ? null : v)}
+              >
+                <SelectTrigger className="w-32 h-8 text-xs auth-input">
+                  <SelectValue placeholder="Select">
+                    {opp.scope ? (
+                      <span className="truncate">{scopeOptions.find(s => s.value === opp.scope)?.label || opp.scope}</span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {scopeOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </TableCell>
+          )}
           <TableCell>
             {(() => {
               const oppContacts = getOpportunityContacts(opp.id);
@@ -1632,6 +1786,8 @@ export default function PipelinePage() {
                     <TableHead>Source</TableHead>
                     {isDeal && <TableHead>Account Type</TableHead>}
                     <TableHead>Affiliate</TableHead>
+                    {isAccount && <TableHead>Client</TableHead>}
+                    {isAccount && <TableHead>Scope</TableHead>}
                     <TableHead>Contact</TableHead>
                     <TableHead>Referrer</TableHead>
                     {activeTab !== 'accounts' && <TableHead>Last Contacted</TableHead>}
@@ -1669,6 +1825,8 @@ export default function PipelinePage() {
                       <TableCell><span className="text-gray-400">-</span></TableCell>
                       {isDeal && <TableCell><span className="text-gray-400">-</span></TableCell>}
                       <TableCell><span className="text-gray-400">-</span></TableCell>
+                      {isAccount && <TableCell><span className="text-gray-400">-</span></TableCell>}
+                      {isAccount && <TableCell><span className="text-gray-400">-</span></TableCell>}
                       <TableCell><span className="text-gray-400">-</span></TableCell>
                       <TableCell><span className="text-gray-400">-</span></TableCell>
                       {activeTab !== 'accounts' && <TableCell><span className="text-gray-400">-</span></TableCell>}
@@ -1691,7 +1849,7 @@ export default function PipelinePage() {
                   )}
                   {stageOpps.length === 0 && addingToStage !== stage ? (
                     <TableRow>
-                      <TableCell colSpan={isDeal ? 13 : 12} className="text-center py-6 text-gray-400 text-sm">
+                      <TableCell colSpan={isAccount ? 14 : isDeal ? 13 : 12} className="text-center py-6 text-gray-400 text-sm">
                         {isOver ? 'Drop here to move to this stage' : `No ${activeTab} in this stage`}
                       </TableCell>
                     </TableRow>
@@ -2001,6 +2159,172 @@ export default function PipelinePage() {
         )}
       </div>
 
+      {/* Bulk action bar */}
+      {selectedOpportunities.length > 0 && (
+        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+              <span className="text-sm font-semibold text-gray-700">{selectedOpportunities.length} opportunit{selectedOpportunities.length !== 1 ? 'ies' : 'y'} selected</span>
+            </div>
+            <div className="h-4 w-px bg-gray-300"></div>
+            <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
+          </div>
+          <div className="mb-4 pb-4 border-b border-gray-200">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-gray-600 border-gray-300 hover:bg-gray-50"
+              onClick={() => {
+                const currentOpps = currentOpportunities;
+                const allIds = currentOpps.map(o => o.id);
+                if (allIds.every(id => selectedOpportunities.includes(id))) {
+                  setSelectedOpportunities(prev => prev.filter(id => !allIds.includes(id)));
+                } else {
+                  setSelectedOpportunities(prev => Array.from(new Set([...prev, ...allIds])));
+                }
+              }}
+            >
+              {currentOpportunities.length > 0 && currentOpportunities.every(o => selectedOpportunities.includes(o.id)) ? 'Deselect All' : 'Select All'}
+            </Button>
+          </div>
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Stage */}
+            <div className="min-w-[120px] flex flex-col">
+              <span className="text-xs text-gray-600 font-semibold mb-1">Stage</span>
+              <Select value={bulkEdit.stage || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, stage: v as OpportunityStage }))}>
+                <SelectTrigger className="h-8 text-xs auth-input">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(activeTab === 'accounts' ? accountStages : activeTab === 'deals' ? dealStages : leadStages).map((stage) => (
+                    <SelectItem key={stage} value={stage}>{stageLabels[stage]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Owner */}
+            <div className="min-w-[120px] flex flex-col">
+              <span className="text-xs text-gray-600 font-semibold mb-1">Owner</span>
+              <Select value={bulkEdit.owner_id || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, owner_id: v === 'none' ? null : v }))}>
+                <SelectTrigger className="h-8 text-xs auth-input">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Source */}
+            <div className="min-w-[120px] flex flex-col">
+              <span className="text-xs text-gray-600 font-semibold mb-1">Source</span>
+              <Select value={bulkEdit.source || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, source: v === 'none' ? null : v }))}>
+                <SelectTrigger className="h-8 text-xs auth-input">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {sourceOptions.map((source) => (
+                    <SelectItem key={source} value={source}>{formatSource(source)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Account Type (for deals/accounts) */}
+            {(activeTab === 'deals' || activeTab === 'accounts') && (
+              <div className="min-w-[120px] flex flex-col">
+                <span className="text-xs text-gray-600 font-semibold mb-1">Account Type</span>
+                <Select value={bulkEdit.account_type || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, account_type: v === 'none' ? null : v }))}>
+                  <SelectTrigger className="h-8 text-xs auth-input">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {accountTypeOptions.map((type) => (
+                      <SelectItem key={type} value={type}>{formatSource(type)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {/* Affiliate */}
+            <div className="min-w-[120px] flex flex-col">
+              <span className="text-xs text-gray-600 font-semibold mb-1">Affiliate</span>
+              <Select value={bulkEdit.affiliate_id || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, affiliate_id: v === 'none' ? null : v }))}>
+                <SelectTrigger className="h-8 text-xs auth-input">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {affiliates.map((aff) => (
+                    <SelectItem key={aff.id} value={aff.id}>{aff.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {/* Client (for accounts) */}
+            {activeTab === 'accounts' && (
+              <div className="min-w-[120px] flex flex-col">
+                <span className="text-xs text-gray-600 font-semibold mb-1">Client</span>
+                <Select value={bulkEdit.client_id || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, client_id: v === 'none' ? null : v }))}>
+                  <SelectTrigger className="h-8 text-xs auth-input">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {/* Scope (for accounts) */}
+            {activeTab === 'accounts' && (
+              <div className="min-w-[120px] flex flex-col">
+                <span className="text-xs text-gray-600 font-semibold mb-1">Scope</span>
+                <Select value={bulkEdit.scope || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, scope: v === 'none' ? null : v }))}>
+                  <SelectTrigger className="h-8 text-xs auth-input">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {scopeOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {/* Apply Button */}
+            <Button
+              size="sm"
+              onClick={handleBulkUpdate}
+              disabled={Object.keys(bulkEdit).length === 0}
+              className="h-8 hover:opacity-90"
+              style={{ backgroundColor: '#3e8692', color: 'white' }}
+            >
+              Apply Changes
+            </Button>
+            {/* Cancel Button */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setSelectedOpportunities([]);
+                setBulkEdit({});
+              }}
+              className="h-8"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Tabs for Outreach, Leads, Deals, and Accounts */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'outreach' | 'leads' | 'deals' | 'accounts')}>
         <div className="flex items-center justify-between mb-4 flex-shrink-0">
@@ -2211,6 +2535,48 @@ export default function PipelinePage() {
                       <SelectItem value="campaign">Campaign</SelectItem>
                       <SelectItem value="lite">Lite</SelectItem>
                       <SelectItem value="ad_hoc">Ad Hoc</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {accountStages.includes(opportunityForm.stage as OpportunityStage) && (
+                <div className="grid gap-2">
+                  <Label htmlFor="opp-client">Linked Client</Label>
+                  <Select
+                    value={opportunityForm.client_id || 'none'}
+                    onValueChange={(v) => setOpportunityForm({ ...opportunityForm, client_id: v === 'none' ? undefined : v })}
+                  >
+                    <SelectTrigger className="auth-input">
+                      <SelectValue placeholder="Select client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No client linked</SelectItem>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {accountStages.includes(opportunityForm.stage as OpportunityStage) && (
+                <div className="grid gap-2">
+                  <Label htmlFor="opp-scope">Scope</Label>
+                  <Select
+                    value={opportunityForm.scope || 'none'}
+                    onValueChange={(v) => setOpportunityForm({ ...opportunityForm, scope: v === 'none' ? undefined : v })}
+                  >
+                    <SelectTrigger className="auth-input">
+                      <SelectValue placeholder="Select scope" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {scopeOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

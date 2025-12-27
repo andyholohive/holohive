@@ -35,6 +35,7 @@ import {
   PartnerStatus,
   AffiliateStatus
 } from '@/lib/crmService';
+import { UserService } from '@/lib/userService';
 
 type NetworkTab = 'partners' | 'affiliates';
 
@@ -48,6 +49,7 @@ export default function NetworkPage() {
   const [affiliates, setAffiliates] = useState<CRMAffiliate[]>([]);
   const [contacts, setContacts] = useState<CRMContact[]>([]);
   const [allContactLinks, setAllContactLinks] = useState<CRMContactLink[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string | null; email: string }[]>([]);
 
   const [isNewPartnerOpen, setIsNewPartnerOpen] = useState(false);
   const [isNewAffiliateOpen, setIsNewAffiliateOpen] = useState(false);
@@ -65,6 +67,13 @@ export default function NetworkPage() {
     status: 'new',
   });
 
+  // Affiliate creation state within partner dialog
+  const [partnerDialogAffiliateMode, setPartnerDialogAffiliateMode] = useState<'link' | 'create'>('link');
+  const [newAffiliateInPartnerDialog, setNewAffiliateInPartnerDialog] = useState<CreateAffiliateData>({
+    name: '',
+    status: 'new',
+  });
+
   // Contact linking state for Partners
   const [isPartnerContactLinkOpen, setIsPartnerContactLinkOpen] = useState(false);
   const [linkingPartner, setLinkingPartner] = useState<CRMPartner | null>(null);
@@ -74,6 +83,16 @@ export default function NetworkPage() {
   const [isAffiliateContactLinkOpen, setIsAffiliateContactLinkOpen] = useState(false);
   const [linkingAffiliate, setLinkingAffiliate] = useState<CRMAffiliate | null>(null);
   const [affiliateContacts, setAffiliateContacts] = useState<CRMContactLink[]>([]);
+
+  // Affiliate linking state for Partners
+  const [isPartnerAffiliateLinkOpen, setIsPartnerAffiliateLinkOpen] = useState(false);
+  const [linkingPartnerForAffiliate, setLinkingPartnerForAffiliate] = useState<CRMPartner | null>(null);
+  const [selectedAffiliateForPartner, setSelectedAffiliateForPartner] = useState<string>('');
+  const [affiliateLinkMode, setAffiliateLinkMode] = useState<'link' | 'create'>('link');
+  const [newAffiliateFormForPartner, setNewAffiliateFormForPartner] = useState<CreateAffiliateData>({
+    name: '',
+    status: 'new',
+  });
 
   // Shared contact linking form state
   const [selectedContactId, setSelectedContactId] = useState<string>('');
@@ -111,6 +130,12 @@ export default function NetworkPage() {
   const [editingCell, setEditingCell] = useState<{ id: string; field: string; type: 'partner' | 'affiliate' } | null>(null);
   const [editingValue, setEditingValue] = useState<string>('');
 
+  // Bulk edit state
+  const [selectedPartners, setSelectedPartners] = useState<string[]>([]);
+  const [selectedAffiliates, setSelectedAffiliates] = useState<string[]>([]);
+  const [bulkPartnerEdit, setBulkPartnerEdit] = useState<Partial<CRMPartner>>({});
+  const [bulkAffiliateEdit, setBulkAffiliateEdit] = useState<Partial<CRMAffiliate>>({});
+
   const partnerStatusLabels: Record<PartnerStatus, string> = {
     active: 'Active',
     inactive: 'Inactive'
@@ -134,6 +159,25 @@ export default function NetworkPage() {
     inactive: { bg: 'bg-gray-50', text: 'text-gray-700' }
   };
 
+  // Partner focus area options
+  const partnerFocusOptions = [
+    { value: 'marketing', label: 'Marketing' },
+    { value: 'infrastructure', label: 'Infrastructure' },
+    { value: 'creative_design', label: 'Creative/Design' },
+    { value: 'kol', label: 'KOL' },
+    { value: 'pr', label: 'PR' },
+    { value: 'ecosystem', label: 'Ecosystem' },
+    { value: 'fundraising', label: 'Fundraising' },
+    { value: 'market_maker', label: 'Market Maker' },
+    { value: 'launchpad', label: 'Launchpad' },
+  ];
+
+  const formatFocusLabel = (value: string | null | undefined) => {
+    if (!value) return null;
+    const option = partnerFocusOptions.find(o => o.value === value);
+    return option?.label || value;
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -141,16 +185,18 @@ export default function NetworkPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [parts, affs, conts, contactLinks] = await Promise.all([
+      const [parts, affs, conts, contactLinks, usersData] = await Promise.all([
         CRMService.getAllPartners(),
         CRMService.getAllAffiliates(),
         CRMService.getAllContacts(),
-        CRMService.getAllContactLinks()
+        CRMService.getAllContactLinks(),
+        UserService.getAllUsers()
       ]);
       setPartners(parts);
       setAffiliates(affs);
       setContacts(conts);
       setAllContactLinks(contactLinks);
+      setUsers(usersData.map(u => ({ id: u.id, name: u.name, email: u.email })));
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -163,17 +209,39 @@ export default function NetworkPage() {
     if (!partnerForm.name.trim()) return;
     setIsSubmitting(true);
     try {
+      let affiliateIdToLink = partnerForm.affiliate_id;
+
+      // If creating a new affiliate, create it first
+      if (partnerDialogAffiliateMode === 'create' && newAffiliateInPartnerDialog.name.trim()) {
+        const newAffiliate = await CRMService.createAffiliate({
+          ...newAffiliateInPartnerDialog,
+          owner_id: user?.id
+        });
+        if (newAffiliate) {
+          affiliateIdToLink = newAffiliate.id;
+          setAffiliates(prev => [...prev, newAffiliate]);
+        }
+      }
+
+      const partnerData = {
+        ...partnerForm,
+        affiliate_id: affiliateIdToLink,
+        is_affiliate: !!affiliateIdToLink
+      };
+
       if (editingPartner) {
-        await CRMService.updatePartner(editingPartner.id, partnerForm);
+        await CRMService.updatePartner(editingPartner.id, partnerData);
       } else {
         await CRMService.createPartner({
-          ...partnerForm,
+          ...partnerData,
           owner_id: user?.id
         });
       }
       setIsNewPartnerOpen(false);
       setEditingPartner(null);
       setPartnerForm({ name: '', status: 'active' });
+      setPartnerDialogAffiliateMode('link');
+      setNewAffiliateInPartnerDialog({ name: '', status: 'new' });
       fetchData();
     } catch (error) {
       console.error('Error saving partner:', error);
@@ -189,6 +257,7 @@ export default function NetworkPage() {
       category: partner.category || undefined,
       focus: partner.focus || undefined,
       status: partner.status,
+      owner_id: partner.owner_id || undefined,
       poc_name: partner.poc_name || undefined,
       poc_email: partner.poc_email || undefined,
       poc_telegram: partner.poc_telegram || undefined,
@@ -196,6 +265,8 @@ export default function NetworkPage() {
       affiliate_id: partner.affiliate_id || undefined,
       notes: partner.notes || undefined
     });
+    setPartnerDialogAffiliateMode('link');
+    setNewAffiliateInPartnerDialog({ name: '', status: 'new' });
     setIsNewPartnerOpen(true);
   };
 
@@ -249,6 +320,7 @@ export default function NetworkPage() {
       status: affiliate.status,
       commission_model: affiliate.commission_model || undefined,
       commission_rate: affiliate.commission_rate || undefined,
+      owner_id: affiliate.owner_id || undefined,
       poc_name: affiliate.poc_name || undefined,
       poc_email: affiliate.poc_email || undefined,
       poc_telegram: affiliate.poc_telegram || undefined,
@@ -271,6 +343,63 @@ export default function NetworkPage() {
       fetchData();
     } catch (error) {
       console.error('Error deleting affiliate:', error);
+    }
+  };
+
+  // Bulk update handlers
+  const handleBulkUpdatePartners = async () => {
+    if (selectedPartners.length === 0 || Object.keys(bulkPartnerEdit).length === 0) return;
+
+    const updates: Record<string, any> = {};
+    Object.entries(bulkPartnerEdit).forEach(([key, value]) => {
+      if (value !== undefined) {
+        updates[key] = value;
+      }
+    });
+
+    if (Object.keys(updates).length === 0) return;
+
+    try {
+      setPartners(prev =>
+        prev.map(p => selectedPartners.includes(p.id) ? { ...p, ...updates } : p)
+      );
+
+      await Promise.all(
+        selectedPartners.map(id => CRMService.updatePartner(id, updates))
+      );
+
+      setSelectedPartners([]);
+      setBulkPartnerEdit({});
+    } catch (error) {
+      console.error('Error bulk updating partners:', error);
+    }
+  };
+
+  const handleBulkUpdateAffiliates = async () => {
+    if (selectedAffiliates.length === 0 || Object.keys(bulkAffiliateEdit).length === 0) return;
+
+    const updates: Record<string, any> = {};
+    Object.entries(bulkAffiliateEdit).forEach(([key, value]) => {
+      if (value !== undefined) {
+        updates[key] = value;
+      }
+    });
+
+    if (Object.keys(updates).length === 0) return;
+
+    try {
+      setAffiliates(prev =>
+        prev.map(a => selectedAffiliates.includes(a.id) ? { ...a, ...updates } : a)
+      );
+
+      await Promise.all(
+        selectedAffiliates.map(id => CRMService.updateAffiliate(id, updates))
+      );
+
+      setSelectedAffiliates([]);
+      setBulkAffiliateEdit({});
+    } catch (error) {
+      console.error('Error bulk updating affiliates:', error);
     }
   };
 
@@ -358,6 +487,98 @@ export default function NetworkPage() {
       setPartnerContacts(links);
     } catch (error) {
       console.error('Error unlinking contact:', error);
+    }
+  };
+
+  // Partner affiliate linking handlers
+  const handleOpenPartnerAffiliateLink = (partner: CRMPartner) => {
+    setLinkingPartnerForAffiliate(partner);
+    setSelectedAffiliateForPartner(partner.affiliate_id || '');
+    setAffiliateLinkMode('link');
+    setNewAffiliateFormForPartner({ name: '', status: 'new' });
+    setIsPartnerAffiliateLinkOpen(true);
+  };
+
+  const handleSavePartnerAffiliateLink = async () => {
+    if (!linkingPartnerForAffiliate) return;
+    setIsSubmitting(true);
+    try {
+      await CRMService.updatePartner(linkingPartnerForAffiliate.id, {
+        affiliate_id: selectedAffiliateForPartner || null
+      });
+      // Update local state
+      const selectedAffiliate = affiliates.find(a => a.id === selectedAffiliateForPartner);
+      setPartners(prev =>
+        prev.map(p =>
+          p.id === linkingPartnerForAffiliate.id
+            ? { ...p, affiliate_id: selectedAffiliateForPartner || null, affiliate: selectedAffiliate || null }
+            : p
+        )
+      );
+      setIsPartnerAffiliateLinkOpen(false);
+    } catch (error) {
+      console.error('Error updating partner affiliate:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRemovePartnerAffiliateLink = async () => {
+    if (!linkingPartnerForAffiliate) return;
+    setIsSubmitting(true);
+    try {
+      await CRMService.updatePartner(linkingPartnerForAffiliate.id, {
+        affiliate_id: null
+      });
+      // Update local state
+      setPartners(prev =>
+        prev.map(p =>
+          p.id === linkingPartnerForAffiliate.id
+            ? { ...p, affiliate_id: null, affiliate: null }
+            : p
+        )
+      );
+      setSelectedAffiliateForPartner('');
+      setIsPartnerAffiliateLinkOpen(false);
+    } catch (error) {
+      console.error('Error removing partner affiliate:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateAndLinkAffiliateToPartner = async () => {
+    if (!linkingPartnerForAffiliate || !newAffiliateFormForPartner.name.trim()) return;
+    setIsSubmitting(true);
+    try {
+      // Create the affiliate
+      const newAffiliate = await CRMService.createAffiliate({
+        ...newAffiliateFormForPartner,
+        owner_id: user?.id
+      });
+      if (newAffiliate) {
+        // Link it to the partner
+        await CRMService.updatePartner(linkingPartnerForAffiliate.id, {
+          affiliate_id: newAffiliate.id
+        });
+        // Update local state
+        setAffiliates(prev => [...prev, newAffiliate]);
+        setPartners(prev =>
+          prev.map(p =>
+            p.id === linkingPartnerForAffiliate.id
+              ? { ...p, affiliate_id: newAffiliate.id, affiliate: newAffiliate }
+              : p
+          )
+        );
+        // Reset form and close
+        setNewAffiliateFormForPartner({ name: '', status: 'new' });
+        setAffiliateLinkMode('link');
+        setIsPartnerAffiliateLinkOpen(false);
+      }
+    } catch (error) {
+      console.error('Error creating and linking affiliate:', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -703,6 +924,8 @@ export default function NetworkPage() {
               onClick={() => {
                 setEditingPartner(null);
                 setPartnerForm({ name: '', status: 'active' });
+                setPartnerDialogAffiliateMode('link');
+                setNewAffiliateInPartnerDialog({ name: '', status: 'new' });
                 setIsNewPartnerOpen(true);
               }}
               className="hover:opacity-90"
@@ -876,6 +1099,123 @@ export default function NetworkPage() {
 
         {/* Partners Tab */}
         <TabsContent value="partners" className="mt-0">
+          {/* Partners Bulk action bar */}
+          {selectedPartners.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                  <span className="text-sm font-semibold text-gray-700">{selectedPartners.length} partner{selectedPartners.length !== 1 ? 's' : ''} selected</span>
+                </div>
+                <div className="h-4 w-px bg-gray-300"></div>
+                <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
+              </div>
+              <div className="mb-4 pb-4 border-b border-gray-200">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                  onClick={() => {
+                    const allIds = filteredPartners.map(p => p.id);
+                    if (allIds.every(id => selectedPartners.includes(id))) {
+                      setSelectedPartners(prev => prev.filter(id => !allIds.includes(id)));
+                    } else {
+                      setSelectedPartners(prev => Array.from(new Set([...prev, ...allIds])));
+                    }
+                  }}
+                >
+                  {filteredPartners.length > 0 && filteredPartners.every(p => selectedPartners.includes(p.id)) ? 'Deselect All' : 'Select All'}
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
+                {/* Status */}
+                <div className="min-w-[120px] flex flex-col">
+                  <span className="text-xs text-gray-600 font-semibold mb-1">Status</span>
+                  <Select value={bulkPartnerEdit.status || ''} onValueChange={(v) => setBulkPartnerEdit(prev => ({ ...prev, status: v as PartnerStatus }))}>
+                    <SelectTrigger className="h-8 text-xs auth-input">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Category */}
+                <div className="min-w-[140px] flex flex-col">
+                  <span className="text-xs text-gray-600 font-semibold mb-1">Category</span>
+                  <Select value={bulkPartnerEdit.category || ''} onValueChange={(v) => setBulkPartnerEdit(prev => ({ ...prev, category: v === 'none' ? null : v }))}>
+                    <SelectTrigger className="h-8 text-xs auth-input">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="service_provider">Service Provider</SelectItem>
+                      <SelectItem value="investor_vc">Investor / VC</SelectItem>
+                      <SelectItem value="project">Project</SelectItem>
+                      <SelectItem value="individual">Individual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Focus */}
+                <div className="min-w-[140px] flex flex-col">
+                  <span className="text-xs text-gray-600 font-semibold mb-1">Focus</span>
+                  <Select value={bulkPartnerEdit.focus || ''} onValueChange={(v) => setBulkPartnerEdit(prev => ({ ...prev, focus: v === 'none' ? null : v }))}>
+                    <SelectTrigger className="h-8 text-xs auth-input">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {partnerFocusOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Owner */}
+                <div className="min-w-[140px] flex flex-col">
+                  <span className="text-xs text-gray-600 font-semibold mb-1">Owner</span>
+                  <Select value={bulkPartnerEdit.owner_id || ''} onValueChange={(v) => setBulkPartnerEdit(prev => ({ ...prev, owner_id: v === 'none' ? null : v }))}>
+                    <SelectTrigger className="h-8 text-xs auth-input">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {users.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name || u.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Apply Button */}
+                <Button
+                  size="sm"
+                  onClick={handleBulkUpdatePartners}
+                  disabled={Object.keys(bulkPartnerEdit).length === 0}
+                  className="h-8 hover:opacity-90"
+                  style={{ backgroundColor: '#3e8692', color: 'white' }}
+                >
+                  Apply Changes
+                </Button>
+                {/* Cancel Button */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedPartners([]);
+                    setBulkPartnerEdit({});
+                  }}
+                  className="h-8"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
           {partnersViewMode === 'table' ? (
             /* Partners Table View */
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -886,6 +1226,9 @@ export default function NetworkPage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Category</TableHead>
+                    <TableHead>Focus</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Affiliate</TableHead>
                     <TableHead>Contacts</TableHead>
                     <TableHead>Last Contacted</TableHead>
                     <TableHead>Created</TableHead>
@@ -895,7 +1238,7 @@ export default function NetworkPage() {
                 <TableBody>
                   {filteredPartners.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={10} className="text-center py-8 text-gray-500">
                         No partners found
                       </TableCell>
                     </TableRow>
@@ -906,7 +1249,41 @@ export default function NetworkPage() {
                       const statusColors = partnerStatusColors[partner.status];
                       return (
                         <TableRow key={partner.id} className="group hover:bg-gray-50">
-                          <TableCell className="text-gray-500 text-sm">{index + 1}</TableCell>
+                          <TableCell className="text-gray-500 text-sm">
+                            {(() => {
+                              const isChecked = selectedPartners.includes(partner.id);
+                              return (
+                                <div className="flex items-center justify-center">
+                                  {isChecked ? (
+                                    <Checkbox
+                                      checked={true}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          setSelectedPartners(prev => [...prev, partner.id]);
+                                        } else {
+                                          setSelectedPartners(prev => prev.filter(id => id !== partner.id));
+                                        }
+                                      }}
+                                    />
+                                  ) : (
+                                    <>
+                                      <span className="block group-hover:hidden">{index + 1}</span>
+                                      <span className="hidden group-hover:flex">
+                                        <Checkbox
+                                          checked={false}
+                                          onCheckedChange={(checked) => {
+                                            if (checked) {
+                                              setSelectedPartners(prev => [...prev, partner.id]);
+                                            }
+                                          }}
+                                        />
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </TableCell>
                           <TableCell>
                             {editingCell?.id === partner.id && editingCell?.field === 'name' && editingCell?.type === 'partner' ? (
                               <Input
@@ -959,6 +1336,66 @@ export default function NetworkPage() {
                                 <SelectItem value="individual">Individual</SelectItem>
                               </SelectContent>
                             </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={partner.focus || 'none'}
+                              onValueChange={(v) => handlePartnerInlineUpdate(partner.id, 'focus', v === 'none' ? null : v)}
+                            >
+                              <SelectTrigger className="w-32 h-8 text-xs auth-input">
+                                <SelectValue placeholder="Select">
+                                  {partner.focus ? formatFocusLabel(partner.focus) : <span className="text-gray-400">-</span>}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                {partnerFocusOptions.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={partner.owner_id || 'none'}
+                              onValueChange={(v) => handlePartnerInlineUpdate(partner.id, 'owner_id', v === 'none' ? null : v)}
+                            >
+                              <SelectTrigger className="w-32 h-8 text-xs auth-input">
+                                <SelectValue placeholder="Select">
+                                  {partner.owner_id ? (users.find(u => u.id === partner.owner_id)?.name || users.find(u => u.id === partner.owner_id)?.email || '-') : <span className="text-gray-400">-</span>}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                {users.map((u) => (
+                                  <SelectItem key={u.id} value={u.id}>
+                                    {u.name || u.email}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            {partner.affiliate ? (
+                              <Badge
+                                className="text-xs cursor-pointer hover:opacity-80"
+                                style={{ backgroundColor: '#3e8692', color: 'white' }}
+                                onClick={() => handleOpenPartnerAffiliateLink(partner)}
+                              >
+                                {partner.affiliate.name}
+                              </Badge>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs text-gray-400 hover:text-gray-600"
+                                onClick={() => handleOpenPartnerAffiliateLink(partner)}
+                              >
+                                + Add
+                              </Button>
+                            )}
                           </TableCell>
                           <TableCell>
                             {primaryContact ? (
@@ -1090,7 +1527,7 @@ export default function NetworkPage() {
                         <Badge
                           variant={partner.status === 'active' ? 'default' : 'secondary'}
                           style={partner.status === 'active' ? { backgroundColor: '#3e8692' } : {}}
-                          className="capitalize"
+                          className="capitalize cursor-default hover:bg-inherit"
                         >
                           {partner.status}
                         </Badge>
@@ -1131,7 +1568,7 @@ export default function NetworkPage() {
                   </CardHeader>
                   <CardContent className="pt-0">
                     {partner.focus && (
-                      <p className="text-sm text-gray-600 mb-2">{partner.focus}</p>
+                      <p className="text-sm text-gray-600 mb-2">{formatFocusLabel(partner.focus)}</p>
                     )}
                                         {partner.is_affiliate && (
                       <Badge variant="secondary" className="mt-2 text-xs bg-purple-100 text-purple-800">
@@ -1177,6 +1614,106 @@ export default function NetworkPage() {
 
         {/* Affiliates Tab */}
         <TabsContent value="affiliates" className="mt-0">
+          {/* Affiliates Bulk action bar */}
+          {selectedAffiliates.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm mb-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                  <span className="text-sm font-semibold text-gray-700">{selectedAffiliates.length} affiliate{selectedAffiliates.length !== 1 ? 's' : ''} selected</span>
+                </div>
+                <div className="h-4 w-px bg-gray-300"></div>
+                <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
+              </div>
+              <div className="mb-4 pb-4 border-b border-gray-200">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                  onClick={() => {
+                    const allIds = filteredAffiliates.map(a => a.id);
+                    if (allIds.every(id => selectedAffiliates.includes(id))) {
+                      setSelectedAffiliates(prev => prev.filter(id => !allIds.includes(id)));
+                    } else {
+                      setSelectedAffiliates(prev => Array.from(new Set([...prev, ...allIds])));
+                    }
+                  }}
+                >
+                  {filteredAffiliates.length > 0 && filteredAffiliates.every(a => selectedAffiliates.includes(a.id)) ? 'Deselect All' : 'Select All'}
+                </Button>
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
+                {/* Status */}
+                <div className="min-w-[120px] flex flex-col">
+                  <span className="text-xs text-gray-600 font-semibold mb-1">Status</span>
+                  <Select value={bulkAffiliateEdit.status || ''} onValueChange={(v) => setBulkAffiliateEdit(prev => ({ ...prev, status: v as AffiliateStatus }))}>
+                    <SelectTrigger className="h-8 text-xs auth-input">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="new">New</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Commission Model */}
+                <div className="min-w-[140px] flex flex-col">
+                  <span className="text-xs text-gray-600 font-semibold mb-1">Commission</span>
+                  <Select value={bulkAffiliateEdit.commission_model || ''} onValueChange={(v) => setBulkAffiliateEdit(prev => ({ ...prev, commission_model: v === 'none' ? null : v }))}>
+                    <SelectTrigger className="h-8 text-xs auth-input">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="Standard">Standard</SelectItem>
+                      <SelectItem value="Strategic">Strategic</SelectItem>
+                      <SelectItem value="Whitelabeled">Whitelabeled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Owner */}
+                <div className="min-w-[140px] flex flex-col">
+                  <span className="text-xs text-gray-600 font-semibold mb-1">Owner</span>
+                  <Select value={bulkAffiliateEdit.owner_id || ''} onValueChange={(v) => setBulkAffiliateEdit(prev => ({ ...prev, owner_id: v === 'none' ? null : v }))}>
+                    <SelectTrigger className="h-8 text-xs auth-input">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      {users.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name || u.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Apply Button */}
+                <Button
+                  size="sm"
+                  onClick={handleBulkUpdateAffiliates}
+                  disabled={Object.keys(bulkAffiliateEdit).length === 0}
+                  className="h-8 hover:opacity-90"
+                  style={{ backgroundColor: '#3e8692', color: 'white' }}
+                >
+                  Apply Changes
+                </Button>
+                {/* Cancel Button */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedAffiliates([]);
+                    setBulkAffiliateEdit({});
+                  }}
+                  className="h-8"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
           {affiliatesViewMode === 'table' ? (
             /* Affiliates Table View */
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -1188,6 +1725,7 @@ export default function NetworkPage() {
                     <TableHead>Status</TableHead>
                     <TableHead>Affiliation</TableHead>
                     <TableHead>Commission</TableHead>
+                    <TableHead>Owner</TableHead>
                     <TableHead>Contacts</TableHead>
                     <TableHead>Last Contacted</TableHead>
                     <TableHead>Created</TableHead>
@@ -1197,7 +1735,7 @@ export default function NetworkPage() {
                 <TableBody>
                   {filteredAffiliates.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={10} className="text-center py-8 text-gray-500">
                         No affiliates found
                       </TableCell>
                     </TableRow>
@@ -1208,7 +1746,41 @@ export default function NetworkPage() {
                       const statusColors = affiliateStatusColors[affiliate.status];
                       return (
                         <TableRow key={affiliate.id} className="group hover:bg-gray-50">
-                          <TableCell className="text-gray-500 text-sm">{index + 1}</TableCell>
+                          <TableCell className="text-gray-500 text-sm">
+                            {(() => {
+                              const isChecked = selectedAffiliates.includes(affiliate.id);
+                              return (
+                                <div className="flex items-center justify-center">
+                                  {isChecked ? (
+                                    <Checkbox
+                                      checked={true}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          setSelectedAffiliates(prev => [...prev, affiliate.id]);
+                                        } else {
+                                          setSelectedAffiliates(prev => prev.filter(id => id !== affiliate.id));
+                                        }
+                                      }}
+                                    />
+                                  ) : (
+                                    <>
+                                      <span className="block group-hover:hidden">{index + 1}</span>
+                                      <span className="hidden group-hover:flex">
+                                        <Checkbox
+                                          checked={false}
+                                          onCheckedChange={(checked) => {
+                                            if (checked) {
+                                              setSelectedAffiliates(prev => [...prev, affiliate.id]);
+                                            }
+                                          }}
+                                        />
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </TableCell>
                           <TableCell>
                             {editingCell?.id === affiliate.id && editingCell?.field === 'name' && editingCell?.type === 'affiliate' ? (
                               <Input
@@ -1282,6 +1854,26 @@ export default function NetworkPage() {
                                 {affiliate.commission_rate ? `${affiliate.commission_rate}%` : <span className="text-gray-400">-</span>}
                               </div>
                             )}
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={affiliate.owner_id || 'none'}
+                              onValueChange={(v) => handleAffiliateInlineUpdate(affiliate.id, 'owner_id', v === 'none' ? null : v)}
+                            >
+                              <SelectTrigger className="w-32 h-8 text-xs auth-input">
+                                <SelectValue placeholder="Select">
+                                  {affiliate.owner_id ? (users.find(u => u.id === affiliate.owner_id)?.name || users.find(u => u.id === affiliate.owner_id)?.email || '-') : <span className="text-gray-400">-</span>}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                {users.map((u) => (
+                                  <SelectItem key={u.id} value={u.id}>
+                                    {u.name || u.email}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell>
                             {primaryContact ? (
@@ -1409,10 +2001,10 @@ export default function NetworkPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge
-                          className={`capitalize ${
-                            affiliate.status === 'active' ? 'bg-green-100 text-green-800' :
-                            affiliate.status === 'new' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
+                          className={`capitalize cursor-default hover:bg-inherit ${
+                            affiliate.status === 'active' ? 'bg-green-100 text-green-800 hover:bg-green-100' :
+                            affiliate.status === 'new' ? 'bg-blue-100 text-blue-800 hover:bg-blue-100' :
+                            'bg-gray-100 text-gray-800 hover:bg-gray-100'
                           }`}
                         >
                           {affiliate.status}
@@ -1557,37 +2149,124 @@ export default function NetworkPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="partner-focus">Focus Area</Label>
-                <Input
-                  id="partner-focus"
-                  value={partnerForm.focus || ''}
-                  onChange={(e) => setPartnerForm({ ...partnerForm, focus: e.target.value })}
-                  placeholder="Area of focus/expertise"
-                  className="auth-input"
-                />
-              </div>
-              {/* Link to Affiliate */}
-              <div className="grid gap-2">
-                <Label htmlFor="partner-affiliate">Link to Affiliate</Label>
                 <Select
-                  value={partnerForm.affiliate_id || 'none'}
-                  onValueChange={(v) => setPartnerForm({
-                    ...partnerForm,
-                    affiliate_id: v === 'none' ? undefined : v,
-                    is_affiliate: v !== 'none'
-                  })}
+                  value={partnerForm.focus || 'none'}
+                  onValueChange={(v) => setPartnerForm({ ...partnerForm, focus: v === 'none' ? undefined : v })}
                 >
                   <SelectTrigger className="auth-input">
-                    <SelectValue placeholder="Select affiliate (optional)" />
+                    <SelectValue placeholder="Select focus area" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No affiliate link</SelectItem>
-                    {affiliates.map((aff) => (
-                      <SelectItem key={aff.id} value={aff.id}>
-                        {aff.name} {aff.affiliation ? `(${aff.affiliation})` : ''}
+                    <SelectItem value="none">None</SelectItem>
+                    {partnerFocusOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              {/* Owner */}
+              <div className="grid gap-2">
+                <Label htmlFor="partner-owner">Owner</Label>
+                <Select
+                  value={partnerForm.owner_id || 'none'}
+                  onValueChange={(v) => setPartnerForm({ ...partnerForm, owner_id: v === 'none' ? undefined : v })}
+                >
+                  <SelectTrigger className="auth-input">
+                    <SelectValue placeholder="Select owner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name || u.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Link to Affiliate */}
+              <div className="grid gap-2">
+                <Label>Affiliate</Label>
+                {/* Toggle between Link and Create */}
+                <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+                  <button
+                    type="button"
+                    onClick={() => setPartnerDialogAffiliateMode('link')}
+                    className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
+                      partnerDialogAffiliateMode === 'link'
+                        ? 'bg-white shadow-sm text-gray-900'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    Link Existing
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPartnerDialogAffiliateMode('create')}
+                    className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
+                      partnerDialogAffiliateMode === 'create'
+                        ? 'bg-white shadow-sm text-gray-900'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    Create New
+                  </button>
+                </div>
+
+                {partnerDialogAffiliateMode === 'link' ? (
+                  <Select
+                    value={partnerForm.affiliate_id || 'none'}
+                    onValueChange={(v) => setPartnerForm({
+                      ...partnerForm,
+                      affiliate_id: v === 'none' ? undefined : v,
+                      is_affiliate: v !== 'none'
+                    })}
+                  >
+                    <SelectTrigger className="auth-input">
+                      <SelectValue placeholder="Select affiliate (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No affiliate link</SelectItem>
+                      {affiliates.map((aff) => (
+                        <SelectItem key={aff.id} value={aff.id}>
+                          {aff.name} {aff.commission_model ? `(${aff.commission_model})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="space-y-2">
+                    <Input
+                      value={newAffiliateInPartnerDialog.name}
+                      onChange={(e) => setNewAffiliateInPartnerDialog({ ...newAffiliateInPartnerDialog, name: e.target.value })}
+                      placeholder="Affiliate name *"
+                      className="auth-input"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select
+                        value={newAffiliateInPartnerDialog.commission_model || ''}
+                        onValueChange={(value) => setNewAffiliateInPartnerDialog({ ...newAffiliateInPartnerDialog, commission_model: value })}
+                      >
+                        <SelectTrigger className="auth-input">
+                          <SelectValue placeholder="Commission model" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Standard">Standard</SelectItem>
+                          <SelectItem value="Strategic">Strategic</SelectItem>
+                          <SelectItem value="Whitelabeled">Whitelabeled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        value={newAffiliateInPartnerDialog.commission_rate || ''}
+                        onChange={(e) => setNewAffiliateInPartnerDialog({ ...newAffiliateInPartnerDialog, commission_rate: e.target.value })}
+                        placeholder="Rate (e.g., 10%)"
+                        className="auth-input"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="partner-notes">Notes</Label>
@@ -1678,6 +2357,25 @@ export default function NetworkPage() {
                   className="auth-input"
                 />
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="affiliate-owner">Owner</Label>
+                <Select
+                  value={affiliateForm.owner_id || 'none'}
+                  onValueChange={(v) => setAffiliateForm({ ...affiliateForm, owner_id: v === 'none' ? undefined : v })}
+                >
+                  <SelectTrigger className="auth-input">
+                    <SelectValue placeholder="Select owner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name || u.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="border-t pt-4">
                 <h4 className="font-medium text-sm mb-3">Commission Structure</h4>
                 <div className="grid grid-cols-2 gap-3">
@@ -1694,13 +2392,20 @@ export default function NetworkPage() {
                   </div>
                   <div className="grid gap-2 col-span-2">
                     <Label htmlFor="affiliate-model">Commission Model</Label>
-                    <Input
-                      id="affiliate-model"
-                      value={affiliateForm.commission_model || ''}
-                      onChange={(e) => setAffiliateForm({ ...affiliateForm, commission_model: e.target.value })}
-                      placeholder="Describe the commission structure"
-                      className="auth-input"
-                    />
+                    <Select
+                      value={affiliateForm.commission_model || 'none'}
+                      onValueChange={(v) => setAffiliateForm({ ...affiliateForm, commission_model: v === 'none' ? undefined : v })}
+                    >
+                      <SelectTrigger className="auth-input">
+                        <SelectValue placeholder="Select model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="Standard">Standard</SelectItem>
+                        <SelectItem value="Strategic">Strategic</SelectItem>
+                        <SelectItem value="Whitelabeled">Whitelabeled</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -1908,6 +2613,158 @@ export default function NetworkPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsPartnerContactLinkOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Partner Affiliate Link Dialog */}
+      <Dialog open={isPartnerAffiliateLinkOpen} onOpenChange={setIsPartnerAffiliateLinkOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Manage Affiliate</DialogTitle>
+            <DialogDescription>
+              Link an affiliate to {linkingPartnerForAffiliate?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Current Linked Affiliate */}
+            {linkingPartnerForAffiliate?.affiliate && (
+              <div className="space-y-2">
+                <Label>Currently Linked Affiliate</Label>
+                <div className="border rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-full" style={{ backgroundColor: '#e8f4f5' }}>
+                        <Handshake className="h-4 w-4" style={{ color: '#3e8692' }} />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{linkingPartnerForAffiliate.affiliate.name}</p>
+                        {linkingPartnerForAffiliate.affiliate.commission_model && (
+                          <span className="text-xs text-gray-500">{linkingPartnerForAffiliate.affiliate.commission_model}</span>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemovePartnerAffiliateLink}
+                      disabled={isSubmitting}
+                      className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Add/Change Affiliate */}
+            <div className="space-y-3 border-t pt-4">
+              <Label>{linkingPartnerForAffiliate?.affiliate ? 'Change Affiliate' : 'Add Affiliate'}</Label>
+              {/* Toggle between Link and Create */}
+              <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+                <button
+                  type="button"
+                  onClick={() => setAffiliateLinkMode('link')}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    affiliateLinkMode === 'link'
+                      ? 'bg-white shadow-sm text-gray-900'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Link Existing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAffiliateLinkMode('create')}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                    affiliateLinkMode === 'create'
+                      ? 'bg-white shadow-sm text-gray-900'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Create New
+                </button>
+              </div>
+
+              {affiliateLinkMode === 'link' ? (
+                <>
+                  <Select
+                    value={selectedAffiliateForPartner}
+                    onValueChange={setSelectedAffiliateForPartner}
+                  >
+                    <SelectTrigger className="auth-input">
+                      <SelectValue placeholder="Select an affiliate" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {affiliates.map((affiliate) => (
+                        <SelectItem key={affiliate.id} value={affiliate.id}>
+                          {affiliate.name} {affiliate.commission_model ? `(${affiliate.commission_model})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    onClick={handleSavePartnerAffiliateLink}
+                    disabled={!selectedAffiliateForPartner || isSubmitting}
+                    className="w-full hover:opacity-90"
+                    style={{ backgroundColor: '#3e8692', color: 'white' }}
+                  >
+                    <LinkIcon className="h-4 w-4 mr-2" />
+                    {isSubmitting ? 'Saving...' : 'Link Affiliate'}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Input
+                    value={newAffiliateFormForPartner.name}
+                    onChange={(e) => setNewAffiliateFormForPartner({ ...newAffiliateFormForPartner, name: e.target.value })}
+                    placeholder="Affiliate name *"
+                    className="auth-input"
+                  />
+                  <Select
+                    value={newAffiliateFormForPartner.commission_model || ''}
+                    onValueChange={(value) => setNewAffiliateFormForPartner({ ...newAffiliateFormForPartner, commission_model: value })}
+                  >
+                    <SelectTrigger className="auth-input">
+                      <SelectValue placeholder="Commission model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Standard">Standard</SelectItem>
+                      <SelectItem value="Strategic">Strategic</SelectItem>
+                      <SelectItem value="Whitelabeled">Whitelabeled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    value={newAffiliateFormForPartner.commission_rate || ''}
+                    onChange={(e) => setNewAffiliateFormForPartner({ ...newAffiliateFormForPartner, commission_rate: e.target.value })}
+                    placeholder="Commission rate (e.g., 10%)"
+                    className="auth-input"
+                  />
+                  <Textarea
+                    value={newAffiliateFormForPartner.notes || ''}
+                    onChange={(e) => setNewAffiliateFormForPartner({ ...newAffiliateFormForPartner, notes: e.target.value })}
+                    placeholder="Notes"
+                    className="auth-input"
+                    rows={2}
+                  />
+                  <Button
+                    onClick={handleCreateAndLinkAffiliateToPartner}
+                    disabled={!newAffiliateFormForPartner.name.trim() || isSubmitting}
+                    className="w-full hover:opacity-90"
+                    style={{ backgroundColor: '#3e8692', color: 'white' }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    {isSubmitting ? 'Creating...' : 'Create & Link Affiliate'}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPartnerAffiliateLinkOpen(false)}>
               Close
             </Button>
           </DialogFooter>

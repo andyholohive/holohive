@@ -1,14 +1,18 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Bell, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useChangelog } from '@/contexts/ChangelogContext';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface SidebarProps {
   children: React.ReactNode;
@@ -25,6 +29,55 @@ export default function Sidebar({ children }: SidebarProps) {
     }
     return false;
   });
+  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
+
+  // Get changelog data from context (fetched once at app level)
+  const { changelogs, latestVersion } = useChangelog();
+
+  // Format date for changelog display
+  const formatChangelogDate = (dateString: string | null) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  // Render changelog content
+  const renderChangelogContent = (content: string) => {
+    return content.split('\n').map((line, index) => {
+      if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
+        return (
+          <li key={index} className="ml-4 text-gray-700 text-sm">
+            {line.trim().substring(2)}
+          </li>
+        );
+      }
+      if (line.trim().startsWith('### ')) {
+        return (
+          <h4 key={index} className="font-semibold text-gray-900 mt-3 mb-1 text-sm">
+            {line.trim().substring(4)}
+          </h4>
+        );
+      }
+      if (line.trim().startsWith('## ')) {
+        return (
+          <h3 key={index} className="font-bold text-gray-900 mt-4 mb-2 text-sm">
+            {line.trim().substring(3)}
+          </h3>
+        );
+      }
+      if (line.trim() === '') {
+        return <div key={index} className="h-2" />;
+      }
+      return (
+        <p key={index} className="text-gray-700 text-sm">
+          {line}
+        </p>
+      );
+    });
+  };
 
   const handleSidebarToggle = () => {
     setIsSidebarCollapsed(prev => {
@@ -54,6 +107,15 @@ export default function Sidebar({ children }: SidebarProps) {
             <div className="flex items-center">
               <Image src="/images/logo.png" alt="Logo" width={36} height={36} />
               <span className="ml-2 text-xl font-semibold text-gray-800">Holo Hive</span>
+              {latestVersion && (
+                <Badge
+                  variant="secondary"
+                  className="ml-2 cursor-pointer bg-[#3e8692]/10 text-[#3e8692] hover:bg-[#3e8692]/20 transition-colors"
+                  onClick={() => setIsChangelogOpen(true)}
+                >
+                  v{latestVersion}
+                </Badge>
+              )}
             </div>
           </div>
           <div className="flex items-center space-x-4">
@@ -400,6 +462,53 @@ export default function Sidebar({ children }: SidebarProps) {
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
+
+      {/* Changelog History Dialog */}
+      <Dialog open={isChangelogOpen} onOpenChange={setIsChangelogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[80vh]">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-[#3e8692]" />
+              <DialogTitle className="text-xl">Changelog</DialogTitle>
+            </div>
+            <DialogDescription>
+              Version history and updates
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <div className="space-y-6">
+              {changelogs.map((changelog, idx) => (
+                <div key={changelog.id} className={idx > 0 ? 'border-t pt-6' : ''}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge
+                      variant="secondary"
+                      className="bg-[#3e8692]/10 text-[#3e8692]"
+                    >
+                      v{changelog.version}
+                    </Badge>
+                    {changelog.published_at && (
+                      <span className="text-sm text-gray-500">
+                        {formatChangelogDate(changelog.published_at)}
+                      </span>
+                    )}
+                  </div>
+                  <h3 className="font-medium text-gray-900 mb-2">
+                    {changelog.title}
+                  </h3>
+                  <div className="space-y-1">
+                    {renderChangelogContent(changelog.content)}
+                  </div>
+                </div>
+              ))}
+              {changelogs.length === 0 && (
+                <p className="text-gray-500 text-center py-4">
+                  No changelogs available yet.
+                </p>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

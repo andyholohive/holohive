@@ -536,11 +536,13 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       setCampaign(normalizedCampaign);
 
       // KOLs - don't fail the whole page if this fails
+      // Use the actual campaign UUID, not the slug from URL
+      const actualCampaignId = campaignData.id;
       try {
         const { data: kolData, error: kolError } = await supabasePublic
           .from('campaign_kols')
           .select(`id, hh_status, client_status, allocated_budget, budget_type, master_kol:master_kols(id, name, link, followers, platform, region, content_type, creator_type)`)
-          .eq('campaign_id', campaignId)
+          .eq('campaign_id', actualCampaignId)
           .order('created_at', { ascending: false });
         
         if (kolError) {
@@ -559,7 +561,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         const { data: contentData, error: contentError } = await supabasePublic
           .from('contents')
           .select('*, campaign_kol:campaign_kols(master_kol:master_kols(id, name, link))')
-          .eq('campaign_id', campaignId)
+          .eq('campaign_id', actualCampaignId)
           .order('created_at', { ascending: false });
         
         if (contentError) {

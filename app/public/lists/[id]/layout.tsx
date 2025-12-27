@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     .eq('id', params.id)
     .single();
 
-  const title = list?.name || 'Holo Hive Partner Portal';
+  const title = list?.name || 'Holo Hive Portal';
   const description = list?.notes || 'KOL List';
 
   // Construct the base URL for the logo
