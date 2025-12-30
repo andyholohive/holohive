@@ -92,20 +92,31 @@ async function sendTelegramMessage(chatId: string, text: string, parseMode: 'HTM
 }
 
 /**
- * Handle bot commands
+ * Handle bot commands - reads from database
  */
 async function handleCommand(chatId: string, command: string, args: string[], message: any) {
-  const cmd = command.toLowerCase().replace('@holo_hive_bot', ''); // Remove bot mention if present
+  // Remove leading slash and bot mention
+  const cmd = command.toLowerCase().replace(/^\//, '').replace('@holo_hive_bot', '');
 
-  switch (cmd) {
-    case '/portal':
-      await sendTelegramMessage(chatId, '✅ Test complete');
-      break;
+  try {
+    // Look up command in database
+    const { data: commandData, error } = await supabaseAdmin
+      .from('telegram_commands')
+      .select('response')
+      .eq('command', cmd)
+      .eq('is_active', true)
+      .single();
 
-    default:
-      // Unknown command - ignore silently
+    if (error || !commandData) {
       console.log('[Telegram Webhook] Unknown command:', cmd);
-      break;
+      return;
+    }
+
+    // Send the response
+    await sendTelegramMessage(chatId, commandData.response);
+    console.log('[Telegram Webhook] Executed command:', cmd);
+  } catch (error) {
+    console.error('[Telegram Webhook] Error handling command:', error);
   }
 }
 

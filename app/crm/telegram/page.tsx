@@ -28,8 +28,17 @@ import {
   CheckCircle,
   Search,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  Plus,
+  Edit,
+  Trash2,
+  Terminal,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { CRMOpportunity } from '@/lib/crmService';
@@ -63,6 +72,16 @@ interface TelegramMessage {
   from_username: string | null;
   text: string | null;
   message_date: string;
+}
+
+interface TelegramCommand {
+  id: string;
+  command: string;
+  response: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 // Sample data for demo purposes
@@ -143,8 +162,20 @@ export default function TelegramChatsPage() {
   const [linking, setLinking] = useState(false);
   const [opportunityPopoverOpen, setOpportunityPopoverOpen] = useState(false);
 
+  // Commands state
+  const [commands, setCommands] = useState<TelegramCommand[]>([]);
+  const [loadingCommands, setLoadingCommands] = useState(true);
+  const [commandDialogOpen, setCommandDialogOpen] = useState(false);
+  const [editingCommand, setEditingCommand] = useState<TelegramCommand | null>(null);
+  const [commandForm, setCommandForm] = useState({ command: '', response: '', description: '' });
+  const [savingCommand, setSavingCommand] = useState(false);
+
+  // Active tab
+  const [activeTab, setActiveTab] = useState('chats');
+
   useEffect(() => {
     fetchData();
+    fetchCommands();
   }, []);
 
   const fetchData = async () => {
@@ -303,6 +334,164 @@ export default function TelegramChatsPage() {
     }
   };
 
+  const fetchCommands = async () => {
+    setLoadingCommands(true);
+    try {
+      const { data, error } = await supabase
+        .from('telegram_commands')
+        .select('*')
+        .order('command');
+
+      if (error) throw error;
+      setCommands(data || []);
+    } catch (error) {
+      console.error('Error fetching commands:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load commands',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingCommands(false);
+    }
+  };
+
+  const openCommandDialog = (command?: TelegramCommand) => {
+    if (command) {
+      setEditingCommand(command);
+      setCommandForm({
+        command: command.command,
+        response: command.response,
+        description: command.description || ''
+      });
+    } else {
+      setEditingCommand(null);
+      setCommandForm({ command: '', response: '', description: '' });
+    }
+    setCommandDialogOpen(true);
+  };
+
+  const handleSaveCommand = async () => {
+    if (!commandForm.command.trim() || !commandForm.response.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Command and response are required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Clean up command (remove leading slash if present)
+    const cleanCommand = commandForm.command.replace(/^\//, '').toLowerCase().trim();
+
+    setSavingCommand(true);
+    try {
+      if (editingCommand) {
+        // Update existing
+        const { error } = await supabase
+          .from('telegram_commands')
+          .update({
+            command: cleanCommand,
+            response: commandForm.response.trim(),
+            description: commandForm.description.trim() || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingCommand.id);
+
+        if (error) throw error;
+
+        toast({
+          title: 'Command updated',
+          description: `/${cleanCommand} has been updated`,
+        });
+      } else {
+        // Create new
+        const { error } = await supabase
+          .from('telegram_commands')
+          .insert({
+            command: cleanCommand,
+            response: commandForm.response.trim(),
+            description: commandForm.description.trim() || null,
+            is_active: true
+          });
+
+        if (error) throw error;
+
+        toast({
+          title: 'Command created',
+          description: `/${cleanCommand} has been added`,
+        });
+      }
+
+      setCommandDialogOpen(false);
+      fetchCommands();
+    } catch (error: any) {
+      console.error('Error saving command:', error);
+      toast({
+        title: 'Error',
+        description: error.message?.includes('duplicate')
+          ? 'A command with this name already exists'
+          : 'Failed to save command',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingCommand(false);
+    }
+  };
+
+  const handleDeleteCommand = async (command: TelegramCommand) => {
+    if (!confirm(`Are you sure you want to delete /${command.command}?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('telegram_commands')
+        .delete()
+        .eq('id', command.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Command deleted',
+        description: `/${command.command} has been removed`,
+      });
+      fetchCommands();
+    } catch (error) {
+      console.error('Error deleting command:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete command',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleToggleCommand = async (command: TelegramCommand) => {
+    try {
+      const { error } = await supabase
+        .from('telegram_commands')
+        .update({
+          is_active: !command.is_active,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', command.id);
+
+      if (error) throw error;
+
+      toast({
+        title: command.is_active ? 'Command disabled' : 'Command enabled',
+        description: `/${command.command} is now ${command.is_active ? 'disabled' : 'enabled'}`,
+      });
+      fetchCommands();
+    } catch (error) {
+      console.error('Error toggling command:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update command',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const formatTimeAgo = (dateString: string | null) => {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
@@ -370,43 +559,65 @@ export default function TelegramChatsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">TG Chats</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Telegram</h2>
           <p className="text-gray-600">
-            {showDemo ? (
-              <span className="text-amber-600">Showing demo data • </span>
-            ) : null}
-            Group chats discovered by the bot ({displayChats.length} total)
+            Manage Telegram chats and bot commands
           </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search chats..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-64"
-            />
-          </div>
-          <Button
-            variant={showDemo ? "default" : "outline"}
-            onClick={() => setShowDemo(!showDemo)}
-            className={showDemo ? "bg-amber-500 hover:bg-amber-600" : ""}
-          >
-            {showDemo ? 'Hide Demo' : 'Show Demo'}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
         </div>
       </div>
 
-      {/* Chat List */}
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
+        <TabsList>
+          <TabsTrigger value="chats" className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            Chats
+          </TabsTrigger>
+          <TabsTrigger value="commands" className="flex items-center gap-2">
+            <Terminal className="h-4 w-4" />
+            Commands
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Chats Tab */}
+        <TabsContent value="chats" className="mt-4 space-y-4">
+          {/* Chats Header */}
+          <div className="flex items-center justify-between">
+            <p className="text-gray-600">
+              {showDemo ? (
+                <span className="text-amber-600">Showing demo data • </span>
+              ) : null}
+              Group chats discovered by the bot ({displayChats.length} total)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Input
+                  placeholder="Search chats..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="auth-input pl-10 w-64"
+                />
+              </div>
+              <Button
+                variant={showDemo ? "default" : "outline"}
+                onClick={() => setShowDemo(!showDemo)}
+                className={showDemo ? "bg-amber-500 hover:bg-amber-600" : ""}
+              >
+                {showDemo ? 'Hide Demo' : 'Show Demo'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* Chat List */}
       {filteredChats.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
@@ -530,6 +741,123 @@ export default function TelegramChatsPage() {
           })}
         </div>
       )}
+        </TabsContent>
+
+        {/* Commands Tab */}
+        <TabsContent value="commands" className="mt-4 space-y-4">
+          {/* Commands Header */}
+          <div className="flex items-center justify-between">
+            <p className="text-gray-600">
+              Bot commands that respond to users ({commands.length} total)
+            </p>
+            <Button
+              onClick={() => openCommandDialog()}
+              style={{ backgroundColor: '#3e8692', color: 'white' }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Command
+            </Button>
+          </div>
+
+          {/* Commands List */}
+          {loadingCommands ? (
+            <div className="grid gap-4">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          ) : commands.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Terminal className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  No commands yet
+                </h3>
+                <p className="text-gray-500 max-w-md mx-auto mb-4">
+                  Add bot commands that will respond when users type them in Telegram chats.
+                </p>
+                <Button
+                  onClick={() => openCommandDialog()}
+                  style={{ backgroundColor: '#3e8692', color: 'white' }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Your First Command
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {commands.map(command => (
+                <Card key={command.id} className={`hover:shadow-md transition-shadow ${!command.is_active ? 'opacity-60' : ''}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      {/* Left: Command Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-2">
+                          <code className="text-lg font-semibold text-gray-900 bg-gray-100 px-2 py-0.5 rounded">
+                            /{command.command}
+                          </code>
+                          {!command.is_active && (
+                            <Badge variant="secondary" className="text-xs">
+                              Disabled
+                            </Badge>
+                          )}
+                        </div>
+
+                        {command.description && (
+                          <p className="text-sm text-gray-600 mb-2">
+                            {command.description}
+                          </p>
+                        )}
+
+                        <div className="mt-2 p-3 bg-gray-50 rounded-md">
+                          <p className="text-xs font-medium text-gray-500 mb-1">Response:</p>
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                            {command.response.length > 200
+                              ? command.response.substring(0, 200) + '...'
+                              : command.response}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Right: Actions */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleCommand(command)}
+                          title={command.is_active ? 'Disable command' : 'Enable command'}
+                        >
+                          {command.is_active ? (
+                            <ToggleRight className="h-5 w-5 text-green-600" />
+                          ) : (
+                            <ToggleLeft className="h-5 w-5 text-gray-400" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openCommandDialog(command)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteCommand(command)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Link Dialog */}
       <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
@@ -618,6 +946,81 @@ export default function TelegramChatsPage() {
               style={{ backgroundColor: '#3e8692', color: 'white' }}
             >
               {linking ? 'Saving...' : (selectedOpportunityId && selectedOpportunityId !== '__none__') ? 'Link Chat' : 'Unlink Chat'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Command Dialog (Add/Edit) */}
+      <Dialog open={commandDialogOpen} onOpenChange={setCommandDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingCommand ? 'Edit Command' : 'Add Command'}</DialogTitle>
+            <DialogDescription>
+              {editingCommand
+                ? 'Update the command and its response.'
+                : 'Create a new bot command. Users can trigger it by typing /<command> in any chat where the bot is present.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="command">Command</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-lg text-gray-500">/</span>
+                <Input
+                  id="command"
+                  placeholder="help"
+                  value={commandForm.command}
+                  onChange={(e) => setCommandForm({ ...commandForm, command: e.target.value })}
+                  className="auth-input flex-1"
+                />
+              </div>
+              <p className="text-xs text-gray-500">
+                Lowercase letters only, no spaces. e.g., help, info, support
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (Optional)</Label>
+              <Input
+                id="description"
+                placeholder="Shows help information"
+                value={commandForm.description}
+                onChange={(e) => setCommandForm({ ...commandForm, description: e.target.value })}
+                className="auth-input"
+              />
+              <p className="text-xs text-gray-500">
+                A short description of what this command does.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="response">Response</Label>
+              <Textarea
+                id="response"
+                placeholder="Welcome! Here's how to get help..."
+                value={commandForm.response}
+                onChange={(e) => setCommandForm({ ...commandForm, response: e.target.value })}
+                rows={5}
+                className="auth-input"
+              />
+              <p className="text-xs text-gray-500">
+                The message the bot will send when this command is used. Supports HTML formatting.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCommandDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveCommand}
+              disabled={savingCommand}
+              style={{ backgroundColor: '#3e8692', color: 'white' }}
+            >
+              {savingCommand ? 'Saving...' : editingCommand ? 'Update Command' : 'Add Command'}
             </Button>
           </DialogFooter>
         </DialogContent>
