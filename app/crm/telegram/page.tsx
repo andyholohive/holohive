@@ -79,6 +79,7 @@ interface TelegramCommand {
   command: string;
   response: string;
   description: string | null;
+  image_url: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -167,7 +168,7 @@ export default function TelegramChatsPage() {
   const [loadingCommands, setLoadingCommands] = useState(true);
   const [commandDialogOpen, setCommandDialogOpen] = useState(false);
   const [editingCommand, setEditingCommand] = useState<TelegramCommand | null>(null);
-  const [commandForm, setCommandForm] = useState({ command: '', response: '', description: '' });
+  const [commandForm, setCommandForm] = useState({ command: '', response: '', description: '', image_url: '' });
   const [savingCommand, setSavingCommand] = useState(false);
 
   // Active tab
@@ -362,11 +363,12 @@ export default function TelegramChatsPage() {
       setCommandForm({
         command: command.command,
         response: command.response,
-        description: command.description || ''
+        description: command.description || '',
+        image_url: command.image_url || ''
       });
     } else {
       setEditingCommand(null);
-      setCommandForm({ command: '', response: '', description: '' });
+      setCommandForm({ command: '', response: '', description: '', image_url: '' });
     }
     setCommandDialogOpen(true);
   };
@@ -394,6 +396,7 @@ export default function TelegramChatsPage() {
             command: cleanCommand,
             response: commandForm.response.trim(),
             description: commandForm.description.trim() || null,
+            image_url: commandForm.image_url.trim() || null,
             updated_at: new Date().toISOString()
           })
           .eq('id', editingCommand.id);
@@ -412,6 +415,7 @@ export default function TelegramChatsPage() {
             command: cleanCommand,
             response: commandForm.response.trim(),
             description: commandForm.description.trim() || null,
+            image_url: commandForm.image_url.trim() || null,
             is_active: true
           });
 
@@ -992,6 +996,20 @@ export default function TelegramChatsPage() {
               />
               <p className="text-xs text-gray-500">
                 A short description of what this command does.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="image_url">Image URL (Optional)</Label>
+              <Input
+                id="image_url"
+                placeholder="https://example.com/image.jpg"
+                value={commandForm.image_url}
+                onChange={(e) => setCommandForm({ ...commandForm, image_url: e.target.value })}
+                className="auth-input"
+              />
+              <p className="text-xs text-gray-500">
+                If set, the image will appear above the response text.
               </p>
             </div>
 

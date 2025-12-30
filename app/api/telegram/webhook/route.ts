@@ -92,6 +92,45 @@ async function sendTelegramMessage(chatId: string, text: string, parseMode: 'HTM
 }
 
 /**
+ * Send a photo with caption to a Telegram chat
+ */
+async function sendTelegramPhoto(chatId: string, photoUrl: string, caption: string, parseMode: 'HTML' | 'Markdown' = 'HTML') {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    console.error('[Telegram Webhook] Bot token not configured');
+    return false;
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${botToken}/sendPhoto`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          photo: photoUrl,
+          caption,
+          parse_mode: parseMode
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[Telegram Webhook] Send photo error:', error);
+      return false;
+    }
+
+    console.log('[Telegram Webhook] Sent photo to chat:', chatId);
+    return true;
+  } catch (error) {
+    console.error('[Telegram Webhook] Error sending photo:', error);
+    return false;
+  }
+}
+
+/**
  * Handle bot commands - reads from database
  */
 async function handleCommand(chatId: string, command: string, args: string[], message: any) {
@@ -102,7 +141,7 @@ async function handleCommand(chatId: string, command: string, args: string[], me
     // Look up command in database
     const { data: commandData, error } = await supabaseAdmin
       .from('telegram_commands')
-      .select('response')
+      .select('response, image_url')
       .eq('command', cmd)
       .eq('is_active', true)
       .single();
@@ -112,8 +151,12 @@ async function handleCommand(chatId: string, command: string, args: string[], me
       return;
     }
 
-    // Send the response
-    await sendTelegramMessage(chatId, commandData.response);
+    // Send photo with caption if image_url exists, otherwise just send message
+    if (commandData.image_url) {
+      await sendTelegramPhoto(chatId, commandData.image_url, commandData.response);
+    } else {
+      await sendTelegramMessage(chatId, commandData.response);
+    }
     console.log('[Telegram Webhook] Executed command:', cmd);
   } catch (error) {
     console.error('[Telegram Webhook] Error handling command:', error);
