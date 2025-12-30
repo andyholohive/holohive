@@ -15,13 +15,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import {
   MessageSquare,
   RefreshCw,
@@ -29,11 +24,11 @@ import {
   Link as LinkIcon,
   Unlink,
   Clock,
-  Users,
   Hash,
   CheckCircle,
   Search,
-  ExternalLink
+  Check,
+  ChevronsUpDown
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
@@ -146,6 +141,7 @@ export default function TelegramChatsPage() {
   const [selectedChat, setSelectedChat] = useState<TelegramChat | null>(null);
   const [selectedOpportunityId, setSelectedOpportunityId] = useState<string>('');
   const [linking, setLinking] = useState(false);
+  const [opportunityPopoverOpen, setOpportunityPopoverOpen] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -556,24 +552,56 @@ export default function TelegramChatsPage() {
 
             <div className="space-y-2">
               <Label htmlFor="opportunity">Opportunity</Label>
-              <Select
-                value={selectedOpportunityId}
-                onValueChange={setSelectedOpportunityId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select an opportunity..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">
-                    <span className="text-gray-500">No link (unlink)</span>
-                  </SelectItem>
-                  {opportunities.map(opp => (
-                    <SelectItem key={opp.id} value={opp.id}>
-                      {opp.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={opportunityPopoverOpen} onOpenChange={setOpportunityPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={opportunityPopoverOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {selectedOpportunityId && selectedOpportunityId !== '__none__'
+                      ? opportunities.find(opp => opp.id === selectedOpportunityId)?.name
+                      : selectedOpportunityId === '__none__'
+                        ? 'No link (unlink)'
+                        : 'Select an opportunity...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search opportunities..." className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>No opportunity found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="__none__"
+                          onSelect={() => {
+                            setSelectedOpportunityId('__none__');
+                            setOpportunityPopoverOpen(false);
+                          }}
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${selectedOpportunityId === '__none__' ? 'opacity-100' : 'opacity-0'}`} />
+                          <span className="text-gray-500">No link (unlink)</span>
+                        </CommandItem>
+                        {opportunities.map(opp => (
+                          <CommandItem
+                            key={opp.id}
+                            value={opp.name}
+                            onSelect={() => {
+                              setSelectedOpportunityId(opp.id);
+                              setOpportunityPopoverOpen(false);
+                            }}
+                          >
+                            <Check className={`mr-2 h-4 w-4 ${selectedOpportunityId === opp.id ? 'opacity-100' : 'opacity-0'}`} />
+                            {opp.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               <p className="text-xs text-gray-500">
                 This will also update the opportunity's Telegram Chat ID field.
               </p>

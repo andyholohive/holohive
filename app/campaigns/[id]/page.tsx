@@ -1453,13 +1453,13 @@ const CampaignDetailsPage = () => {
 
   // Payment functions
   const fetchPayments = async () => {
-    if (!id) return;
+    if (!campaign?.id) return;
     setLoadingPayments(true);
     try {
       const { data, error } = await supabase
         .from('payments')
         .select('*')
-        .eq('campaign_id', id)
+        .eq('campaign_id', campaign.id)
         .order('payment_date', { ascending: false });
       
       if (error) throw error;
@@ -1477,7 +1477,7 @@ const CampaignDetailsPage = () => {
   };
 
   const handleAddPayment = async () => {
-    if (!id || !newPaymentData.campaign_kol_id || newPaymentData.amount <= 0) {
+    if (!campaign?.id || !newPaymentData.campaign_kol_id || newPaymentData.amount <= 0) {
       toast({ title: "Error", description: "Please fill in all required fields.", variant: "destructive" });
       return;
     }
@@ -1486,7 +1486,7 @@ const CampaignDetailsPage = () => {
       const { data, error } = await supabase
         .from('payments')
         .insert({
-          campaign_id: id,
+          campaign_id: campaign.id,
           campaign_kol_id: newPaymentData.campaign_kol_id,
           amount: newPaymentData.amount,
           payment_date: newPaymentData.payment_date,
@@ -3530,11 +3530,16 @@ const CampaignDetailsPage = () => {
                               <div className="relative w-full">
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
                                 <Input
-                                  type="number"
+                                  type="text"
                                   className="pl-6 w-full auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
                                   style={{ borderColor: '#e5e7eb' }}
-                                  value={form?.total_budget || ""}
-                                  onChange={e => handleChange("total_budget", e.target.value)}
+                                  value={form?.total_budget ? Number(form.total_budget).toLocaleString() : ""}
+                                  onChange={e => {
+                                    const value = e.target.value.replace(/,/g, '');
+                                    if (value === '' || !isNaN(Number(value))) {
+                                      handleChange("total_budget", value);
+                                    }
+                                  }}
                                 />
                               </div>
                             ) : (

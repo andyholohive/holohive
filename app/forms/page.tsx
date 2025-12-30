@@ -10,9 +10,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Trash2, Share2, FileText, Copy, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Share2, FileText, Copy, CheckCircle2, ExternalLink, Globe, Eye, Download, Upload } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { FormService, FormWithStats, FormStatus } from '@/lib/formService';
+import { FormService, FormWithStats, FormStatus, FormResponse, FormWithFields, FormField } from '@/lib/formService';
 import { useRouter } from 'next/navigation';
 
 export default function FormsPage() {
@@ -31,6 +32,17 @@ export default function FormsPage() {
   const [duplicatingForm, setDuplicatingForm] = useState<FormWithStats | null>(null);
   const [duplicateFormName, setDuplicateFormName] = useState('');
   const [isDuplicating, setIsDuplicating] = useState(false);
+
+  // Responses dialog state
+  const [isResponsesDialogOpen, setIsResponsesDialogOpen] = useState(false);
+  const [viewingResponsesForm, setViewingResponsesForm] = useState<FormWithStats | null>(null);
+  const [responses, setResponses] = useState<FormResponse[]>([]);
+  const [loadingResponses, setLoadingResponses] = useState(false);
+
+  // Single response view state
+  const [isResponseDetailOpen, setIsResponseDetailOpen] = useState(false);
+  const [selectedResponse, setSelectedResponse] = useState<FormResponse | null>(null);
+  const [formWithFields, setFormWithFields] = useState<FormWithFields | null>(null);
 
   // New form data
   const [newFormName, setNewFormName] = useState('');
@@ -226,6 +238,162 @@ export default function FormsPage() {
     }
   };
 
+  const handleViewResponses = async (form: FormWithStats) => {
+    setViewingResponsesForm(form);
+    setIsResponsesDialogOpen(true);
+    setLoadingResponses(true);
+    try {
+      const formResponses = await FormService.getResponses(form.id);
+      setResponses(formResponses);
+    } catch (error) {
+      console.error('Error fetching responses:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load responses',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingResponses(false);
+    }
+  };
+
+  const handleViewSingleResponse = async (response: FormResponse) => {
+    if (!viewingResponsesForm) return;
+
+    // Fetch form with fields if not already loaded
+    if (!formWithFields || formWithFields.id !== viewingResponsesForm.id) {
+      try {
+        const form = await FormService.getFormById(viewingResponsesForm.id);
+        setFormWithFields(form);
+      } catch (error) {
+        console.error('Error fetching form:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load form details',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    setSelectedResponse(response);
+    setIsResponseDetailOpen(true);
+  };
+
+  const handleDeleteResponse = async (responseId: string) => {
+    if (!confirm('Delete this response?')) return;
+
+    try {
+      await FormService.deleteResponse(responseId);
+      toast({
+        title: 'Success',
+        description: 'Response deleted successfully',
+      });
+      // Refresh responses
+      setResponses(prev => prev.filter(r => r.id !== responseId));
+      // Update response count in forms list
+      if (viewingResponsesForm) {
+        setForms(prev => prev.map(f =>
+          f.id === viewingResponsesForm.id
+            ? { ...f, response_count: f.response_count - 1 }
+            : f
+        ));
+      }
+    } catch (error) {
+      console.error('Error deleting response:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete response',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDownloadResponsePDF = async (response: FormResponse) => {
+    if (!viewingResponsesForm) return;
+
+    // Fetch form with fields if not already loaded
+    let form = formWithFields;
+    if (!form || form.id !== viewingResponsesForm.id) {
+      try {
+        form = await FormService.getFormById(viewingResponsesForm.id);
+        setFormWithFields(form);
+      } catch (error) {
+        console.error('Error fetching form:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load form details',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    if (!form) return;
+
+    // Create a simple text-based PDF
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+
+    let yPosition = 20;
+    const lineHeight = 7;
+    const pageHeight = 280;
+    const margin = 20;
+
+    // Title
+    doc.setFontSize(16);
+    doc.text(form.name, margin, yPosition);
+    yPosition += lineHeight * 2;
+
+    // Submission info
+    doc.setFontSize(10);
+    doc.text(`Submitted: ${new Date(response.submitted_at).toLocaleString()}`, margin, yPosition);
+    yPosition += lineHeight;
+    doc.text(`Name: ${response.submitted_by_name || '-'}`, margin, yPosition);
+    yPosition += lineHeight;
+    doc.text(`Email: ${response.submitted_by_email || '-'}`, margin, yPosition);
+    yPosition += lineHeight * 2;
+
+    // Fields
+    doc.setFontSize(10);
+    for (const field of form.fields.sort((a, b) => a.display_order - b.display_order)) {
+      const displayOnlyTypes = ['section', 'description', 'link'];
+      if (displayOnlyTypes.includes(field.field_type)) continue;
+
+      // Check if we need a new page
+      if (yPosition > pageHeight) {
+        doc.addPage();
+        yPosition = 20;
+      }
+
+      // Field label (strip HTML)
+      const label = field.label.replace(/<[^>]*>/g, '');
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, margin, yPosition);
+      yPosition += lineHeight;
+
+      // Field value
+      doc.setFont('helvetica', 'normal');
+      const value = response.response_data[field.id];
+      const displayValue = Array.isArray(value) ? value.join(', ') : (value || '-');
+
+      // Word wrap long text
+      const splitText = doc.splitTextToSize(String(displayValue), 170);
+      for (const line of splitText) {
+        if (yPosition > pageHeight) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        doc.text(line, margin, yPosition);
+        yPosition += lineHeight;
+      }
+
+      yPosition += lineHeight;
+    }
+
+    doc.save(`${form.name}-response-${new Date(response.submitted_at).toISOString().split('T')[0]}.pdf`);
+  };
+
   // Filter forms
   const filteredForms = forms.filter(form => {
     const matchesSearch = form.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -403,14 +571,28 @@ export default function FormsPage() {
                   <div className="space-y-3">
                     {/* Stats */}
                     <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleViewResponses(form)}
+                        className="flex items-center gap-1 hover:text-[#3e8692] transition-colors"
+                        title="View responses"
+                      >
                         <FileText className="h-4 w-4" />
                         <span>{form.response_count} responses</span>
-                      </div>
+                        <Eye className="h-3 w-3 ml-1" />
+                      </button>
                       <div className="text-xs text-gray-500">
                         {new Date(form.created_at).toLocaleDateString()}
                       </div>
                     </div>
+                    {/* Subdomain Connection */}
+                    {form.subdomain_enabled && form.subdomain_url && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Globe className="h-4 w-4 text-green-600" />
+                        <span className="text-green-700 font-medium truncate max-w-[200px]" title={form.subdomain_url}>
+                          {form.subdomain_url.replace(/^https?:\/\//, '')}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Actions */}
                     <div className="flex gap-2 pt-2">
@@ -580,6 +762,251 @@ export default function FormsPage() {
                 style={{ backgroundColor: '#3e8692', color: 'white' }}
               >
                 {isDuplicating ? 'Duplicating...' : 'Duplicate Form'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* View Responses Dialog */}
+        <Dialog open={isResponsesDialogOpen} onOpenChange={setIsResponsesDialogOpen}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Responses</DialogTitle>
+              <DialogDescription>
+                {viewingResponsesForm?.name} - {responses.length} responses
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto">
+              {loadingResponses ? (
+                <div className="space-y-2 p-4">
+                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+                </div>
+              ) : responses.length === 0 ? (
+                <div className="text-center py-12">
+                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">No responses yet</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Submitted</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {responses.map((response) => (
+                      <TableRow key={response.id}>
+                        <TableCell>
+                          {new Date(response.submitted_at).toLocaleString()}
+                        </TableCell>
+                        <TableCell>{response.submitted_by_name || '-'}</TableCell>
+                        <TableCell>{response.submitted_by_email || '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewSingleResponse(response)}
+                              title="View response"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDownloadResponsePDF(response)}
+                              title="Download PDF"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteResponse(response.id)}
+                              title="Delete response"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/forms/${viewingResponsesForm?.slug || viewingResponsesForm?.id}?tab=responses`)}
+              >
+                View Full Details
+              </Button>
+              <Button variant="outline" onClick={() => setIsResponsesDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Response Detail Dialog */}
+        <Dialog open={isResponseDetailOpen} onOpenChange={setIsResponseDetailOpen}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-semibold">Response Details</DialogTitle>
+            </DialogHeader>
+            {selectedResponse && formWithFields && (
+              <div className="space-y-6">
+                {/* Submission Info */}
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label className="text-xs font-semibold text-gray-600 uppercase">Submitted</Label>
+                      <p className="text-sm font-medium text-gray-900 mt-1">
+                        {new Date(selectedResponse.submitted_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold text-gray-600 uppercase">Name</Label>
+                      <p className="text-sm font-medium text-gray-900 mt-1">
+                        {selectedResponse.submitted_by_name || '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold text-gray-600 uppercase">Email</Label>
+                      <p className="text-sm font-medium text-gray-900 mt-1">
+                        {selectedResponse.submitted_by_email || '-'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form Fields */}
+                <div className="space-y-4">
+                  {formWithFields.fields
+                    .sort((a, b) => a.display_order - b.display_order)
+                    .map((field) => {
+                      const value = selectedResponse.response_data[field.id];
+                      const reasonKey = `${field.id}_reason`;
+                      const reason = selectedResponse.response_data[reasonKey];
+                      const attachmentsKey = `${field.id}_attachments`;
+                      const attachments = selectedResponse.response_data[attachmentsKey];
+
+                      // Skip display-only fields that don't collect responses
+                      const displayOnlyTypes = ['section', 'description', 'link'];
+                      const isDisplayOnly = displayOnlyTypes.includes(field.field_type);
+
+                      return (
+                        <div key={field.id} className="bg-white p-4 rounded-lg border border-gray-200">
+                          <div className="mb-3 flex items-start gap-1">
+                            <div
+                              className="text-sm text-gray-900 flex-1"
+                              dangerouslySetInnerHTML={{ __html: field.label }}
+                            />
+                            {field.required && !isDisplayOnly && <span className="text-red-500">*</span>}
+                          </div>
+
+                          {/* Value Display - Only show for actual input fields */}
+                          {!isDisplayOnly && (
+                            <div className="text-sm text-gray-900 mt-2">
+                              {/* Show the main field value */}
+                              {field.field_type === 'yes_no' ? (
+                                <div>
+                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                    value === 'Yes'
+                                      ? 'bg-green-100 text-green-800'
+                                      : value === 'No'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {value || '-'}
+                                  </span>
+                                  {reason && (
+                                    <div className="mt-2 pl-4 border-l-2 border-gray-300">
+                                      <Label className="text-xs text-gray-600">Reason:</Label>
+                                      <p className="text-sm text-gray-900 mt-1">{reason}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : Array.isArray(value) ? (
+                                <div className="space-y-1">
+                                  {value.length > 0 ? (
+                                    value.map((item: string, idx: number) => (
+                                      <div key={idx} className="flex gap-2">
+                                        <span className="font-medium text-gray-700">{idx + 1}.</span>
+                                        <span className="text-gray-900">{item}</span>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <span className="text-gray-400 italic">No selection</span>
+                                  )}
+                                </div>
+                              ) : field.field_type === 'long_text' || field.field_type === 'textarea' ? (
+                                <p className="whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200">
+                                  {value || <span className="text-gray-400 italic">No response</span>}
+                                </p>
+                              ) : (
+                                <p className="font-medium">
+                                  {value || <span className="text-gray-400 italic">No response</span>}
+                                </p>
+                              )}
+
+                              {/* Display attachments if any exist for this field */}
+                              {attachments && Array.isArray(attachments) && attachments.length > 0 && (
+                                <div className="mt-3 space-y-2">
+                                  <p className="text-xs font-medium text-gray-500 uppercase">Attachments:</p>
+                                  {attachments.map((url: string, idx: number) => (
+                                    <div key={idx} className="flex items-center gap-2">
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 text-blue-600 hover:text-blue-800 underline text-sm"
+                                      >
+                                        <Upload className="h-4 w-4" />
+                                        Attachment {idx + 1}
+                                      </a>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={async () => {
+                                          try {
+                                            const response = await fetch(url);
+                                            const blob = await response.blob();
+                                            const downloadUrl = window.URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = downloadUrl;
+                                            a.download = `attachment-${idx + 1}`;
+                                            document.body.appendChild(a);
+                                            a.click();
+                                            document.body.removeChild(a);
+                                            window.URL.revokeObjectURL(downloadUrl);
+                                          } catch (error) {
+                                            console.error('Error downloading file:', error);
+                                          }
+                                        }}
+                                        className="h-7 px-2"
+                                      >
+                                        <Download className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsResponseDetailOpen(false)}>
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>

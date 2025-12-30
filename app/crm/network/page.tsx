@@ -117,6 +117,7 @@ export default function NetworkPage() {
 
   // Filter state
   const [filterPartnerStatus, setFilterPartnerStatus] = useState<string>('all');
+  const [filterPartnerCategory, setFilterPartnerCategory] = useState<string>('all');
   const [filterAffiliateStatus, setFilterAffiliateStatus] = useState<string>('all');
 
   // Sort state
@@ -724,6 +725,14 @@ export default function NetworkPage() {
       if (filterPartnerStatus !== 'all' && p.status !== filterPartnerStatus) {
         return false;
       }
+      if (filterPartnerCategory !== 'all') {
+        if (filterPartnerCategory === 'none' && p.category) {
+          return false;
+        }
+        if (filterPartnerCategory !== 'none' && p.category !== filterPartnerCategory) {
+          return false;
+        }
+      }
       return true;
     })
     .sort((a, b) => {
@@ -767,12 +776,13 @@ export default function NetworkPage() {
     });
 
   // Check if any filters are active
-  const hasActiveFilters = (activeTab === 'partners' && filterPartnerStatus !== 'all') ||
+  const hasActiveFilters = (activeTab === 'partners' && (filterPartnerStatus !== 'all' || filterPartnerCategory !== 'all')) ||
     (activeTab === 'affiliates' && filterAffiliateStatus !== 'all');
 
   // Clear all filters
   const clearFilters = () => {
     setFilterPartnerStatus('all');
+    setFilterPartnerCategory('all');
     setFilterAffiliateStatus('all');
     setSearchTerm('');
   };
@@ -1014,16 +1024,31 @@ export default function NetworkPage() {
           <span className="text-sm text-gray-600">Filters:</span>
         </div>
         {activeTab === 'partners' && (
-          <Select value={filterPartnerStatus} onValueChange={setFilterPartnerStatus}>
-            <SelectTrigger className="w-36 h-9 text-sm auth-input">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
+          <>
+            <Select value={filterPartnerStatus} onValueChange={setFilterPartnerStatus}>
+              <SelectTrigger className="w-36 h-9 text-sm auth-input">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterPartnerCategory} onValueChange={setFilterPartnerCategory}>
+              <SelectTrigger className="w-40 h-9 text-sm auth-input">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="service_provider">Service Provider</SelectItem>
+                <SelectItem value="investor_vc">Investor / VC</SelectItem>
+                <SelectItem value="project">Project</SelectItem>
+                <SelectItem value="individual">Individual</SelectItem>
+                <SelectItem value="none">No Category</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
         )}
         {activeTab === 'affiliates' && (
           <Select value={filterAffiliateStatus} onValueChange={setFilterAffiliateStatus}>

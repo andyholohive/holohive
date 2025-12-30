@@ -54,6 +54,62 @@ export async function POST(request: NextRequest) {
 }
 
 /**
+ * Send a message to a Telegram chat
+ */
+async function sendTelegramMessage(chatId: string, text: string, parseMode: 'HTML' | 'Markdown' = 'HTML') {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    console.error('[Telegram Webhook] Bot token not configured');
+    return false;
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: parseMode
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[Telegram Webhook] Send message error:', error);
+      return false;
+    }
+
+    console.log('[Telegram Webhook] Sent reply to chat:', chatId);
+    return true;
+  } catch (error) {
+    console.error('[Telegram Webhook] Error sending message:', error);
+    return false;
+  }
+}
+
+/**
+ * Handle bot commands
+ */
+async function handleCommand(chatId: string, command: string, args: string[], message: any) {
+  const cmd = command.toLowerCase().replace('@holo_hive_bot', ''); // Remove bot mention if present
+
+  switch (cmd) {
+    case '/portal':
+      await sendTelegramMessage(chatId, '✅ Test complete');
+      break;
+
+    default:
+      // Unknown command - ignore silently
+      console.log('[Telegram Webhook] Unknown command:', cmd);
+      break;
+  }
+}
+
+/**
  * Handle incoming message from Telegram
  */
 async function handleMessage(message: any) {
@@ -73,9 +129,17 @@ async function handleMessage(message: any) {
     return;
   }
 
-  // Only process group/supergroup messages
+  // Handle commands (messages starting with /)
+  if (messageText.startsWith('/')) {
+    const parts = messageText.split(' ');
+    const command = parts[0];
+    const args = parts.slice(1);
+    await handleCommand(chatId, command, args, message);
+  }
+
+  // Only track group/supergroup messages in database
   if (chatType !== 'group' && chatType !== 'supergroup') {
-    console.log('[Telegram Webhook] Ignoring non-group message:', chatType);
+    console.log('[Telegram Webhook] Ignoring non-group message for tracking:', chatType);
     return;
   }
 

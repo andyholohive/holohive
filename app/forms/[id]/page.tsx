@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +14,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Plus, Edit, Trash2, Save, Share2, Copy, CheckCircle2, GripVertical, FileText, Download, Eye, ExternalLink, X, Bold, Italic, Palette, Upload, Minus } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Save, Share2, Copy, CheckCircle2, GripVertical, FileText, Download, Eye, ExternalLink, X, Bold, Italic, Palette, Upload, Minus, Globe, Link as LinkIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { FormService, FormWithFields, FormField, FieldType, FormStatus, FormResponse } from '@/lib/formService';
 import { CustomColorPicker } from '@/components/ui/custom-color-picker';
@@ -1155,13 +1155,20 @@ function SortablePageTab({ pageNum, currentPage, fieldsCount, totalPages, onPage
 export default function FormBuilderPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const formId = params.id as string;
 
   const [form, setForm] = useState<FormWithFields | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('build');
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'build');
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Connect subdomain dialog state
+  const [connectDialogOpen, setConnectDialogOpen] = useState(false);
+  const [subdomainEnabled, setSubdomainEnabled] = useState(false);
+  const [subdomainUrl, setSubdomainUrl] = useState('');
+  const [savingConnect, setSavingConnect] = useState(false);
 
   // Build tab state
   const [isEditingInfo, setIsEditingInfo] = useState(false);
@@ -1223,6 +1230,18 @@ export default function FormBuilderPage() {
       fetchResponses(); // Refresh when tab is clicked
     }
   }, [activeTab]);
+
+  // Auto-open response dialog if view query param is set
+  useEffect(() => {
+    const viewResponseId = searchParams.get('view');
+    if (viewResponseId && responses.length > 0) {
+      const responseToView = responses.find(r => r.id === viewResponseId);
+      if (responseToView) {
+        setSelectedResponse(responseToView);
+        setIsResponseDialogOpen(true);
+      }
+    }
+  }, [searchParams, responses]);
 
   const fetchForm = async () => {
     try {
@@ -1466,6 +1485,43 @@ export default function FormBuilderPage() {
     const identifier = form?.slug || form?.id || formId;
     const shareUrl = `${window.location.origin}/public/forms/${identifier}`;
     window.open(shareUrl, '_blank');
+  };
+
+  const handleOpenConnectDialog = () => {
+    setSubdomainEnabled(form?.subdomain_enabled || false);
+    setSubdomainUrl(form?.subdomain_url || '');
+    setConnectDialogOpen(true);
+  };
+
+  const handleSaveConnect = async () => {
+    if (!form) return;
+    setSavingConnect(true);
+    try {
+      await FormService.updateForm({
+        id: form.id,
+        subdomain_enabled: subdomainEnabled,
+        subdomain_url: subdomainEnabled ? subdomainUrl : null,
+      });
+      setForm({
+        ...form,
+        subdomain_enabled: subdomainEnabled,
+        subdomain_url: subdomainEnabled ? subdomainUrl : null,
+      });
+      setConnectDialogOpen(false);
+      toast({
+        title: 'Saved!',
+        description: 'Subdomain connection settings updated',
+      });
+    } catch (error) {
+      console.error('Error saving connect settings:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save connection settings',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingConnect(false);
+    }
   };
 
   const handleExportCSV = async () => {
@@ -1992,6 +2048,10 @@ export default function FormBuilderPage() {
               <Button variant="outline" onClick={handleCopyShareLink} className="hover:opacity-90">
                 {copiedLink ? <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
                 Copy Link
+              </Button>
+              <Button variant="outline" onClick={handleOpenConnectDialog} className="hover:opacity-90">
+                {form.subdomain_enabled ? <Globe className="h-4 w-4 mr-2 text-green-600" /> : <LinkIcon className="h-4 w-4 mr-2" />}
+                Connect
               </Button>
               <Button variant="outline" onClick={handleOpenShareLink} className="hover:opacity-90">
                 <ExternalLink className="h-4 w-4 mr-2" />
@@ -2969,6 +3029,53 @@ export default function FormBuilderPage() {
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Connect Subdomain Dialog */}
+        <Dialog open={connectDialogOpen} onOpenChange={setConnectDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Connect to Subdomain</DialogTitle>
+              <DialogDescription>
+                Link this form to a custom subdomain URL for embedding.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="subdomain-enabled"
+                  checked={subdomainEnabled}
+                  onCheckedChange={(checked) => setSubdomainEnabled(checked as boolean)}
+                />
+                <Label htmlFor="subdomain-enabled" className="cursor-pointer">
+                  Enable subdomain connection
+                </Label>
+              </div>
+              {subdomainEnabled && (
+                <div className="space-y-2">
+                  <Label htmlFor="subdomain-url">Subdomain URL</Label>
+                  <Input
+                    id="subdomain-url"
+                    placeholder="https://forms.yourdomain.com"
+                    value={subdomainUrl}
+                    onChange={(e) => setSubdomainUrl(e.target.value)}
+                    className="auth-input"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter the full URL where this form will be accessible.
+                  </p>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConnectDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveConnect} disabled={savingConnect} className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                {savingConnect ? 'Saving...' : 'Save'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

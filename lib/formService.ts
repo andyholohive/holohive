@@ -12,6 +12,8 @@ export interface Form {
   slug: string | null;
   description: string | null;
   status: FormStatus;
+  subdomain_enabled: boolean | null;
+  subdomain_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -64,6 +66,8 @@ export interface UpdateFormData {
   slug?: string | null;
   description?: string | null;
   status?: FormStatus;
+  subdomain_enabled?: boolean | null;
+  subdomain_url?: string | null;
 }
 
 export interface CreateFieldData {
