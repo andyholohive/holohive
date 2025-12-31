@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Bell, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Bell, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChangelog } from '@/contexts/ChangelogContext';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -367,6 +367,21 @@ export default function Sidebar({ children }: SidebarProps) {
                     </Button>
                   </Link>
                 )}
+                {/* Links tab */}
+                <Link href="/links" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/links') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/links') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Links' : undefined}
+                  >
+                    <span>
+                      <Link2 className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Links'}
+                    </span>
+                  </Button>
+                </Link>
                 {/* AI Insights tab (disabled) */}
                 <Button
                   variant="ghost"
