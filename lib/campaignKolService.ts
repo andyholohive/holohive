@@ -117,11 +117,12 @@ export class CampaignKOLService {
     // Get the IDs of assigned KOLs
     const assignedIds = assignedKOLs?.map(kol => kol.master_kol_id) || [];
 
-    // If no KOLs are assigned, return all KOLs
+    // If no KOLs are assigned, return all non-archived KOLs
     if (assignedIds.length === 0) {
       const { data, error } = await supabase
         .from('master_kols')
         .select('*')
+        .neq('status', 'archived')
         .order('name');
 
       if (error) {
@@ -132,10 +133,11 @@ export class CampaignKOLService {
       return data || [];
     }
 
-    // Get all KOLs that are not in the assigned list
+    // Get all non-archived KOLs that are not in the assigned list
     const { data, error } = await supabase
       .from('master_kols')
       .select('*')
+      .neq('status', 'archived')
       .not('id', 'in', `(${assignedIds.join(',')})`)
       .order('name');
 
