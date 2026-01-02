@@ -567,7 +567,7 @@ export default function LinksPage() {
                               <div className="flex flex-wrap gap-1 max-w-[200px]">
                                 {link.link_types.length > 0 ? (
                                   link.link_types.slice(0, 2).map(type => (
-                                    <Badge key={type} variant="outline" className="text-xs">
+                                    <Badge key={type} variant="outline" className="text-xs cursor-default">
                                       {getLinkTypeLabel(type)}
                                     </Badge>
                                   ))
@@ -575,19 +575,19 @@ export default function LinksPage() {
                                   <span className="text-gray-400">-</span>
                                 )}
                                 {link.link_types.length > 2 && (
-                                  <Badge variant="outline" className="text-xs">
+                                  <Badge variant="outline" className="text-xs cursor-default">
                                     +{link.link_types.length - 2}
                                   </Badge>
                                 )}
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge className={getAccessBadgeColor(link.access)}>
+                              <Badge className={`${getAccessBadgeColor(link.access)} hover:bg-inherit cursor-default`}>
                                 {getAccessLabel(link.access)}
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              <Badge className={getStatusBadgeColor(link.status)}>
+                              <Badge className={`${getStatusBadgeColor(link.status)} hover:bg-inherit cursor-default`}>
                                 {getStatusLabel(link.status)}
                               </Badge>
                             </TableCell>
