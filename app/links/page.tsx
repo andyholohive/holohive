@@ -541,7 +541,7 @@ export default function LinksPage() {
                         <TableRow className="bg-gray-50/50">
                           <TableHead>Name</TableHead>
                           <TableHead>URL</TableHead>
-                          <TableHead>Types</TableHead>
+                          <TableHead>Link Type</TableHead>
                           <TableHead>Access</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="w-16 text-right">Actions</TableHead>
@@ -714,7 +714,7 @@ export default function LinksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Link Types</Label>
+              <Label>Link Type</Label>
               <Popover open={linkTypesPopoverOpen} onOpenChange={setLinkTypesPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
