@@ -1218,7 +1218,7 @@ const CampaignDetailsPage = () => {
         // Create new
         const { error } = await supabase
           .from('campaign_reports')
-          .insert({ campaign_id: id, custom_message: customMessage });
+          .insert({ campaign_id: campaign?.id, custom_message: customMessage });
 
         if (error) throw error;
       }
@@ -1559,7 +1559,7 @@ const CampaignDetailsPage = () => {
 
         // Create a payment record for each payment in the array
         return kolData.payments.map((payment, index) => ({
-          campaign_id: id,
+          campaign_id: campaign?.id,
           campaign_kol_id: kolId,
           amount: payment.amount,
           payment_date: payment.payment_date || new Date().toISOString().split('T')[0],
@@ -2426,7 +2426,7 @@ const CampaignDetailsPage = () => {
       // Insert into database immediately
       try {
         const payload = {
-          campaign_id: id,
+          campaign_id: campaign?.id,
           campaign_kols_id: updatedContent.campaign_kols_id || null,
           activation_date: updatedContent.activation_date || null,
           content_link: updatedContent.content_link || null,
@@ -5234,7 +5234,7 @@ const CampaignDetailsPage = () => {
                                             className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer rounded"
                                             onClick={async () => {
                                               const payload = {
-                                                campaign_id: id,
+                                                campaign_id: campaign?.id,
                                                 campaign_kols_id: campaignKOL.id,
                                                 type: type,
                                                 status: 'pending',
@@ -5264,7 +5264,7 @@ const CampaignDetailsPage = () => {
                                                 // Auto-create payment for this content
                                                 if (data) {
                                                   const paymentPayload = {
-                                                    campaign_id: id,
+                                                    campaign_id: campaign?.id,
                                                     campaign_kol_id: campaignKOL.id,
                                                     content_id: data.id,
                                                     amount: 0,
@@ -5762,7 +5762,7 @@ const CampaignDetailsPage = () => {
                           const newId = `new-${Date.now()}`;
                           const newContent: any = {
                             id: newId,
-                            campaign_id: id,
+                            campaign_id: campaign?.id,
                             campaign_kols_id: '',
                             activation_date: '',
                             content_link: '',
@@ -5975,7 +5975,7 @@ const CampaignDetailsPage = () => {
                           onClick={async () => {
                             setIsAddingContent(true);
                             const payload = {
-                              campaign_id: id,
+                              campaign_id: campaign?.id,
                               campaign_kols_id: addContentData.campaign_kols_id,
                               activation_date: addContentData.activation_date || null,
                               content_link: addContentData.content_link || null,
@@ -6009,7 +6009,7 @@ const CampaignDetailsPage = () => {
 
                                 if (kol) {
                                   const paymentPayload = {
-                                    campaign_id: id,
+                                    campaign_id: campaign?.id,
                                     campaign_kol_id: kol.id,
                                     content_id: newContent.id,
                                     amount: 0,
