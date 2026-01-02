@@ -29,7 +29,7 @@ interface Link {
   url: string;
   client: string | null;
   link_types: string[];
-  access: 'public' | 'partners' | 'team' | 'guest';
+  access: 'public' | 'partners' | 'team' | 'client';
   status: 'active' | 'inactive' | 'archived';
   created_by: string | null;
   created_at: string;
@@ -55,7 +55,7 @@ const ACCESS_OPTIONS = [
   { value: 'public', label: 'Public' },
   { value: 'partners', label: 'Partners' },
   { value: 'team', label: 'Team' },
-  { value: 'guest', label: 'Guest' }
+  { value: 'client', label: 'Client' }
 ];
 
 export default function LinksPage() {
@@ -79,7 +79,7 @@ export default function LinksPage() {
     url: '',
     client: '',
     link_types: [] as string[],
-    access: 'team' as 'public' | 'partners' | 'team' | 'guest'
+    access: 'team' as 'public' | 'partners' | 'team' | 'client'
   });
 
   // Filter state
@@ -140,7 +140,7 @@ export default function LinksPage() {
         url: link.url,
         client: link.client || '',
         link_types: link.link_types || [],
-        access: link.access === 'client' ? 'guest' : link.access
+        access: link.access
       });
     } else {
       setEditingLink(null);
@@ -338,8 +338,7 @@ export default function LinksPage() {
       case 'public': return 'bg-green-100 text-green-800 hover:bg-green-100';
       case 'partners': return 'bg-blue-100 text-blue-800 hover:bg-blue-100';
       case 'team': return 'bg-purple-100 text-purple-800 hover:bg-purple-100';
-      case 'guest': return 'bg-orange-100 text-orange-800 hover:bg-orange-100';
-      case 'client': return 'bg-orange-100 text-orange-800 hover:bg-orange-100'; // Legacy support
+      case 'client': return 'bg-orange-100 text-orange-800 hover:bg-orange-100';
       default: return 'bg-gray-100 text-gray-800 hover:bg-gray-100';
     }
   };
@@ -350,7 +349,6 @@ export default function LinksPage() {
   };
 
   const getAccessLabel = (value: string) => {
-    if (value === 'client') return 'Guest'; // Legacy support
     const opt = ACCESS_OPTIONS.find(o => o.value === value);
     return opt?.label || value;
   };
@@ -750,7 +748,7 @@ export default function LinksPage() {
               <Label>Access</Label>
               <Select
                 value={formData.access}
-                onValueChange={(value: 'public' | 'partners' | 'team' | 'guest') =>
+                onValueChange={(value: 'public' | 'partners' | 'team' | 'client') =>
                   setFormData({ ...formData, access: value })
                 }
               >
