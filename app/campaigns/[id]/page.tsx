@@ -5686,22 +5686,6 @@ const CampaignDetailsPage = () => {
                             </Badge>
                           </div>
 
-                          {/* Allocated Budget */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Allocated Budget</span>
-                            <span className="font-medium text-gray-900">
-                              {campaignKOL.allocated_budget ? `$${Number(campaignKOL.allocated_budget).toLocaleString('en-US')}` : '-'}
-                            </span>
-                          </div>
-
-                          {/* Budget Type */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Budget Type</span>
-                            <span className="font-medium text-gray-900">
-                              {campaignKOL.budget_type || '-'}
-                            </span>
-                          </div>
-
                           {/* Paid Amount */}
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-gray-600">Paid</span>
