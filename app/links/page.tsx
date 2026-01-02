@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,13 +9,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import {
   Plus, Search, Edit, Trash2, ExternalLink, Link as LinkIcon,
-  Check, ChevronsUpDown, X, ChevronRight, ChevronDown, Building2
+  Check, ChevronsUpDown, X, ChevronRight, ChevronDown, Building2, BookOpen, Users
 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
@@ -26,22 +27,13 @@ interface Link {
   id: string;
   name: string;
   url: string;
-  client_id: string | null;
+  client: string | null;
   link_types: string[];
-  access: 'public' | 'partners' | 'team' | 'client';
+  access: 'public' | 'partners' | 'team' | 'guest';
   status: 'active' | 'inactive' | 'archived';
   created_by: string | null;
   created_at: string;
   updated_at: string;
-  client?: {
-    id: string;
-    name: string;
-  } | null;
-}
-
-interface Client {
-  id: string;
-  name: string;
 }
 
 const LINK_TYPES = [
@@ -63,13 +55,7 @@ const ACCESS_OPTIONS = [
   { value: 'public', label: 'Public' },
   { value: 'partners', label: 'Partners' },
   { value: 'team', label: 'Team' },
-  { value: 'client', label: 'Client' }
-];
-
-const STATUS_OPTIONS = [
-  { value: 'active', label: 'Active' },
-  { value: 'inactive', label: 'Inactive' },
-  { value: 'archived', label: 'Archived' }
+  { value: 'guest', label: 'Guest' }
 ];
 
 export default function LinksPage() {
@@ -77,8 +63,10 @@ export default function LinksPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [links, setLinks] = useState<Link[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'holohive' | 'guide' | 'clients'>('holohive');
 
   // Dialog state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -89,14 +77,12 @@ export default function LinksPage() {
   const [formData, setFormData] = useState({
     name: '',
     url: '',
-    client_id: '',
+    client: '',
     link_types: [] as string[],
-    access: 'team' as 'public' | 'partners' | 'team' | 'client',
-    status: 'active' as 'active' | 'inactive' | 'archived'
+    access: 'team' as 'public' | 'partners' | 'team' | 'guest'
   });
 
   // Filter state
-  const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterAccess, setFilterAccess] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
 
@@ -107,27 +93,29 @@ export default function LinksPage() {
   const [clientPopoverOpen, setClientPopoverOpen] = useState(false);
   const [linkTypesPopoverOpen, setLinkTypesPopoverOpen] = useState(false);
 
-  // Adding to client state
-  const [addingToClient, setAddingToClient] = useState<string | null>(null);
+  // Get unique client names from existing links for suggestions
+  const clientSuggestions = useMemo(() => {
+    const clients = new Set<string>();
+    links.forEach(link => {
+      if (link.client && link.client.trim()) {
+        clients.add(link.client.trim());
+      }
+    });
+    // Always include "Holo Hive" as an option
+    clients.add('Holo Hive');
+    return Array.from(clients).sort();
+  }, [links]);
 
   useEffect(() => {
-    fetchData();
+    fetchLinks();
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
-    await Promise.all([fetchLinks(), fetchClients()]);
-    setLoading(false);
-  };
-
   const fetchLinks = async () => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from('links')
-        .select(`
-          *,
-          client:clients(id, name)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -139,43 +127,29 @@ export default function LinksPage() {
         description: 'Failed to load links',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
   };
 
-  const fetchClients = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select('id, name')
-        .order('name');
-
-      if (error) throw error;
-      setClients(data || []);
-    } catch (error) {
-      console.error('Error fetching clients:', error);
-    }
-  };
-
-  const openDialog = (link?: Link, clientId?: string) => {
+  const openDialog = (link?: Link, clientName?: string) => {
     if (link) {
       setEditingLink(link);
       setFormData({
         name: link.name,
         url: link.url,
-        client_id: link.client_id || '',
+        client: link.client || '',
         link_types: link.link_types || [],
-        access: link.access,
-        status: link.status
+        access: link.access === 'client' ? 'guest' : link.access
       });
     } else {
       setEditingLink(null);
       setFormData({
         name: '',
         url: '',
-        client_id: clientId || '',
-        link_types: [],
-        access: 'team',
-        status: 'active'
+        client: clientName || (activeTab === 'holohive' ? 'Holo Hive' : ''),
+        link_types: activeTab === 'guide' ? ['guide'] : [],
+        access: 'team'
       });
     }
     setIsDialogOpen(true);
@@ -199,10 +173,9 @@ export default function LinksPage() {
           .update({
             name: formData.name.trim(),
             url: formData.url.trim(),
-            client_id: formData.client_id || null,
+            client: formData.client.trim() || null,
             link_types: formData.link_types,
             access: formData.access,
-            status: formData.status,
             updated_at: new Date().toISOString()
           })
           .eq('id', editingLink.id);
@@ -215,10 +188,10 @@ export default function LinksPage() {
           .insert({
             name: formData.name.trim(),
             url: formData.url.trim(),
-            client_id: formData.client_id || null,
+            client: formData.client.trim() || null,
             link_types: formData.link_types,
             access: formData.access,
-            status: formData.status,
+            status: 'active',
             created_by: user?.id
           });
 
@@ -227,7 +200,6 @@ export default function LinksPage() {
       }
 
       setIsDialogOpen(false);
-      setAddingToClient(null);
       fetchLinks();
     } catch (error) {
       console.error('Error saving link:', error);
@@ -272,32 +244,49 @@ export default function LinksPage() {
     }));
   };
 
-  const toggleClientCollapse = (clientId: string) => {
+  const toggleClientCollapse = (clientName: string) => {
     setCollapsedClients(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(clientId)) {
-        newSet.delete(clientId);
+      if (newSet.has(clientName)) {
+        newSet.delete(clientName);
       } else {
-        newSet.add(clientId);
+        newSet.add(clientName);
       }
       return newSet;
     });
   };
 
-  // Filter links
-  const filteredLinks = links.filter(link => {
+  // Filter links based on active tab
+  const getTabLinks = () => {
+    let tabLinks = links;
+
+    // Filter by tab
+    switch (activeTab) {
+      case 'holohive':
+        tabLinks = links.filter(link => link.client === 'Holo Hive');
+        break;
+      case 'guide':
+        tabLinks = links.filter(link => link.link_types.includes('guide'));
+        break;
+      case 'clients':
+        tabLinks = links.filter(link => link.client && link.client !== 'Holo Hive');
+        break;
+    }
+
+    return tabLinks;
+  };
+
+  // Apply search and filters
+  const filteredLinks = getTabLinks().filter(link => {
     // Search filter
     if (searchTerm) {
       const query = searchTerm.toLowerCase();
       if (!link.name.toLowerCase().includes(query) &&
           !link.url.toLowerCase().includes(query) &&
-          !link.client?.name?.toLowerCase().includes(query)) {
+          !link.client?.toLowerCase().includes(query)) {
         return false;
       }
     }
-
-    // Status filter
-    if (filterStatus !== 'all' && link.status !== filterStatus) return false;
 
     // Access filter
     if (filterAccess !== 'all' && link.access !== filterAccess) return false;
@@ -310,60 +299,48 @@ export default function LinksPage() {
 
   // Group links by client
   const groupedLinks = () => {
-    const groups: { clientId: string; clientName: string; links: Link[] }[] = [];
+    const groups: { clientName: string; links: Link[] }[] = [];
     const clientMap = new Map<string, Link[]>();
 
-    // Group by client_id
+    // Group by client
     filteredLinks.forEach(link => {
-      const clientId = link.client_id || '__no_client__';
-      if (!clientMap.has(clientId)) {
-        clientMap.set(clientId, []);
+      const clientName = link.client || 'No Client';
+      if (!clientMap.has(clientName)) {
+        clientMap.set(clientName, []);
       }
-      clientMap.get(clientId)!.push(link);
+      clientMap.get(clientName)!.push(link);
     });
 
     // Convert to array and sort
-    clientMap.forEach((links, clientId) => {
-      const clientName = clientId === '__no_client__'
-        ? 'No Client'
-        : links[0]?.client?.name || 'Unknown Client';
-      groups.push({ clientId, clientName, links });
+    clientMap.forEach((links, clientName) => {
+      groups.push({ clientName, links });
     });
 
     // Sort: clients with names first (alphabetically), then "No Client" at the end
     groups.sort((a, b) => {
-      if (a.clientId === '__no_client__') return 1;
-      if (b.clientId === '__no_client__') return -1;
+      if (a.clientName === 'No Client') return 1;
+      if (b.clientName === 'No Client') return -1;
       return a.clientName.localeCompare(b.clientName);
     });
 
     return groups;
   };
 
-  const hasActiveFilters = filterStatus !== 'all' || filterAccess !== 'all' || filterType !== 'all';
+  const hasActiveFilters = filterAccess !== 'all' || filterType !== 'all';
 
   const clearFilters = () => {
-    setFilterStatus('all');
     setFilterAccess('all');
     setFilterType('all');
   };
 
   const getAccessBadgeColor = (access: string) => {
     switch (access) {
-      case 'public': return 'bg-green-100 text-green-800';
-      case 'partners': return 'bg-blue-100 text-blue-800';
-      case 'team': return 'bg-purple-100 text-purple-800';
-      case 'client': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'inactive': return 'bg-yellow-100 text-yellow-800';
-      case 'archived': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'public': return 'bg-green-100 text-green-800 hover:bg-green-100';
+      case 'partners': return 'bg-blue-100 text-blue-800 hover:bg-blue-100';
+      case 'team': return 'bg-purple-100 text-purple-800 hover:bg-purple-100';
+      case 'guest': return 'bg-orange-100 text-orange-800 hover:bg-orange-100';
+      case 'client': return 'bg-orange-100 text-orange-800 hover:bg-orange-100'; // Legacy support
+      default: return 'bg-gray-100 text-gray-800 hover:bg-gray-100';
     }
   };
 
@@ -373,14 +350,15 @@ export default function LinksPage() {
   };
 
   const getAccessLabel = (value: string) => {
+    if (value === 'client') return 'Guest'; // Legacy support
     const opt = ACCESS_OPTIONS.find(o => o.value === value);
     return opt?.label || value;
   };
 
-  const getStatusLabel = (value: string) => {
-    const opt = STATUS_OPTIONS.find(o => o.value === value);
-    return opt?.label || value;
-  };
+  // Count links per tab
+  const holoHiveCount = links.filter(l => l.client === 'Holo Hive').length;
+  const guideCount = links.filter(l => l.link_types.includes('guide')).length;
+  const clientsCount = links.filter(l => l.client && l.client !== 'Holo Hive').length;
 
   if (loading) {
     return (
@@ -424,6 +402,27 @@ export default function LinksPage() {
         </Button>
       </div>
 
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+        <TabsList>
+          <TabsTrigger value="holohive" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Holo Hive
+            <Badge variant="secondary" className="ml-1 text-xs">{holoHiveCount}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="guide" className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4" />
+            Guide
+            <Badge variant="secondary" className="ml-1 text-xs">{guideCount}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="clients" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Clients
+            <Badge variant="secondary" className="ml-1 text-xs">{clientsCount}</Badge>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       {/* Search and Filters */}
       <div className="flex items-center space-x-4 flex-wrap gap-y-2">
         <div className="relative flex-1 max-w-sm">
@@ -435,18 +434,6 @@ export default function LinksPage() {
             className="pl-10 auth-input"
           />
         </div>
-
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[140px] auth-input">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            {STATUS_OPTIONS.map(opt => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
 
         <Select value={filterAccess} onValueChange={setFilterAccess}>
           <SelectTrigger className="w-[140px] auth-input">
@@ -489,22 +476,22 @@ export default function LinksPage() {
             <p className="text-sm text-gray-500 mt-1">
               {links.length === 0
                 ? 'Add your first link to get started'
-                : 'Try adjusting your filters'}
+                : 'Try adjusting your filters or switch tabs'}
             </p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-4">
           {groups.map(group => {
-            const isCollapsed = collapsedClients.has(group.clientId);
-            const isNoClient = group.clientId === '__no_client__';
+            const isCollapsed = collapsedClients.has(group.clientName);
+            const isNoClient = group.clientName === 'No Client';
 
             return (
-              <div key={group.clientId}>
+              <div key={group.clientName}>
                 {/* Client Header */}
                 <div
                   className={`flex items-center justify-between px-4 py-3 bg-gray-100 ${isCollapsed ? 'rounded-lg' : 'rounded-t-lg'} border border-gray-200 ${isCollapsed ? '' : 'border-b-0'} cursor-pointer select-none transition-all hover:bg-gray-150`}
-                  onClick={() => toggleClientCollapse(group.clientId)}
+                  onClick={() => toggleClientCollapse(group.clientName)}
                 >
                   <div className="flex items-center gap-3">
                     {isCollapsed ? (
@@ -526,7 +513,7 @@ export default function LinksPage() {
                     className="h-7 px-2 text-gray-600 hover:bg-gray-200"
                     onClick={(e) => {
                       e.stopPropagation();
-                      openDialog(undefined, isNoClient ? '' : group.clientId);
+                      openDialog(undefined, isNoClient ? '' : group.clientName);
                     }}
                   >
                     <Plus className="h-4 w-4" />
@@ -543,7 +530,6 @@ export default function LinksPage() {
                           <TableHead>URL</TableHead>
                           <TableHead>Link Type</TableHead>
                           <TableHead>Access</TableHead>
-                          <TableHead>Status</TableHead>
                           <TableHead className="w-16 text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -582,13 +568,8 @@ export default function LinksPage() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge className={`${getAccessBadgeColor(link.access)} hover:bg-inherit cursor-default`}>
+                              <Badge className={`${getAccessBadgeColor(link.access)} cursor-default`}>
                                 {getAccessLabel(link.access)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={`${getStatusBadgeColor(link.status)} hover:bg-inherit cursor-default`}>
-                                {getStatusLabel(link.status)}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
@@ -671,39 +652,35 @@ export default function LinksPage() {
                     role="combobox"
                     className="w-full justify-between font-normal"
                   >
-                    {formData.client_id
-                      ? clients.find(c => c.id === formData.client_id)?.name
-                      : 'Select client...'}
+                    {formData.client || 'Select or type client...'}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[400px] p-0">
                   <Command>
-                    <CommandInput placeholder="Search clients..." />
+                    <CommandInput
+                      placeholder="Search or type client name..."
+                      value={formData.client}
+                      onValueChange={(value) => setFormData({ ...formData, client: value })}
+                    />
                     <CommandList>
-                      <CommandEmpty>No client found.</CommandEmpty>
+                      <CommandEmpty>
+                        <div className="py-2 px-3 text-sm">
+                          Press enter to use "{formData.client}"
+                        </div>
+                      </CommandEmpty>
                       <CommandGroup>
-                        <CommandItem
-                          value=""
-                          onSelect={() => {
-                            setFormData({ ...formData, client_id: '' });
-                            setClientPopoverOpen(false);
-                          }}
-                        >
-                          <Check className={`mr-2 h-4 w-4 ${!formData.client_id ? 'opacity-100' : 'opacity-0'}`} />
-                          No client
-                        </CommandItem>
-                        {clients.map(client => (
+                        {clientSuggestions.map(client => (
                           <CommandItem
-                            key={client.id}
-                            value={client.name}
+                            key={client}
+                            value={client}
                             onSelect={() => {
-                              setFormData({ ...formData, client_id: client.id });
+                              setFormData({ ...formData, client });
                               setClientPopoverOpen(false);
                             }}
                           >
-                            <Check className={`mr-2 h-4 w-4 ${formData.client_id === client.id ? 'opacity-100' : 'opacity-0'}`} />
-                            {client.name}
+                            <Check className={`mr-2 h-4 w-4 ${formData.client === client ? 'opacity-100' : 'opacity-0'}`} />
+                            {client}
                           </CommandItem>
                         ))}
                       </CommandGroup>
@@ -769,44 +746,23 @@ export default function LinksPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Access</Label>
-                <Select
-                  value={formData.access}
-                  onValueChange={(value: 'public' | 'partners' | 'team' | 'client') =>
-                    setFormData({ ...formData, access: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ACCESS_OPTIONS.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(value: 'active' | 'inactive' | 'archived') =>
-                    setFormData({ ...formData, status: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label>Access</Label>
+              <Select
+                value={formData.access}
+                onValueChange={(value: 'public' | 'partners' | 'team' | 'guest') =>
+                  setFormData({ ...formData, access: value })
+                }
+              >
+                <SelectTrigger className="auth-input">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ACCESS_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
