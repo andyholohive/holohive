@@ -34,7 +34,9 @@ import {
   Trash2,
   Terminal,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  User,
+  Users
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -528,13 +530,26 @@ export default function TelegramChatsPage() {
   const displayChats = showDemo ? SAMPLE_CHATS : chats;
   const displayMessages = showDemo ? SAMPLE_MESSAGES : messages;
 
-  const filteredChats = displayChats.filter(chat => {
+  // Separate group chats from DMs
+  const groupChats = displayChats.filter(chat => chat.chat_type === 'group' || chat.chat_type === 'supergroup');
+  const dmChats = displayChats.filter(chat => chat.chat_type === 'private');
+
+  const filteredGroupChats = groupChats.filter(chat => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
       chat.title?.toLowerCase().includes(query) ||
       chat.chat_id.includes(query) ||
       chat.opportunity?.name?.toLowerCase().includes(query)
+    );
+  });
+
+  const filteredDMChats = dmChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query)
     );
   });
 
@@ -574,8 +589,18 @@ export default function TelegramChatsPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
         <TabsList>
           <TabsTrigger value="chats" className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" />
-            Chats
+            <Users className="h-4 w-4" />
+            Groups
+            {groupChats.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{groupChats.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="dms" className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            DMs
+            {dmChats.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{dmChats.length}</Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="commands" className="flex items-center gap-2">
             <Terminal className="h-4 w-4" />
@@ -583,7 +608,7 @@ export default function TelegramChatsPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Chats Tab */}
+        {/* Chats Tab (Groups only) */}
         <TabsContent value="chats" className="mt-4 space-y-4">
           {/* Chats Header */}
           <div className="flex items-center justify-between">
@@ -591,7 +616,7 @@ export default function TelegramChatsPage() {
               {showDemo ? (
                 <span className="text-amber-600">Showing demo data • </span>
               ) : null}
-              Group chats discovered by the bot ({displayChats.length} total)
+              Group chats discovered by the bot ({groupChats.length} total)
             </p>
             <div className="flex items-center gap-4">
               <div className="relative">
@@ -622,23 +647,23 @@ export default function TelegramChatsPage() {
           </div>
 
           {/* Chat List */}
-      {filteredChats.length === 0 ? (
+      {filteredGroupChats.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
-            <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+            <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {chats.length === 0 ? 'No chats discovered yet' : 'No matching chats'}
+              {groupChats.length === 0 ? 'No group chats discovered yet' : 'No matching chats'}
             </h3>
             <p className="text-gray-500 max-w-md mx-auto">
-              {chats.length === 0
-                ? 'Chats will appear here when messages are sent in groups where your bot is a member. Make sure the webhook is connected in Settings.'
+              {groupChats.length === 0
+                ? 'Group chats will appear here when messages are sent in groups where your bot is a member. Make sure the webhook is connected in Settings.'
                 : 'Try a different search term.'}
             </p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4">
-          {filteredChats.map(chat => {
+          {filteredGroupChats.map(chat => {
             const activity = getActivityStatus(chat.last_message_at);
             return (
               <Card key={chat.id} className="hover:shadow-md transition-shadow">
@@ -745,6 +770,132 @@ export default function TelegramChatsPage() {
           })}
         </div>
       )}
+        </TabsContent>
+
+        {/* DMs Tab */}
+        <TabsContent value="dms" className="mt-4 space-y-4">
+          {/* DMs Header */}
+          <div className="flex items-center justify-between">
+            <p className="text-gray-600">
+              {showDemo ? (
+                <span className="text-amber-600">Showing demo data • </span>
+              ) : null}
+              Direct messages with the bot ({dmChats.length} total)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Input
+                  placeholder="Search DMs..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="auth-input pl-10 w-64"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* DM List */}
+          {filteredDMChats.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <User className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {dmChats.length === 0 ? 'No direct messages yet' : 'No matching DMs'}
+                </h3>
+                <p className="text-gray-500 max-w-md mx-auto">
+                  {dmChats.length === 0
+                    ? 'Direct messages will appear here when users message your bot privately.'
+                    : 'Try a different search term.'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredDMChats.map(chat => {
+                const activity = getActivityStatus(chat.last_message_at);
+                return (
+                  <Card key={chat.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        {/* Left: DM Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                            <div className="p-1.5 bg-blue-50 rounded-full">
+                              <User className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <h3 className="font-semibold text-gray-900 truncate">
+                              {chat.title || 'Unknown User'}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              DM
+                            </Badge>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                                {chat.chat_id}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => copyToClipboard(chat.chat_id)}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{formatTimeAgo(chat.last_message_at)}</span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>{chat.message_count} messages</span>
+                            </div>
+                          </div>
+
+                          {/* Recent Messages */}
+                          {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <p className="text-xs font-medium text-gray-500 mb-2">Recent Messages:</p>
+                              <div className="space-y-1.5">
+                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => (
+                                  <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
+                                    <span className="font-medium text-gray-700">
+                                      {msg.from_user_name || msg.from_username || 'Unknown'}:
+                                    </span>{' '}
+                                    <span className="text-gray-600">
+                                      {msg.text && msg.text.length > 80
+                                        ? msg.text.substring(0, 80) + '...'
+                                        : msg.text || '[No text]'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
 
         {/* Commands Tab */}

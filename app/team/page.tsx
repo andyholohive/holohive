@@ -51,7 +51,7 @@ export default function TeamPage() {
     try {
       const success = await UserService.updateUserRole(
         userId,
-        newRole as 'super_admin' | 'admin' | 'member' | 'client'
+        newRole as 'super_admin' | 'admin' | 'member' | 'guest'
       );
 
       if (success) {
@@ -87,11 +87,11 @@ export default function TeamPage() {
     try {
       setLoading(true);
       
-      // Fetch all users except those with client role
+      // Fetch all users except those with guest role
       const { data: users, error } = await supabase
         .from('users')
         .select('*')
-        .neq('role', 'client')
+        .neq('role', 'guest')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -290,7 +290,7 @@ export default function TeamPage() {
                                 <SelectItem value="super_admin">Super Admin</SelectItem>
                                 <SelectItem value="admin">Admin</SelectItem>
                                 <SelectItem value="member">Member</SelectItem>
-                                <SelectItem value="client">Client</SelectItem>
+                                <SelectItem value="guest">Guest</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>

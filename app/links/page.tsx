@@ -16,8 +16,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import {
   Plus, Search, Edit, Trash2, ExternalLink, Link as LinkIcon,
-  Check, ChevronsUpDown, X, ChevronRight, ChevronDown, Building2, BookOpen, Users
+  Check, ChevronsUpDown, X, ChevronRight, ChevronDown, Building2, BookOpen, Users, Info
 } from 'lucide-react';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { Textarea } from '@/components/ui/textarea';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
@@ -27,6 +29,7 @@ interface Link {
   id: string;
   name: string;
   url: string;
+  description: string | null;
   client: string | null;
   link_types: string[];
   access: 'public' | 'partners' | 'team' | 'client';
@@ -45,10 +48,10 @@ const LINK_TYPES = [
   { value: 'resources', label: 'Resources' },
   { value: 'list', label: 'List' },
   { value: 'loom', label: 'Loom' },
-  { value: 'others', label: 'Others' },
   { value: 'sales', label: 'Sales' },
   { value: 'guide', label: 'Guide' },
-  { value: 'contract', label: 'Contract' }
+  { value: 'contract', label: 'Contract' },
+  { value: 'others', label: 'Others' }
 ];
 
 const ACCESS_OPTIONS = [
@@ -77,6 +80,7 @@ export default function LinksPage() {
   const [formData, setFormData] = useState({
     name: '',
     url: '',
+    description: '',
     client: '',
     link_types: [] as string[],
     access: 'team' as 'public' | 'partners' | 'team' | 'client'
@@ -138,6 +142,7 @@ export default function LinksPage() {
       setFormData({
         name: link.name,
         url: link.url,
+        description: link.description || '',
         client: link.client || '',
         link_types: link.link_types || [],
         access: link.access
@@ -147,6 +152,7 @@ export default function LinksPage() {
       setFormData({
         name: '',
         url: '',
+        description: '',
         client: clientName || (activeTab === 'holohive' ? 'Holo Hive' : ''),
         link_types: activeTab === 'guide' ? ['guide'] : [],
         access: 'team'
@@ -173,6 +179,7 @@ export default function LinksPage() {
           .update({
             name: formData.name.trim(),
             url: formData.url.trim(),
+            description: formData.description.trim() || null,
             client: formData.client.trim() || null,
             link_types: formData.link_types,
             access: formData.access,
@@ -188,6 +195,7 @@ export default function LinksPage() {
           .insert({
             name: formData.name.trim(),
             url: formData.url.trim(),
+            description: formData.description.trim() || null,
             client: formData.client.trim() || null,
             link_types: formData.link_types,
             access: formData.access,
@@ -390,14 +398,24 @@ export default function LinksPage() {
             Manage all your important links ({links.length} total)
           </p>
         </div>
-        <Button
-          onClick={() => openDialog()}
-          className="hover:opacity-90"
-          style={{ backgroundColor: '#3e8692', color: 'white' }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Link
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => window.open('/public/links/submit', '_blank')}
+            className="hover:opacity-90"
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Submission Form
+          </Button>
+          <Button
+            onClick={() => openDialog()}
+            className="hover:opacity-90"
+            style={{ backgroundColor: '#3e8692', color: 'white' }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Link
+          </Button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -534,7 +552,26 @@ export default function LinksPage() {
                       <TableBody>
                         {group.links.map(link => (
                           <TableRow key={link.id} className="hover:bg-gray-50">
-                            <TableCell className="font-medium">{link.name}</TableCell>
+                            <TableCell className="font-medium">
+                              {link.description ? (
+                                <HoverCard>
+                                  <HoverCardTrigger asChild>
+                                    <span className="cursor-help flex items-center gap-1">
+                                      {link.name}
+                                      <Info className="h-3 w-3 text-gray-400" />
+                                    </span>
+                                  </HoverCardTrigger>
+                                  <HoverCardContent className="w-80">
+                                    <div className="space-y-1">
+                                      <h4 className="text-sm font-semibold">{link.name}</h4>
+                                      <p className="text-sm text-gray-600">{link.description}</p>
+                                    </div>
+                                  </HoverCardContent>
+                                </HoverCard>
+                              ) : (
+                                link.name
+                              )}
+                            </TableCell>
                             <TableCell>
                               <a
                                 href={link.url}
@@ -638,6 +675,18 @@ export default function LinksPage() {
                 value={formData.url}
                 onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                 className="auth-input"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Optional description (shown on hover)"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="auth-input"
+                rows={2}
               />
             </div>
 

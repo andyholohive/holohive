@@ -442,7 +442,7 @@ export default function ListsPage() {
       const { data, error } = await supabase
         .from('master_kols')
         .select('id, name, platform, followers, region, link, creator_type, rating')
-        .neq('status', 'archived')
+        .is('archived_at', null)
         .order('name');
 
       if (error) throw error;

@@ -495,7 +495,7 @@ const CampaignDetailsPage = () => {
               const { data, error } = await supabase
                 .from('contents')
                 .select('*')
-                .eq('campaign_id', id);
+                .eq('campaign_id', campaign?.id);
               if (!error && data) {
                 setContents(data);
               }
@@ -883,7 +883,7 @@ const CampaignDetailsPage = () => {
     }
   };
 
-  const handleUpdateKOLStatus = async (kolId: string, status: 'Curated' | 'Interested' | 'Onboarded' | 'Concluded') => {
+  const handleUpdateKOLStatus = async (kolId: string, status: 'Curated' | 'Contacted' | 'Interested' | 'Onboarded' | 'Concluded') => {
     try {
       await CampaignKOLService.updateCampaignKOL(kolId, { hh_status: status });
       setCampaignKOLs(prev => prev.map(kol => kol.id === kolId ? { ...kol, hh_status: status } : kol));
@@ -1105,7 +1105,7 @@ const CampaignDetailsPage = () => {
       const { data, error } = await supabase
         .from('campaign_report_files')
         .select('*')
-        .eq('campaign_id', id)
+        .eq('campaign_id', campaign?.id)
         .order('display_order', { ascending: true });
 
       if (error) throw error;
@@ -1124,7 +1124,7 @@ const CampaignDetailsPage = () => {
       const { data, error } = await supabase
         .from('campaign_reports')
         .select('*')
-        .eq('campaign_id', id)
+        .eq('campaign_id', campaign?.id)
         .single();
 
       if (data) {
@@ -1203,7 +1203,7 @@ const CampaignDetailsPage = () => {
       const { data: existingReport } = await supabase
         .from('campaign_reports')
         .select('id')
-        .eq('campaign_id', id)
+        .eq('campaign_id', campaign?.id)
         .single();
 
       if (existingReport) {
@@ -1211,7 +1211,7 @@ const CampaignDetailsPage = () => {
         const { error } = await supabase
           .from('campaign_reports')
           .update({ custom_message: customMessage })
-          .eq('campaign_id', id);
+          .eq('campaign_id', campaign?.id);
 
         if (error) throw error;
       } else {
@@ -1910,6 +1910,7 @@ const CampaignDetailsPage = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Curated': return 'bg-blue-100 text-blue-800';
+      case 'Contacted': return 'bg-purple-100 text-purple-800';
       case 'Interested': return 'bg-yellow-100 text-yellow-800';
       case 'Onboarded': return 'bg-green-100 text-green-800';
       case 'Concluded': return 'bg-gray-100 text-gray-800';
@@ -2025,13 +2026,13 @@ const CampaignDetailsPage = () => {
 
   // 2. Fetch contents for campaign when campaign changes
   const fetchContents = async () => {
-    if (!id) return;
+    if (!campaign?.id) return;
     setLoadingContents(true);
     try {
       const { data, error } = await supabase
         .from('contents')
         .select('*')
-        .eq('campaign_id', id);
+        .eq('campaign_id', campaign?.id);
       if (error) throw error;
       setContents(data || []);
     } catch (err) {
@@ -2043,8 +2044,10 @@ const CampaignDetailsPage = () => {
   };
 
   useEffect(() => {
-    fetchContents();
-  }, [id]); // When campaign changes
+    if (campaign?.id) {
+      fetchContents();
+    }
+  }, [campaign?.id]); // When campaign is loaded
 
   const [contentsSearchTerm, setContentsSearchTerm] = useState('');
   const [bulkContentStatus, setBulkContentStatus] = useState('');
@@ -2521,7 +2524,7 @@ const CampaignDetailsPage = () => {
       let getColorClass = () => '';
 
       if (field === 'hh_status') {
-        options = ['Curated', 'Interested', 'Onboarded', 'Concluded'];
+        options = ['Curated', 'Contacted', 'Interested', 'Onboarded', 'Concluded'];
         getColorClass = () => value ? getStatusColor(value) : 'bg-gray-100 text-gray-800';
       } else if (field === 'budget_type') {
         options = ['Token', 'Fiat', 'WL'];
@@ -4734,7 +4737,7 @@ const CampaignDetailsPage = () => {
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
                                     <div className="text-xs font-semibold text-gray-600 mb-2">Filter Status</div>
-                                    {['Curated','Interested','Onboarded','Concluded'].map((status) => (
+                                    {['Curated','Contacted','Interested','Onboarded','Concluded'].map((status) => (
                                       <div
                                         key={status}
                                         className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
@@ -5488,7 +5491,7 @@ const CampaignDetailsPage = () => {
                             <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Status</span>
                             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                               <MultiSelect
-                                options={['Curated','Interested','Onboarded','Concluded']}
+                                options={['Curated','Contacted','Interested','Onboarded','Concluded']}
                                 selected={kolFilters.hh_status}
                                 onSelectedChange={(hh_status) => setKolFilters(prev => ({ ...prev, hh_status }))}
                                 className="w-full"
@@ -6070,7 +6073,7 @@ const CampaignDetailsPage = () => {
                                   const { data, error } = await supabase
                                     .from('contents')
                                     .select('*')
-                                    .eq('campaign_id', id);
+                                    .eq('campaign_id', campaign?.id);
                                   if (error) throw error;
                                   setContents(data || []);
                                 } catch (error) {

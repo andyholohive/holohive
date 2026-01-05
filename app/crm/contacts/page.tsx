@@ -13,8 +13,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Plus, Search, Edit, Trash2, UserPlus,
   Mail, MessageSquare, MoreHorizontal, Building2, Handshake, Users, TrendingUp,
-  Filter, ArrowUpDown, X
+  Filter, ArrowUpDown, X, Link2
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
@@ -46,6 +47,14 @@ export default function ContactsPage() {
   // Delete confirmation dialog state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [contactToDelete, setContactToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  // Link to network state
+  const [linkToAffiliate, setLinkToAffiliate] = useState(false);
+  const [selectedAffiliateId, setSelectedAffiliateId] = useState<string>('');
+  const [linkToPartner, setLinkToPartner] = useState(false);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string>('');
+  const [existingAffiliateLink, setExistingAffiliateLink] = useState<CRMContactLink | null>(null);
+  const [existingPartnerLink, setExistingPartnerLink] = useState<CRMContactLink | null>(null);
 
   // Filter state
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -107,23 +116,70 @@ export default function ContactsPage() {
     if (!contactForm.name.trim()) return;
     setIsSubmitting(true);
     try {
+      let contactId: string;
+
       if (editingContact) {
         await CRMService.updateContact(editingContact.id, contactForm);
+        contactId = editingContact.id;
       } else {
-        await CRMService.createContact({
+        const newContact = await CRMService.createContact({
           ...contactForm,
           owner_id: user?.id
         });
+        contactId = newContact.id;
       }
+
+      // Handle affiliate link
+      if (linkToAffiliate && selectedAffiliateId) {
+        if (existingAffiliateLink) {
+          // If affiliate changed, delete old and create new
+          if (existingAffiliateLink.affiliate_id !== selectedAffiliateId) {
+            await CRMService.unlinkContact(existingAffiliateLink.id);
+            await CRMService.linkContactToAffiliate(contactId, selectedAffiliateId);
+          }
+        } else {
+          await CRMService.linkContactToAffiliate(contactId, selectedAffiliateId);
+        }
+      } else if (!linkToAffiliate && existingAffiliateLink) {
+        // Unlink affiliate if checkbox unchecked
+        await CRMService.unlinkContact(existingAffiliateLink.id);
+      }
+
+      // Handle partner link
+      if (linkToPartner && selectedPartnerId) {
+        if (existingPartnerLink) {
+          // If partner changed, delete old and create new
+          if (existingPartnerLink.partner_id !== selectedPartnerId) {
+            await CRMService.unlinkContact(existingPartnerLink.id);
+            await CRMService.linkContactToPartner(contactId, selectedPartnerId);
+          }
+        } else {
+          await CRMService.linkContactToPartner(contactId, selectedPartnerId);
+        }
+      } else if (!linkToPartner && existingPartnerLink) {
+        // Unlink partner if checkbox unchecked
+        await CRMService.unlinkContact(existingPartnerLink.id);
+      }
+
       setIsNewContactOpen(false);
       setEditingContact(null);
       setContactForm({ name: '' });
+      resetLinkState();
       fetchContacts();
     } catch (error) {
       console.error('Error saving contact:', error);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const resetLinkState = () => {
+    setLinkToAffiliate(false);
+    setSelectedAffiliateId('');
+    setLinkToPartner(false);
+    setSelectedPartnerId('');
+    setExistingAffiliateLink(null);
+    setExistingPartnerLink(null);
   };
 
   const handleEditContact = (contact: CRMContact) => {
@@ -137,6 +193,32 @@ export default function ContactsPage() {
       category: contact.category || undefined,
       notes: contact.notes || undefined
     });
+
+    // Check for existing affiliate/partner links
+    const contactLinks = getContactLinks(contact.id);
+    const affiliateLink = contactLinks.find(l => l.affiliate_id);
+    const partnerLink = contactLinks.find(l => l.partner_id);
+
+    if (affiliateLink) {
+      setLinkToAffiliate(true);
+      setSelectedAffiliateId(affiliateLink.affiliate_id || '');
+      setExistingAffiliateLink(affiliateLink);
+    } else {
+      setLinkToAffiliate(false);
+      setSelectedAffiliateId('');
+      setExistingAffiliateLink(null);
+    }
+
+    if (partnerLink) {
+      setLinkToPartner(true);
+      setSelectedPartnerId(partnerLink.partner_id || '');
+      setExistingPartnerLink(partnerLink);
+    } else {
+      setLinkToPartner(false);
+      setSelectedPartnerId('');
+      setExistingPartnerLink(null);
+    }
+
     setIsNewContactOpen(true);
   };
 
@@ -271,6 +353,7 @@ export default function ContactsPage() {
             onClick={() => {
               setEditingContact(null);
               setContactForm({ name: '' });
+              resetLinkState();
               setIsNewContactOpen(true);
             }}
             className="hover:opacity-90"
@@ -411,6 +494,7 @@ export default function ContactsPage() {
                 onClick={() => {
                   setEditingContact(null);
                   setContactForm({ name: '' });
+                  resetLinkState();
                   setIsNewContactOpen(true);
                 }}
                 style={{ backgroundColor: '#3e8692', color: 'white' }}
@@ -501,27 +585,46 @@ export default function ContactsPage() {
 
                   {/* Linked Entities */}
                   {totalLinks > 0 && (
-                    <div className="pt-1.5 border-t border-gray-100">
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {linkedOpps.length > 0 && (
-                          <Badge variant="secondary" className="text-[10px] bg-emerald-50 text-emerald-700 font-normal px-1.5 py-0">
-                            <TrendingUp className="h-2.5 w-2.5 mr-0.5" />
-                            {linkedOpps.length}
-                          </Badge>
-                        )}
-                        {linkedParts.length > 0 && (
-                          <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-700 font-normal px-1.5 py-0">
-                            <Handshake className="h-2.5 w-2.5 mr-0.5" />
-                            {linkedParts.length}
-                          </Badge>
-                        )}
-                        {linkedAffs.length > 0 && (
-                          <Badge variant="secondary" className="text-[10px] bg-purple-50 text-purple-700 font-normal px-1.5 py-0">
-                            <Users className="h-2.5 w-2.5 mr-0.5" />
-                            {linkedAffs.length}
-                          </Badge>
-                        )}
-                      </div>
+                    <div className="pt-1.5 border-t border-gray-100 space-y-1.5">
+                      {/* Linked Opportunities */}
+                      {linkedOpps.length > 0 && (
+                        <div className="flex items-start gap-1">
+                          <TrendingUp className="h-3 w-3 text-emerald-600 mt-0.5 shrink-0" />
+                          <div className="flex flex-wrap gap-1">
+                            {linkedOpps.map(opp => (
+                              <Badge key={opp.id} variant="secondary" className="text-[10px] bg-emerald-50 text-emerald-700 font-normal px-1.5 py-0">
+                                {opp.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {/* Linked Partners */}
+                      {linkedParts.length > 0 && (
+                        <div className="flex items-start gap-1">
+                          <Handshake className="h-3 w-3 text-blue-600 mt-0.5 shrink-0" />
+                          <div className="flex flex-wrap gap-1">
+                            {linkedParts.map(part => (
+                              <Badge key={part.id} variant="secondary" className="text-[10px] bg-blue-50 text-blue-700 font-normal px-1.5 py-0">
+                                {part.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {/* Linked Affiliates */}
+                      {linkedAffs.length > 0 && (
+                        <div className="flex items-start gap-1">
+                          <Users className="h-3 w-3 text-purple-600 mt-0.5 shrink-0" />
+                          <div className="flex flex-wrap gap-1">
+                            {linkedAffs.map(aff => (
+                              <Badge key={aff.id} variant="secondary" className="text-[10px] bg-purple-50 text-purple-700 font-normal px-1.5 py-0">
+                                {aff.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -619,6 +722,79 @@ export default function ContactsPage() {
                   rows={3}
                 />
               </div>
+
+              {/* Link to Network Section */}
+              {(affiliates.length > 0 || partners.length > 0) && (
+                <div className="border-t pt-4 mt-2">
+                  <Label className="text-sm font-medium flex items-center gap-2 mb-3">
+                    <Link2 className="h-4 w-4" />
+                    Link to Network
+                  </Label>
+                  <div className="space-y-3">
+                    {/* Affiliate Link */}
+                    {affiliates.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="link-affiliate"
+                            checked={linkToAffiliate}
+                            onCheckedChange={(checked) => {
+                              setLinkToAffiliate(!!checked);
+                              if (!checked) setSelectedAffiliateId('');
+                            }}
+                          />
+                          <Label htmlFor="link-affiliate" className="text-sm font-normal cursor-pointer">
+                            Link to Affiliate
+                          </Label>
+                        </div>
+                        {linkToAffiliate && (
+                          <Select value={selectedAffiliateId} onValueChange={setSelectedAffiliateId}>
+                            <SelectTrigger className="auth-input">
+                              <SelectValue placeholder="Select affiliate..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {affiliates.map(aff => (
+                                <SelectItem key={aff.id} value={aff.id}>{aff.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Partner Link */}
+                    {partners.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="link-partner"
+                            checked={linkToPartner}
+                            onCheckedChange={(checked) => {
+                              setLinkToPartner(!!checked);
+                              if (!checked) setSelectedPartnerId('');
+                            }}
+                          />
+                          <Label htmlFor="link-partner" className="text-sm font-normal cursor-pointer">
+                            Link to Partner
+                          </Label>
+                        </div>
+                        {linkToPartner && (
+                          <Select value={selectedPartnerId} onValueChange={setSelectedPartnerId}>
+                            <SelectTrigger className="auth-input">
+                              <SelectValue placeholder="Select partner..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {partners.map(part => (
+                                <SelectItem key={part.id} value={part.id}>{part.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsNewContactOpen(false)}>

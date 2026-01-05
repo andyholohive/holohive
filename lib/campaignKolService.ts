@@ -4,7 +4,7 @@ export interface CampaignKOL {
   id: string;
   campaign_id: string;
   master_kol_id: string;
-  hh_status: 'Curated' | 'Interested' | 'Onboarded' | 'Concluded' | null;
+  hh_status: 'Curated' | 'Contacted' | 'Interested' | 'Onboarded' | 'Concluded' | null;
   client_status?: 'Rejected' | 'Preferred' | null;
   notes?: string | null;
   allocated_budget?: number | null;
@@ -122,7 +122,7 @@ export class CampaignKOLService {
       const { data, error } = await supabase
         .from('master_kols')
         .select('*')
-        .neq('status', 'archived')
+        .is('archived_at', null)
         .order('name');
 
       if (error) {
@@ -137,7 +137,7 @@ export class CampaignKOLService {
     const { data, error } = await supabase
       .from('master_kols')
       .select('*')
-      .neq('status', 'archived')
+      .is('archived_at', null)
       .not('id', 'in', `(${assignedIds.join(',')})`)
       .order('name');
 
@@ -150,7 +150,7 @@ export class CampaignKOLService {
   }
 
   static getHHStatusOptions(): CampaignKOL['hh_status'][] {
-    return ['Curated', 'Interested', 'Onboarded', 'Concluded'];
+    return ['Curated', 'Contacted', 'Interested', 'Onboarded', 'Concluded'];
   }
 
   static getClientStatusOptions(): ('Rejected' | 'Preferred')[] {

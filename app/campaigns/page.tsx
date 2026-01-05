@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Copy, ExternalLink } from "lucide-react";
+import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Copy, ExternalLink, Archive, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ClientService, ClientWithAccess } from "@/lib/clientService";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
@@ -35,6 +35,9 @@ export default function CampaignsPage() {
   const [isSubmittingCampaign, setIsSubmittingCampaign] = useState(false);
   const [isShareCampaignOpen, setIsShareCampaignOpen] = useState(false);
   const [sharingCampaign, setSharingCampaign] = useState<CampaignWithDetails | null>(null);
+  const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
+  const [archivingCampaign, setArchivingCampaign] = useState<CampaignWithDetails | null>(null);
+  const [isArchiving, setIsArchiving] = useState(false);
   const [availableClients, setAvailableClients] = useState<ClientWithAccess[]>([]);
   const [availableTemplates, setAvailableTemplates] = useState<CampaignTemplateWithDetails[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<string>("none");
@@ -335,6 +338,27 @@ export default function CampaignsPage() {
   const handleShareCampaign = (campaign: CampaignWithDetails) => {
     setSharingCampaign(campaign);
     setIsShareCampaignOpen(true);
+  };
+
+  const handleArchiveCampaign = (campaign: CampaignWithDetails) => {
+    setArchivingCampaign(campaign);
+    setIsArchiveDialogOpen(true);
+  };
+
+  const confirmArchiveCampaign = async () => {
+    if (!archivingCampaign) return;
+    setIsArchiving(true);
+    try {
+      await CampaignService.archiveCampaign(archivingCampaign.id);
+      await fetchCampaigns();
+      setIsArchiveDialogOpen(false);
+      setArchivingCampaign(null);
+    } catch (err) {
+      console.error('Error archiving campaign:', err);
+      setError('Failed to archive campaign');
+    } finally {
+      setIsArchiving(false);
+    }
   };
 
   const getStatusVariant = (status: string) => {
@@ -1014,15 +1038,26 @@ export default function CampaignsPage() {
                 >
                   View Campaign
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full mt-2"
-                  onClick={() => handleShareCampaign(campaign)}
-                >
-                  <Share2 className="h-4 w-4 mr-2" />
-                  Share Campaign
-                </Button>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleShareCampaign(campaign)}
+                  >
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                    onClick={() => handleArchiveCampaign(campaign)}
+                  >
+                    <Archive className="h-4 w-4 mr-2" />
+                    Archive
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))
@@ -1130,6 +1165,44 @@ export default function CampaignsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsShareCampaignOpen(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Archive Campaign Confirmation Dialog */}
+      <Dialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="h-5 w-5" />
+              Archive Campaign
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to archive <span className="font-semibold">{archivingCampaign?.name}</span>?
+              The campaign will be moved to the archive and can be restored later.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800">
+              <p>This will:</p>
+              <ul className="list-disc list-inside mt-1 space-y-1">
+                <li>Hide the campaign from the main campaigns list</li>
+                <li>Keep all campaign data intact</li>
+                <li>Allow restoration from the Archive page</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsArchiveDialogOpen(false)} disabled={isArchiving}>
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmArchiveCampaign}
+              disabled={isArchiving}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+            >
+              {isArchiving ? "Archiving..." : "Archive Campaign"}
             </Button>
           </DialogFooter>
         </DialogContent>

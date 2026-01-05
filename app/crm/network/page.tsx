@@ -74,6 +74,13 @@ export default function NetworkPage() {
     status: 'new',
   });
 
+  // Contact creation state within partner dialog
+  const [partnerDialogContactMode, setPartnerDialogContactMode] = useState<'link' | 'create' | 'none'>('none');
+  const [newContactInPartnerDialog, setNewContactInPartnerDialog] = useState<CreateContactData>({ name: '' });
+  const [selectedContactInPartnerDialog, setSelectedContactInPartnerDialog] = useState<string>('');
+  const [contactRoleInPartnerDialog, setContactRoleInPartnerDialog] = useState<string>('');
+  const [isPrimaryContactInPartnerDialog, setIsPrimaryContactInPartnerDialog] = useState(false);
+
   // Contact linking state for Partners
   const [isPartnerContactLinkOpen, setIsPartnerContactLinkOpen] = useState(false);
   const [linkingPartner, setLinkingPartner] = useState<CRMPartner | null>(null);
@@ -230,19 +237,55 @@ export default function NetworkPage() {
         is_affiliate: !!affiliateIdToLink
       };
 
+      let partnerId: string;
       if (editingPartner) {
         await CRMService.updatePartner(editingPartner.id, partnerData);
+        partnerId = editingPartner.id;
       } else {
-        await CRMService.createPartner({
+        const newPartner = await CRMService.createPartner({
           ...partnerData,
           owner_id: user?.id
         });
+        partnerId = newPartner.id;
       }
+
+      // Handle contact creation/linking
+      if (partnerDialogContactMode === 'create' && newContactInPartnerDialog.name.trim()) {
+        // Create and link new contact
+        const newContact = await CRMService.createContact({
+          ...newContactInPartnerDialog,
+          owner_id: user?.id
+        });
+        if (newContact) {
+          await CRMService.linkContactToPartner(
+            newContact.id,
+            partnerId,
+            contactRoleInPartnerDialog || undefined,
+            isPrimaryContactInPartnerDialog
+          );
+          setContacts(prev => [...prev, newContact]);
+        }
+      } else if (partnerDialogContactMode === 'link' && selectedContactInPartnerDialog) {
+        // Link existing contact
+        await CRMService.linkContactToPartner(
+          selectedContactInPartnerDialog,
+          partnerId,
+          contactRoleInPartnerDialog || undefined,
+          isPrimaryContactInPartnerDialog
+        );
+      }
+
       setIsNewPartnerOpen(false);
       setEditingPartner(null);
       setPartnerForm({ name: '', status: 'active' });
       setPartnerDialogAffiliateMode('link');
       setNewAffiliateInPartnerDialog({ name: '', status: 'new' });
+      // Reset contact states
+      setPartnerDialogContactMode('none');
+      setNewContactInPartnerDialog({ name: '' });
+      setSelectedContactInPartnerDialog('');
+      setContactRoleInPartnerDialog('');
+      setIsPrimaryContactInPartnerDialog(false);
       fetchData();
     } catch (error) {
       console.error('Error saving partner:', error);
@@ -268,6 +311,12 @@ export default function NetworkPage() {
     });
     setPartnerDialogAffiliateMode('link');
     setNewAffiliateInPartnerDialog({ name: '', status: 'new' });
+    // Reset contact states
+    setPartnerDialogContactMode('none');
+    setNewContactInPartnerDialog({ name: '' });
+    setSelectedContactInPartnerDialog('');
+    setContactRoleInPartnerDialog('');
+    setIsPrimaryContactInPartnerDialog(false);
     setIsNewPartnerOpen(true);
   };
 
@@ -2289,6 +2338,125 @@ export default function NetworkPage() {
                         placeholder="Rate (e.g., 10%)"
                         className="auth-input"
                       />
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Link to Contact */}
+              <div className="grid gap-2">
+                <Label>Contact</Label>
+                {/* Toggle between None, Link, and Create */}
+                <div className="flex rounded-lg border border-gray-200 p-1 bg-gray-50">
+                  <button
+                    type="button"
+                    onClick={() => setPartnerDialogContactMode('none')}
+                    className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
+                      partnerDialogContactMode === 'none'
+                        ? 'bg-white shadow-sm text-gray-900'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    None
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPartnerDialogContactMode('link')}
+                    className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
+                      partnerDialogContactMode === 'link'
+                        ? 'bg-white shadow-sm text-gray-900'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    Link Existing
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPartnerDialogContactMode('create')}
+                    className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-colors ${
+                      partnerDialogContactMode === 'create'
+                        ? 'bg-white shadow-sm text-gray-900'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    Create New
+                  </button>
+                </div>
+
+                {partnerDialogContactMode === 'link' && (
+                  <div className="space-y-2">
+                    <Select
+                      value={selectedContactInPartnerDialog || 'none'}
+                      onValueChange={(v) => setSelectedContactInPartnerDialog(v === 'none' ? '' : v)}
+                    >
+                      <SelectTrigger className="auth-input">
+                        <SelectValue placeholder="Select a contact" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Select a contact</SelectItem>
+                        {contacts.map((contact) => (
+                          <SelectItem key={contact.id} value={contact.id}>
+                            {contact.name} {contact.email ? `(${contact.email})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={contactRoleInPartnerDialog}
+                      onChange={(e) => setContactRoleInPartnerDialog(e.target.value)}
+                      placeholder="Role (e.g., Account Manager)"
+                      className="auth-input"
+                    />
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="partner-dialog-is-primary"
+                        checked={isPrimaryContactInPartnerDialog}
+                        onCheckedChange={(checked) => setIsPrimaryContactInPartnerDialog(checked === true)}
+                      />
+                      <Label htmlFor="partner-dialog-is-primary" className="text-sm font-normal">
+                        Primary contact
+                      </Label>
+                    </div>
+                  </div>
+                )}
+
+                {partnerDialogContactMode === 'create' && (
+                  <div className="space-y-2">
+                    <Input
+                      value={newContactInPartnerDialog.name}
+                      onChange={(e) => setNewContactInPartnerDialog({ ...newContactInPartnerDialog, name: e.target.value })}
+                      placeholder="Contact name *"
+                      className="auth-input"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="email"
+                        value={newContactInPartnerDialog.email || ''}
+                        onChange={(e) => setNewContactInPartnerDialog({ ...newContactInPartnerDialog, email: e.target.value })}
+                        placeholder="Email"
+                        className="auth-input"
+                      />
+                      <Input
+                        value={newContactInPartnerDialog.telegram_id || ''}
+                        onChange={(e) => setNewContactInPartnerDialog({ ...newContactInPartnerDialog, telegram_id: e.target.value })}
+                        placeholder="Telegram @username"
+                        className="auth-input"
+                      />
+                    </div>
+                    <Input
+                      value={contactRoleInPartnerDialog}
+                      onChange={(e) => setContactRoleInPartnerDialog(e.target.value)}
+                      placeholder="Role (e.g., Account Manager)"
+                      className="auth-input"
+                    />
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="partner-dialog-is-primary-new"
+                        checked={isPrimaryContactInPartnerDialog}
+                        onCheckedChange={(checked) => setIsPrimaryContactInPartnerDialog(checked === true)}
+                      />
+                      <Label htmlFor="partner-dialog-is-primary-new" className="text-sm font-normal">
+                        Primary contact
+                      </Label>
                     </div>
                   </div>
                 )}

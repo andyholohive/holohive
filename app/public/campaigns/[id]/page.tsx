@@ -171,6 +171,8 @@ const getStatusColor = (status: string) => {
   switch (s) {
     case 'curated':
       return 'bg-blue-100 text-blue-800';
+    case 'contacted':
+      return 'bg-purple-100 text-purple-800';
     case 'interested':
       return 'bg-yellow-100 text-yellow-800';
     case 'onboarded':
@@ -1328,7 +1330,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   <PopoverContent className="w-[200px] p-0" align="start">
                                     <div className="p-3">
                                       <div className="text-xs font-semibold text-gray-600 mb-2">Filter Status</div>
-                                      {['Curated','Interested','Onboarded','Concluded'].map((status) => (
+                                      {['Curated','Contacted','Interested','Onboarded','Concluded'].map((status) => (
                                         <div
                                           key={status}
                                           className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"

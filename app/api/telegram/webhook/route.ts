@@ -191,14 +191,14 @@ async function handleMessage(message: any) {
     await handleCommand(chatId, command, args, message);
   }
 
-  // Only track group/supergroup messages in database
-  if (chatType !== 'group' && chatType !== 'supergroup') {
-    console.log('[Telegram Webhook] Ignoring non-group message for tracking:', chatType);
-    return;
-  }
+  // Track all chat types (groups, supergroups, and private DMs)
+  // For DMs, use the user's name as the title
+  const title = chatType === 'private'
+    ? [fromFirstName, fromLastName].filter(Boolean).join(' ') || fromUsername || 'Unknown User'
+    : chatTitle;
 
   // Track/update chat in telegram_chats table
-  await trackChat(chatId, chatTitle, chatType, messageDate);
+  await trackChat(chatId, title, chatType, messageDate);
 
   // Store the message for chat identification
   const fromName = [fromFirstName, fromLastName].filter(Boolean).join(' ') || 'Unknown';

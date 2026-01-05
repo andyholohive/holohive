@@ -182,21 +182,7 @@ export default function Sidebar({ children }: SidebarProps) {
                     </span>
                   </Button>
                 </Link>
-                {/* Channel Partners tab */}
-                <Link href="/channel-partners" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/channel-partners') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/channel-partners') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Channel Partners' : undefined}
-                  >
-                    <span>
-                      <Building2 className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Channel Partners'}
-                    </span>
-                  </Button>
-                </Link>
+                {/* Clients tab */}
                 <Link href="/clients" legacyBehavior>
                   <Button
                     asChild
@@ -211,6 +197,16 @@ export default function Sidebar({ children }: SidebarProps) {
                     </span>
                   </Button>
                 </Link>
+              </div>
+
+              {/* KOLs Section */}
+              {!isSidebarCollapsed && (
+                <div className="flex items-center space-x-2">
+                  <Crown className="h-4 w-4 text-gray-400" />
+                  <div className="flex-1 h-px bg-gray-200"></div>
+                </div>
+              )}
+              <div className="space-y-2">
                 {/* KOLs tab */}
                 <Link href="/kols" legacyBehavior>
                   <Button
@@ -223,6 +219,36 @@ export default function Sidebar({ children }: SidebarProps) {
                     <span>
                       <Crown className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
                       {!isSidebarCollapsed && 'KOLs'}
+                    </span>
+                  </Button>
+                </Link>
+                {/* Lists tab */}
+                <Link href="/lists" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/lists') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/lists') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Lists' : undefined}
+                  >
+                    <span>
+                      <List className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Lists'}
+                    </span>
+                  </Button>
+                </Link>
+                {/* Campaigns tab */}
+                <Link href="/campaigns" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/campaigns') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/campaigns') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Campaigns' : undefined}
+                  >
+                    <span>
+                      <Megaphone className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Campaigns'}
                     </span>
                   </Button>
                 </Link>
@@ -306,50 +332,6 @@ export default function Sidebar({ children }: SidebarProps) {
                 </div>
               )}
               <div className="space-y-2">
-                {/* Lists tab */}
-                <Link href="/lists" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/lists') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/lists') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Lists' : undefined}
-                  >
-                    <span>
-                      <List className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Lists'}
-                    </span>
-                  </Button>
-                </Link>
-                <Link href="/campaigns" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/campaigns') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/campaigns') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Campaigns' : undefined}
-                  >
-                    <span>
-                      <Megaphone className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Campaigns'}
-                    </span>
-                  </Button>
-                </Link>
-                {/* Templates tab */}
-                <Link href="/templates" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/templates') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/templates') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Templates' : undefined}
-                  >
-                    <span>
-                      <MessageSquare className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Templates'}
-                    </span>
-                  </Button>
-                </Link>
                 {/* Forms tab - Admin only */}
                 {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                   <Link href="/forms" legacyBehavior>
@@ -382,18 +364,21 @@ export default function Sidebar({ children }: SidebarProps) {
                     </span>
                   </Button>
                 </Link>
-                {/* AI Insights tab (disabled) */}
-                <Button
-                  variant="ghost"
-                  className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} opacity-50 cursor-not-allowed`}
-                  title={isSidebarCollapsed ? 'AI Insights' : undefined}
-                  disabled
-                >
-                  <div className={`flex items-center whitespace-nowrap ${isSidebarCollapsed ? '' : ''}`}>
-                    <Zap className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                    {!isSidebarCollapsed && <span>AI Insights</span>}
-                  </div>
-                </Button>
+                {/* Templates tab */}
+                <Link href="/templates" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/templates') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/templates') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Templates' : undefined}
+                  >
+                    <span>
+                      <MessageSquare className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Templates'}
+                    </span>
+                  </Button>
+                </Link>
               </div>
 
               {/* Admin Section */}

@@ -36,7 +36,7 @@ export class UserService {
     userId: string,
     email: string,
     name?: string,
-    role: 'super_admin' | 'admin' | 'member' | 'client' = 'member'
+    role: 'super_admin' | 'admin' | 'member' | 'guest' = 'member'
   ): Promise<UserProfile | null> {
     // First try to get existing profile
     const existingProfile = await this.getUserProfile(userId)
@@ -124,7 +124,7 @@ export class UserService {
   /**
    * Update user role (super_admin only)
    */
-  static async updateUserRole(userId: string, newRole: 'super_admin' | 'admin' | 'member' | 'client'): Promise<boolean> {
+  static async updateUserRole(userId: string, newRole: 'super_admin' | 'admin' | 'member' | 'guest'): Promise<boolean> {
     return this.updateUserProfile(userId, { role: newRole })
   }
 
