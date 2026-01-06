@@ -2155,12 +2155,10 @@ const CampaignDetailsPage = () => {
     }
 
     return (
-      (!search ||
-        (kol?.master_kol?.name?.toLowerCase().includes(search)) ||
-        (content.platform?.toLowerCase().includes(search)) ||
-        (content.status?.toLowerCase().includes(search))
-      ) &&
-      (!bulkContentStatus || content.status === bulkContentStatus)
+      !search ||
+      (kol?.master_kol?.name?.toLowerCase().includes(search)) ||
+      (content.platform?.toLowerCase().includes(search)) ||
+      (content.status?.toLowerCase().includes(search))
     );
   });
 
