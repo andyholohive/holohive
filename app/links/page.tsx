@@ -171,6 +171,24 @@ export default function LinksPage() {
       return;
     }
 
+    if (!formData.client.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Client is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (formData.link_types.length === 0) {
+      toast({
+        title: 'Error',
+        description: 'At least one link type is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       if (editingLink) {
@@ -679,19 +697,7 @@ export default function LinksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                placeholder="Optional description (shown on hover)"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="auth-input"
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Client</Label>
+              <Label>Client <span className="text-red-500">*</span></Label>
               <Popover open={clientPopoverOpen} onOpenChange={setClientPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -738,7 +744,7 @@ export default function LinksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Link Type</Label>
+              <Label>Link Type <span className="text-red-500">*</span></Label>
               <Popover open={linkTypesPopoverOpen} onOpenChange={setLinkTypesPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -794,7 +800,7 @@ export default function LinksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Access</Label>
+              <Label>Access <span className="text-red-500">*</span></Label>
               <Select
                 value={formData.access}
                 onValueChange={(value: 'public' | 'partners' | 'team' | 'client') =>
@@ -810,6 +816,18 @@ export default function LinksPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (Optional)</Label>
+              <Textarea
+                id="description"
+                placeholder="Optional description (shown on hover)"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="auth-input"
+                rows={2}
+              />
             </div>
           </div>
 

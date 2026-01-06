@@ -4,7 +4,6 @@ import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ChangelogProvider } from '@/contexts/ChangelogContext';
 import { Toaster } from '@/components/ui/toaster';
-import FloatingChat from '@/components/ai/FloatingChat';
 import ChangelogModal from '@/components/changelog/ChangelogModal';
 import { ChunkErrorHandler } from '@/components/ChunkErrorHandler';
 
@@ -32,7 +31,6 @@ export default function RootLayout({
         <AuthProvider>
           <ChangelogProvider>
             {children}
-            <FloatingChat />
             <ChangelogModal />
           </ChangelogProvider>
         </AuthProvider>

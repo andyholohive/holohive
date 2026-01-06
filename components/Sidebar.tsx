@@ -159,6 +159,24 @@ export default function Sidebar({ children }: SidebarProps) {
           <div className="flex flex-col h-full">
             {/* Navigation */}
             <nav className="p-4 space-y-4 flex-1 overflow-y-auto">
+              {/* Holo GPT - Top of sidebar */}
+              <div className="space-y-2">
+                <Link href="/chat" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/chat') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/chat') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Holo GPT' : undefined}
+                  >
+                    <span>
+                      <Sparkles className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Holo GPT'}
+                    </span>
+                  </Button>
+                </Link>
+              </div>
+
               {/* People Section */}
               {!isSidebarCollapsed && (
                 <div className="flex items-center space-x-2">

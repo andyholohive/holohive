@@ -117,6 +117,15 @@ export default function LinkSubmitPage() {
       return;
     }
 
+    if (!formData.client.trim()) {
+      setError('Client is required');
+      return;
+    }
+    if (formData.link_types.length === 0) {
+      setError('At least one link type is required');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -226,20 +235,7 @@ export default function LinkSubmitPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                placeholder="Optional description for this link"
-                value={formData.description}
-                onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                disabled={isSubmitting}
-                className="auth-input"
-                rows={2}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Client</Label>
+              <Label>Client <span className="text-red-500">*</span></Label>
               <Popover open={clientPopoverOpen} onOpenChange={setClientPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -287,7 +283,7 @@ export default function LinkSubmitPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Link Type</Label>
+              <Label>Link Type <span className="text-red-500">*</span></Label>
               <Popover open={linkTypesPopoverOpen} onOpenChange={setLinkTypesPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -345,7 +341,7 @@ export default function LinkSubmitPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Access</Label>
+              <Label>Access <span className="text-red-500">*</span></Label>
               <Select
                 value={formData.access}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, access: value }))}
@@ -360,6 +356,19 @@ export default function LinkSubmitPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (Optional)</Label>
+              <Textarea
+                id="description"
+                placeholder="Optional description for this link"
+                value={formData.description}
+                onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                disabled={isSubmitting}
+                className="auth-input"
+                rows={2}
+              />
             </div>
 
             <Button
