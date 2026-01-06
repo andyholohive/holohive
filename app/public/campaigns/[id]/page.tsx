@@ -206,8 +206,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   const [contents, setContents] = useState<ContentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [kolViewMode, setKolViewMode] = useState<'overview' | 'table' | 'cards'>('overview');
-  const [contentViewMode, setContentViewMode] = useState<'table' | 'overview'>('overview');
+  const [kolViewMode, setKolViewMode] = useState<'overview' | 'table' | 'cards'>('table');
+  const [contentViewMode, setContentViewMode] = useState<'table' | 'overview'>('table');
   const [email, setEmail] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [emailError, setEmailError] = useState('');
@@ -799,13 +799,6 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                   <div className="mb-4">
                     <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
                       <div
-                        onClick={() => setKolViewMode('overview')}
-                        className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'overview' ? 'bg-background text-foreground shadow-sm' : ''}`}
-                      >
-                        <BarChart3 className="h-4 w-4 mr-2" />
-                        Overview
-                      </div>
-                      <div
                         onClick={() => setKolViewMode('table')}
                         className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'table' ? 'bg-background text-foreground shadow-sm' : ''}`}
                       >
@@ -818,6 +811,13 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       >
                         <CreditCard className="h-4 w-4 mr-2" />
                         Cards
+                      </div>
+                      <div
+                        onClick={() => setKolViewMode('overview')}
+                        className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'overview' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                      >
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        Overview
                       </div>
                     </div>
                   </div>
@@ -1781,11 +1781,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                   {/* Content View Toggle */}
                   <div className="mb-4">
                     <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
-                      <div onClick={() => setContentViewMode('overview')} className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${contentViewMode === 'overview' ? 'bg-background text-foreground shadow-sm' : ''}`}>
-                        <BarChart3 className="h-4 w-4 mr-2" /> Overview
-                      </div>
                       <div onClick={() => setContentViewMode('table')} className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${contentViewMode === 'table' ? 'bg-background text-foreground shadow-sm' : ''}`}>
                         <TableIcon className="h-4 w-4 mr-2" /> Table
+                      </div>
+                      <div onClick={() => setContentViewMode('overview')} className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${contentViewMode === 'overview' ? 'bg-background text-foreground shadow-sm' : ''}`}>
+                        <BarChart3 className="h-4 w-4 mr-2" /> Overview
                       </div>
                     </div>
                   </div>
