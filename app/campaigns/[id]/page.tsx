@@ -6633,7 +6633,7 @@ const CampaignDetailsPage = () => {
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
+                              <CalendarComponent
                                 mode="single"
                                 selected={bulkContentActivationDate ? new Date(bulkContentActivationDate) : undefined}
                                 onSelect={date => setBulkContentActivationDate(date ? formatDateLocal(date) : '')}
