@@ -325,21 +325,23 @@ export default function Sidebar({ children }: SidebarProps) {
                     </span>
                   </Button>
                 </Link>
-                {/* Telegram Chats tab */}
-                <Link href="/crm/telegram" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/crm/telegram') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/crm/telegram') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'TG Chats' : undefined}
-                  >
-                    <span>
-                      <MessageSquare className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'TG Chats'}
-                    </span>
-                  </Button>
-                </Link>
+                {/* Telegram Chats tab - Super Admin only */}
+                {userProfile?.role === 'super_admin' && (
+                  <Link href="/crm/telegram" legacyBehavior>
+                    <Button
+                      asChild
+                      variant={pathname.startsWith('/crm/telegram') ? 'default' : 'ghost'}
+                      className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                      style={pathname.startsWith('/crm/telegram') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                      title={isSidebarCollapsed ? 'TG Chats' : undefined}
+                    >
+                      <span>
+                        <MessageSquare className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                        {!isSidebarCollapsed && 'TG Chats'}
+                      </span>
+                    </Button>
+                  </Link>
+                )}
               </div>
 
               {/* Documents Section */}
