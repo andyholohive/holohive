@@ -1651,7 +1651,7 @@ export default function FormBuilderPage() {
       currentY += headerH + 8;
 
       // === FIELDS ===
-      const sortedFields = [...form.fields].sort((a, b) => a.display_order - b.display_order);
+      const sortedFields = [...form.fields].sort((a, b) => (a.page_number - b.page_number) || (a.display_order - b.display_order));
 
       for (const field of sortedFields) {
         if (['section', 'description', 'link'].includes(field.field_type)) continue;
@@ -2912,7 +2912,7 @@ export default function FormBuilderPage() {
                 {/* Form Fields */}
                 <div className="space-y-4">
                   {form?.fields
-                    .sort((a, b) => a.display_order - b.display_order)
+                    .sort((a, b) => (a.page_number - b.page_number) || (a.display_order - b.display_order))
                     .map((field) => {
                       const value = selectedResponse.response_data[field.id];
                       const reasonKey = `${field.id}_reason`;

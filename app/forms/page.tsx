@@ -356,7 +356,7 @@ export default function FormsPage() {
 
     // Fields
     doc.setFontSize(10);
-    for (const field of form.fields.sort((a, b) => a.display_order - b.display_order)) {
+    for (const field of form.fields.sort((a, b) => (a.page_number - b.page_number) || (a.display_order - b.display_order))) {
       const displayOnlyTypes = ['section', 'description', 'link'];
       if (displayOnlyTypes.includes(field.field_type)) continue;
 
@@ -887,7 +887,7 @@ export default function FormsPage() {
                 {/* Form Fields */}
                 <div className="space-y-4">
                   {formWithFields.fields
-                    .sort((a, b) => a.display_order - b.display_order)
+                    .sort((a, b) => (a.page_number - b.page_number) || (a.display_order - b.display_order))
                     .map((field) => {
                       const value = selectedResponse.response_data[field.id];
                       const reasonKey = `${field.id}_reason`;
