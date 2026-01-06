@@ -5797,7 +5797,13 @@ const CampaignDetailsPage = () => {
                           <Label className="mb-1 block">KOL</Label>
                           <Select
                             value={addContentData.campaign_kols_id}
-                            onValueChange={v => setAddContentData(d => ({ ...d, campaign_kols_id: v }))}
+                            onValueChange={v => {
+                              const selectedKol = campaignKOLs.find(k => k.id === v);
+                              const platforms = selectedKol?.master_kol?.platform || [];
+                              // Auto-set platform if KOL has exactly one platform
+                              const autoplatform = platforms.length === 1 ? platforms[0] : '';
+                              setAddContentData(d => ({ ...d, campaign_kols_id: v, platform: autoplatform }));
+                            }}
                           >
                             <SelectTrigger className="auth-input">
                               <SelectValue placeholder="Select KOL" />
