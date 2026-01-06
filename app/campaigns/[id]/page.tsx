@@ -2051,6 +2051,9 @@ const CampaignDetailsPage = () => {
 
   const [contentsSearchTerm, setContentsSearchTerm] = useState('');
   const [bulkContentStatus, setBulkContentStatus] = useState('');
+  const [bulkContentPlatform, setBulkContentPlatform] = useState('');
+  const [bulkContentType, setBulkContentType] = useState('');
+  const [bulkContentActivationDate, setBulkContentActivationDate] = useState('');
 
   // 1. Add state for selection and bulk actions for contents
   const [selectedContents, setSelectedContents] = useState<string[]>([]);
@@ -2174,8 +2177,56 @@ const CampaignDetailsPage = () => {
     setSelectedContents([]);
   };
   const handleBulkStatusChange = async () => {
-    // Implement bulk status update logic as needed
-    setSelectedContents([]);
+    if (selectedContents.length === 0) return;
+
+    // Build update object with only non-empty values
+    const updateData: any = {};
+    if (bulkContentStatus) updateData.status = bulkContentStatus;
+    if (bulkContentPlatform) updateData.platform = bulkContentPlatform;
+    if (bulkContentType) updateData.type = bulkContentType;
+    if (bulkContentActivationDate) updateData.activation_date = bulkContentActivationDate;
+
+    if (Object.keys(updateData).length === 0) {
+      toast({
+        title: 'No changes',
+        description: 'Please select at least one field to update',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      // Update each selected content
+      await Promise.all(selectedContents.map(contentId =>
+        supabase.from('contents').update(updateData).eq('id', contentId)
+      ));
+
+      // Update local state
+      setContents(prev => prev.map(content =>
+        selectedContents.includes(content.id)
+          ? { ...content, ...updateData }
+          : content
+      ));
+
+      toast({
+        title: 'Success',
+        description: `Updated ${selectedContents.length} content item${selectedContents.length !== 1 ? 's' : ''}`,
+      });
+
+      // Reset selections and bulk values
+      setSelectedContents([]);
+      setBulkContentStatus('');
+      setBulkContentPlatform('');
+      setBulkContentType('');
+      setBulkContentActivationDate('');
+    } catch (error) {
+      console.error('Error updating contents:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update contents',
+        variant: 'destructive',
+      });
+    }
   };
 
   // 1. Add state for inline editing
@@ -6516,6 +6567,42 @@ const CampaignDetailsPage = () => {
                         </Button>
                       </div>
                       <div className="min-w-[120px] flex flex-col items-end justify-end">
+                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Platform</span>
+                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                          <Select value={bulkContentPlatform} onValueChange={v => setBulkContentPlatform(v)}>
+                            <SelectTrigger
+                              className="border-none shadow-none bg-transparent h-7 px-0 py-0 text-xs font-semibold text-black focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none [&>span]:text-xs [&>span]:font-semibold [&>span]:text-black"
+                              style={{ outline: 'none', boxShadow: 'none' }}
+                            >
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {fieldOptions.platforms.map(platform => (
+                                <SelectItem key={platform} value={platform}>{platform}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="min-w-[120px] flex flex-col items-end justify-end">
+                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Type</span>
+                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                          <Select value={bulkContentType} onValueChange={v => setBulkContentType(v)}>
+                            <SelectTrigger
+                              className="border-none shadow-none bg-transparent h-7 px-0 py-0 text-xs font-semibold text-black focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none [&>span]:text-xs [&>span]:font-semibold [&>span]:text-black"
+                              style={{ outline: 'none', boxShadow: 'none' }}
+                            >
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {fieldOptions.deliverables.map(type => (
+                                <SelectItem key={type} value={type}>{type}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="min-w-[120px] flex flex-col items-end justify-end">
                         <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Status</span>
                         <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                           <Select value={bulkContentStatus} onValueChange={v => setBulkContentStatus(v)}>
@@ -6533,13 +6620,36 @@ const CampaignDetailsPage = () => {
                           </Select>
                         </div>
                       </div>
+                      <div className="min-w-[140px] flex flex-col items-end justify-end">
+                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Activation Date</span>
+                        <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                className="h-7 px-0 py-0 text-xs font-semibold text-black hover:bg-transparent"
+                              >
+                                {bulkContentActivationDate ? formatDisplayDate(bulkContentActivationDate) : 'Select'}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={bulkContentActivationDate ? new Date(bulkContentActivationDate) : undefined}
+                                onSelect={date => setBulkContentActivationDate(date ? formatDateLocal(date) : '')}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
                       <div className="flex gap-2">
                         <div className="flex flex-col items-end justify-end">
                           <div className="h-5"></div>
                           <Button
                             size="sm"
                             className="bg-[#3e8692] hover:bg-[#2d6b75] text-white border-0 shadow-sm whitespace-nowrap"
-                            disabled={selectedContents.length === 0 || !bulkContentStatus}
+                            disabled={selectedContents.length === 0 || (!bulkContentStatus && !bulkContentPlatform && !bulkContentType && !bulkContentActivationDate)}
                             onClick={handleBulkStatusChange}
                           >
                             Apply
