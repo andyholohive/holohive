@@ -1959,23 +1959,22 @@ export default function NetworkPage() {
                             </Select>
                           </TableCell>
                           <TableCell>
-                            {editingCell?.id === affiliate.id && editingCell?.field === 'affiliation' && editingCell?.type === 'affiliate' ? (
-                              <Input
-                                value={editingValue}
-                                onChange={(e) => setEditingValue(e.target.value)}
-                                onBlur={() => handleAffiliateInlineUpdate(affiliate.id, 'affiliation', editingValue)}
-                                onKeyDown={(e) => handleKeyDown(e, affiliate.id, 'affiliation', 'affiliate')}
-                                className="h-8 text-sm auth-input"
-                                autoFocus
-                              />
-                            ) : (
-                              <div
-                                onClick={() => startEditing(affiliate.id, 'affiliation', 'affiliate', affiliate.affiliation)}
-                                className="cursor-pointer hover:bg-gray-100 rounded px-2 py-1 -mx-2 -my-1 text-sm text-gray-600"
-                              >
-                                {affiliate.affiliation || <span className="text-gray-400">-</span>}
-                              </div>
-                            )}
+                            <Select
+                              value={affiliate.affiliation || 'none'}
+                              onValueChange={(v) => handleAffiliateInlineUpdate(affiliate.id, 'affiliation', v === 'none' ? null : v)}
+                            >
+                              <SelectTrigger className="w-36 h-8 text-xs auth-input">
+                                <SelectValue placeholder="Select">
+                                  {affiliate.affiliation ? formatAffiliation(affiliate.affiliation) : <span className="text-gray-400">-</span>}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                <SelectItem value="kol_affiliate">KOL Affiliate</SelectItem>
+                                <SelectItem value="apac_affiliate">APAC Affiliate</SelectItem>
+                                <SelectItem value="general_affiliate">General Affiliate</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell>
                             <Select
