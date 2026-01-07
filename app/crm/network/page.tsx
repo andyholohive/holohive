@@ -39,6 +39,18 @@ import { UserService } from '@/lib/userService';
 
 type NetworkTab = 'partners' | 'affiliates';
 
+const categoryDisplayMap: Record<string, string> = {
+  'service_provider': 'Service Provider',
+  'investor_vc': 'Investor / VC',
+  'project': 'Project',
+  'individual': 'Individual'
+};
+
+const formatCategory = (category: string | null | undefined): string => {
+  if (!category) return '';
+  return categoryDisplayMap[category] || category;
+};
+
 export default function NetworkPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<NetworkTab>('partners');
@@ -1399,7 +1411,7 @@ export default function NetworkPage() {
                             >
                               <SelectTrigger className="w-36 h-8 text-xs auth-input capitalize">
                                 <SelectValue placeholder="Select">
-                                  {partner.category ? partner.category.replace('_', ' ') : <span className="text-gray-400">-</span>}
+                                  {partner.category ? formatCategory(partner.category) : <span className="text-gray-400">-</span>}
                                 </SelectValue>
                               </SelectTrigger>
                               <SelectContent>
@@ -1592,7 +1604,7 @@ export default function NetworkPage() {
                           <CardTitle className="text-base">{partner.name}</CardTitle>
                           {partner.category && (
                             <Badge variant="outline" className="text-xs mt-1 capitalize">
-                              {partner.category.replace('_', ' ')}
+                              {formatCategory(partner.category)}
                             </Badge>
                           )}
                         </div>
