@@ -2167,15 +2167,15 @@ export default function NetworkPage() {
 
       {/* Partner Dialog */}
       <Dialog open={isNewPartnerOpen} onOpenChange={setIsNewPartnerOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{editingPartner ? 'Edit Partner' : 'Add New Partner'}</DialogTitle>
             <DialogDescription>
               {editingPartner ? 'Update partner details.' : 'Add a new business partner.'}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={(e) => { e.preventDefault(); handleCreatePartner(); }}>
-            <div className="grid gap-4 py-4">
+          <form onSubmit={(e) => { e.preventDefault(); handleCreatePartner(); }} className="flex flex-col min-h-0 flex-1">
+            <div className="grid gap-4 py-4 overflow-y-auto flex-1 pr-2">
               <div className="grid gap-2">
                 <Label htmlFor="partner-name">Name *</Label>
                 <Input
@@ -2473,7 +2473,7 @@ export default function NetworkPage() {
                 />
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="flex-shrink-0 pt-4">
               <Button type="button" variant="outline" onClick={() => setIsNewPartnerOpen(false)}>
                 Cancel
               </Button>
