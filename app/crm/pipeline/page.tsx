@@ -114,6 +114,7 @@ export default function PipelinePage() {
   // Delete confirmation dialog state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [opportunityToDelete, setOpportunityToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
 
   // Convert to deal dialog state
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
@@ -402,6 +403,19 @@ export default function PipelinePage() {
       fetchData();
     } catch (error) {
       console.error('Error deleting opportunity:', error);
+    }
+  };
+
+  const confirmBulkDelete = async () => {
+    if (selectedOpportunities.length === 0) return;
+    try {
+      await Promise.all(selectedOpportunities.map(id => CRMService.deleteOpportunity(id)));
+      setIsBulkDeleteDialogOpen(false);
+      setSelectedOpportunities([]);
+      setBulkEdit({});
+      fetchData();
+    } catch (error) {
+      console.error('Error bulk deleting opportunities:', error);
     }
   };
 
@@ -1712,9 +1726,6 @@ export default function PipelinePage() {
               {opp.last_contacted_at ? formatShortDate(opp.last_contacted_at) : '-'}
             </TableCell>
           )}
-          <TableCell className="text-sm text-gray-500">
-            {opp.created_at ? formatShortDate(opp.created_at) : '-'}
-          </TableCell>
           <TableCell>
             {renderActionMenu(opp)}
           </TableCell>
@@ -1791,7 +1802,6 @@ export default function PipelinePage() {
                     <TableHead>Contact</TableHead>
                     <TableHead>Referrer</TableHead>
                     {activeTab !== 'accounts' && <TableHead>Last Contacted</TableHead>}
-                    <TableHead>Created</TableHead>
                     <TableHead className="w-16">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -2308,6 +2318,14 @@ export default function PipelinePage() {
               style={{ backgroundColor: '#3e8692', color: 'white' }}
             >
               Apply Changes
+            </Button>
+            {/* Delete Button */}
+            <Button
+              size="sm"
+              onClick={() => setIsBulkDeleteDialogOpen(true)}
+              className="h-8 bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete
             </Button>
             {/* Cancel Button */}
             <Button
@@ -2904,6 +2922,31 @@ export default function PipelinePage() {
               onClick={confirmDeleteOpportunity}
             >
               Delete Opportunity
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <Dialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete {selectedOpportunities.length} Opportunities</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-gray-600">
+              Are you sure you want to delete <strong>{selectedOpportunities.length}</strong> selected opportunities? This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBulkDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmBulkDelete}
+            >
+              Delete All
             </Button>
           </DialogFooter>
         </DialogContent>

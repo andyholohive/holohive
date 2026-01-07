@@ -42,13 +42,34 @@ type NetworkTab = 'partners' | 'affiliates';
 const categoryDisplayMap: Record<string, string> = {
   'service_provider': 'Service Provider',
   'investor_vc': 'Investor / VC',
-  'project': 'Project',
-  'individual': 'Individual'
+  'project': 'Project'
+};
+
+const affiliationDisplayMap: Record<string, string> = {
+  'kol_affiliate': 'KOL Affiliate',
+  'apac_affiliate': 'APAC Affiliate',
+  'general_affiliate': 'General Affiliate'
+};
+
+const termsOfInterestDisplayMap: Record<string, string> = {
+  'mutual_deal_flow': 'Mutual Deal Flow',
+  'referral': 'Referral',
+  'portco_support': 'Portco Support'
+};
+
+const formatTermsOfInterest = (terms: string | null | undefined): string => {
+  if (!terms) return '';
+  return termsOfInterestDisplayMap[terms] || terms;
 };
 
 const formatCategory = (category: string | null | undefined): string => {
   if (!category) return '';
   return categoryDisplayMap[category] || category;
+};
+
+const formatAffiliation = (affiliation: string | null | undefined): string => {
+  if (!affiliation) return '';
+  return affiliationDisplayMap[affiliation] || affiliation;
 };
 
 export default function NetworkPage() {
@@ -133,6 +154,8 @@ export default function NetworkPage() {
   const [partnerToDelete, setPartnerToDelete] = useState<{ id: string; name: string } | null>(null);
   const [isDeleteAffiliateDialogOpen, setIsDeleteAffiliateDialogOpen] = useState(false);
   const [affiliateToDelete, setAffiliateToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [isBulkDeletePartnerDialogOpen, setIsBulkDeletePartnerDialogOpen] = useState(false);
+  const [isBulkDeleteAffiliateDialogOpen, setIsBulkDeleteAffiliateDialogOpen] = useState(false);
 
   // Filter state
   const [filterPartnerStatus, setFilterPartnerStatus] = useState<string>('all');
@@ -405,6 +428,32 @@ export default function NetworkPage() {
       fetchData();
     } catch (error) {
       console.error('Error deleting affiliate:', error);
+    }
+  };
+
+  const confirmBulkDeletePartners = async () => {
+    if (selectedPartners.length === 0) return;
+    try {
+      await Promise.all(selectedPartners.map(id => CRMService.deletePartner(id)));
+      setIsBulkDeletePartnerDialogOpen(false);
+      setSelectedPartners([]);
+      setBulkPartnerEdit({});
+      fetchData();
+    } catch (error) {
+      console.error('Error bulk deleting partners:', error);
+    }
+  };
+
+  const confirmBulkDeleteAffiliates = async () => {
+    if (selectedAffiliates.length === 0) return;
+    try {
+      await Promise.all(selectedAffiliates.map(id => CRMService.deleteAffiliate(id)));
+      setIsBulkDeleteAffiliateDialogOpen(false);
+      setSelectedAffiliates([]);
+      setBulkAffiliateEdit({});
+      fetchData();
+    } catch (error) {
+      console.error('Error bulk deleting affiliates:', error);
     }
   };
 
@@ -1105,8 +1154,7 @@ export default function NetworkPage() {
                 <SelectItem value="service_provider">Service Provider</SelectItem>
                 <SelectItem value="investor_vc">Investor / VC</SelectItem>
                 <SelectItem value="project">Project</SelectItem>
-                <SelectItem value="individual">Individual</SelectItem>
-                <SelectItem value="none">No Category</SelectItem>
+                                <SelectItem value="none">No Category</SelectItem>
               </SelectContent>
             </Select>
           </>
@@ -1239,8 +1287,7 @@ export default function NetworkPage() {
                       <SelectItem value="service_provider">Service Provider</SelectItem>
                       <SelectItem value="investor_vc">Investor / VC</SelectItem>
                       <SelectItem value="project">Project</SelectItem>
-                      <SelectItem value="individual">Individual</SelectItem>
-                    </SelectContent>
+                                          </SelectContent>
                   </Select>
                 </div>
                 {/* Focus */}
@@ -1287,6 +1334,14 @@ export default function NetworkPage() {
                 >
                   Apply Changes
                 </Button>
+                {/* Delete Button */}
+                <Button
+                  size="sm"
+                  onClick={() => setIsBulkDeletePartnerDialogOpen(true)}
+                  className="h-8 bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Delete
+                </Button>
                 {/* Cancel Button */}
                 <Button
                   size="sm"
@@ -1317,14 +1372,13 @@ export default function NetworkPage() {
                     <TableHead>Affiliate</TableHead>
                     <TableHead>Contacts</TableHead>
                     <TableHead>Last Contacted</TableHead>
-                    <TableHead>Created</TableHead>
                     <TableHead className="w-16">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredPartners.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                         No partners found
                       </TableCell>
                     </TableRow>
@@ -1419,8 +1473,7 @@ export default function NetworkPage() {
                                 <SelectItem value="service_provider">Service Provider</SelectItem>
                                 <SelectItem value="investor_vc">Investor / VC</SelectItem>
                                 <SelectItem value="project">Project</SelectItem>
-                                <SelectItem value="individual">Individual</SelectItem>
-                              </SelectContent>
+                                                              </SelectContent>
                             </Select>
                           </TableCell>
                           <TableCell>
@@ -1543,9 +1596,6 @@ export default function NetworkPage() {
                           </TableCell>
                           <TableCell className="text-sm text-gray-500">
                             {partner.last_contacted_at ? formatShortDate(partner.last_contacted_at) : '-'}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-500">
-                            {formatShortDate(partner.created_at)}
                           </TableCell>
                           <TableCell>
                             <DropdownMenu>
@@ -1785,6 +1835,14 @@ export default function NetworkPage() {
                 >
                   Apply Changes
                 </Button>
+                {/* Delete Button */}
+                <Button
+                  size="sm"
+                  onClick={() => setIsBulkDeleteAffiliateDialogOpen(true)}
+                  className="h-8 bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Delete
+                </Button>
                 {/* Cancel Button */}
                 <Button
                   size="sm"
@@ -1810,18 +1868,16 @@ export default function NetworkPage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Affiliation</TableHead>
-                    <TableHead>Commission</TableHead>
                     <TableHead>Owner</TableHead>
                     <TableHead>Contacts</TableHead>
                     <TableHead>Last Contacted</TableHead>
-                    <TableHead>Created</TableHead>
                     <TableHead className="w-16">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredAffiliates.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                         No affiliates found
                       </TableCell>
                     </TableRow>
@@ -1922,26 +1978,6 @@ export default function NetworkPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            {editingCell?.id === affiliate.id && editingCell?.field === 'commission_rate' && editingCell?.type === 'affiliate' ? (
-                              <Input
-                                value={editingValue}
-                                onChange={(e) => setEditingValue(e.target.value)}
-                                onBlur={() => handleAffiliateInlineUpdate(affiliate.id, 'commission_rate', editingValue ? parseFloat(editingValue) : null)}
-                                onKeyDown={(e) => handleKeyDown(e, affiliate.id, 'commission_rate', 'affiliate')}
-                                className="h-8 text-sm auth-input w-20"
-                                type="number"
-                                autoFocus
-                              />
-                            ) : (
-                              <div
-                                onClick={() => startEditing(affiliate.id, 'commission_rate', 'affiliate', affiliate.commission_rate)}
-                                className="cursor-pointer hover:bg-gray-100 rounded px-2 py-1 -mx-2 -my-1 text-sm"
-                              >
-                                {affiliate.commission_rate ? `${affiliate.commission_rate}%` : <span className="text-gray-400">-</span>}
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
                             <Select
                               value={affiliate.owner_id || 'none'}
                               onValueChange={(v) => handleAffiliateInlineUpdate(affiliate.id, 'owner_id', v === 'none' ? null : v)}
@@ -2021,9 +2057,6 @@ export default function NetworkPage() {
                           </TableCell>
                           <TableCell className="text-sm text-gray-500">
                             {affiliate.last_contacted_at ? formatShortDate(affiliate.last_contacted_at) : '-'}
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-500">
-                            {formatShortDate(affiliate.created_at)}
                           </TableCell>
                           <TableCell>
                             <DropdownMenu>
@@ -2213,8 +2246,7 @@ export default function NetworkPage() {
                       <SelectItem value="service_provider">Service Provider</SelectItem>
                       <SelectItem value="investor_vc">Investor / VC</SelectItem>
                       <SelectItem value="project">Project</SelectItem>
-                      <SelectItem value="individual">Individual</SelectItem>
-                    </SelectContent>
+                                          </SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-2">
@@ -2330,27 +2362,19 @@ export default function NetworkPage() {
                       placeholder="Affiliate name *"
                       className="auth-input"
                     />
-                    <div className="grid grid-cols-2 gap-2">
-                      <Select
-                        value={newAffiliateInPartnerDialog.commission_model || ''}
-                        onValueChange={(value) => setNewAffiliateInPartnerDialog({ ...newAffiliateInPartnerDialog, commission_model: value })}
-                      >
-                        <SelectTrigger className="auth-input">
-                          <SelectValue placeholder="Commission model" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Standard">Standard</SelectItem>
-                          <SelectItem value="Strategic">Strategic</SelectItem>
-                          <SelectItem value="Whitelabeled">Whitelabeled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        value={newAffiliateInPartnerDialog.commission_rate || ''}
-                        onChange={(e) => setNewAffiliateInPartnerDialog({ ...newAffiliateInPartnerDialog, commission_rate: e.target.value })}
-                        placeholder="Rate (e.g., 10%)"
-                        className="auth-input"
-                      />
-                    </div>
+                    <Select
+                      value={newAffiliateInPartnerDialog.commission_model || ''}
+                      onValueChange={(value) => setNewAffiliateInPartnerDialog({ ...newAffiliateInPartnerDialog, commission_model: value })}
+                    >
+                      <SelectTrigger className="auth-input">
+                        <SelectValue placeholder="Commission model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Standard">Standard</SelectItem>
+                        <SelectItem value="Strategic">Strategic</SelectItem>
+                        <SelectItem value="Whitelabeled">Whitelabeled</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 )}
               </div>
@@ -2527,13 +2551,20 @@ export default function NetworkPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="affiliate-affiliation">Affiliation</Label>
-                  <Input
-                    id="affiliate-affiliation"
-                    value={affiliateForm.affiliation || ''}
-                    onChange={(e) => setAffiliateForm({ ...affiliateForm, affiliation: e.target.value })}
-                    placeholder="Company/organization"
-                    className="auth-input"
-                  />
+                  <Select
+                    value={affiliateForm.affiliation || 'none'}
+                    onValueChange={(v) => setAffiliateForm({ ...affiliateForm, affiliation: v === 'none' ? undefined : v })}
+                  >
+                    <SelectTrigger className="auth-input">
+                      <SelectValue placeholder="Select affiliation" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="kol_affiliate">KOL Affiliate</SelectItem>
+                      <SelectItem value="apac_affiliate">APAC Affiliate</SelectItem>
+                      <SelectItem value="general_affiliate">General Affiliate</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="affiliate-status">Status</Label>
@@ -2554,13 +2585,20 @@ export default function NetworkPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="affiliate-category">Category</Label>
-                <Input
-                  id="affiliate-category"
-                  value={affiliateForm.category || ''}
-                  onChange={(e) => setAffiliateForm({ ...affiliateForm, category: e.target.value })}
-                  placeholder="Type of affiliate"
-                  className="auth-input"
-                />
+                <Select
+                  value={affiliateForm.category || 'none'}
+                  onValueChange={(v) => setAffiliateForm({ ...affiliateForm, category: v === 'none' ? undefined : v })}
+                >
+                  <SelectTrigger className="auth-input">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="service_provider">Service Provider</SelectItem>
+                    <SelectItem value="investor_vc">Investor / VC</SelectItem>
+                    <SelectItem value="project">Project</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="affiliate-owner">Owner</Label>
@@ -2583,19 +2621,8 @@ export default function NetworkPage() {
               </div>
               <div className="border-t pt-4">
                 <h4 className="font-medium text-sm mb-3">Commission Structure</h4>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-3">
                   <div className="grid gap-2">
-                    <Label htmlFor="affiliate-rate">Commission Rate (%)</Label>
-                    <Input
-                      id="affiliate-rate"
-                      type="number"
-                      value={affiliateForm.commission_rate || ''}
-                      onChange={(e) => setAffiliateForm({ ...affiliateForm, commission_rate: parseFloat(e.target.value) || undefined })}
-                      placeholder="0"
-                      className="auth-input"
-                    />
-                  </div>
-                  <div className="grid gap-2 col-span-2">
                     <Label htmlFor="affiliate-model">Commission Model</Label>
                     <Select
                       value={affiliateForm.commission_model || 'none'}
@@ -2609,6 +2636,23 @@ export default function NetworkPage() {
                         <SelectItem value="Standard">Standard</SelectItem>
                         <SelectItem value="Strategic">Strategic</SelectItem>
                         <SelectItem value="Whitelabeled">Whitelabeled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="affiliate-terms">Terms of Interest</Label>
+                    <Select
+                      value={affiliateForm.terms_of_interest || 'none'}
+                      onValueChange={(v) => setAffiliateForm({ ...affiliateForm, terms_of_interest: v === 'none' ? undefined : v })}
+                    >
+                      <SelectTrigger className="auth-input">
+                        <SelectValue placeholder="Select terms" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="mutual_deal_flow">Mutual Deal Flow</SelectItem>
+                        <SelectItem value="referral">Referral</SelectItem>
+                        <SelectItem value="portco_support">Portco Support</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -2942,12 +2986,6 @@ export default function NetworkPage() {
                       <SelectItem value="Whitelabeled">Whitelabeled</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Input
-                    value={newAffiliateFormForPartner.commission_rate || ''}
-                    onChange={(e) => setNewAffiliateFormForPartner({ ...newAffiliateFormForPartner, commission_rate: e.target.value })}
-                    placeholder="Commission rate (e.g., 10%)"
-                    className="auth-input"
-                  />
                   <Textarea
                     value={newAffiliateFormForPartner.notes || ''}
                     onChange={(e) => setNewAffiliateFormForPartner({ ...newAffiliateFormForPartner, notes: e.target.value })}
@@ -3279,6 +3317,56 @@ export default function NetworkPage() {
               onClick={confirmDeleteAffiliate}
             >
               Delete Affiliate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Partner Confirmation Dialog */}
+      <Dialog open={isBulkDeletePartnerDialogOpen} onOpenChange={setIsBulkDeletePartnerDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete {selectedPartners.length} Partners</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-gray-600">
+              Are you sure you want to delete <strong>{selectedPartners.length}</strong> selected partners? This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBulkDeletePartnerDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmBulkDeletePartners}
+            >
+              Delete All
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Affiliate Confirmation Dialog */}
+      <Dialog open={isBulkDeleteAffiliateDialogOpen} onOpenChange={setIsBulkDeleteAffiliateDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete {selectedAffiliates.length} Affiliates</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-gray-600">
+              Are you sure you want to delete <strong>{selectedAffiliates.length}</strong> selected affiliates? This action cannot be undone.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBulkDeleteAffiliateDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmBulkDeleteAffiliates}
+            >
+              Delete All
             </Button>
           </DialogFooter>
         </DialogContent>

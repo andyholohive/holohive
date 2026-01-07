@@ -31,6 +31,7 @@ export interface CRMAffiliate {
   status: AffiliateStatus;
   commission_model: string | null;
   commission_rate: number | null;
+  terms_of_interest: string | null;
   last_contacted_at: string | null;
   owner_id: string | null;
   poc_name: string | null;
@@ -141,6 +142,7 @@ export interface CreateAffiliateData {
   status?: AffiliateStatus;
   commission_model?: string;
   commission_rate?: number;
+  terms_of_interest?: string;
   owner_id?: string;
   poc_name?: string;
   poc_email?: string;
