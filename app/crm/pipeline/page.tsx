@@ -294,7 +294,7 @@ export default function PipelinePage() {
     closed_lost: 'Lost',
     account_active: 'Active',
     account_at_risk: 'At Risk',
-    account_churned: 'Churned'
+    account_churned: 'Inactive'
   };
 
   const stageColors: Record<OpportunityStage, { bg: string; text: string; border: string; solid: string }> = {
@@ -1317,7 +1317,8 @@ export default function PipelinePage() {
   const renderTableView = () => {
     const isDeal = activeTab === 'deals' || activeTab === 'accounts';
     const isAccount = activeTab === 'accounts';
-    const currentStages = isAccount ? accountStages : isDeal ? dealStages : leadStages;
+    const isOutreach = activeTab === 'outreach';
+    const currentStages = isAccount ? accountStages : isDeal ? dealStages : isOutreach ? outreachStages : leadStages;
 
     const renderEditableText = (opp: CRMOpportunity, field: string, value: string | null | undefined, className?: string) => {
       const isEditing = editingCell?.id === opp.id && editingCell?.field === field;
@@ -1498,26 +1499,6 @@ export default function PipelinePage() {
               </SelectContent>
             </Select>
           </TableCell>
-          <TableCell>
-            <Select
-              value={opp.source || 'none'}
-              onValueChange={(v) => handleInlineUpdate(opp.id, 'source', v === 'none' ? null : v)}
-            >
-              <SelectTrigger className="w-32 h-8 text-xs auth-input">
-                <SelectValue placeholder="Select">
-                  {opp.source ? formatSource(opp.source) : <span className="text-gray-400">-</span>}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">None</SelectItem>
-                {sourceOptions.map((source) => (
-                  <SelectItem key={source} value={source}>
-                    {formatSource(source)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </TableCell>
           {isDeal && (
             <TableCell>
               <Select
@@ -1540,6 +1521,26 @@ export default function PipelinePage() {
               </Select>
             </TableCell>
           )}
+          <TableCell>
+            <Select
+              value={opp.source || 'none'}
+              onValueChange={(v) => handleInlineUpdate(opp.id, 'source', v === 'none' ? null : v)}
+            >
+              <SelectTrigger className="w-32 h-8 text-xs auth-input">
+                <SelectValue placeholder="Select">
+                  {opp.source ? formatSource(opp.source) : <span className="text-gray-400">-</span>}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                {sourceOptions.map((source) => (
+                  <SelectItem key={source} value={source}>
+                    {formatSource(source)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </TableCell>
           <TableCell>
             <Popover open={affiliatePopoverOpen === opp.id} onOpenChange={(open) => setAffiliatePopoverOpen(open ? opp.id : null)}>
               <PopoverTrigger asChild>
@@ -1622,28 +1623,53 @@ export default function PipelinePage() {
           )}
           {isAccount && (
             <TableCell>
-              <Select
-                value={opp.scope || 'none'}
-                onValueChange={(v) => handleInlineUpdate(opp.id, 'scope', v === 'none' ? null : v)}
-              >
-                <SelectTrigger className="w-32 h-8 text-xs auth-input">
-                  <SelectValue placeholder="Select">
-                    {opp.scope ? (
-                      <span className="truncate">{scopeOptions.find(s => s.value === opp.scope)?.label || opp.scope}</span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  {scopeOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-36 h-8 text-xs auth-input justify-between font-normal"
+                  >
+                    <span className="truncate">
+                      {opp.scope ? (
+                        opp.scope.split(',').map(s => scopeOptions.find(o => o.value === s)?.label || s).join(', ')
+                      ) : (
+                        <span className="text-gray-400">Select scope</span>
+                      )}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-2" align="start">
+                  <div className="space-y-2">
+                    {scopeOptions.map((opt) => {
+                      const currentScopes = opp.scope ? opp.scope.split(',') : [];
+                      const isChecked = currentScopes.includes(opt.value);
+                      return (
+                        <div key={opt.value} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`scope-${opp.id}-${opt.value}`}
+                            checked={isChecked}
+                            onCheckedChange={(checked) => {
+                              let newScopes: string[];
+                              if (checked) {
+                                newScopes = [...currentScopes, opt.value];
+                              } else {
+                                newScopes = currentScopes.filter(s => s !== opt.value);
+                              }
+                              handleInlineUpdate(opp.id, 'scope', newScopes.length > 0 ? newScopes.join(',') : null);
+                            }}
+                          />
+                          <label
+                            htmlFor={`scope-${opp.id}-${opt.value}`}
+                            className="text-sm cursor-pointer"
+                          >
+                            {opt.label}
+                          </label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </TableCell>
           )}
           <TableCell>
@@ -1794,8 +1820,8 @@ export default function PipelinePage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Stage</TableHead>
                     <TableHead>Owner</TableHead>
-                    <TableHead>Source</TableHead>
                     {isDeal && <TableHead>Account Type</TableHead>}
+                    <TableHead>Source</TableHead>
                     <TableHead>Affiliate</TableHead>
                     {isAccount && <TableHead>Client</TableHead>}
                     {isAccount && <TableHead>Scope</TableHead>}
@@ -2296,17 +2322,53 @@ export default function PipelinePage() {
             {activeTab === 'accounts' && (
               <div className="min-w-[120px] flex flex-col">
                 <span className="text-xs text-gray-600 font-semibold mb-1">Scope</span>
-                <Select value={bulkEdit.scope || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, scope: v === 'none' ? null : v }))}>
-                  <SelectTrigger className="h-8 text-xs auth-input">
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {scopeOptions.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="h-8 text-xs auth-input justify-between font-normal"
+                    >
+                      <span className="truncate">
+                        {bulkEdit.scope ? (
+                          bulkEdit.scope.split(',').map(s => scopeOptions.find(o => o.value === s)?.label || s).join(', ')
+                        ) : (
+                          'Select'
+                        )}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-48 p-2" align="start">
+                    <div className="space-y-2">
+                      {scopeOptions.map((opt) => {
+                        const currentScopes = bulkEdit.scope ? bulkEdit.scope.split(',') : [];
+                        const isChecked = currentScopes.includes(opt.value);
+                        return (
+                          <div key={opt.value} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`bulk-scope-${opt.value}`}
+                              checked={isChecked}
+                              onCheckedChange={(checked) => {
+                                let newScopes: string[];
+                                if (checked) {
+                                  newScopes = [...currentScopes, opt.value];
+                                } else {
+                                  newScopes = currentScopes.filter(s => s !== opt.value);
+                                }
+                                setBulkEdit(prev => ({ ...prev, scope: newScopes.length > 0 ? newScopes.join(',') : undefined }));
+                              }}
+                            />
+                            <label
+                              htmlFor={`bulk-scope-${opt.value}`}
+                              className="text-sm cursor-pointer"
+                            >
+                              {opt.label}
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             )}
             {/* Apply Button */}

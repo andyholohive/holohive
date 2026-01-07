@@ -560,10 +560,10 @@ export default function LinksPage() {
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-gray-50/50">
-                          <TableHead>Name</TableHead>
-                          <TableHead>URL</TableHead>
-                          <TableHead>Link Type</TableHead>
-                          <TableHead>Access</TableHead>
+                          <TableHead className="w-[200px]">Name</TableHead>
+                          <TableHead className="w-[200px]">URL</TableHead>
+                          <TableHead className="w-[250px]">Link Type</TableHead>
+                          <TableHead className="w-[100px]">Access</TableHead>
                           <TableHead className="w-16 text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -603,20 +603,15 @@ export default function LinksPage() {
                               </a>
                             </TableCell>
                             <TableCell>
-                              <div className="flex flex-wrap gap-1 max-w-[200px]">
+                              <div className="flex flex-wrap gap-1">
                                 {link.link_types.length > 0 ? (
-                                  link.link_types.slice(0, 2).map(type => (
+                                  link.link_types.map(type => (
                                     <Badge key={type} variant="outline" className="text-xs cursor-default">
                                       {getLinkTypeLabel(type)}
                                     </Badge>
                                   ))
                                 ) : (
                                   <span className="text-gray-400">-</span>
-                                )}
-                                {link.link_types.length > 2 && (
-                                  <Badge variant="outline" className="text-xs cursor-default">
-                                    +{link.link_types.length - 2}
-                                  </Badge>
                                 )}
                               </div>
                             </TableCell>
