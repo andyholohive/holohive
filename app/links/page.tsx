@@ -337,8 +337,10 @@ export default function LinksPage() {
       clientMap.get(clientName)!.push(link);
     });
 
-    // Convert to array and sort
+    // Convert to array and sort links within each group alphabetically
     clientMap.forEach((links, clientName) => {
+      // Sort links alphabetically by name
+      links.sort((a, b) => a.name.localeCompare(b.name));
       groups.push({ clientName, links });
     });
 

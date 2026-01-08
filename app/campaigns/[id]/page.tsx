@@ -161,6 +161,19 @@ const CampaignDetailsPage = () => {
     }>;
   }}>({});
 
+  // Non-KOL payment state
+  const [paymentType, setPaymentType] = useState<'kol' | 'other'>('kol');
+  const [nonKOLPayment, setNonKOLPayment] = useState({
+    recipient_name: '',
+    payment_category: 'other' as 'operational' | 'other',
+    amount: 0,
+    payment_date: new Date().toISOString().split('T')[0],
+    payment_method: 'Token',
+    transaction_id: '',
+    wallet: '',
+    notes: ''
+  });
+
   // Payment filters state
   const [paymentFilters, setPaymentFilters] = useState({
     kol_ids: [] as string[],
@@ -173,6 +186,19 @@ const CampaignDetailsPage = () => {
   // Payment inline editing state
   const [editingPaymentCell, setEditingPaymentCell] = useState<{ paymentId: string, field: string } | null>(null);
   const [editingPaymentValue, setEditingPaymentValue] = useState<any>(null);
+
+  // Email views state
+  const [isEmailViewsDialogOpen, setIsEmailViewsDialogOpen] = useState(false);
+  const [emailViews, setEmailViews] = useState<Array<{
+    id: string;
+    email: string;
+    viewed_at: string;
+    user_agent: string | null;
+  }>>([]);
+  const [loadingEmailViews, setLoadingEmailViews] = useState(false);
+
+  // Approved emails state
+  const [emailInput, setEmailInput] = useState('');
 
   // Helper function to filter payments
   const getFilteredPayments = () => {
@@ -1330,6 +1356,7 @@ const CampaignDetailsPage = () => {
         nda_signed: form.nda_signed,
         budget_type: form.budget_type,
         outline: form.outline,
+        approved_emails: (form as any).approved_emails?.length > 0 ? (form as any).approved_emails : null,
       });
       // Handle allocations
       // Delete marked allocations
@@ -1429,8 +1456,27 @@ const CampaignDetailsPage = () => {
   const handleWalletSave = async (kolId: string) => {
     const wallet = editingWallet[kolId];
     try {
-      await CampaignKOLService.updateCampaignKOL(kolId, { wallet });
-      setCampaignKOLs(prev => prev.map(kol => kol.id === kolId ? { ...kol, wallet } : kol));
+      // Find the campaign KOL to get the master_kol_id
+      const campaignKOL = campaignKOLs.find(kol => kol.id === kolId);
+      if (!campaignKOL?.master_kol?.id) {
+        console.error('Could not find master KOL ID');
+        return;
+      }
+
+      // Update master_kols table instead of campaign_kols
+      const { error } = await supabase
+        .from('master_kols')
+        .update({ wallet })
+        .eq('id', campaignKOL.master_kol.id);
+
+      if (error) throw error;
+
+      // Update local state - update the master_kol.wallet
+      setCampaignKOLs(prev => prev.map(kol =>
+        kol.id === kolId
+          ? { ...kol, master_kol: { ...kol.master_kol, wallet } }
+          : kol
+      ));
       setEditingWalletId(null);
     } catch (err) {
       console.error('Error updating wallet:', err);
@@ -1488,6 +1534,32 @@ const CampaignDetailsPage = () => {
       toast({ title: "Error", description: "Failed to fetch payments.", variant: "destructive" });
     } finally {
       setLoadingPayments(false);
+    }
+  };
+
+  // Fetch email views for this campaign
+  const handleShowEmailViews = async () => {
+    if (!campaign?.id) return;
+    setIsEmailViewsDialogOpen(true);
+    setLoadingEmailViews(true);
+    try {
+      const { data, error } = await supabase
+        .from('campaign_email_views')
+        .select('id, email, viewed_at, user_agent')
+        .eq('campaign_id', campaign.id)
+        .order('viewed_at', { ascending: false });
+
+      if (error) throw error;
+      setEmailViews(data || []);
+    } catch (err) {
+      console.error('Error fetching email views:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to load email views',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingEmailViews(false);
     }
   };
 
@@ -1630,6 +1702,58 @@ const CampaignDetailsPage = () => {
     } catch (err) {
       console.error('Error adding payments:', err);
       toast({ title: "Error", description: "Failed to record payments.", variant: "destructive" });
+    }
+  };
+
+  const handleAddNonKOLPayment = async () => {
+    if (!nonKOLPayment.recipient_name.trim()) {
+      toast({ title: "Error", description: "Please enter a recipient name.", variant: "destructive" });
+      return;
+    }
+    if (!nonKOLPayment.amount || nonKOLPayment.amount <= 0) {
+      toast({ title: "Error", description: "Please enter a valid amount.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .insert({
+          campaign_id: campaign?.id,
+          campaign_kol_id: null,
+          recipient_name: nonKOLPayment.recipient_name.trim(),
+          payment_category: nonKOLPayment.payment_category,
+          amount: nonKOLPayment.amount,
+          payment_date: nonKOLPayment.payment_date || new Date().toISOString().split('T')[0],
+          payment_method: nonKOLPayment.payment_method || 'Token',
+          transaction_id: nonKOLPayment.transaction_id || null,
+          wallet: nonKOLPayment.wallet || null,
+          notes: nonKOLPayment.notes || null
+        })
+        .select();
+
+      if (error) throw error;
+
+      // Refetch payments
+      fetchPayments();
+
+      // Reset state
+      setNonKOLPayment({
+        recipient_name: '',
+        payment_category: 'other',
+        amount: 0,
+        payment_date: new Date().toISOString().split('T')[0],
+        payment_method: 'Token',
+        transaction_id: '',
+        wallet: '',
+        notes: ''
+      });
+      setPaymentType('kol');
+      setIsAddingPayment(false);
+      toast({ title: "Success", description: "Non-KOL payment recorded successfully." });
+    } catch (err) {
+      console.error('Error adding non-KOL payment:', err);
+      toast({ title: "Error", description: "Failed to record payment.", variant: "destructive" });
     }
   };
 
@@ -2851,6 +2975,15 @@ const CampaignDetailsPage = () => {
                 <Share2 className="h-4 w-4 mr-2" />
                 Share Campaign
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleShowEmailViews}
+                title="View emails that accessed this campaign"
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                Views
+              </Button>
             </div>
           </div>
           
@@ -3578,6 +3711,73 @@ const CampaignDetailsPage = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Approved Emails Section (only in edit mode) */}
+                  {editMode && (
+                    <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                      <div className="flex items-center gap-3 mb-5">
+                        <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                          <Users className="h-5 w-5 text-white" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900">Approved Emails</h3>
+                      </div>
+                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                        <p className="text-sm text-gray-600 mb-3">
+                          Add email addresses that are allowed to access the public campaign view (in addition to the client email).
+                        </p>
+                        <div className="flex flex-col gap-2">
+                          <Textarea
+                            value={emailInput}
+                            onChange={(e) => setEmailInput(e.target.value)}
+                            placeholder="Enter email addresses (comma or newline separated)&#10;e.g. email1@example.com, email2@example.com"
+                            className="auth-input min-h-[80px]"
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              const emails = emailInput
+                                .split(/[\n,]+/)
+                                .map(email => email.trim().toLowerCase())
+                                .filter(email => email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+                              const currentEmails = (form as any)?.approved_emails || [];
+                              const newEmails = emails.filter(email => !currentEmails.includes(email));
+                              if (newEmails.length > 0) {
+                                handleChange('approved_emails' as any, [...currentEmails, ...newEmails]);
+                                setEmailInput('');
+                              }
+                            }}
+                            disabled={!emailInput.trim()}
+                            className="hover:opacity-90 w-fit"
+                            style={{ backgroundColor: '#3e8692', color: 'white' }}
+                          >
+                            Add Emails
+                          </Button>
+                        </div>
+                        {((form as any)?.approved_emails || []).length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {((form as any)?.approved_emails || []).map((email: string, index: number) => (
+                              <div
+                                key={index}
+                                className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm"
+                              >
+                                {email}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const currentEmails = (form as any)?.approved_emails || [];
+                                    handleChange('approved_emails' as any, currentEmails.filter((_: string, i: number) => i !== index));
+                                  }}
+                                  className="ml-1 text-gray-500 hover:text-gray-700"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Budget Section */}
                   <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
@@ -4935,7 +5135,6 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Wallet <span className="text-gray-500 text-xs">(Internal)</span></TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Notes</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Add Content</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content</TableHead>
@@ -4945,7 +5144,7 @@ const CampaignDetailsPage = () => {
                       <TableBody className="bg-white">
                         {filteredKOLs.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={13} className="text-center py-12">
+                            <TableCell colSpan={12} className="text-center py-12">
                               <div className="flex flex-col items-center justify-center text-gray-500">
                                 <Users className="h-12 w-12 mb-4 text-gray-300" />
                                 <p className="text-lg font-medium mb-2">No KOLs match your filters</p>
@@ -5228,35 +5427,6 @@ const CampaignDetailsPage = () => {
                                     </div>
                                   </TableCell>
                                   <TableCell
-                                    className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 align-middle overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'wallet')}
-                                    style={{ width: '20%' }}
-                                    onClick={() => {
-                                      if (editingWalletId !== campaignKOL.id) {
-                                        handleCellSelect('kols', campaignKOL.id, 'wallet', campaignKOL.wallet);
-                                      }
-                                    }}
-                                    onDoubleClick={() => {
-                                      setEditingWalletId(campaignKOL.id);
-                                      setEditingWallet((prev) => ({ ...prev, [campaignKOL.id]: campaignKOL.wallet ?? '' }));
-                                    }}
-                                  >
-                                    {editingWalletId === campaignKOL.id ? (
-                                      <Input
-                                        value={editingWallet[campaignKOL.id] ?? campaignKOL.wallet ?? ''}
-                                        onChange={e => handleWalletChange(campaignKOL.id, e.target.value)}
-                                        onBlur={() => handleWalletSave(campaignKOL.id)}
-                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleWalletSave(campaignKOL.id); }}}
-                                        className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none min-h-[32px]"
-                                        style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
-                                        autoFocus
-                                      />
-                                    ) : (
-                                      <div className="truncate min-h-[32px] flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.wallet}>
-                                        {campaignKOL.wallet || <span className="text-gray-400 italic">Double-click to add</span>}
-                                      </div>
-                                    )}
-                                  </TableCell>
-                                  <TableCell
                                     className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 align-middle overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'notes')}
                                     style={{ width: '20%' }}
                                     onClick={() => {
@@ -5380,7 +5550,7 @@ const CampaignDetailsPage = () => {
                                                     amount: 0,
                                                     payment_date: new Date().toISOString().split('T')[0],
                                                     payment_method: 'Token',
-                                                    notes: `Auto-created for content: ${data.content_link || type}`
+                                                    notes: null
                                                   };
 
                                                   const { error: paymentError } = await supabase
@@ -6154,7 +6324,7 @@ const CampaignDetailsPage = () => {
                                     amount: 0,
                                     payment_date: new Date().toISOString().split('T')[0],
                                     payment_method: 'Token',
-                                    notes: `Auto-created for content: ${newContent.content_link || 'New content'}`
+                                    notes: null
                                   };
 
                                   const { error: paymentError } = await supabase
@@ -7677,9 +7847,36 @@ const CampaignDetailsPage = () => {
                     <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden">
                       <DialogHeader>
                         <DialogTitle>Record Payment(s)</DialogTitle>
-                        <p className="text-sm text-gray-500 mt-1">Select one or more KOLs and enter payment details for each</p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {paymentType === 'kol' ? 'Select one or more KOLs and enter payment details for each' : 'Record a non-KOL expense or payment'}
+                        </p>
                       </DialogHeader>
+
+                      {/* Payment Type Toggle */}
+                      <div className="flex gap-2 mb-2">
+                        <Button
+                          type="button"
+                          variant={paymentType === 'kol' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setPaymentType('kol')}
+                          style={paymentType === 'kol' ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                        >
+                          KOL Payment
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={paymentType === 'other' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setPaymentType('other')}
+                          style={paymentType === 'other' ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                        >
+                          Other Expense
+                        </Button>
+                      </div>
+
                       <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
+                        {paymentType === 'kol' ? (
+                        <>
                         <div className="grid gap-2">
                           <Label htmlFor="kol-select">Select KOLs</Label>
                           <div className="border rounded-lg p-3 max-h-64 overflow-y-auto space-y-2">
@@ -7878,7 +8075,7 @@ const CampaignDetailsPage = () => {
                                     </div>
 
                                     <div className="grid gap-2">
-                                      <Label>Content (Optional - Multi-select)</Label>
+                                      <Label>Content</Label>
                                       <MultiSelect
                                         options={contents
                                           .filter(content => content.campaign_kols_id === kolId)
@@ -7965,22 +8162,158 @@ const CampaignDetailsPage = () => {
                             })}
                           </div>
                         )}
+                        </>
+                        ) : (
+                        /* Non-KOL Payment Form */
+                        <div className="space-y-4">
+                          <div className="grid gap-2">
+                            <Label>Recipient Name *</Label>
+                            <Input
+                              placeholder="e.g., Venue Rental, Equipment, Agency Fee"
+                              value={nonKOLPayment.recipient_name}
+                              onChange={(e) => setNonKOLPayment(prev => ({ ...prev, recipient_name: e.target.value }))}
+                              className="auth-input"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                              <Label>Amount (USD) *</Label>
+                              <div className="relative w-full">
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                                <Input
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9,]*"
+                                  className="auth-input pl-6 w-full"
+                                  value={nonKOLPayment.amount ? Number(nonKOLPayment.amount).toLocaleString('en-US') : ''}
+                                  onChange={(e) => {
+                                    const raw = e.target.value.replace(/[^0-9]/g, '');
+                                    setNonKOLPayment(prev => ({ ...prev, amount: parseFloat(raw) || 0 }));
+                                  }}
+                                  placeholder="Enter amount"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid gap-2">
+                              <Label>Payment Date</Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                                    style={{
+                                      borderColor: "#e5e7eb",
+                                      backgroundColor: "white",
+                                      color: nonKOLPayment.payment_date ? "#111827" : "#9ca3af"
+                                    }}
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {nonKOLPayment.payment_date ? formatDisplayDate(nonKOLPayment.payment_date) : "Select payment date"}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="!bg-white border shadow-md w-auto p-0 z-50" align="start">
+                                  <CalendarComponent
+                                    mode="single"
+                                    selected={nonKOLPayment.payment_date ? new Date(nonKOLPayment.payment_date) : undefined}
+                                    onSelect={date => {
+                                      setNonKOLPayment(prev => ({ ...prev, payment_date: date ? formatDateLocal(date) : '' }));
+                                    }}
+                                    initialFocus
+                                    classNames={{
+                                      day_selected: "text-white hover:text-white focus:text-white",
+                                    }}
+                                    modifiersStyles={{
+                                      selected: { backgroundColor: "#3e8692" }
+                                    }}
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                              <Label>Payment Method</Label>
+                              <Select
+                                value={nonKOLPayment.payment_method}
+                                onValueChange={(value) => setNonKOLPayment(prev => ({ ...prev, payment_method: value }))}
+                              >
+                                <SelectTrigger className="auth-input">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Token">Token</SelectItem>
+                                  <SelectItem value="Fiat">Fiat</SelectItem>
+                                  <SelectItem value="WL">WL</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="grid gap-2">
+                              <Label>Transaction ID</Label>
+                              <Input
+                                placeholder="Optional"
+                                value={nonKOLPayment.transaction_id}
+                                onChange={(e) => setNonKOLPayment(prev => ({ ...prev, transaction_id: e.target.value }))}
+                                className="auth-input"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid gap-2">
+                            <Label>Wallet</Label>
+                            <Input
+                              placeholder="Optional wallet address"
+                              value={nonKOLPayment.wallet}
+                              onChange={(e) => setNonKOLPayment(prev => ({ ...prev, wallet: e.target.value }))}
+                              className="auth-input"
+                            />
+                          </div>
+
+                          <div className="grid gap-2">
+                            <Label>Notes</Label>
+                            <Textarea
+                              placeholder="Optional notes"
+                              value={nonKOLPayment.notes}
+                              onChange={(e) => setNonKOLPayment(prev => ({ ...prev, notes: e.target.value }))}
+                              rows={2}
+                              className="auth-input"
+                            />
+                          </div>
+                        </div>
+                        )}
                       </div>
                       <DialogFooter>
                         <Button variant="outline" onClick={() => {
                           setIsAddingPayment(false);
                           setSelectedKOLsForPayment([]);
                           setMultiKOLPayments({});
+                          setPaymentType('kol');
+                          setNonKOLPayment({
+                            recipient_name: '',
+                            payment_category: 'other',
+                            amount: 0,
+                            payment_date: new Date().toISOString().split('T')[0],
+                            payment_method: 'Token',
+                            transaction_id: '',
+                            wallet: '',
+                            notes: ''
+                          });
                         }}>
                           Cancel
                         </Button>
                         <Button
-                          onClick={handleAddMultiKOLPayments}
-                          disabled={selectedKOLsForPayment.length === 0}
+                          onClick={paymentType === 'kol' ? handleAddMultiKOLPayments : handleAddNonKOLPayment}
+                          disabled={paymentType === 'kol' ? selectedKOLsForPayment.length === 0 : !nonKOLPayment.recipient_name.trim() || !nonKOLPayment.amount}
                           style={{ backgroundColor: '#3e8692', color: 'white' }}
                           className="hover:opacity-90"
                         >
-                          Record {selectedKOLsForPayment.length > 0 ? `${selectedKOLsForPayment.length} Payment${selectedKOLsForPayment.length > 1 ? 's' : ''}` : 'Payment'}
+                          {paymentType === 'kol'
+                            ? `Record ${selectedKOLsForPayment.length > 0 ? `${selectedKOLsForPayment.length} Payment${selectedKOLsForPayment.length > 1 ? 's' : ''}` : 'Payment'}`
+                            : 'Record Expense'
+                          }
                         </Button>
                       </DialogFooter>
                     </DialogContent>
@@ -8192,6 +8525,9 @@ const CampaignDetailsPage = () => {
                                 </div>
                               </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <span>Wallet</span>
+                              </TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
                                 <div className="flex items-center gap-1 cursor-pointer group">
                                   <span>Amount</span>
                                   <Popover>
@@ -8386,13 +8722,37 @@ const CampaignDetailsPage = () => {
                                   className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-gray-600 cursor-pointer`, 'payments', payment.id, 'kol_name')}
                                   style={{ verticalAlign: 'middle', fontWeight: 'bold' }}
                                   onClick={() => {
-                                    const kolName = campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.name || 'Unknown KOL';
-                                    handleCellSelect('payments', payment.id, 'kol_name', kolName);
+                                    const displayName = payment.campaign_kol_id
+                                      ? campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.name || 'Unknown KOL'
+                                      : payment.recipient_name || 'Unknown';
+                                    handleCellSelect('payments', payment.id, 'kol_name', displayName);
                                   }}
                                 >
-                                  <div className="flex items-center w-full h-full">
-                                    {campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.name || 'Unknown KOL'}
+                                  <div className="flex items-center w-full h-full gap-2">
+                                    {payment.campaign_kol_id ? (
+                                      campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.name || 'Unknown KOL'
+                                    ) : (
+                                      <>
+                                        <span>{payment.recipient_name || 'Unknown'}</span>
+                                        <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
+                                          Expense
+                                        </span>
+                                      </>
+                                    )}
                                   </div>
+                                </TableCell>
+                                <TableCell
+                                  className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}
+                                >
+                                  {payment.campaign_kol_id ? (
+                                    <div className="truncate" title={campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet ?? undefined}>
+                                      {campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet || <span className="text-gray-400 italic">No wallet</span>}
+                                    </div>
+                                  ) : (
+                                    <div className="truncate" title={payment.wallet ?? undefined}>
+                                      {payment.wallet || <span className="text-gray-400 italic">No wallet</span>}
+                                    </div>
+                                  )}
                                 </TableCell>
                                 <TableCell
                                   className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'payments', payment.id, 'amount')}
@@ -8418,6 +8778,7 @@ const CampaignDetailsPage = () => {
                                   {renderEditablePaymentCell(payment.payment_method, 'payment_method', payment)}
                                 </TableCell>
                                 <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                  {payment.campaign_kol_id ? (
                                   <MultiSelect
                                     options={contents
                                       .filter(content => content.campaign_kols_id === payment.campaign_kol_id)
@@ -8459,7 +8820,7 @@ const CampaignDetailsPage = () => {
                                           if (contentIds.length === 1) {
                                             const content = contents.find(c => c.id === contentIds[0]);
                                             return content ?
-                                              <span className="text-xs">{content.type || 'Content'} - {content.platform || 'Unknown'}</span> :
+                                              <span className="text-xs">{content.type || 'Content'} - {content.platform || 'Unknown'}{content.activation_date ? ` (${formatDisplayDate(content.activation_date)})` : ''}</span> :
                                               <span className="text-xs">Content not found</span>;
                                           }
                                           return <span className="text-xs">{contentIds.length} contents linked</span>;
@@ -8472,6 +8833,9 @@ const CampaignDetailsPage = () => {
                                       return `${content.type || 'Content'} - ${content.platform || 'Unknown'}${content.activation_date ? ` (${formatDisplayDate(content.activation_date)})` : ''}`;
                                     }}
                                   />
+                                  ) : (
+                                    <span className="text-gray-400 italic">N/A</span>
+                                  )}
                                 </TableCell>
                                 <TableCell
                                   className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'payments', payment.id, 'notes')}
@@ -9309,7 +9673,7 @@ const CampaignDetailsPage = () => {
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-content">Content (Optional - Multi-select)</Label>
+              <Label htmlFor="edit-content">Content</Label>
               <MultiSelect
                 options={contents
                   .filter(content => content.campaign_kols_id === newPaymentData.campaign_kol_id)
@@ -9527,6 +9891,63 @@ const CampaignDetailsPage = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Email Views Dialog */}
+      <Dialog open={isEmailViewsDialogOpen} onOpenChange={setIsEmailViewsDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Email Views: {campaign?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Emails that have accessed this campaign via the public link.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {loadingEmailViews ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#3e8692]"></div>
+              </div>
+            ) : emailViews.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Eye className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p>No email views recorded yet.</p>
+                <p className="text-sm mt-2">Views will appear here when users access the campaign via the public link.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                <div className="text-sm text-gray-500 mb-3">
+                  {emailViews.length} view{emailViews.length !== 1 ? 's' : ''} recorded
+                </div>
+                {emailViews.map((view) => (
+                  <div
+                    key={view.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{view.email}</p>
+                      <p className="text-xs text-gray-500">
+                        {new Date(view.viewed_at).toLocaleString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEmailViewsDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

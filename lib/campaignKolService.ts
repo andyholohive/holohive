@@ -33,6 +33,7 @@ export interface CampaignKOLWithDetails extends CampaignKOL {
     rating?: number | null;
     group_chat?: boolean | null;
     description?: string | null;
+    wallet?: string | null;
   };
 }
 

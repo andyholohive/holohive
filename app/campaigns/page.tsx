@@ -164,6 +164,12 @@ export default function CampaignsPage() {
     if (!newCampaign.client_id || !newCampaign.name.trim() || !newCampaign.total_budget || !newCampaign.start_date) return;
     try {
       setIsSubmittingCampaign(true);
+
+      // Get team member emails for approved_emails
+      const teamEmails = allUsers
+        .map(u => u.email)
+        .filter((email): email is string => !!email && email.trim() !== '');
+
       const campaign = await CampaignService.createCampaign({
         client_id: newCampaign.client_id,
         name: newCampaign.name.trim(),
@@ -178,6 +184,7 @@ export default function CampaignsPage() {
         intro_call: newCampaign.intro_call,
         intro_call_date: newCampaign.intro_call_date || null,
         manager: newCampaign.manager || null,
+        approved_emails: teamEmails.length > 0 ? teamEmails : undefined,
       });
       setNewCampaign({
         client_id: "",

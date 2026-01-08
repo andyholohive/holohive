@@ -67,7 +67,8 @@ export default function KOLsPage() {
     community: true,
     group_chat: true,
     in_house: true,
-    description: true
+    description: true,
+    wallet: true
   };
 
   // Initialize visible columns from URL params
@@ -759,6 +760,7 @@ export default function KOLsPage() {
             {visibleColumns.group_chat && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Group Chat</TableHead>}
             {visibleColumns.in_house && <TableHead className={`bg-gray-50 border-r border-gray-200 select-none ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}>In-House</TableHead>}
             {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Description</TableHead>}
+            {visibleColumns.wallet && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Wallet</TableHead>}
             <TableHead className="bg-gray-50 whitespace-nowrap">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -780,6 +782,7 @@ export default function KOLsPage() {
               {visibleColumns.group_chat && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
               {visibleColumns.in_house && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
               {visibleColumns.description && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.wallet && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden w-16`}><div className="flex space-x-1 w-full"><Skeleton className="h-8 w-8 rounded" /><Skeleton className="h-8 w-8 rounded" /></div></TableCell>
             </TableRow>
           ))}
@@ -2768,6 +2771,7 @@ export default function KOLsPage() {
                 </TableHead>
               )}
               {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Description</TableHead>}
+              {visibleColumns.wallet && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Wallet</TableHead>}
               <TableHead className="bg-gray-50 whitespace-nowrap">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -2893,6 +2897,11 @@ export default function KOLsPage() {
                   {visibleColumns.description && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                       <div className="truncate">{renderEditableCell(kol.description, 'description', kol.id, 'text')}</div>
+                  </TableCell>
+                  )}
+                  {visibleColumns.wallet && (
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                      <div className="truncate">{renderEditableCell(kol.wallet, 'wallet', kol.id, 'text')}</div>
                   </TableCell>
                   )}
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>

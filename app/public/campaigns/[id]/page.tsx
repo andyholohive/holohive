@@ -212,6 +212,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [clientEmail, setClientEmail] = useState<string | null>(null);
+  const [approvedEmails, setApprovedEmails] = useState<string[]>([]);
   const [loadingClientEmail, setLoadingClientEmail] = useState(true);
   const [campaignUuid, setCampaignUuid] = useState<string | null>(null);
 
@@ -329,7 +330,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     if (clientEmail) {
       checkCachedAuth();
     }
-  }, [clientEmail]);
+  }, [clientEmail, approvedEmails]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -340,23 +341,27 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   // Check if user is already authenticated via cache
   const checkCachedAuth = () => {
     if (!clientEmail) return;
-    
+
     try {
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
         const { email: cachedEmail, timestamp } = JSON.parse(cached);
         const now = Date.now();
-        
+
         // Check if cache is still valid (within 24 hours)
         if (now - timestamp < CACHE_DURATION) {
-          // Verify the cached email still matches the current client email
-          if (cachedEmail && cachedEmail.toLowerCase() === clientEmail.toLowerCase()) {
+          // Verify the cached email matches client email OR is in approved emails
+          const cachedEmailLower = cachedEmail?.toLowerCase();
+          const isClientEmail = cachedEmailLower === clientEmail.toLowerCase();
+          const isApprovedEmail = approvedEmails.some(approved => approved.toLowerCase() === cachedEmailLower);
+
+          if (cachedEmail && (isClientEmail || isApprovedEmail)) {
             setEmail(cachedEmail);
             setIsAuthenticated(true);
             return;
           }
         }
-        
+
         // Cache expired or invalid, remove it
         localStorage.removeItem(cacheKey);
       }
@@ -405,7 +410,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(campaignId);
       let query = supabasePublic
         .from('campaigns')
-        .select('id, client_id');
+        .select('id, client_id, approved_emails');
 
       if (isUUID) {
         query = query.eq('id', campaignId);
@@ -426,6 +431,9 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
       // Store the campaign UUID for logging
       setCampaignUuid(campaignData.id);
+
+      // Store approved emails from campaign
+      setApprovedEmails((campaignData.approved_emails as string[]) || []);
 
       const { data: clientData, error: clientError } = await supabasePublic
         .from('clients')
@@ -488,7 +496,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailError('');
-    
+
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -503,7 +511,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       return;
     }
 
-    if (email.toLowerCase() !== authorizedEmail.toLowerCase()) {
+    // Check if email matches client email OR is in approved emails list
+    const emailLower = email.toLowerCase();
+    const isClientEmail = emailLower === authorizedEmail.toLowerCase();
+    const isApprovedEmail = approvedEmails.some(approved => approved.toLowerCase() === emailLower);
+
+    if (!isClientEmail && !isApprovedEmail) {
       setEmailError('This email address is not authorized to access this campaign');
       return;
     }

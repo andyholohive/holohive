@@ -20,6 +20,7 @@ export interface MasterKOL {
   group_chat: boolean | null;
   in_house: string | null;
   description: string | null;
+  wallet: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -41,6 +42,7 @@ export interface CreateKOLData {
   group_chat?: boolean;
   in_house?: string | null;
   description?: string;
+  wallet?: string;
 }
 
 export interface UpdateKOLData {
@@ -61,6 +63,7 @@ export interface UpdateKOLData {
   group_chat?: boolean | null;
   in_house?: string | null;
   description?: string | null;
+  wallet?: string | null;
 }
 
 export class KOLService {
