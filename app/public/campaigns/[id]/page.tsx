@@ -213,6 +213,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   const [emailError, setEmailError] = useState('');
   const [clientEmail, setClientEmail] = useState<string | null>(null);
   const [loadingClientEmail, setLoadingClientEmail] = useState(true);
+  const [campaignUuid, setCampaignUuid] = useState<string | null>(null);
 
   // KOL Table filters and search
   const [searchTerm, setSearchTerm] = useState('');
@@ -287,8 +288,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
   // Filter and search Contents
   const filteredContents = contents.filter(content => {
-    // Get KOL name for search
+    // Get KOL - if KOL is hidden (not in kols array), exclude this content
     const kol = kols.find(k => k.id === content.campaign_kols_id);
+
+    // Only show content for visible (non-hidden) KOLs
+    if (content.campaign_kols_id && !kol) return false;
+
     const kolName = kol?.master_kol?.name || '';
 
     // Search filter
@@ -375,6 +380,23 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     }
   };
 
+  // Log email view to database
+  const logEmailView = async (userEmail: string, campaignUuid: string) => {
+    try {
+      await supabasePublic
+        .from('campaign_email_views')
+        .insert({
+          campaign_id: campaignUuid,
+          email: userEmail,
+          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null
+        });
+      console.log('Campaign email view logged:', userEmail);
+    } catch (err) {
+      console.error('Error logging campaign email view:', err);
+      // Don't block authentication if logging fails
+    }
+  };
+
   async function fetchClientEmail() {
     try {
       setLoadingClientEmail(true);
@@ -383,7 +405,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(campaignId);
       let query = supabasePublic
         .from('campaigns')
-        .select('client_id');
+        .select('id, client_id');
 
       if (isUUID) {
         query = query.eq('id', campaignId);
@@ -392,31 +414,34 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       }
 
       const { data: campaignData, error: campaignError } = await query.single();
-      
+
       if (campaignError) {
         console.error('Campaign fetch error:', campaignError);
         throw new Error('Campaign not found or access denied');
       }
-      
+
       if (!campaignData?.client_id) {
         throw new Error('Campaign has no associated client');
       }
-      
+
+      // Store the campaign UUID for logging
+      setCampaignUuid(campaignData.id);
+
       const { data: clientData, error: clientError } = await supabasePublic
         .from('clients')
         .select('email')
         .eq('id', campaignData.client_id)
         .single();
-      
+
       if (clientError) {
         console.error('Client fetch error:', clientError);
         throw new Error('Client information not found');
       }
-      
+
       if (!clientData?.email) {
         throw new Error('Client has no email address configured');
       }
-      
+
       setClientEmail(clientData.email);
     } catch (e: any) {
       console.error('Error fetching client email:', e);
@@ -433,7 +458,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(campaignId);
       let query = supabasePublic
         .from('campaigns')
-        .select('client_id');
+        .select('id, client_id');
 
       if (isUUID) {
         query = query.eq('id', campaignId);
@@ -443,6 +468,9 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
       const { data: campaignData, error: campaignError } = await query.single();
       if (campaignError || !campaignData?.client_id) return null;
+
+      // Store the campaign UUID for logging
+      setCampaignUuid(campaignData.id);
 
       const { data: clientData, error: clientError } = await supabasePublic
         .from('clients')
@@ -482,6 +510,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
     // Save authentication to cache and proceed
     saveAuthToCache(email, authorizedEmail);
+
+    // Log the email view
+    if (campaignUuid) {
+      await logEmailView(email, campaignUuid);
+    }
     setIsAuthenticated(true);
   };
 
@@ -545,6 +578,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           .from('campaign_kols')
           .select(`id, hh_status, client_status, allocated_budget, budget_type, master_kol:master_kols(id, name, link, followers, platform, region, content_type, creator_type)`)
           .eq('campaign_id', actualCampaignId)
+          .or('hidden.is.null,hidden.eq.false')
           .order('created_at', { ascending: false });
         
         if (kolError) {

@@ -108,7 +108,10 @@ const CampaignDetailsPage = () => {
   
   // KOLs view toggle state
   const [kolViewMode, setKolViewMode] = useState<'overview' | 'table' | 'graph'>('overview');
-  
+
+  // KOL visibility tab state (active vs hidden)
+  const [kolVisibilityTab, setKolVisibilityTab] = useState<'active' | 'hidden'>('active');
+
   // Payments view toggle state
   const [paymentViewMode, setPaymentViewMode] = useState<'table' | 'graph'>('table');
 
@@ -902,6 +905,15 @@ const CampaignDetailsPage = () => {
     }
   };
 
+  const handleToggleKOLHidden = async (kolId: string, hidden: boolean) => {
+    try {
+      await CampaignKOLService.updateCampaignKOL(kolId, { hidden });
+      setCampaignKOLs(prev => prev.map(kol => kol.id === kolId ? { ...kol, hidden } : kol));
+    } catch (error) {
+      console.error('Error toggling KOL visibility:', error);
+    }
+  };
+
   // MultiSelect component
   const MultiSelect = ({
     options,
@@ -1004,6 +1016,9 @@ const CampaignDetailsPage = () => {
   };
 
   const filteredKOLs = campaignKOLs.filter(kol => {
+    // Hidden/Active filter based on visibility tab
+    const matchesVisibility = kolVisibilityTab === 'active' ? !kol.hidden : kol.hidden === true;
+
     // Search term filter
     const matchesSearch = !searchTerm || (
       kol.master_kol.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1074,7 +1089,7 @@ const CampaignDetailsPage = () => {
       }
     })();
 
-    return matchesSearch && matchesPlatform && matchesRegion && matchesCreatorType && matchesContentType &&
+    return matchesVisibility && matchesSearch && matchesPlatform && matchesRegion && matchesCreatorType && matchesContentType &&
            matchesStatus && matchesBudgetType && matchesFollowers && matchesBudget && matchesPaid;
   });
   useEffect(() => {
@@ -4399,6 +4414,32 @@ const CampaignDetailsPage = () => {
                 {/* Table View */}
                 {kolViewMode === 'table' && (
                   <>
+                {/* Active/Hidden Tab Switcher */}
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="inline-flex items-center rounded-lg border border-gray-200 p-1 bg-gray-50">
+                    <button
+                      onClick={() => setKolVisibilityTab('active')}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                        kolVisibilityTab === 'active'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Active ({campaignKOLs.filter(k => !k.hidden).length})
+                    </button>
+                    <button
+                      onClick={() => setKolVisibilityTab('hidden')}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                        kolVisibilityTab === 'hidden'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Hidden ({campaignKOLs.filter(k => k.hidden === true).length})
+                    </button>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between mb-2">
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -4473,6 +4514,23 @@ const CampaignDetailsPage = () => {
                           }}
                         >
                           Apply
+                        </Button>
+                      </div>
+                      <div className="flex flex-col items-end justify-end">
+                        <div className="h-5"></div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="whitespace-nowrap"
+                          disabled={selectedKOLs.length === 0}
+                          onClick={async () => {
+                            const newHiddenState = kolVisibilityTab === 'active';
+                            setCampaignKOLs(prev => prev.map(kol => selectedKOLs.includes(kol.id) ? { ...kol, hidden: newHiddenState } : kol));
+                            await Promise.all(selectedKOLs.map(kolId => CampaignKOLService.updateCampaignKOL(kolId, { hidden: newHiddenState })));
+                            setSelectedKOLs([]);
+                          }}
+                        >
+                          {kolVisibilityTab === 'active' ? <><EyeOff className="h-3 w-3 mr-1" /> Hide</> : <><Eye className="h-3 w-3 mr-1" /> Unhide</>}
                         </Button>
                       </div>
                       <div className="flex flex-col items-end justify-end">
@@ -5385,6 +5443,14 @@ const CampaignDetailsPage = () => {
                                   <Button
                                     size="sm"
                                     variant="outline"
+                                    onClick={() => handleToggleKOLHidden(campaignKOL.id, !campaignKOL.hidden)}
+                                    title={campaignKOL.hidden ? "Unhide KOL" : "Hide KOL"}
+                                  >
+                                    {campaignKOL.hidden ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
                                     onClick={() => {
                                       setKolsToDelete([campaignKOL.id]);
                                           setShowKOLDeleteDialog(true);
@@ -6058,6 +6124,21 @@ const CampaignDetailsPage = () => {
                                 });
                                 setIsAddingContent(false);
                                 return;
+                              }
+
+                              // Update campaign status to Active when content is added
+                              if (campaign?.id && campaign?.status !== 'Active') {
+                                const { error: statusError } = await supabase
+                                  .from('campaigns')
+                                  .update({ status: 'Active' })
+                                  .eq('id', campaign.id);
+
+                                if (statusError) {
+                                  console.error('Error updating campaign status:', statusError);
+                                } else {
+                                  // Update local campaign state
+                                  setCampaign(prev => prev ? { ...prev, status: 'Active' } : prev);
+                                }
                               }
 
                               // Auto-create payment for this content

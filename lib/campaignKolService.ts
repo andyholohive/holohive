@@ -11,6 +11,7 @@ export interface CampaignKOL {
   budget_type?: 'Token' | 'Fiat' | 'WL' | null;
   paid?: number | null;
   wallet?: string | null;
+  hidden?: boolean | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
