@@ -2871,8 +2871,8 @@ export default function KOLsPage() {
                   </TableCell>
                   )}
                   {visibleColumns.region && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                    <div className="truncate">{renderEditableCell(kol.region, 'region', kol.id, 'select')}</div>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-visible`}>
+                    <div>{renderEditableCell(kol.region, 'region', kol.id, 'select')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.creator_type && (
@@ -2891,8 +2891,8 @@ export default function KOLsPage() {
                   </TableCell>
                   )}
                   {visibleColumns.pricing && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                    <div className="truncate">{renderEditableCell(kol.pricing, 'pricing', kol.id, 'select')}</div>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-visible`}>
+                    <div>{renderEditableCell(kol.pricing, 'pricing', kol.id, 'select')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.rating && (
