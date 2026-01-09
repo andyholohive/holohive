@@ -5560,12 +5560,16 @@ const CampaignDetailsPage = () => {
                                             key={type}
                                             className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer rounded"
                                             onClick={async () => {
+                                              // Default activation date to today
+                                              const today = new Date();
+                                              const defaultActivationDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
                                               const payload = {
                                                 campaign_id: campaign?.id,
                                                 campaign_kols_id: campaignKOL.id,
                                                 type: type,
                                                 status: 'pending',
-                                                activation_date: null,
+                                                activation_date: defaultActivationDate,
                                                 content_link: null,
                                                 platform: null,
                                                 impressions: null,
@@ -6097,11 +6101,14 @@ const CampaignDetailsPage = () => {
                         onClick={async (e) => {
                           e.preventDefault();
                           const newId = `new-${Date.now()}`;
+                          // Default activation date to today
+                          const today = new Date();
+                          const defaultActivationDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
                           const newContent: any = {
                             id: newId,
                             campaign_id: campaign?.id,
                             campaign_kols_id: '',
-                            activation_date: '',
+                            activation_date: defaultActivationDate,
                             content_link: '',
                             platform: '',
                             type: '',
