@@ -71,7 +71,7 @@ const CampaignDetailsPage = () => {
     createPayment: false,
     payment_amount: 0,
     payment_date: '',
-    payment_method: 'Token'
+    payment_method: 'Fiat'
   });
 
   const [editMode, setEditMode] = useState(false);
@@ -141,7 +141,7 @@ const CampaignDetailsPage = () => {
     campaign_kol_id: '',
     amount: 0,
     payment_date: '',
-    payment_method: 'Token',
+    payment_method: 'Fiat',
     content_id: 'none',
     transaction_id: '',
     notes: ''
@@ -168,7 +168,7 @@ const CampaignDetailsPage = () => {
     payment_category: 'other' as 'operational' | 'other',
     amount: 0,
     payment_date: '',
-    payment_method: 'Token',
+    payment_method: 'Fiat',
     transaction_id: '',
     wallet: '',
     notes: ''
@@ -900,7 +900,7 @@ const CampaignDetailsPage = () => {
         createPayment: false,
         payment_amount: 0,
         payment_date: '',
-        payment_method: 'Token'
+        payment_method: 'Fiat'
       });
       setIsAddKOLsDialogOpen(false);
       fetchCampaignKOLs();
@@ -1607,7 +1607,7 @@ const CampaignDetailsPage = () => {
         campaign_kol_id: '',
         amount: 0,
         payment_date: '',
-        payment_method: 'Token',
+        payment_method: 'Fiat',
         content_id: 'none',
         transaction_id: '',
         notes: ''
@@ -1743,7 +1743,7 @@ const CampaignDetailsPage = () => {
         payment_category: 'other',
         amount: 0,
         payment_date: new Date().toISOString().split('T')[0],
-        payment_method: 'Token',
+        payment_method: 'Fiat',
         transaction_id: '',
         wallet: '',
         notes: ''
@@ -1868,7 +1868,7 @@ const CampaignDetailsPage = () => {
         campaign_kol_id: '',
         amount: 0,
         payment_date: '',
-        payment_method: 'Token',
+        payment_method: 'Fiat',
         content_id: 'none',
         transaction_id: '',
         notes: ''
@@ -5596,7 +5596,7 @@ const CampaignDetailsPage = () => {
                                                     content_id: data.id,
                                                     amount: 0,
                                                     payment_date: null,
-                                                    payment_method: 'Token',
+                                                    payment_method: 'Fiat',
                                                     notes: null
                                                   };
 
@@ -6372,7 +6372,7 @@ const CampaignDetailsPage = () => {
                                     content_id: newContent.id,
                                     amount: 0,
                                     payment_date: null,
-                                    payment_method: 'Token',
+                                    payment_method: 'Fiat',
                                     notes: null
                                   };
 
@@ -7987,7 +7987,7 @@ const CampaignDetailsPage = () => {
                                           payments: [{
                                             amount: 0,
                                             payment_date: '',
-                                            payment_method: 'Token',
+                                            payment_method: 'Fiat',
                                             content_id: 'none',
                                             transaction_id: '',
                                             notes: ''
@@ -8021,7 +8021,7 @@ const CampaignDetailsPage = () => {
                                             return currentPayments[i] || {
                                               amount: 0,
                                               payment_date: '',
-                                              payment_method: 'Token',
+                                              payment_method: 'Fiat',
                                               content_id: 'none',
                                               transaction_id: '',
                                               notes: ''
@@ -8386,7 +8386,7 @@ const CampaignDetailsPage = () => {
                             payment_category: 'other',
                             amount: 0,
                             payment_date: '',
-                            payment_method: 'Token',
+                            payment_method: 'Fiat',
                             transaction_id: '',
                             wallet: '',
                             notes: ''
