@@ -2228,6 +2228,12 @@ const CampaignDetailsPage = () => {
     bookmarks_value: ''
   });
 
+  // Content sorting state
+  const [contentSort, setContentSort] = useState<{
+    field: 'kol' | 'platform' | 'type' | 'status' | 'activation_date' | 'impressions' | 'likes' | 'retweets' | 'comments' | 'bookmarks' | 'created_at';
+    direction: 'asc' | 'desc';
+  }>({ field: 'created_at', direction: 'desc' });
+
   // 2. Add filtering logic for search and status
   const filteredContents = contents.filter(content => {
     const kol = campaignKOLs.find(k => k.id === content.campaign_kols_id);
@@ -2299,6 +2305,43 @@ const CampaignDetailsPage = () => {
       (content.platform?.toLowerCase().includes(search)) ||
       (content.status?.toLowerCase().includes(search))
     );
+  }).sort((a, b) => {
+    const direction = contentSort.direction === 'asc' ? 1 : -1;
+
+    switch (contentSort.field) {
+      case 'kol': {
+        const kolA = campaignKOLs.find(k => k.id === a.campaign_kols_id)?.master_kol?.name || '';
+        const kolB = campaignKOLs.find(k => k.id === b.campaign_kols_id)?.master_kol?.name || '';
+        return kolA.localeCompare(kolB) * direction;
+      }
+      case 'platform':
+        return ((a.platform || '').localeCompare(b.platform || '')) * direction;
+      case 'type':
+        return ((a.type || '').localeCompare(b.type || '')) * direction;
+      case 'status':
+        return ((a.status || '').localeCompare(b.status || '')) * direction;
+      case 'activation_date': {
+        const dateA = a.activation_date ? new Date(a.activation_date).getTime() : 0;
+        const dateB = b.activation_date ? new Date(b.activation_date).getTime() : 0;
+        return (dateA - dateB) * direction;
+      }
+      case 'impressions':
+        return ((a.impressions || 0) - (b.impressions || 0)) * direction;
+      case 'likes':
+        return ((a.likes || 0) - (b.likes || 0)) * direction;
+      case 'retweets':
+        return ((a.retweets || 0) - (b.retweets || 0)) * direction;
+      case 'comments':
+        return ((a.comments || 0) - (b.comments || 0)) * direction;
+      case 'bookmarks':
+        return ((a.bookmarks || 0) - (b.bookmarks || 0)) * direction;
+      case 'created_at':
+      default: {
+        const createdA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const createdB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return (createdA - createdB) * direction;
+      }
+    }
   });
 
   // 3. Add bulk action handlers
@@ -6787,7 +6830,7 @@ const CampaignDetailsPage = () => {
                 {/* Table Tab - Existing Contents Table */}
                 {contentsViewMode === 'table' && (
                   <>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-2 gap-3">
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
@@ -6796,6 +6839,47 @@ const CampaignDetailsPage = () => {
                       value={contentsSearchTerm}
                       onChange={e => setContentsSearchTerm(e.target.value)}
                     />
+                  </div>
+                  {/* Sort Menu */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">Sort by:</span>
+                    <Select
+                      value={contentSort.field}
+                      onValueChange={(value: typeof contentSort.field) => setContentSort(prev => ({ ...prev, field: value }))}
+                    >
+                      <SelectTrigger className="w-[140px] h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="created_at">Date Added</SelectItem>
+                        <SelectItem value="kol">KOL Name</SelectItem>
+                        <SelectItem value="platform">Platform</SelectItem>
+                        <SelectItem value="type">Type</SelectItem>
+                        <SelectItem value="status">Status</SelectItem>
+                        <SelectItem value="activation_date">Activation Date</SelectItem>
+                        <SelectItem value="impressions">Impressions</SelectItem>
+                        <SelectItem value="likes">Likes</SelectItem>
+                        <SelectItem value="retweets">Retweets</SelectItem>
+                        <SelectItem value="comments">Comments</SelectItem>
+                        <SelectItem value="bookmarks">Bookmarks</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-9 px-2"
+                      onClick={() => setContentSort(prev => ({ ...prev, direction: prev.direction === 'asc' ? 'desc' : 'asc' }))}
+                    >
+                      {contentSort.direction === 'asc' ? (
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                        </svg>
+                      ) : (
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
+                        </svg>
+                      )}
+                    </Button>
                   </div>
                 </div>
                 {selectedContents.length > 0 && (
