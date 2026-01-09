@@ -5081,6 +5081,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
+                          {/* Paid column hidden
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Paid <span className="text-gray-500 text-xs">(Internal)</span></span>
@@ -5135,6 +5136,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
+                          */}
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Notes</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Add Content</TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content</TableHead>
@@ -5418,6 +5420,7 @@ const CampaignDetailsPage = () => {
                                   </SelectContent>
                                 </Select>
                               </TableCell>
+                                  {/* Paid cell hidden
                                   <TableCell
                                     className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'paid')}
                                     onClick={() => handleCellSelect('kols', campaignKOL.id, 'paid', campaignKOL.paid)}
@@ -5426,6 +5429,7 @@ const CampaignDetailsPage = () => {
                                       {campaignKOL.paid != null ? `$${campaignKOL.paid.toLocaleString()}` : <span className="text-gray-400 italic">No payments</span>}
                                     </div>
                                   </TableCell>
+                                  */}
                                   <TableCell
                                     className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 align-middle overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'notes')}
                                     style={{ width: '20%' }}
@@ -5877,7 +5881,7 @@ const CampaignDetailsPage = () => {
                               />
                             </div>
                           </div>
-                          {/* Paid Filter */}
+                          {/* Paid Filter - hidden
                           <div className="min-w-[130px] flex flex-col items-end justify-end">
                             <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Paid (USD)</span>
                             <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
@@ -5902,6 +5906,7 @@ const CampaignDetailsPage = () => {
                               />
                             </div>
                           </div>
+                          */}
                           {/* Reset Filters Button */}
                           <div className="flex flex-col items-end justify-end">
                             <span className="text-xs text-transparent mb-1 self-start">Reset</span>
@@ -5974,13 +5979,14 @@ const CampaignDetailsPage = () => {
                             </Badge>
                           </div>
 
-                          {/* Paid Amount */}
+                          {/* Paid Amount - hidden
                           <div className="flex items-center justify-between">
                             <span className="text-sm text-gray-600">Paid</span>
                             <span className="font-medium text-gray-900">
                               {campaignKOL.paid ? `$${campaignKOL.paid}` : '-'}
                             </span>
                           </div>
+                          */}
 
                           {/* Content Count */}
                           <div className="flex items-center justify-between">
