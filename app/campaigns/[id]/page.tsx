@@ -167,7 +167,7 @@ const CampaignDetailsPage = () => {
     recipient_name: '',
     payment_category: 'other' as 'operational' | 'other',
     amount: 0,
-    payment_date: new Date().toISOString().split('T')[0],
+    payment_date: '',
     payment_method: 'Token',
     transaction_id: '',
     wallet: '',
@@ -5560,16 +5560,12 @@ const CampaignDetailsPage = () => {
                                             key={type}
                                             className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer rounded"
                                             onClick={async () => {
-                                              // Default activation date to today
-                                              const today = new Date();
-                                              const defaultActivationDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
                                               const payload = {
                                                 campaign_id: campaign?.id,
                                                 campaign_kols_id: campaignKOL.id,
                                                 type: type,
                                                 status: 'pending',
-                                                activation_date: defaultActivationDate,
+                                                activation_date: null,
                                                 content_link: null,
                                                 platform: null,
                                                 impressions: null,
@@ -5599,7 +5595,7 @@ const CampaignDetailsPage = () => {
                                                     campaign_kol_id: campaignKOL.id,
                                                     content_id: data.id,
                                                     amount: 0,
-                                                    payment_date: new Date().toISOString().split('T')[0],
+                                                    payment_date: null,
                                                     payment_method: 'Token',
                                                     notes: null
                                                   };
@@ -6101,14 +6097,11 @@ const CampaignDetailsPage = () => {
                         onClick={async (e) => {
                           e.preventDefault();
                           const newId = `new-${Date.now()}`;
-                          // Default activation date to today
-                          const today = new Date();
-                          const defaultActivationDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
                           const newContent: any = {
                             id: newId,
                             campaign_id: campaign?.id,
                             campaign_kols_id: '',
-                            activation_date: defaultActivationDate,
+                            activation_date: '',
                             content_link: '',
                             platform: '',
                             type: '',
@@ -6378,7 +6371,7 @@ const CampaignDetailsPage = () => {
                                     campaign_kol_id: kol.id,
                                     content_id: newContent.id,
                                     amount: 0,
-                                    payment_date: new Date().toISOString().split('T')[0],
+                                    payment_date: null,
                                     payment_method: 'Token',
                                     notes: null
                                   };
@@ -7993,7 +7986,7 @@ const CampaignDetailsPage = () => {
                                           number_of_payments: 1,
                                           payments: [{
                                             amount: 0,
-                                            payment_date: new Date().toISOString().split('T')[0],
+                                            payment_date: '',
                                             payment_method: 'Token',
                                             content_id: 'none',
                                             transaction_id: '',
@@ -8027,7 +8020,7 @@ const CampaignDetailsPage = () => {
                                             // Keep existing payment data if available, otherwise create new
                                             return currentPayments[i] || {
                                               amount: 0,
-                                              payment_date: new Date().toISOString().split('T')[0],
+                                              payment_date: '',
                                               payment_method: 'Token',
                                               content_id: 'none',
                                               transaction_id: '',
@@ -8392,7 +8385,7 @@ const CampaignDetailsPage = () => {
                             recipient_name: '',
                             payment_category: 'other',
                             amount: 0,
-                            payment_date: new Date().toISOString().split('T')[0],
+                            payment_date: '',
                             payment_method: 'Token',
                             transaction_id: '',
                             wallet: '',
