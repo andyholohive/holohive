@@ -33,6 +33,7 @@ export default function KOLsPage() {
   const [editingValue, setEditingValue] = useState<any>(null);
   const [selectedKOLs, setSelectedKOLs] = useState<string[]>([]);
   const [bulkEdit, setBulkEdit] = useState<Partial<MasterKOL>>({});
+  const [bulkEditDropdown, setBulkEditDropdown] = useState<string | null>(null);
   const [filters, setFilters] = useState({
     name: '',
     link: '',
@@ -1027,17 +1028,25 @@ export default function KOLsPage() {
                   const kolToUpdate = kols.find(k => k.id === kolId);
                   if (kolToUpdate) {
                     const updatedKOL = { ...kolToUpdate, [fieldKey]: newValue };
-                    setKols(prevKols => 
+                    setKols(prevKols =>
                       prevKols.map(k => k.id === kolId ? updatedKOL : k)
                     );
                     try {
                       await KOLService.updateKOL(updatedKOL);
                     } catch (error) {
                       console.error('Error updating field:', error);
-                      setKols(prevKols => 
+                      setKols(prevKols =>
                         prevKols.map(k => k.id === kolId ? kolToUpdate : k)
                       );
                     }
+                  }
+                }}
+                isOpen={openDropdown?.kolId === kolId && openDropdown?.field === field}
+                onOpenChange={(open) => {
+                  if (open) {
+                    setOpenDropdown({ kolId, field: field as string });
+                  } else {
+                    setOpenDropdown(null);
                   }
                 }}
                 renderOption={(option) => {
@@ -1451,6 +1460,8 @@ export default function KOLsPage() {
                 onSelectedChange={platform => setBulkEdit(prev => ({ ...prev, platform }))}
                 placeholder="Platform"
                 className="w-full"
+                isOpen={bulkEditDropdown === 'platform'}
+                onOpenChange={(open) => setBulkEditDropdown(open ? 'platform' : null)}
                 triggerContent={
                   <div className="w-full flex items-center h-7 min-h-[28px]">
                     {bulkEdit.platform && bulkEdit.platform.length > 0 ? (
@@ -1486,6 +1497,8 @@ export default function KOLsPage() {
                 }}
                 placeholder="Region"
                 className="w-full"
+                isOpen={bulkEditDropdown === 'region'}
+                onOpenChange={(open) => setBulkEditDropdown(open ? 'region' : null)}
                 renderOption={(option) => (
                   <div className="flex items-center space-x-2">
                     <span>{getRegionIcon(option).flag}</span>
@@ -1520,6 +1533,8 @@ export default function KOLsPage() {
                 onSelectedChange={creator_type => setBulkEdit(prev => ({ ...prev, creator_type }))}
                 placeholder="Creator Type"
                 className="w-full"
+                isOpen={bulkEditDropdown === 'creator_type'}
+                onOpenChange={(open) => setBulkEditDropdown(open ? 'creator_type' : null)}
                 triggerContent={
                   <div className="w-full flex items-center h-7 min-h-[28px]">
                     {bulkEdit.creator_type && bulkEdit.creator_type.length > 0 ? (
@@ -1549,6 +1564,8 @@ export default function KOLsPage() {
                 onSelectedChange={content_type => setBulkEdit(prev => ({ ...prev, content_type }))}
                 placeholder="Content Type"
                 className="w-full"
+                isOpen={bulkEditDropdown === 'content_type'}
+                onOpenChange={(open) => setBulkEditDropdown(open ? 'content_type' : null)}
                 triggerContent={
                   <div className="w-full flex items-center h-7 min-h-[28px]">
                     {bulkEdit.content_type && bulkEdit.content_type.length > 0 ? (
@@ -1578,6 +1595,8 @@ export default function KOLsPage() {
                 onSelectedChange={deliverables => setBulkEdit(prev => ({ ...prev, deliverables }))}
                 placeholder="Deliverables"
                 className="w-full"
+                isOpen={bulkEditDropdown === 'deliverables'}
+                onOpenChange={(open) => setBulkEditDropdown(open ? 'deliverables' : null)}
                 triggerContent={
                   <div className="w-full flex items-center h-7 min-h-[28px]">
                     {bulkEdit.deliverables && bulkEdit.deliverables.length > 0 ? (
@@ -1611,6 +1630,8 @@ export default function KOLsPage() {
                 }}
                 placeholder="Pricing"
                 className="w-full"
+                isOpen={bulkEditDropdown === 'pricing'}
+                onOpenChange={(open) => setBulkEditDropdown(open ? 'pricing' : null)}
                 renderOption={(option) => (
                   <span className={`px-2 py-1 rounded-md text-xs font-medium ${getPricingColor(option)}`}>
                     {option}
