@@ -2232,7 +2232,7 @@ const CampaignDetailsPage = () => {
   const [contentSort, setContentSort] = useState<{
     field: 'kol' | 'platform' | 'type' | 'status' | 'activation_date' | 'impressions' | 'likes' | 'retweets' | 'comments' | 'bookmarks' | 'created_at';
     direction: 'asc' | 'desc';
-  }>({ field: 'created_at', direction: 'desc' });
+  }>({ field: 'activation_date', direction: 'desc' });
 
   // 2. Add filtering logic for search and status
   const filteredContents = contents.filter(content => {
@@ -6847,7 +6847,7 @@ const CampaignDetailsPage = () => {
                       value={contentSort.field}
                       onValueChange={(value: typeof contentSort.field) => setContentSort(prev => ({ ...prev, field: value }))}
                     >
-                      <SelectTrigger className="w-[140px] h-9">
+                      <SelectTrigger className="w-[160px] h-9">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
