@@ -98,6 +98,7 @@ export default function ChangelogAdminPage() {
       setSaving(true);
 
       if (editingChangelog) {
+        const wasPublished = editingChangelog.is_published;
         await ChangelogService.updateChangelog(editingChangelog.id, {
           version: formData.version,
           title: formData.title,
@@ -105,6 +106,22 @@ export default function ChangelogAdminPage() {
           is_published: formData.is_published,
           published_at: formData.is_published ? new Date().toISOString() : null
         });
+
+        // Send Telegram notification if switching from draft to published
+        if (!wasPublished && formData.is_published) {
+          try {
+            const notificationMessage = `<b>New Changelog Published</b>\n\n<b>Version:</b> v${formData.version}\n<b>Title:</b> ${formData.title}\n\n${formData.content.substring(0, 500)}${formData.content.length > 500 ? '...' : ''}`;
+
+            await fetch('/api/telegram/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: notificationMessage })
+            });
+          } catch (telegramErr) {
+            console.error('Failed to send Telegram notification:', telegramErr);
+          }
+        }
+
         toast({
           title: 'Success',
           description: 'Changelog updated successfully',
@@ -117,6 +134,22 @@ export default function ChangelogAdminPage() {
           is_published: formData.is_published,
           published_at: formData.is_published ? new Date().toISOString() : null
         });
+
+        // Send Telegram notification if created as published
+        if (formData.is_published) {
+          try {
+            const notificationMessage = `<b>New Changelog Published</b>\n\n<b>Version:</b> v${formData.version}\n<b>Title:</b> ${formData.title}\n\n${formData.content.substring(0, 500)}${formData.content.length > 500 ? '...' : ''}`;
+
+            await fetch('/api/telegram/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: notificationMessage })
+            });
+          } catch (telegramErr) {
+            console.error('Failed to send Telegram notification:', telegramErr);
+          }
+        }
+
         toast({
           title: 'Success',
           description: 'Changelog created successfully',
@@ -165,6 +198,21 @@ export default function ChangelogAdminPage() {
         });
       } else {
         await ChangelogService.publishChangelog(changelog.id);
+
+        // Send Telegram notification to HH Operations chat
+        try {
+          const notificationMessage = `<b>New Changelog Published</b>\n\n<b>Version:</b> v${changelog.version}\n<b>Title:</b> ${changelog.title}\n\n${changelog.content.substring(0, 500)}${changelog.content.length > 500 ? '...' : ''}`;
+
+          await fetch('/api/telegram/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: notificationMessage })
+          });
+        } catch (telegramErr) {
+          console.error('Failed to send Telegram notification:', telegramErr);
+          // Don't fail the publish if notification fails
+        }
+
         toast({
           title: 'Success',
           description: 'Changelog published',
