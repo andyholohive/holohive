@@ -2051,8 +2051,8 @@ const CampaignDetailsPage = () => {
       case 'Curated': return 'bg-blue-100 text-blue-800';
       case 'Contacted': return 'bg-purple-100 text-purple-800';
       case 'Interested': return 'bg-yellow-100 text-yellow-800';
-      case 'Onboarded': return 'bg-green-100 text-green-800';
-      case 'Concluded': return 'bg-gray-100 text-gray-800';
+      case 'Onboarded': return 'bg-orange-100 text-orange-800';
+      case 'Concluded': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -2082,6 +2082,7 @@ const CampaignDetailsPage = () => {
   const [isAddKOLsDialogOpen, setIsAddKOLsDialogOpen] = useState(false);
   const [isAddContentsDialogOpen, setIsAddContentsDialogOpen] = useState(false);
   const [quickAddContentKolId, setQuickAddContentKolId] = useState<string | null>(null);
+  const [quickAddContentCount, setQuickAddContentCount] = useState(1);
   const [isShareCampaignOpen, setIsShareCampaignOpen] = useState(false);
   const [isWarningsOpen, setIsWarningsOpen] = useState(false);
   const { toast } = useToast();
@@ -3755,19 +3756,21 @@ const CampaignDetailsPage = () => {
                     </div>
                   </div>
 
-                  {/* Approved Emails Section (only in edit mode) */}
-                  {editMode && (
-                    <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                      <div className="flex items-center gap-3 mb-5">
-                        <div className="bg-[#3e8692] p-2.5 rounded-lg">
-                          <Users className="h-5 w-5 text-white" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-gray-900">Approved Emails</h3>
+                  {/* Approved Emails Section */}
+                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                        <Users className="h-5 w-5 text-white" />
                       </div>
-                      <div className="bg-white p-4 rounded-lg border border-gray-200">
-                        <p className="text-sm text-gray-600 mb-3">
-                          Add email addresses that are allowed to access the public campaign view (in addition to the client email).
-                        </p>
+                      <h3 className="text-lg font-semibold text-gray-900">Approved Emails</h3>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg border border-gray-200">
+                      <p className="text-sm text-gray-600 mb-3">
+                        {editMode
+                          ? 'Add email addresses that are allowed to access the public campaign view (in addition to the client email and same-domain emails).'
+                          : 'Email addresses allowed to access the public campaign view (in addition to the client email and same-domain emails).'}
+                      </p>
+                      {editMode && (
                         <div className="flex flex-col gap-2">
                           <Textarea
                             value={emailInput}
@@ -3796,14 +3799,16 @@ const CampaignDetailsPage = () => {
                             Add Emails
                           </Button>
                         </div>
-                        {((form as any)?.approved_emails || []).length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            {((form as any)?.approved_emails || []).map((email: string, index: number) => (
-                              <div
-                                key={index}
-                                className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm"
-                              >
-                                {email}
+                      )}
+                      {((editMode ? (form as any)?.approved_emails : campaign?.approved_emails) || []).length > 0 ? (
+                        <div className={`flex flex-wrap gap-2 ${editMode ? 'mt-3' : ''}`}>
+                          {((editMode ? (form as any)?.approved_emails : campaign?.approved_emails) || []).map((email: string, index: number) => (
+                            <div
+                              key={index}
+                              className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm"
+                            >
+                              {email}
+                              {editMode && (
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -3814,13 +3819,17 @@ const CampaignDetailsPage = () => {
                                 >
                                   ×
                                 </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        !editMode && (
+                          <p className="text-sm text-gray-400 italic">No approved emails added yet.</p>
+                        )
+                      )}
                     </div>
-                  )}
+                  </div>
 
                   {/* Budget Section */}
                   <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
@@ -5541,7 +5550,10 @@ const CampaignDetailsPage = () => {
                                   })()}
                                   <Popover
                                     open={quickAddContentKolId === campaignKOL.id}
-                                    onOpenChange={(open) => setQuickAddContentKolId(open ? campaignKOL.id : null)}
+                                    onOpenChange={(open) => {
+                                      setQuickAddContentKolId(open ? campaignKOL.id : null);
+                                      if (!open) setQuickAddContentCount(1);
+                                    }}
                                   >
                                     <PopoverTrigger asChild>
                                       <Button
@@ -5552,85 +5564,102 @@ const CampaignDetailsPage = () => {
                                         <Plus className="h-4 w-4 text-gray-600" />
                                       </Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-[200px] p-2" align="start">
-                                      <div className="space-y-1">
-                                        <div className="text-xs font-semibold text-gray-600 mb-2">Select Content Type</div>
-                                        {fieldOptions.deliverables.map((type) => (
-                                          <div
-                                            key={type}
-                                            className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer rounded"
-                                            onClick={async () => {
-                                              const payload = {
-                                                campaign_id: campaign?.id,
-                                                campaign_kols_id: campaignKOL.id,
-                                                type: type,
-                                                status: 'pending',
-                                                activation_date: null,
-                                                content_link: null,
-                                                platform: null,
-                                                impressions: null,
-                                                likes: null,
-                                                retweets: null,
-                                                comments: null,
-                                                bookmarks: null,
-                                              };
-                                              try {
-                                                console.log('Creating content with payload:', payload);
-                                                const { error, data } = await supabase.from('contents').insert(payload).select().single();
-                                                if (error) {
-                                                  console.error('Error creating content:', error);
-                                                  console.error('Error details:', JSON.stringify(error, null, 2));
-                                                  toast({
-                                                    title: 'Error',
-                                                    description: `Failed to create content: ${error.message}`,
-                                                    variant: 'destructive'
-                                                  });
-                                                  return;
-                                                }
-
-                                                // Auto-create payment for this content
-                                                if (data) {
-                                                  const paymentPayload = {
-                                                    campaign_id: campaign?.id,
-                                                    campaign_kol_id: campaignKOL.id,
-                                                    content_id: data.id,
-                                                    amount: 0,
-                                                    payment_date: null,
-                                                    payment_method: 'Fiat',
-                                                    notes: null
-                                                  };
-
-                                                  const { error: paymentError } = await supabase
-                                                    .from('payments')
-                                                    .insert(paymentPayload);
-
-                                                  if (paymentError) {
-                                                    console.error('Error creating payment:', paymentError);
+                                    <PopoverContent className="w-[220px] p-3" align="start">
+                                      <div className="space-y-3">
+                                        <div className="text-xs font-semibold text-gray-600">Add Contents</div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm text-gray-600">Count:</span>
+                                          <Input
+                                            type="number"
+                                            min={1}
+                                            max={20}
+                                            value={quickAddContentCount}
+                                            onChange={(e) => setQuickAddContentCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+                                            className="w-16 h-8 text-center auth-input"
+                                          />
+                                        </div>
+                                        <div className="text-xs font-semibold text-gray-600">Select Type</div>
+                                        <div className="space-y-1">
+                                          {fieldOptions.deliverables.map((type) => (
+                                            <div
+                                              key={type}
+                                              className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer rounded flex items-center justify-between"
+                                              onClick={async () => {
+                                                const count = quickAddContentCount;
+                                                const payloads = Array.from({ length: count }, () => ({
+                                                  campaign_id: campaign?.id,
+                                                  campaign_kols_id: campaignKOL.id,
+                                                  type: type,
+                                                  status: 'pending',
+                                                  activation_date: null,
+                                                  content_link: null,
+                                                  platform: null,
+                                                  impressions: null,
+                                                  likes: null,
+                                                  retweets: null,
+                                                  comments: null,
+                                                  bookmarks: null,
+                                                }));
+                                                try {
+                                                  console.log(`Creating ${count} contents with type:`, type);
+                                                  const { error, data } = await supabase.from('contents').insert(payloads).select();
+                                                  if (error) {
+                                                    console.error('Error creating contents:', error);
                                                     toast({
-                                                      title: 'Warning',
-                                                      description: 'Content created but failed to create payment record',
+                                                      title: 'Error',
+                                                      description: `Failed to create contents: ${error.message}`,
                                                       variant: 'destructive'
                                                     });
-                                                  } else {
-                                                    // Refetch payments to update the table
-                                                    fetchPayments();
+                                                    return;
                                                   }
-                                                }
 
-                                                fetchContents();
-                                                setQuickAddContentKolId(null);
-                                                toast({
-                                                  title: 'Success',
-                                                  description: 'Content and payment created successfully',
-                                                });
-                                              } catch (err) {
-                                                console.error('Unexpected error:', err);
-                                              }
-                                            }}
-                                          >
-                                            {type}
-                                          </div>
-                                        ))}
+                                                  // Auto-create payments for each content
+                                                  if (data && data.length > 0) {
+                                                    const paymentPayloads = data.map((content: any) => ({
+                                                      campaign_id: campaign?.id,
+                                                      campaign_kol_id: campaignKOL.id,
+                                                      content_id: content.id,
+                                                      amount: 0,
+                                                      payment_date: null,
+                                                      payment_method: 'Fiat',
+                                                      notes: null
+                                                    }));
+
+                                                    const { error: paymentError } = await supabase
+                                                      .from('payments')
+                                                      .insert(paymentPayloads);
+
+                                                    if (paymentError) {
+                                                      console.error('Error creating payments:', paymentError);
+                                                      toast({
+                                                        title: 'Warning',
+                                                        description: 'Contents created but failed to create payment records',
+                                                        variant: 'destructive'
+                                                      });
+                                                    } else {
+                                                      fetchPayments();
+                                                    }
+                                                  }
+
+                                                  fetchContents();
+                                                  setQuickAddContentKolId(null);
+                                                  setQuickAddContentCount(1);
+                                                  toast({
+                                                    title: 'Success',
+                                                    description: `${count} ${type}${count > 1 ? 's' : ''} and payment${count > 1 ? 's' : ''} created successfully`,
+                                                  });
+                                                } catch (err) {
+                                                  console.error('Unexpected error:', err);
+                                                }
+                                              }}
+                                            >
+                                              <span>{type}</span>
+                                              {quickAddContentCount > 1 && (
+                                                <span className="text-xs text-gray-400">×{quickAddContentCount}</span>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
                                       </div>
                                     </PopoverContent>
                                   </Popover>
@@ -8832,16 +8861,65 @@ const CampaignDetailsPage = () => {
                                   </div>
                                 </TableCell>
                                 <TableCell
-                                  className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}
+                                  className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`}
+                                  onClick={() => {
+                                    if (payment.campaign_kol_id) {
+                                      // For KOL payments - edit master KOL wallet
+                                      if (editingWalletId !== payment.campaign_kol_id) {
+                                        const currentWallet = campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet || '';
+                                        setEditingWallet({ [payment.campaign_kol_id]: currentWallet });
+                                        setEditingWalletId(payment.campaign_kol_id);
+                                      }
+                                    } else {
+                                      // For non-KOL payments - edit payment wallet
+                                      if (editingPaymentCell?.paymentId !== payment.id || editingPaymentCell?.field !== 'wallet') {
+                                        handleCellSelect('payments', payment.id, 'wallet', payment.wallet);
+                                      }
+                                    }
+                                  }}
                                 >
                                   {payment.campaign_kol_id ? (
-                                    <div className="truncate" title={campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet ?? undefined}>
-                                      {campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet || <span className="text-gray-400 italic">No wallet</span>}
-                                    </div>
+                                    editingWalletId === payment.campaign_kol_id ? (
+                                      <Input
+                                        type="text"
+                                        value={editingWallet[payment.campaign_kol_id] || ''}
+                                        onChange={e => setEditingWallet({ ...editingWallet, [payment.campaign_kol_id]: e.target.value })}
+                                        onBlur={() => handleWalletSave(payment.campaign_kol_id)}
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter') handleWalletSave(payment.campaign_kol_id);
+                                          if (e.key === 'Escape') { setEditingWalletId(null); setEditingWallet({}); }
+                                        }}
+                                        className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
+                                        style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
+                                        autoFocus
+                                        onClick={e => e.stopPropagation()}
+                                      />
+                                    ) : (
+                                      <div className="truncate" title={campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet ?? undefined}>
+                                        {campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet || <span className="text-gray-400 italic">No wallet</span>}
+                                      </div>
+                                    )
                                   ) : (
-                                    <div className="truncate" title={payment.wallet ?? undefined}>
-                                      {payment.wallet || <span className="text-gray-400 italic">No wallet</span>}
-                                    </div>
+                                    editingPaymentCell?.paymentId === payment.id && editingPaymentCell?.field === 'wallet' ? (
+                                      <Input
+                                        type="text"
+                                        value={editingPaymentValue ?? ''}
+                                        onChange={e => setEditingPaymentValue(e.target.value)}
+                                        onBlur={() => handlePaymentCellSave(payment, 'wallet', editingPaymentValue)}
+                                        onKeyDown={e => {
+                                          if (e.key === 'Enter') handlePaymentCellSave(payment, 'wallet', editingPaymentValue);
+                                          if (e.key === 'Escape') { setEditingPaymentCell(null); setEditingPaymentValue(null); }
+                                        }}
+                                        className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
+                                        style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
+                                        autoFocus
+                                        onClick={e => e.stopPropagation()}
+                                      />
+                                    ) : (
+                                      <div className="truncate" title={payment.wallet ?? undefined}>
+                                        {payment.wallet || <span className="text-gray-400 italic">No wallet</span>}
+                                      </div>
+                                    )
                                   )}
                                 </TableCell>
                                 <TableCell
@@ -9873,7 +9951,7 @@ const CampaignDetailsPage = () => {
                 <p className="text-xs text-blue-600 mt-2">Use the client's email address as the password to access the public campaign view</p>
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="share-creator-type"
@@ -9893,6 +9971,27 @@ const CampaignDetailsPage = () => {
                 />
                 <Label htmlFor="share-creator-type" className="text-sm font-medium cursor-pointer">
                   Share Creator Type for KOLs
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="share-kol-notes"
+                  checked={(campaign as any)?.share_kol_notes || false}
+                  onCheckedChange={async (checked) => {
+                    if (campaign?.id) {
+                      try {
+                        await CampaignService.updateCampaign(campaign.id, {
+                          share_kol_notes: checked as boolean
+                        } as any);
+                        setCampaign({ ...campaign, share_kol_notes: checked as boolean } as any);
+                      } catch (error) {
+                        console.error('Error updating campaign:', error);
+                      }
+                    }
+                  }}
+                />
+                <Label htmlFor="share-kol-notes" className="text-sm font-medium cursor-pointer">
+                  Share KOL Notes
                 </Label>
               </div>
             </div>

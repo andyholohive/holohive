@@ -18,6 +18,8 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import {
   CRMService,
   CRMContact,
@@ -59,6 +61,9 @@ export default function ContactsPage() {
   // Filter state
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterLinked, setFilterLinked] = useState<string>('all');
+
+  // Category combobox state
+  const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false);
 
   // Sort state
   const [sortBy, setSortBy] = useState<string>('created_desc');
@@ -184,20 +189,35 @@ export default function ContactsPage() {
 
   const handleEditContact = (contact: CRMContact) => {
     setEditingContact(contact);
+
+    // Check for existing affiliate/partner links
+    const contactLinks = getContactLinks(contact.id);
+    const affiliateLink = contactLinks.find(l => l.affiliate_id);
+    const partnerLink = contactLinks.find(l => l.partner_id);
+
+    // Determine category - use contact's category, or fall back to affiliate's category
+    let categoryToUse = contact.category || undefined;
+    if (!categoryToUse && affiliateLink?.affiliate_id) {
+      const linkedAffiliate = affiliates.find(a => a.id === affiliateLink.affiliate_id);
+      if (linkedAffiliate?.category) {
+        // Format affiliate category to human-readable
+        categoryToUse =
+          linkedAffiliate.category === 'service_provider' ? 'Service Provider' :
+          linkedAffiliate.category === 'investor_vc' ? 'Investor / VC' :
+          linkedAffiliate.category === 'project' ? 'Project' :
+          linkedAffiliate.category;
+      }
+    }
+
     setContactForm({
       name: contact.name,
       email: contact.email || undefined,
       telegram_id: contact.telegram_id || undefined,
       x_id: contact.x_id || undefined,
       role: contact.role || undefined,
-      category: contact.category || undefined,
+      category: categoryToUse,
       notes: contact.notes || undefined
     });
-
-    // Check for existing affiliate/partner links
-    const contactLinks = getContactLinks(contact.id);
-    const affiliateLink = contactLinks.find(l => l.affiliate_id);
-    const partnerLink = contactLinks.find(l => l.partner_id);
 
     if (affiliateLink) {
       setLinkToAffiliate(true);
@@ -239,8 +259,24 @@ export default function ContactsPage() {
     }
   };
 
-  // Get all unique categories
-  const categories = [...new Set(contacts.map(c => c.category).filter(Boolean))] as string[];
+  // Helper function to format category names
+  const formatCategory = (category: string): string => {
+    // Handle known affiliate category codes
+    if (category === 'service_provider') return 'Service Provider';
+    if (category === 'investor_vc') return 'Investor / VC';
+    if (category === 'project') return 'Project';
+    // For other categories, capitalize first letter of each word
+    return category
+      .split(/[_\s]+/)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+  };
+
+  // Get all unique categories (from contacts and affiliates), formatted
+  const categories = [...new Set([
+    ...contacts.map(c => c.category).filter(Boolean).map(formatCategory),
+    ...affiliates.map(a => a.category).filter(Boolean).map(formatCategory)
+  ])] as string[];
 
   const filteredContacts = contacts
     .filter(c => {
@@ -703,13 +739,58 @@ export default function ContactsPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="contact-category">Category</Label>
-                <Input
-                  id="contact-category"
-                  value={contactForm.category || ''}
-                  onChange={(e) => setContactForm({ ...contactForm, category: e.target.value })}
-                  placeholder="Contact category"
-                  className="auth-input"
-                />
+                <Popover open={categoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={categoryPopoverOpen}
+                      className="w-full justify-between auth-input font-normal"
+                    >
+                      {contactForm.category || <span className="text-gray-400">Select or enter category...</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command>
+                      <CommandInput
+                        placeholder="Search or enter new category..."
+                        value={contactForm.category || ''}
+                        onValueChange={(value) => setContactForm({ ...contactForm, category: value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && contactForm.category) {
+                            e.preventDefault();
+                            setCategoryPopoverOpen(false);
+                          }
+                        }}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          <div className="py-2 px-3 text-sm">
+                            {contactForm.category ? (
+                              <span>Press enter to use "<strong>{contactForm.category}</strong>"</span>
+                            ) : (
+                              <span>Type to enter a new category</span>
+                            )}
+                          </div>
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {categories.map((cat) => (
+                            <CommandItem
+                              key={cat}
+                              value={cat}
+                              onSelect={(value) => {
+                                setContactForm({ ...contactForm, category: value });
+                                setCategoryPopoverOpen(false);
+                              }}
+                            >
+                              {cat}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="contact-notes">Notes</Label>
@@ -740,7 +821,20 @@ export default function ContactsPage() {
                             checked={linkToAffiliate}
                             onCheckedChange={(checked) => {
                               setLinkToAffiliate(!!checked);
-                              if (!checked) setSelectedAffiliateId('');
+                              if (!checked) {
+                                setSelectedAffiliateId('');
+                              } else if (selectedAffiliateId) {
+                                // Auto-fill category if affiliate already selected
+                                const selectedAffiliate = affiliates.find(a => a.id === selectedAffiliateId);
+                                if (selectedAffiliate?.category) {
+                                  const formattedCategory =
+                                    selectedAffiliate.category === 'service_provider' ? 'Service Provider' :
+                                    selectedAffiliate.category === 'investor_vc' ? 'Investor / VC' :
+                                    selectedAffiliate.category === 'project' ? 'Project' :
+                                    selectedAffiliate.category;
+                                  setContactForm(prev => ({ ...prev, category: formattedCategory }));
+                                }
+                              }
                             }}
                           />
                           <Label htmlFor="link-affiliate" className="text-sm font-normal cursor-pointer">
@@ -748,7 +842,23 @@ export default function ContactsPage() {
                           </Label>
                         </div>
                         {linkToAffiliate && (
-                          <Select value={selectedAffiliateId} onValueChange={setSelectedAffiliateId}>
+                          <Select
+                            value={selectedAffiliateId}
+                            onValueChange={(affId) => {
+                              setSelectedAffiliateId(affId);
+                              // Auto-fill category from affiliate
+                              const selectedAffiliate = affiliates.find(a => a.id === affId);
+                              if (selectedAffiliate?.category) {
+                                // Format affiliate category to human-readable
+                                const formattedCategory =
+                                  selectedAffiliate.category === 'service_provider' ? 'Service Provider' :
+                                  selectedAffiliate.category === 'investor_vc' ? 'Investor / VC' :
+                                  selectedAffiliate.category === 'project' ? 'Project' :
+                                  selectedAffiliate.category;
+                                setContactForm(prev => ({ ...prev, category: formattedCategory }));
+                              }
+                            }}
+                          >
                             <SelectTrigger className="auth-input">
                               <SelectValue placeholder="Select affiliate..." />
                             </SelectTrigger>

@@ -273,6 +273,46 @@ export default function TelegramChatsPage() {
     setLinkDialogOpen(true);
   };
 
+  const handleUnlink = async (chat: TelegramChat) => {
+    if (!chat.opportunity_id) return;
+
+    try {
+      // Update telegram_chats table to remove opportunity link
+      const { error: chatError } = await supabase
+        .from('telegram_chats')
+        .update({
+          opportunity_id: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', chat.id);
+
+      if (chatError) throw chatError;
+
+      // Clear the gc field on the opportunity
+      await supabase
+        .from('crm_opportunities')
+        .update({
+          gc: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', chat.opportunity_id);
+
+      toast({
+        title: 'Chat unlinked',
+        description: 'Chat has been unlinked from the opportunity',
+      });
+
+      fetchChats();
+    } catch (error) {
+      console.error('Error unlinking chat:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to unlink chat',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleLink = async () => {
     if (!selectedChat) return;
 
@@ -745,6 +785,17 @@ export default function TelegramChatsPage() {
 
                     {/* Right: Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {chat.opportunity_id && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleUnlink(chat)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                        >
+                          <Unlink className="h-4 w-4 mr-1.5" />
+                          Unlink
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -752,7 +803,7 @@ export default function TelegramChatsPage() {
                       >
                         {chat.opportunity_id ? (
                           <>
-                            <Unlink className="h-4 w-4 mr-1.5" />
+                            <Edit className="h-4 w-4 mr-1.5" />
                             Change Link
                           </>
                         ) : (

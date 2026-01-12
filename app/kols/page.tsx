@@ -934,9 +934,12 @@ export default function KOLsPage() {
                       return;
                     }
 
+                    // Handle "none" as clearing the field
+                    const actualValue = newValue === 'none' ? null : newValue;
+
                     const kolToUpdate = kols.find(k => k.id === kolId);
                     if (kolToUpdate) {
-                      const updatedKOL = { ...kolToUpdate, in_house: newValue };
+                      const updatedKOL = { ...kolToUpdate, in_house: actualValue };
                       setKols(prevKols =>
                         prevKols.map(k => k.id === kolId ? updatedKOL : k)
                       );
@@ -956,6 +959,9 @@ export default function KOLsPage() {
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none" className="text-gray-500">
+                      None
+                    </SelectItem>
                     {dynamicFieldOptions.in_house?.map(option => (
                       <SelectItem key={option} value={option}>
                         {option}
@@ -2916,8 +2922,8 @@ export default function KOLsPage() {
                   </TableCell>
                   )}
                   {visibleColumns.description && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                      <div className="truncate">{renderEditableCell(kol.description, 'description', kol.id, 'text')}</div>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2`}>
+                      <div className="max-w-xs whitespace-pre-wrap break-words">{renderEditableCell(kol.description, 'description', kol.id, 'text')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.wallet && (

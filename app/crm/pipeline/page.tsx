@@ -1627,9 +1627,9 @@ export default function PipelinePage() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-36 h-8 text-xs auth-input justify-between font-normal"
+                    className="w-auto min-w-36 h-8 text-xs auth-input justify-between font-normal"
                   >
-                    <span className="truncate">
+                    <span>
                       {opp.scope ? (
                         opp.scope.split(',').map(s => scopeOptions.find(o => o.value === s)?.label || s).join(', ')
                       ) : (

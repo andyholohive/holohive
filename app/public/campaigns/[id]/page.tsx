@@ -33,6 +33,7 @@ type Campaign = {
   client_name?: string | null;
   budget_allocations?: { id: string; region: string; allocated_budget: number }[];
   share_creator_type?: boolean | null;
+  share_kol_notes?: boolean | null;
 };
 
 type CampaignKOL = {
@@ -41,6 +42,7 @@ type CampaignKOL = {
   client_status: string | null;
   allocated_budget: number | null;
   budget_type: string | null;
+  notes: string | null;
   master_kol: {
     id: string;
     name: string;
@@ -176,9 +178,9 @@ const getStatusColor = (status: string) => {
     case 'interested':
       return 'bg-yellow-100 text-yellow-800';
     case 'onboarded':
-      return 'bg-green-100 text-green-800';
+      return 'bg-orange-100 text-orange-800';
     case 'concluded':
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-green-100 text-green-800';
     default:
       return 'bg-gray-100 text-gray-800';
   }
@@ -350,12 +352,19 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
         // Check if cache is still valid (within 24 hours)
         if (now - timestamp < CACHE_DURATION) {
-          // Verify the cached email matches client email OR is in approved emails
+          // Verify the cached email matches client email, is in approved emails, or has same domain
           const cachedEmailLower = cachedEmail?.toLowerCase();
-          const isClientEmail = cachedEmailLower === clientEmail.toLowerCase();
+          const clientEmailLower = clientEmail.toLowerCase();
+          const isClientEmail = cachedEmailLower === clientEmailLower;
           const isApprovedEmail = approvedEmails.some(approved => approved.toLowerCase() === cachedEmailLower);
 
-          if (cachedEmail && (isClientEmail || isApprovedEmail)) {
+          // Check if email has the same domain as client email
+          const getEmailDomain = (email: string) => email.split('@')[1];
+          const cachedDomain = cachedEmailLower ? getEmailDomain(cachedEmailLower) : null;
+          const clientDomain = getEmailDomain(clientEmailLower);
+          const isSameDomain = cachedDomain && clientDomain && cachedDomain === clientDomain;
+
+          if (cachedEmail && (isClientEmail || isApprovedEmail || isSameDomain)) {
             setEmail(cachedEmail);
             setIsAuthenticated(true);
             return;
@@ -511,12 +520,19 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       return;
     }
 
-    // Check if email matches client email OR is in approved emails list
+    // Check if email matches client email, is in approved emails list, or has same domain as client
     const emailLower = email.toLowerCase();
-    const isClientEmail = emailLower === authorizedEmail.toLowerCase();
+    const authorizedEmailLower = authorizedEmail.toLowerCase();
+    const isClientEmail = emailLower === authorizedEmailLower;
     const isApprovedEmail = approvedEmails.some(approved => approved.toLowerCase() === emailLower);
 
-    if (!isClientEmail && !isApprovedEmail) {
+    // Check if email has the same domain as client email
+    const getEmailDomain = (email: string) => email.split('@')[1];
+    const enteredDomain = getEmailDomain(emailLower);
+    const clientDomain = getEmailDomain(authorizedEmailLower);
+    const isSameDomain = enteredDomain && clientDomain && enteredDomain === clientDomain;
+
+    if (!isClientEmail && !isApprovedEmail && !isSameDomain) {
       setEmailError('This email address is not authorized to access this campaign');
       return;
     }
@@ -566,6 +582,12 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         return;
       }
 
+      // Check if campaign is archived
+      if (campaignData.status === 'archived') {
+        setError('This campaign has been archived and is no longer available for public viewing.');
+        return;
+      }
+
       const normalizedCampaign: Campaign = {
         id: campaignData.id,
         name: campaignData.name,
@@ -580,6 +602,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         client_name: (campaignData.clients as any)?.name || null,
         budget_allocations: (campaignData.campaign_budget_allocations || []).map((b: any) => ({ id: b.id, region: b.region, allocated_budget: b.allocated_budget })),
         share_creator_type: campaignData.share_creator_type || false,
+        share_kol_notes: campaignData.share_kol_notes || false,
       };
       setCampaign(normalizedCampaign);
 
@@ -589,7 +612,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       try {
         const { data: kolData, error: kolError } = await supabasePublic
           .from('campaign_kols')
-          .select(`id, hh_status, client_status, allocated_budget, budget_type, master_kol:master_kols(id, name, link, followers, platform, region, content_type, creator_type)`)
+          .select(`id, hh_status, client_status, allocated_budget, budget_type, notes, master_kol:master_kols(id, name, link, followers, platform, region, content_type, creator_type)`)
           .eq('campaign_id', actualCampaignId)
           .or('hidden.is.null,hidden.eq.false')
           .order('created_at', { ascending: false });
@@ -1414,13 +1437,16 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 )}
                               </div>
                             </TableHead>
-                            <TableHead className="relative bg-gray-50 select-none">Content</TableHead>
+                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content</TableHead>
+                            {campaign?.share_kol_notes && (
+                              <TableHead className="relative bg-gray-50 select-none">Notes</TableHead>
+                            )}
                           </TableRow>
                         </TableHeader>
                         <TableBody className="bg-white">
                           {filteredKOLs.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={campaign?.share_creator_type ? 10 : 9} className="text-center py-12">
+                              <TableCell colSpan={(campaign?.share_creator_type ? 10 : 9) + (campaign?.share_kol_notes ? 1 : 0)} className="text-center py-12">
                                 <div className="flex flex-col items-center justify-center text-gray-500">
                                   <Users className="h-12 w-12 mb-4 text-gray-300" />
                                   <p className="text-lg font-medium mb-2">No KOLs match your filters</p>
@@ -1510,11 +1536,18 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                       {campaignKOL.hh_status || 'Curated'}
                                     </span>
                                   </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden text-center`}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${campaign?.share_kol_notes ? 'border-r border-gray-200' : ''} p-2 overflow-hidden text-center`}>
                                     <div className="font-medium text-gray-900">
                                       {contents.filter(content => content.campaign_kols_id === campaignKOL.id).length}
                                     </div>
                                   </TableCell>
+                                  {campaign?.share_kol_notes && (
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
+                                      <div className="text-sm text-gray-600 max-w-xs whitespace-pre-wrap">
+                                        {campaignKOL.notes || <span className="text-gray-400 italic">-</span>}
+                                      </div>
+                                    </TableCell>
+                                  )}
                                 </TableRow>
                               );
                             })
@@ -1584,14 +1617,22 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           {/* View Profile Link */}
                           {item.master_kol.link && (
                             <div className="pt-2 border-t border-gray-100">
-                              <a 
-                                href={item.master_kol.link} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
+                              <a
+                                href={item.master_kol.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="text-sm text-blue-600 hover:text-blue-800 font-medium"
                               >
                                 View Profile →
                               </a>
+                            </div>
+                          )}
+
+                          {/* Notes */}
+                          {campaign?.share_kol_notes && item.notes && (
+                            <div className="pt-2 border-t border-gray-100">
+                              <span className="text-sm text-gray-600 block mb-1">Notes</span>
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{item.notes}</p>
                             </div>
                           )}
                         </CardContent>

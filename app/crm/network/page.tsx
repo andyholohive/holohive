@@ -1867,6 +1867,7 @@ export default function NetworkPage() {
                     <TableHead className="w-10">#</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Category</TableHead>
                     <TableHead>Affiliation</TableHead>
                     <TableHead>Owner</TableHead>
                     <TableHead>Contacts</TableHead>
@@ -1877,7 +1878,7 @@ export default function NetworkPage() {
                 <TableBody>
                   {filteredAffiliates.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                      <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                         No affiliates found
                       </TableCell>
                     </TableRow>
@@ -1955,6 +1956,29 @@ export default function NetworkPage() {
                                 <SelectItem value="new">New</SelectItem>
                                 <SelectItem value="active">Active</SelectItem>
                                 <SelectItem value="inactive">Inactive</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={affiliate.category || 'none'}
+                              onValueChange={(v) => handleAffiliateInlineUpdate(affiliate.id, 'category', v === 'none' ? null : v)}
+                            >
+                              <SelectTrigger className="w-40 h-8 text-xs auth-input">
+                                <SelectValue placeholder="Select">
+                                  {affiliate.category ? (
+                                    affiliate.category === 'service_provider' ? 'Service Provider' :
+                                    affiliate.category === 'investor_vc' ? 'Investor / VC' :
+                                    affiliate.category === 'project' ? 'Project' :
+                                    affiliate.category
+                                  ) : <span className="text-gray-400">-</span>}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">None</SelectItem>
+                                <SelectItem value="service_provider">Service Provider</SelectItem>
+                                <SelectItem value="investor_vc">Investor / VC</SelectItem>
+                                <SelectItem value="project">Project</SelectItem>
                               </SelectContent>
                             </Select>
                           </TableCell>
