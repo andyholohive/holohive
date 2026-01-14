@@ -11,8 +11,9 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import { KOLService, MasterKOL } from "@/lib/kolService";
 import { FieldOptionsService } from "@/lib/fieldOptionsService";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -69,7 +70,8 @@ export default function KOLsPage() {
     group_chat: true,
     in_house: true,
     description: true,
-    wallet: true
+    wallet: true,
+    telegram: true
   };
 
   // Initialize visible columns from URL params
@@ -115,6 +117,9 @@ export default function KOLsPage() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
+
+  // Telegram chat links for KOLs
+  const [kolTelegramChats, setKolTelegramChats] = useState<Record<string, { chat_id: string; title: string | null }>>({});
 
   const fieldOptions = KOLService.getFieldOptions();
   const { toast } = useToast();
@@ -264,6 +269,7 @@ export default function KOLsPage() {
   useEffect(() => {
     fetchKOLs();
     loadDynamicFieldOptions();
+    fetchTelegramChats();
   }, []);
 
   // Debounce search term for performance (300ms delay)
@@ -334,6 +340,31 @@ export default function KOLsPage() {
       setError('Failed to load KOLs');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTelegramChats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('telegram_chats')
+        .select('chat_id, title, master_kol_id')
+        .not('master_kol_id', 'is', null);
+
+      if (error) throw error;
+
+      // Build a map of kol_id -> chat info
+      const chatsMap: Record<string, { chat_id: string; title: string | null }> = {};
+      data?.forEach(chat => {
+        if (chat.master_kol_id) {
+          chatsMap[chat.master_kol_id] = {
+            chat_id: chat.chat_id,
+            title: chat.title
+          };
+        }
+      });
+      setKolTelegramChats(chatsMap);
+    } catch (err) {
+      console.error('Error fetching telegram chats:', err);
     }
   };
 
@@ -762,6 +793,7 @@ export default function KOLsPage() {
             {visibleColumns.in_house && <TableHead className={`bg-gray-50 border-r border-gray-200 select-none ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}>In-House</TableHead>}
             {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Description</TableHead>}
             {visibleColumns.wallet && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Wallet</TableHead>}
+            {visibleColumns.telegram && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Telegram</TableHead>}
             <TableHead className="bg-gray-50 whitespace-nowrap">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -784,6 +816,7 @@ export default function KOLsPage() {
               {visibleColumns.in_house && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
               {visibleColumns.description && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
               {visibleColumns.wallet && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.telegram && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden w-16`}><div className="flex space-x-1 w-full"><Skeleton className="h-8 w-8 rounded" /><Skeleton className="h-8 w-8 rounded" /></div></TableCell>
             </TableRow>
           ))}
@@ -2799,6 +2832,7 @@ export default function KOLsPage() {
               )}
               {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Description</TableHead>}
               {visibleColumns.wallet && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Wallet</TableHead>}
+              {visibleColumns.telegram && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Telegram</TableHead>}
               <TableHead className="bg-gray-50 whitespace-nowrap">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -2929,6 +2963,23 @@ export default function KOLsPage() {
                   {visibleColumns.wallet && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                       <div className="truncate">{renderEditableCell(kol.wallet, 'wallet', kol.id, 'text')}</div>
+                  </TableCell>
+                  )}
+                  {visibleColumns.telegram && (
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                      {kolTelegramChats[kol.id] ? (
+                        <a
+                          href={`/crm/telegram?tab=kols`}
+                          className="flex items-center gap-1 text-blue-600 hover:text-blue-800"
+                        >
+                          <MessageSquare className="h-3 w-3" />
+                          <span className="text-xs truncate max-w-24" title={kolTelegramChats[kol.id].title || 'Linked Chat'}>
+                            {kolTelegramChats[kol.id].title || 'Linked Chat'}
+                          </span>
+                        </a>
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                      )}
                   </TableCell>
                   )}
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>

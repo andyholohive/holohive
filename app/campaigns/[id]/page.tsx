@@ -200,6 +200,21 @@ const CampaignDetailsPage = () => {
   // Approved emails state
   const [emailInput, setEmailInput] = useState('');
 
+  // Payment notification state
+  const [kolTelegramChats, setKolTelegramChats] = useState<Record<string, { chat_id: string; title: string | null }>>({});
+  const [paymentNotifyDialogOpen, setPaymentNotifyDialogOpen] = useState(false);
+  const [pendingPaymentNotification, setPendingPaymentNotification] = useState<{
+    kolId: string;
+    kolName: string;
+    paymentIndex: number;
+    amount: number;
+    wallet: string;
+    chatId: string;
+    chatTitle: string | null;
+    date: Date;
+  } | null>(null);
+  const [sendingPaymentNotification, setSendingPaymentNotification] = useState(false);
+
   // Helper function to filter payments
   const getFilteredPayments = () => {
     return payments.filter(payment => {
@@ -417,6 +432,7 @@ const CampaignDetailsPage = () => {
       fetchAvailableKOLs();
       fetchCampaignUpdates();
       fetchPayments();
+      fetchKolTelegramChats();
     }
   }, [campaign]);
 
@@ -821,77 +837,11 @@ const CampaignDetailsPage = () => {
         )
       );
 
-      // Automatically create payment records for each added KOL
-      console.log('Creating payments for KOLs:', {
-        amount: newKOLData.createPayment ? newKOLData.payment_amount : 0,
-        date: newKOLData.createPayment && newKOLData.payment_date ? newKOLData.payment_date : new Date().toISOString().split('T')[0],
-        method: newKOLData.createPayment ? newKOLData.payment_method : 'Token',
-        kolCount: addedKOLs.length
+      // Payment records are now created when content is added, not when KOL is added
+      toast({
+        title: 'Success',
+        description: `${addedKOLs.length} KOL(s) added successfully.`,
       });
-
-      const paymentResults = await Promise.all(
-        addedKOLs.map(async (campaignKOL) => {
-          try {
-            const { data: paymentData, error: paymentError } = await supabase
-              .from('payments')
-              .insert({
-                campaign_id: campaign.id,
-                campaign_kol_id: campaignKOL.id,
-                amount: newKOLData.createPayment ? (newKOLData.payment_amount || 0) : 0,
-                payment_date: newKOLData.createPayment && newKOLData.payment_date ? newKOLData.payment_date : new Date().toISOString().split('T')[0],
-                payment_method: newKOLData.createPayment ? newKOLData.payment_method : 'Token',
-                content_id: null,
-                transaction_id: null,
-                notes: newKOLData.createPayment ? null : 'Auto-created payment record'
-              })
-              .select()
-              .single();
-
-            if (paymentError) {
-              console.error('Payment insert error:', paymentError);
-              throw paymentError;
-            }
-
-            console.log('Payment created:', paymentData);
-
-            // Update the KOL's paid amount if payment details were provided
-            if (newKOLData.createPayment && newKOLData.payment_amount > 0) {
-              const paidAmount = newKOLData.payment_amount || 0;
-              const { error: updateError } = await supabase
-                .from('campaign_kols')
-                .update({ paid: paidAmount })
-                .eq('id', campaignKOL.id);
-
-              if (updateError) {
-                console.error('KOL update error:', updateError);
-                throw updateError;
-              }
-            }
-
-            return paymentData;
-          } catch (err) {
-            console.error('Error creating payment for KOL:', campaignKOL.id, err);
-            throw err;
-          }
-        })
-      );
-
-      console.log('All payments created:', paymentResults.length);
-
-      // Refresh payments
-      await fetchPayments();
-
-      if (newKOLData.createPayment) {
-        toast({
-          title: 'Success',
-          description: `${addedKOLs.length} KOL(s) added with ${paymentResults.length} payment(s) recorded.`,
-        });
-      } else {
-        toast({
-          title: 'Success',
-          description: `${addedKOLs.length} KOL(s) added with default payment records created.`,
-        });
-      }
 
       setNewKOLData({
         selectedKOLs: [],
@@ -1478,8 +1428,18 @@ const CampaignDetailsPage = () => {
           : kol
       ));
       setEditingWalletId(null);
+
+      toast({
+        title: 'Wallet updated',
+        description: `Wallet address for ${campaignKOL.master_kol?.name || 'KOL'} has been updated`,
+      });
     } catch (err) {
       console.error('Error updating wallet:', err);
+      toast({
+        title: 'Error',
+        description: 'Failed to update wallet address',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -1535,6 +1495,153 @@ const CampaignDetailsPage = () => {
     } finally {
       setLoadingPayments(false);
     }
+  };
+
+  // Fetch telegram chats linked to KOLs
+  const fetchKolTelegramChats = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('telegram_chats')
+        .select('chat_id, title, master_kol_id')
+        .not('master_kol_id', 'is', null);
+
+      if (error) throw error;
+
+      const chatsMap: Record<string, { chat_id: string; title: string | null }> = {};
+      data?.forEach(chat => {
+        if (chat.master_kol_id) {
+          chatsMap[chat.master_kol_id] = {
+            chat_id: chat.chat_id,
+            title: chat.title
+          };
+        }
+      });
+      setKolTelegramChats(chatsMap);
+    } catch (err) {
+      console.error('Error fetching KOL telegram chats:', err);
+    }
+  };
+
+  // Handle payment date selection with notification option
+  const handlePaymentDateSelect = (
+    date: Date | undefined,
+    kolId: string,
+    paymentIndex: number,
+    payment: any
+  ) => {
+    if (!date) {
+      // Just clear the date if no date selected
+      setMultiKOLPayments(prev => {
+        const newPayments = [...(prev[kolId]?.payments || [])];
+        newPayments[paymentIndex] = { ...newPayments[paymentIndex], payment_date: '' };
+        return { ...prev, [kolId]: { ...prev[kolId], payments: newPayments } };
+      });
+      return;
+    }
+
+    // Find the KOL and check for telegram chat
+    const kol = campaignKOLs.find(k => k.id === kolId);
+    const masterKolId = kol?.master_kol?.id;
+    const telegramChat = masterKolId ? kolTelegramChats[masterKolId] : null;
+    const wallet = kol?.master_kol?.wallet;
+    const amount = payment.amount;
+
+    console.log('[Payment Date] KOL:', kol?.master_kol?.name, 'masterKolId:', masterKolId, 'telegramChat:', telegramChat, 'wallet:', wallet, 'amount:', amount);
+    console.log('[Payment Date] All telegram chats:', kolTelegramChats);
+
+    // Always set the date first
+    setMultiKOLPayments(prev => {
+      const newPayments = [...(prev[kolId]?.payments || [])];
+      newPayments[paymentIndex] = { ...newPayments[paymentIndex], payment_date: formatDateLocal(date) };
+      return { ...prev, [kolId]: { ...prev[kolId], payments: newPayments } };
+    });
+
+    // Check conditions for showing notification dialog
+    if (!telegramChat) {
+      toast({
+        title: 'No Telegram chat linked',
+        description: `${kol?.master_kol?.name || 'This KOL'} doesn't have a linked Telegram chat`,
+      });
+      return;
+    }
+
+    if (!wallet) {
+      toast({
+        title: 'No wallet address',
+        description: `${kol?.master_kol?.name || 'This KOL'} doesn't have a wallet address set`,
+      });
+      return;
+    }
+
+    if (!amount || amount <= 0) {
+      toast({
+        title: 'No payment amount',
+        description: 'Please enter a payment amount first',
+      });
+      return;
+    }
+
+    // Show confirmation dialog
+    setPendingPaymentNotification({
+      kolId,
+      kolName: kol?.master_kol?.name || 'Unknown KOL',
+      paymentIndex,
+      amount,
+      wallet,
+      chatId: telegramChat.chat_id,
+      chatTitle: telegramChat.title,
+      date
+    });
+    setPaymentNotifyDialogOpen(true);
+  };
+
+  // Send payment notification to telegram
+  const sendPaymentNotification = async () => {
+    if (!pendingPaymentNotification) return;
+
+    const { amount, wallet, chatId } = pendingPaymentNotification;
+
+    // Send the notification
+    setSendingPaymentNotification(true);
+    try {
+      const message = `$${amount.toLocaleString()} has been deposited to ${wallet}! 🙌`;
+
+      const response = await fetch('/api/telegram/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatId,
+          message
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to send notification');
+      }
+
+      toast({
+        title: 'Notification sent',
+        description: 'Payment notification sent to Telegram chat',
+      });
+    } catch (error: any) {
+      console.error('Error sending payment notification:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to send notification',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingPaymentNotification(false);
+      setPaymentNotifyDialogOpen(false);
+      setPendingPaymentNotification(null);
+    }
+  };
+
+  // Skip notification - date is already set, just close dialog
+  const skipPaymentNotification = () => {
+    setPaymentNotifyDialogOpen(false);
+    setPendingPaymentNotification(null);
   };
 
   // Fetch email views for this campaign
@@ -1894,11 +2001,120 @@ const CampaignDetailsPage = () => {
       setEditingPaymentCell(null);
       setEditingPaymentValue(null);
 
+      // Check for telegram notification when payment_date is set
+      if (field === 'payment_date' && newValue) {
+        const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
+        const masterKolId = kol?.master_kol?.id;
+        const telegramChat = masterKolId ? kolTelegramChats[masterKolId] : null;
+        const wallet = kol?.master_kol?.wallet;
+        const amount = payment.amount;
+
+        console.log('[Payment Date Save] KOL:', kol?.master_kol?.name, 'masterKolId:', masterKolId, 'telegramChat:', telegramChat, 'wallet:', wallet, 'amount:', amount);
+        console.log('[Payment Date Save] All telegram chats:', kolTelegramChats);
+
+        if (!telegramChat) {
+          toast({
+            title: 'No Telegram chat linked',
+            description: `${kol?.master_kol?.name || 'This KOL'} doesn't have a linked Telegram chat`,
+          });
+        } else if (!wallet) {
+          toast({
+            title: 'No wallet address',
+            description: `${kol?.master_kol?.name || 'This KOL'} doesn't have a wallet address set`,
+          });
+        } else if (!amount || amount <= 0) {
+          toast({
+            title: 'No payment amount',
+            description: 'Payment has no amount set',
+          });
+        } else {
+          // Show confirmation dialog
+          setPendingPaymentNotification({
+            kolId: payment.campaign_kol_id,
+            kolName: kol?.master_kol?.name || 'Unknown KOL',
+            paymentIndex: -1, // Not used for existing payments
+            amount,
+            wallet,
+            chatId: telegramChat.chat_id,
+            chatTitle: telegramChat.title,
+            date: new Date(newValue)
+          });
+          setPaymentNotifyDialogOpen(true);
+          return; // Don't show success toast yet
+        }
+      }
+
       toast({ title: 'Success', description: 'Payment updated successfully' });
     } catch (error) {
       console.error('Error updating payment:', error);
       toast({ title: 'Error', description: 'Failed to update payment', variant: 'destructive' });
     }
+  };
+
+  // Export payments to CSV
+  const exportPaymentsToCSV = () => {
+    const filteredPayments = getFilteredPayments();
+
+    if (filteredPayments.length === 0) {
+      toast({ title: 'No data', description: 'No payments to export', variant: 'destructive' });
+      return;
+    }
+
+    // CSV headers
+    const headers = ['Name', 'Wallet', 'Amount (USD)', 'Payment Date', 'Payment Method', 'Transaction ID', 'Content', 'Notes'];
+
+    // Build CSV rows
+    const rows = filteredPayments.map(payment => {
+      const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
+      const name = payment.campaign_kol_id
+        ? (kol?.master_kol?.name || 'Unknown KOL')
+        : (payment.recipient_name || 'Unknown');
+      const wallet = payment.campaign_kol_id
+        ? (kol?.master_kol?.wallet || '')
+        : (payment.wallet || '');
+      const contentIds = Array.isArray(payment.content_id) ? payment.content_id : (payment.content_id ? [payment.content_id] : []);
+      const contentNames = contentIds.map(id => {
+        const content = contents.find(c => c.id === id);
+        return content ? `${content.platform || ''} - ${content.content_type || ''}` : id;
+      }).join('; ');
+
+      return [
+        name,
+        wallet,
+        payment.amount || 0,
+        payment.payment_date || '',
+        payment.payment_method || '',
+        payment.transaction_id || '',
+        contentNames,
+        payment.notes || ''
+      ];
+    });
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => {
+        // Escape quotes and wrap in quotes if contains comma, quote, or newline
+        const cellStr = String(cell);
+        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+          return `"${cellStr.replace(/"/g, '""')}"`;
+        }
+        return cellStr;
+      }).join(','))
+    ].join('\n');
+
+    // Download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${campaign?.name || 'campaign'}_budget_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({ title: 'Exported', description: `${filteredPayments.length} payment(s) exported to CSV` });
   };
 
   const renderEditablePaymentCell = (value: any, field: string, payment: any) => {
@@ -3528,8 +3744,8 @@ const CampaignDetailsPage = () => {
                     </div>
                   </div>
 
-                  {/* Client Communication Section */}
-                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                  {/* Client Communication Section - Hidden */}
+                  {false && <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="bg-[#3e8692] p-2.5 rounded-lg">
                         <Phone className="h-5 w-5 text-white" />
@@ -3636,7 +3852,7 @@ const CampaignDetailsPage = () => {
                         )}
                       </div>
                     </div>
-                  </div>
+                  </div>}
 
                   {/* Team & Management Section */}
                   <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
@@ -5586,6 +5802,9 @@ const CampaignDetailsPage = () => {
                                               className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer rounded flex items-center justify-between"
                                               onClick={async () => {
                                                 const count = quickAddContentCount;
+                                                // Auto-set platform from KOL's first platform
+                                                const kolPlatforms = campaignKOL.master_kol?.platform || [];
+                                                const autoPlatform = kolPlatforms.length > 0 ? kolPlatforms[0] : null;
                                                 const payloads = Array.from({ length: count }, () => ({
                                                   campaign_id: campaign?.id,
                                                   campaign_kols_id: campaignKOL.id,
@@ -5593,7 +5812,7 @@ const CampaignDetailsPage = () => {
                                                   status: 'pending',
                                                   activation_date: null,
                                                   content_link: null,
-                                                  platform: null,
+                                                  platform: autoPlatform,
                                                   impressions: null,
                                                   likes: null,
                                                   retweets: null,
@@ -5618,7 +5837,7 @@ const CampaignDetailsPage = () => {
                                                     const paymentPayloads = data.map((content: any) => ({
                                                       campaign_id: campaign?.id,
                                                       campaign_kol_id: campaignKOL.id,
-                                                      content_id: content.id,
+                                                      content_id: [content.id],
                                                       amount: 0,
                                                       payment_date: null,
                                                       payment_method: 'Fiat',
@@ -6398,7 +6617,7 @@ const CampaignDetailsPage = () => {
                                   const paymentPayload = {
                                     campaign_id: campaign?.id,
                                     campaign_kol_id: kol.id,
-                                    content_id: newContent.id,
+                                    content_id: [newContent.id],
                                     amount: 0,
                                     payment_date: null,
                                     payment_method: 'Fiat',
@@ -7956,6 +8175,14 @@ const CampaignDetailsPage = () => {
                   <h2 className="text-2xl font-bold text-gray-900">Budget Management</h2>
                 </div>
                 <div className="flex items-center gap-3">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={exportPaymentsToCSV}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </Button>
                   <Dialog open={isAddingPayment} onOpenChange={setIsAddingPayment}>
                     <DialogTrigger asChild>
                       <Button size="sm" style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
@@ -8145,16 +8372,7 @@ const CampaignDetailsPage = () => {
                                           <CalendarComponent
                                             mode="single"
                                             selected={payment.payment_date ? new Date(payment.payment_date) : undefined}
-                                            onSelect={date => {
-                                              setMultiKOLPayments(prev => {
-                                                const newPayments = [...(prev[kolId]?.payments || [])];
-                                                newPayments[paymentIndex] = { ...newPayments[paymentIndex], payment_date: date ? formatDateLocal(date) : '' };
-                                                return {
-                                                  ...prev,
-                                                  [kolId]: { ...prev[kolId], payments: newPayments }
-                                                };
-                                              });
-                                            }}
+                                            onSelect={date => handlePaymentDateSelect(date, kolId, paymentIndex, payment)}
                                             initialFocus
                                             classNames={{
                                               day_selected: "text-white hover:text-white focus:text-white",
@@ -8895,8 +9113,26 @@ const CampaignDetailsPage = () => {
                                         onClick={e => e.stopPropagation()}
                                       />
                                     ) : (
-                                      <div className="truncate" title={campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet ?? undefined}>
-                                        {campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet || <span className="text-gray-400 italic">No wallet</span>}
+                                      <div className="flex items-center gap-1">
+                                        <div className="truncate flex-1" title={campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet ?? undefined}>
+                                          {campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet || <span className="text-gray-400 italic">No wallet</span>}
+                                        </div>
+                                        {campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              const wallet = campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet;
+                                              if (wallet) {
+                                                navigator.clipboard.writeText(wallet);
+                                                toast({ title: 'Copied', description: 'Wallet address copied to clipboard' });
+                                              }
+                                            }}
+                                            className="p-1 hover:bg-gray-200 rounded flex-shrink-0"
+                                            title="Copy wallet address"
+                                          >
+                                            <Copy className="h-3 w-3 text-gray-500" />
+                                          </button>
+                                        )}
                                       </div>
                                     )
                                   ) : (
@@ -8916,8 +9152,23 @@ const CampaignDetailsPage = () => {
                                         onClick={e => e.stopPropagation()}
                                       />
                                     ) : (
-                                      <div className="truncate" title={payment.wallet ?? undefined}>
-                                        {payment.wallet || <span className="text-gray-400 italic">No wallet</span>}
+                                      <div className="flex items-center gap-1">
+                                        <div className="truncate flex-1" title={payment.wallet ?? undefined}>
+                                          {payment.wallet || <span className="text-gray-400 italic">No wallet</span>}
+                                        </div>
+                                        {payment.wallet && (
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              navigator.clipboard.writeText(payment.wallet!);
+                                              toast({ title: 'Copied', description: 'Wallet address copied to clipboard' });
+                                            }}
+                                            className="p-1 hover:bg-gray-200 rounded flex-shrink-0"
+                                            title="Copy wallet address"
+                                          >
+                                            <Copy className="h-3 w-3 text-gray-500" />
+                                          </button>
+                                        )}
                                       </div>
                                     )
                                   )}
@@ -10133,6 +10384,48 @@ const CampaignDetailsPage = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEmailViewsDialogOpen(false)}>
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment Notification Confirmation Dialog */}
+      <Dialog open={paymentNotifyDialogOpen} onOpenChange={setPaymentNotifyDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Payment Notification?</DialogTitle>
+            <DialogDescription>
+              Send a payment notification to {pendingPaymentNotification?.kolName}'s Telegram chat?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              <p className="text-sm text-gray-600">Message preview:</p>
+              <p className="font-medium text-gray-900">
+                ${pendingPaymentNotification?.amount.toLocaleString()} has been deposited to {pendingPaymentNotification?.wallet}! 🙌
+              </p>
+            </div>
+            {pendingPaymentNotification?.chatTitle && (
+              <p className="text-xs text-gray-500 mt-2">
+                Will be sent to: {pendingPaymentNotification.chatTitle}
+              </p>
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={skipPaymentNotification}
+              disabled={sendingPaymentNotification}
+            >
+              Skip
+            </Button>
+            <Button
+              onClick={sendPaymentNotification}
+              disabled={sendingPaymentNotification}
+              style={{ backgroundColor: '#3e8692', color: 'white' }}
+              className="hover:opacity-90"
+            >
+              {sendingPaymentNotification ? 'Sending...' : 'Send Notification'}
             </Button>
           </DialogFooter>
         </DialogContent>

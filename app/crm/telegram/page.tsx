@@ -36,7 +36,8 @@ import {
   ToggleLeft,
   ToggleRight,
   User,
-  Users
+  Users,
+  Megaphone
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -55,6 +56,7 @@ interface TelegramChat {
   last_message_at: string | null;
   message_count: number;
   opportunity_id: string | null;
+  master_kol_id: string | null;
   created_at: string;
   updated_at: string;
   // Joined
@@ -63,6 +65,17 @@ interface TelegramChat {
     name: string;
     stage: string;
   } | null;
+  master_kol?: {
+    id: string;
+    name: string;
+    platform: string[] | null;
+  } | null;
+}
+
+interface MasterKOL {
+  id: string;
+  name: string;
+  platform: string[] | null;
 }
 
 interface TelegramMessage {
@@ -153,17 +166,29 @@ export default function TelegramChatsPage() {
   const [chats, setChats] = useState<TelegramChat[]>([]);
   const [messages, setMessages] = useState<Record<string, TelegramMessage[]>>({});
   const [opportunities, setOpportunities] = useState<CRMOpportunity[]>([]);
+  const [masterKOLs, setMasterKOLs] = useState<MasterKOL[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDemo, setShowDemo] = useState(false);
 
-  // Link dialog state
+  // Link dialog state (for opportunities)
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [selectedChat, setSelectedChat] = useState<TelegramChat | null>(null);
   const [selectedOpportunityId, setSelectedOpportunityId] = useState<string>('');
   const [linking, setLinking] = useState(false);
   const [opportunityPopoverOpen, setOpportunityPopoverOpen] = useState(false);
+
+  // KOL Link dialog state
+  const [kolLinkDialogOpen, setKolLinkDialogOpen] = useState(false);
+  const [selectedKolId, setSelectedKolId] = useState<string>('');
+  const [kolPopoverOpen, setKolPopoverOpen] = useState(false);
+
+  // Send message dialog state
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const [chatToMessage, setChatToMessage] = useState<TelegramChat | null>(null);
+  const [messageContent, setMessageContent] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   // Commands state
   const [commands, setCommands] = useState<TelegramCommand[]>([]);
@@ -182,7 +207,7 @@ export default function TelegramChatsPage() {
   }, []);
 
   const fetchData = async () => {
-    await Promise.all([fetchChats(), fetchMessages(), fetchOpportunities()]);
+    await Promise.all([fetchChats(), fetchMessages(), fetchOpportunities(), fetchMasterKOLs()]);
   };
 
   const fetchChats = async () => {
@@ -191,7 +216,8 @@ export default function TelegramChatsPage() {
         .from('telegram_chats')
         .select(`
           *,
-          opportunity:crm_opportunities(id, name, stage)
+          opportunity:crm_opportunities(id, name, stage),
+          master_kol:master_kols(id, name, platform)
         `)
         .order('last_message_at', { ascending: false, nullsFirst: false });
 
@@ -206,6 +232,55 @@ export default function TelegramChatsPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMasterKOLs = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('master_kols')
+        .select('id, name, platform')
+        .is('archived_at', null)
+        .order('name');
+
+      if (error) throw error;
+      setMasterKOLs(data || []);
+    } catch (error) {
+      console.error('Error fetching master KOLs:', error);
+    }
+  };
+
+  // Platform icon helper
+  const getPlatformIcon = (platform: string) => {
+    switch (platform) {
+      case 'X':
+        return <span className="font-bold text-black text-sm">𝕏</span>;
+      case 'Telegram':
+        return (
+          <svg className="h-4 w-4 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+          </svg>
+        );
+      case 'YouTube':
+        return (
+          <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+          </svg>
+        );
+      case 'Facebook':
+        return (
+          <svg className="h-4 w-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+          </svg>
+        );
+      case 'TikTok':
+        return (
+          <svg className="h-4 w-4 text-black" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.10-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+          </svg>
+        );
+      default:
+        return null;
     }
   };
 
@@ -374,6 +449,132 @@ export default function TelegramChatsPage() {
       });
     } finally {
       setLinking(false);
+    }
+  };
+
+  // KOL Link functions
+  const openKolLinkDialog = (chat: TelegramChat) => {
+    setSelectedChat(chat);
+    setSelectedKolId(chat.master_kol_id || '__none__');
+    setKolLinkDialogOpen(true);
+  };
+
+  const handleUnlinkKol = async (chat: TelegramChat) => {
+    if (!chat.master_kol_id) return;
+
+    try {
+      const { error: chatError } = await supabase
+        .from('telegram_chats')
+        .update({
+          master_kol_id: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', chat.id);
+
+      if (chatError) throw chatError;
+
+      toast({
+        title: 'Chat unlinked',
+        description: 'Chat has been unlinked from the KOL',
+      });
+
+      fetchChats();
+    } catch (error) {
+      console.error('Error unlinking chat from KOL:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to unlink chat',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleLinkKol = async () => {
+    if (!selectedChat) return;
+
+    const kolId = selectedKolId === '__none__' ? null : selectedKolId;
+
+    setLinking(true);
+    try {
+      const { error: chatError } = await supabase
+        .from('telegram_chats')
+        .update({
+          master_kol_id: kolId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedChat.id);
+
+      if (chatError) throw chatError;
+
+      toast({
+        title: kolId ? 'Chat linked' : 'Chat unlinked',
+        description: kolId
+          ? 'Chat has been linked to the KOL'
+          : 'Chat has been unlinked from the KOL',
+      });
+
+      setKolLinkDialogOpen(false);
+      fetchChats();
+    } catch (error) {
+      console.error('Error linking chat to KOL:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update chat link',
+        variant: 'destructive',
+      });
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  // Open message dialog
+  const openMessageDialog = (chat: TelegramChat) => {
+    setChatToMessage(chat);
+    setMessageContent('');
+    setMessageDialogOpen(true);
+  };
+
+  // Send message to chat
+  const handleSendMessage = async () => {
+    if (!chatToMessage || !messageContent.trim()) return;
+
+    setSendingMessage(true);
+    try {
+      const response = await fetch('/api/telegram/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chatId: chatToMessage.chat_id,
+          message: messageContent.trim()
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send message');
+      }
+
+      toast({
+        title: 'Message sent',
+        description: `Message sent to ${chatToMessage.title || 'the chat'} successfully`,
+      });
+
+      setMessageDialogOpen(false);
+      setMessageContent('');
+      setChatToMessage(null);
+
+      // Refresh messages after sending
+      fetchMessages();
+    } catch (error: any) {
+      console.error('Error sending message:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to send message',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingMessage(false);
     }
   };
 
@@ -570,9 +771,10 @@ export default function TelegramChatsPage() {
   const displayChats = showDemo ? SAMPLE_CHATS : chats;
   const displayMessages = showDemo ? SAMPLE_MESSAGES : messages;
 
-  // Separate group chats from DMs
+  // Separate group chats from DMs and KOL chats
   const groupChats = displayChats.filter(chat => chat.chat_type === 'group' || chat.chat_type === 'supergroup');
   const dmChats = displayChats.filter(chat => chat.chat_type === 'private');
+  const kolChats = displayChats.filter(chat => chat.master_kol_id !== null);
 
   const filteredGroupChats = groupChats.filter(chat => {
     if (!searchQuery) return true;
@@ -590,6 +792,16 @@ export default function TelegramChatsPage() {
     return (
       chat.title?.toLowerCase().includes(query) ||
       chat.chat_id.includes(query)
+    );
+  });
+
+  const filteredKolChats = kolChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query) ||
+      chat.master_kol?.name?.toLowerCase().includes(query)
     );
   });
 
@@ -642,6 +854,13 @@ export default function TelegramChatsPage() {
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{dmChats.length}</Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="kols" className="flex items-center gap-2">
+            <Megaphone className="h-4 w-4" />
+            KOLs
+            {kolChats.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{kolChats.length}</Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="commands" className="flex items-center gap-2">
             <Terminal className="h-4 w-4" />
             Commands
@@ -668,6 +887,7 @@ export default function TelegramChatsPage() {
                   className="auth-input pl-10 w-64"
                 />
               </div>
+              {false && (
               <Button
                 variant={showDemo ? "default" : "outline"}
                 onClick={() => setShowDemo(!showDemo)}
@@ -675,6 +895,7 @@ export default function TelegramChatsPage() {
               >
                 {showDemo ? 'Hide Demo' : 'Show Demo'}
               </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={handleRefresh}
@@ -813,6 +1034,23 @@ export default function TelegramChatsPage() {
                           </>
                         )}
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openKolLinkDialog(chat)}
+                      >
+                        {chat.master_kol_id ? (
+                          <>
+                            <Edit className="h-4 w-4 mr-1.5" />
+                            Change KOL
+                          </>
+                        ) : (
+                          <>
+                            <Megaphone className="h-4 w-4 mr-1.5" />
+                            Link to KOL
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -919,6 +1157,16 @@ export default function TelegramChatsPage() {
                             </div>
                           </div>
 
+                          {/* Linked KOL */}
+                          {chat.master_kol && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                              <span className="text-sm text-gray-700">
+                                Linked to KOL: <strong>{chat.master_kol.name}</strong>
+                              </span>
+                            </div>
+                          )}
+
                           {/* Recent Messages */}
                           {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
                             <div className="mt-3 pt-3 border-t border-gray-100">
@@ -939,6 +1187,205 @@ export default function TelegramChatsPage() {
                               </div>
                             </div>
                           )}
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {chat.master_kol_id && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleUnlinkKol(chat)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                            >
+                              <Unlink className="h-4 w-4 mr-1.5" />
+                              Unlink
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openKolLinkDialog(chat)}
+                          >
+                            {chat.master_kol_id ? (
+                              <>
+                                <Edit className="h-4 w-4 mr-1.5" />
+                                Change KOL
+                              </>
+                            ) : (
+                              <>
+                                <Megaphone className="h-4 w-4 mr-1.5" />
+                                Link to KOL
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* KOLs Tab */}
+        <TabsContent value="kols" className="mt-4 space-y-4">
+          {/* KOLs Header */}
+          <div className="flex items-center justify-between">
+            <p className="text-gray-600">
+              Chats linked to KOLs ({kolChats.length} total)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Input
+                  placeholder="Search KOL chats..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="auth-input pl-10 w-64"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* KOL Chat List */}
+          {filteredKolChats.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Megaphone className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {kolChats.length === 0 ? 'No KOL chats linked yet' : 'No matching KOL chats'}
+                </h3>
+                <p className="text-gray-500 max-w-md mx-auto">
+                  {kolChats.length === 0
+                    ? 'Link chats to KOLs from the Groups or DMs tab to track conversations with them.'
+                    : 'Try a different search term.'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredKolChats.map(chat => {
+                const activity = getActivityStatus(chat.last_message_at);
+                return (
+                  <Card key={chat.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        {/* Left: Chat Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                            <h3 className="font-semibold text-gray-900 truncate">
+                              {chat.title || 'Unnamed Chat'}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
+                            </Badge>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                                {chat.chat_id}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => copyToClipboard(chat.chat_id)}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{formatTimeAgo(chat.last_message_at)}</span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>{chat.message_count} messages</span>
+                            </div>
+                          </div>
+
+                          {/* Linked KOL */}
+                          {chat.master_kol && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                              <span className="text-sm text-gray-700">
+                                Linked to KOL: <strong>{chat.master_kol.name}</strong>
+                              </span>
+                              {chat.master_kol.platform && chat.master_kol.platform.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                  {chat.master_kol.platform.map((p, i) => (
+                                    <span key={i} title={p}>{getPlatformIcon(p)}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Recent Messages */}
+                          {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <p className="text-xs font-medium text-gray-500 mb-2">Recent Messages:</p>
+                              <div className="space-y-1.5">
+                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => (
+                                  <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
+                                    <span className="font-medium text-gray-700">
+                                      {msg.from_user_name || msg.from_username || 'Unknown'}:
+                                    </span>{' '}
+                                    <span className="text-gray-600">
+                                      {msg.text && msg.text.length > 80
+                                        ? msg.text.substring(0, 80) + '...'
+                                        : msg.text || '[No text]'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button
+                            size="sm"
+                            onClick={() => openMessageDialog(chat)}
+                            style={{ backgroundColor: '#3e8692', color: 'white' }}
+                            className="hover:opacity-90"
+                          >
+                            <MessageSquare className="h-4 w-4 mr-1.5" />
+                            Send Message
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUnlinkKol(chat)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                          >
+                            <Unlink className="h-4 w-4 mr-1.5" />
+                            Unlink
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openKolLinkDialog(chat)}
+                          >
+                            <Edit className="h-4 w-4 mr-1.5" />
+                            Change KOL
+                          </Button>
                         </div>
                       </div>
                     </CardContent>
@@ -1157,6 +1604,107 @@ export default function TelegramChatsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* KOL Link Dialog */}
+      <Dialog open={kolLinkDialogOpen} onOpenChange={setKolLinkDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link Chat to KOL</DialogTitle>
+            <DialogDescription>
+              Connect this Telegram chat to a KOL to track conversations with them.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Chat</Label>
+              <div className="p-3 bg-gray-50 rounded-md">
+                <p className="font-medium">{selectedChat?.title || 'Unnamed Chat'}</p>
+                <code className="text-xs text-gray-500">{selectedChat?.chat_id}</code>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="kol">KOL</Label>
+              <Popover open={kolPopoverOpen} onOpenChange={setKolPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={kolPopoverOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {selectedKolId && selectedKolId !== '__none__'
+                      ? masterKOLs.find(kol => kol.id === selectedKolId)?.name
+                      : selectedKolId === '__none__'
+                        ? 'No link (unlink)'
+                        : 'Select a KOL...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search KOLs..." className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>No KOL found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="__none__"
+                          onSelect={() => {
+                            setSelectedKolId('__none__');
+                            setKolPopoverOpen(false);
+                          }}
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${selectedKolId === '__none__' ? 'opacity-100' : 'opacity-0'}`} />
+                          <span className="text-gray-500">No link (unlink)</span>
+                        </CommandItem>
+                        {masterKOLs.map(kol => (
+                          <CommandItem
+                            key={kol.id}
+                            value={kol.name}
+                            onSelect={() => {
+                              setSelectedKolId(kol.id);
+                              setKolPopoverOpen(false);
+                            }}
+                          >
+                            <Check className={`mr-2 h-4 w-4 ${selectedKolId === kol.id ? 'opacity-100' : 'opacity-0'}`} />
+                            <div className="flex items-center gap-2">
+                              <span>{kol.name}</span>
+                              {kol.platform && kol.platform.length > 0 && (
+                                <div className="flex items-center gap-1">
+                                  {kol.platform.map((p, i) => (
+                                    <span key={i} title={p}>{getPlatformIcon(p)}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-gray-500">
+                Link this chat to a KOL to track your conversations with them.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setKolLinkDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleLinkKol}
+              disabled={linking}
+              style={{ backgroundColor: '#3e8692', color: 'white' }}
+            >
+              {linking ? 'Saving...' : (selectedKolId && selectedKolId !== '__none__') ? 'Link Chat' : 'Unlink Chat'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Command Dialog (Add/Edit) */}
       <Dialog open={commandDialogOpen} onOpenChange={setCommandDialogOpen}>
         <DialogContent>
@@ -1241,6 +1789,56 @@ export default function TelegramChatsPage() {
               style={{ backgroundColor: '#3e8692', color: 'white' }}
             >
               {savingCommand ? 'Saving...' : editingCommand ? 'Update Command' : 'Add Command'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Message Dialog */}
+      <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Message</DialogTitle>
+            <DialogDescription>
+              {chatToMessage?.master_kol
+                ? `Send a message to ${chatToMessage.master_kol.name} via ${chatToMessage.title || 'Telegram'}`
+                : `Send a message to ${chatToMessage?.title || 'this chat'}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="message">Message</Label>
+              <Textarea
+                id="message"
+                placeholder="Type your message here..."
+                value={messageContent}
+                onChange={(e) => setMessageContent(e.target.value)}
+                rows={5}
+                className="auth-input resize-none"
+              />
+              {chatToMessage && (
+                <p className="text-xs text-gray-500">
+                  Will be sent to: {chatToMessage.title || `Chat ${chatToMessage.chat_id}`}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setMessageDialogOpen(false)}
+              disabled={sendingMessage}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSendMessage}
+              disabled={sendingMessage || !messageContent.trim()}
+              style={{ backgroundColor: '#3e8692', color: 'white' }}
+            >
+              {sendingMessage ? 'Sending...' : 'Send Message'}
             </Button>
           </DialogFooter>
         </DialogContent>

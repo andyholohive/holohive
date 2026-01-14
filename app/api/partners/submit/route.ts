@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/database.types';
+import { TelegramService } from '@/lib/telegramService';
 
 export const dynamic = 'force-dynamic';
 
@@ -97,6 +98,22 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Send Telegram notification
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://portal.holohive.agency';
+    const networkUrl = `${baseUrl}/crm/network`;
+    const message = `<b>New Partner Application</b>\n\n` +
+      `<b>Name:</b> ${name.trim()}\n` +
+      `<b>Affiliation:</b> ${affiliation?.trim() || 'N/A'}\n` +
+      `<b>Category:</b> ${category || 'N/A'}\n` +
+      `<b>POC:</b> ${poc_name?.trim() || 'N/A'}\n` +
+      `<b>Email:</b> ${poc_email?.trim() || 'N/A'}\n` +
+      `<b>Telegram:</b> ${poc_telegram?.trim() || 'N/A'}\n\n` +
+      `<a href="${networkUrl}">View Network</a>`;
+
+    TelegramService.sendMessage(message).catch(err => {
+      console.error('[Partners Submit] Telegram notification error:', err);
+    });
 
     return NextResponse.json({
       success: true,
