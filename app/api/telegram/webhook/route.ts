@@ -157,6 +157,7 @@ async function handleCommand(chatId: string, command: string, args: string[], me
 
       if (!fromUserId) {
         console.log('[Telegram Webhook] Team-only command rejected: no user ID');
+        await sendTelegramMessage(chatId, 'This command is only available to team members.');
         return;
       }
 
@@ -169,6 +170,7 @@ async function handleCommand(chatId: string, command: string, args: string[], me
 
       if (teamError || !teamMember) {
         console.log('[Telegram Webhook] Team-only command rejected: user not a team member', fromUserId);
+        await sendTelegramMessage(chatId, 'This command is only available to team members.');
         return;
       }
 
