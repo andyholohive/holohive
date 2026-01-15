@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send Telegram notification
+    // Send Telegram notification (must await in serverless environment)
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://portal.holohive.agency';
     const linkUrl = `${baseUrl}/links`;
     const message = `<b>New Link Submitted</b>\n\n` +
@@ -86,9 +86,11 @@ export async function POST(request: NextRequest) {
       `<b>Type:</b> ${link_types?.join(', ') || 'N/A'}\n\n` +
       `<a href="${linkUrl}">View Links</a>`;
 
-    TelegramService.sendMessage(message).catch(err => {
+    try {
+      await TelegramService.sendMessage(message);
+    } catch (err) {
       console.error('[Links Submit] Telegram notification error:', err);
-    });
+    }
 
     return NextResponse.json({
       success: true,

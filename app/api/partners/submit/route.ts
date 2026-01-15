@@ -111,9 +111,11 @@ export async function POST(request: NextRequest) {
       `<b>Telegram:</b> ${poc_telegram?.trim() || 'N/A'}\n\n` +
       `<a href="${networkUrl}">View Network</a>`;
 
-    TelegramService.sendMessage(message).catch(err => {
+    try {
+      await TelegramService.sendMessage(message);
+    } catch (err) {
       console.error('[Partners Submit] Telegram notification error:', err);
-    });
+    }
 
     return NextResponse.json({
       success: true,

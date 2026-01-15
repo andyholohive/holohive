@@ -136,9 +136,11 @@ export async function POST(request: NextRequest) {
       `<b>Source:</b> ${source || 'N/A'}\n\n` +
       `<a href="${pipelineUrl}">View Pipeline</a>`;
 
-    TelegramService.sendMessage(message).catch(err => {
+    try {
+      await TelegramService.sendMessage(message);
+    } catch (err) {
       console.error('[Leads Submit] Telegram notification error:', err);
-    });
+    }
 
     return NextResponse.json({
       success: true,
