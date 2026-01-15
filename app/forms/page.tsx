@@ -52,6 +52,15 @@ interface LinkSubmission {
   description: string | null;
 }
 
+// Helper function to format field values (replace underscores, capitalize each word)
+const formatFieldValue = (value: string | null | undefined): string => {
+  if (!value) return '-';
+  return value
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
 export default function FormsPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -826,12 +835,10 @@ export default function FormsPage() {
                         <TableCell className="font-medium">{lead.name}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {lead.stage.charAt(0).toUpperCase() + lead.stage.slice(1)}
+                            {formatFieldValue(lead.stage)}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          {lead.source ? lead.source.charAt(0).toUpperCase() + lead.source.slice(1) : '-'}
-                        </TableCell>
+                        <TableCell>{formatFieldValue(lead.source)}</TableCell>
                         <TableCell>
                           {lead.deal_value ? `$${lead.deal_value.toLocaleString()}` : '-'}
                         </TableCell>
@@ -883,12 +890,10 @@ export default function FormsPage() {
                     {partners.map((partner) => (
                       <TableRow key={partner.id}>
                         <TableCell className="font-medium">{partner.name}</TableCell>
-                        <TableCell>
-                          {partner.category ? partner.category.charAt(0).toUpperCase() + partner.category.slice(1) : '-'}
-                        </TableCell>
+                        <TableCell>{formatFieldValue(partner.category)}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {partner.status.charAt(0).toUpperCase() + partner.status.slice(1)}
+                            {formatFieldValue(partner.status)}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -947,11 +952,13 @@ export default function FormsPage() {
                         <TableCell className="font-medium">{link.name}</TableCell>
                         <TableCell>{link.client || '-'}</TableCell>
                         <TableCell>
-                          {link.link_types?.map((type, i) => (
-                            <Badge key={i} variant="outline" className="mr-1">
-                              {type.charAt(0).toUpperCase() + type.slice(1)}
-                            </Badge>
-                          )) || '-'}
+                          {link.link_types && link.link_types.length > 0 ? (
+                            link.link_types.map((type, i) => (
+                              <Badge key={i} variant="outline" className="mr-1">
+                                {formatFieldValue(type)}
+                              </Badge>
+                            ))
+                          ) : '-'}
                         </TableCell>
                         <TableCell>
                           <a
