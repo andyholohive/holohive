@@ -1604,7 +1604,7 @@ const CampaignDetailsPage = () => {
     // Send the notification
     setSendingPaymentNotification(true);
     try {
-      const message = `$${amount.toLocaleString()} has been deposited to ${wallet}! 🙌`;
+      const message = `$${amount.toLocaleString()} has been deposited to ${wallet}!\nThanks for being part of the Holo Hive network 🙌`;
 
       const response = await fetch('/api/telegram/send', {
         method: 'POST',
@@ -10402,7 +10402,9 @@ const CampaignDetailsPage = () => {
             <div className="bg-gray-50 rounded-lg p-4 space-y-2">
               <p className="text-sm text-gray-600">Message preview:</p>
               <p className="font-medium text-gray-900">
-                ${pendingPaymentNotification?.amount.toLocaleString()} has been deposited to {pendingPaymentNotification?.wallet}! 🙌
+                ${pendingPaymentNotification?.amount.toLocaleString()} has been deposited to {pendingPaymentNotification?.wallet}!
+                <br />
+                Thanks for being part of the Holo Hive network 🙌
               </p>
             </div>
             {pendingPaymentNotification?.chatTitle && (

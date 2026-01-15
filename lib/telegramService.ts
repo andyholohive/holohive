@@ -12,46 +12,59 @@ interface TelegramMessage {
 }
 
 export class TelegramService {
-  private static botToken = process.env.TELEGRAM_BOT_TOKEN;
-  private static chatId = process.env.TELEGRAM_TERMINAL_CHAT_ID;
-  private static threadId = process.env.TELEGRAM_TERMINAL_THREAD_ID;
+  // Read env vars at runtime via getters to avoid serverless caching issues
+  private static get botToken() {
+    return process.env.TELEGRAM_BOT_TOKEN;
+  }
+
+  private static get chatId() {
+    return process.env.TELEGRAM_TERMINAL_CHAT_ID;
+  }
+
+  private static get threadId() {
+    return process.env.TELEGRAM_TERMINAL_THREAD_ID;
+  }
 
   /**
    * Send a message to the configured Telegram chat
    */
   static async sendMessage(text: string, parseMode: 'HTML' | 'Markdown' = 'HTML'): Promise<boolean> {
-    if (!this.botToken || !this.chatId) {
+    const botToken = this.botToken;
+    const chatId = this.chatId;
+    const threadId = this.threadId;
+
+    if (!botToken || !chatId) {
       console.error('[Telegram] Configuration missing:', {
-        hasToken: !!this.botToken,
-        hasChatId: !!this.chatId,
-        tokenPrefix: this.botToken ? this.botToken.substring(0, 10) + '...' : 'missing',
-        chatId: this.chatId || 'missing'
+        hasToken: !!botToken,
+        hasChatId: !!chatId,
+        tokenPrefix: botToken ? botToken.substring(0, 10) + '...' : 'missing',
+        chatId: chatId || 'missing'
       });
       return false;
     }
 
     try {
       const message: TelegramMessage = {
-        chat_id: this.chatId,
+        chat_id: chatId,
         text,
         parse_mode: parseMode,
         disable_web_page_preview: false,
       };
 
       // Add thread ID if configured (for sending to specific topics in groups)
-      if (this.threadId) {
-        message.message_thread_id = parseInt(this.threadId);
+      if (threadId) {
+        message.message_thread_id = parseInt(threadId);
       }
 
       console.log('[Telegram] Sending message:', {
-        chatId: this.chatId,
-        threadId: this.threadId,
+        chatId: chatId,
+        threadId: threadId,
         messageLength: text.length,
         parseMode
       });
 
       const response = await fetch(
-        `https://api.telegram.org/bot${this.botToken}/sendMessage`,
+        `https://api.telegram.org/bot${botToken}/sendMessage`,
         {
           method: 'POST',
           headers: {
