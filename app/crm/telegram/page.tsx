@@ -96,6 +96,7 @@ interface TelegramCommand {
   description: string | null;
   image_url: string | null;
   is_active: boolean;
+  team_only: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -195,7 +196,7 @@ export default function TelegramChatsPage() {
   const [loadingCommands, setLoadingCommands] = useState(true);
   const [commandDialogOpen, setCommandDialogOpen] = useState(false);
   const [editingCommand, setEditingCommand] = useState<TelegramCommand | null>(null);
-  const [commandForm, setCommandForm] = useState({ command: '', response: '', description: '', image_url: '' });
+  const [commandForm, setCommandForm] = useState({ command: '', response: '', description: '', image_url: '', team_only: false });
   const [savingCommand, setSavingCommand] = useState(false);
 
   // Active tab
@@ -607,11 +608,12 @@ export default function TelegramChatsPage() {
         command: command.command,
         response: command.response,
         description: command.description || '',
-        image_url: command.image_url || ''
+        image_url: command.image_url || '',
+        team_only: command.team_only || false
       });
     } else {
       setEditingCommand(null);
-      setCommandForm({ command: '', response: '', description: '', image_url: '' });
+      setCommandForm({ command: '', response: '', description: '', image_url: '', team_only: false });
     }
     setCommandDialogOpen(true);
   };
@@ -640,6 +642,7 @@ export default function TelegramChatsPage() {
             response: commandForm.response.trim(),
             description: commandForm.description.trim() || null,
             image_url: commandForm.image_url.trim() || null,
+            team_only: commandForm.team_only,
             updated_at: new Date().toISOString()
           })
           .eq('id', editingCommand.id);
@@ -659,6 +662,7 @@ export default function TelegramChatsPage() {
             response: commandForm.response.trim(),
             description: commandForm.description.trim() || null,
             image_url: commandForm.image_url.trim() || null,
+            team_only: commandForm.team_only,
             is_active: true
           });
 
@@ -1450,6 +1454,12 @@ export default function TelegramChatsPage() {
                           <code className="text-lg font-semibold text-gray-900 bg-gray-100 px-2 py-0.5 rounded">
                             /{command.command}
                           </code>
+                          {command.team_only && (
+                            <Badge variant="outline" className="text-xs border-blue-300 text-blue-600">
+                              <Users className="h-3 w-3 mr-1" />
+                              Team Only
+                            </Badge>
+                          )}
                           {!command.is_active && (
                             <Badge variant="secondary" className="text-xs">
                               Disabled
@@ -1776,6 +1786,20 @@ export default function TelegramChatsPage() {
               <p className="text-xs text-gray-500">
                 The message the bot will send when this command is used. Supports HTML formatting.
               </p>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <Label htmlFor="team_only" className="text-sm font-medium">Team Only</Label>
+                <p className="text-xs text-gray-500">
+                  Only team members can use this command
+                </p>
+              </div>
+              <Switch
+                id="team_only"
+                checked={commandForm.team_only}
+                onCheckedChange={(checked) => setCommandForm({ ...commandForm, team_only: checked })}
+              />
             </div>
           </div>
 

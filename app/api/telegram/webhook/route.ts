@@ -141,7 +141,7 @@ async function handleCommand(chatId: string, command: string, args: string[], me
     // Look up command in database
     const { data: commandData, error } = await supabaseAdmin
       .from('telegram_commands')
-      .select('response, image_url')
+      .select('response, image_url, team_only')
       .eq('command', cmd)
       .eq('is_active', true)
       .single();
@@ -149,6 +149,30 @@ async function handleCommand(chatId: string, command: string, args: string[], me
     if (error || !commandData) {
       console.log('[Telegram Webhook] Unknown command:', cmd);
       return;
+    }
+
+    // Check if command is team-only
+    if (commandData.team_only) {
+      const fromUserId = message.from?.id?.toString();
+
+      if (!fromUserId) {
+        console.log('[Telegram Webhook] Team-only command rejected: no user ID');
+        return;
+      }
+
+      // Check if the user's telegram_id is in the users table (team member)
+      const { data: teamMember, error: teamError } = await supabaseAdmin
+        .from('users')
+        .select('id, name')
+        .eq('telegram_id', fromUserId)
+        .single();
+
+      if (teamError || !teamMember) {
+        console.log('[Telegram Webhook] Team-only command rejected: user not a team member', fromUserId);
+        return;
+      }
+
+      console.log('[Telegram Webhook] Team-only command authorized for:', teamMember.name);
     }
 
     // Send photo with caption if image_url exists, otherwise just send message
