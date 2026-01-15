@@ -10391,7 +10391,7 @@ const CampaignDetailsPage = () => {
 
       {/* Payment Notification Confirmation Dialog */}
       <Dialog open={paymentNotifyDialogOpen} onOpenChange={setPaymentNotifyDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md overflow-hidden">
           <DialogHeader>
             <DialogTitle>Send Payment Notification?</DialogTitle>
             <DialogDescription>
@@ -10399,16 +10399,16 @@ const CampaignDetailsPage = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2 overflow-hidden">
               <p className="text-sm text-gray-600">Message preview:</p>
-              <p className="font-medium text-gray-900">
+              <p className="font-medium text-gray-900 break-words">
                 ${pendingPaymentNotification?.amount.toLocaleString()} has been deposited to {pendingPaymentNotification?.wallet}!
                 <br />
                 Thanks for being part of the Holo Hive network 🙌
               </p>
             </div>
             {pendingPaymentNotification?.chatTitle && (
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-gray-500 mt-2 break-words">
                 Will be sent to: {pendingPaymentNotification.chatTitle}
               </p>
             )}
