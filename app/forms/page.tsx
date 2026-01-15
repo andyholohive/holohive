@@ -10,17 +10,66 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Trash2, Share2, FileText, Copy, CheckCircle2, ExternalLink, Globe, Eye, Download, Upload } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Share2, FileText, Copy, CheckCircle2, ExternalLink, Globe, Eye, Download, Upload, Users, Handshake, Link2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { FormService, FormWithStats, FormStatus, FormResponse, FormWithFields, FormField } from '@/lib/formService';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+
+// Types for submissions
+interface LeadSubmission {
+  id: string;
+  name: string;
+  stage: string;
+  source: string | null;
+  deal_value: number | null;
+  created_at: string;
+  notes: string | null;
+}
+
+interface PartnerSubmission {
+  id: string;
+  name: string;
+  category: string | null;
+  status: string;
+  poc_name: string | null;
+  poc_email: string | null;
+  poc_telegram: string | null;
+  created_at: string;
+  notes: string | null;
+}
+
+interface LinkSubmission {
+  id: string;
+  name: string;
+  url: string;
+  client: string | null;
+  link_types: string[] | null;
+  status: string;
+  created_at: string;
+  description: string | null;
+}
 
 export default function FormsPage() {
   const router = useRouter();
   const { toast } = useToast();
+
+  // Active tab
+  const [activeTab, setActiveTab] = useState('forms');
+
+  // Forms state
   const [forms, setForms] = useState<FormWithStats[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Submissions state
+  const [leads, setLeads] = useState<LeadSubmission[]>([]);
+  const [partners, setPartners] = useState<PartnerSubmission[]>([]);
+  const [links, setLinks] = useState<LinkSubmission[]>([]);
+  const [loadingLeads, setLoadingLeads] = useState(false);
+  const [loadingPartners, setLoadingPartners] = useState(false);
+  const [loadingLinks, setLoadingLinks] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | FormStatus>('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -69,6 +118,86 @@ export default function FormsPage() {
       setLoading(false);
     }
   };
+
+  const fetchLeads = async () => {
+    try {
+      setLoadingLeads(true);
+      const { data, error } = await supabase
+        .from('crm_opportunities')
+        .select('id, name, stage, source, deal_value, created_at, notes')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      setLeads(data || []);
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load lead submissions',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingLeads(false);
+    }
+  };
+
+  const fetchPartners = async () => {
+    try {
+      setLoadingPartners(true);
+      const { data, error } = await supabase
+        .from('crm_affiliates')
+        .select('id, name, category, status, poc_name, poc_email, poc_telegram, created_at, notes')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      setPartners(data || []);
+    } catch (error) {
+      console.error('Error fetching partners:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load partner submissions',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingPartners(false);
+    }
+  };
+
+  const fetchLinks = async () => {
+    try {
+      setLoadingLinks(true);
+      const { data, error } = await supabase
+        .from('links')
+        .select('id, name, url, client, link_types, status, created_at, description')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+      setLinks(data || []);
+    } catch (error) {
+      console.error('Error fetching links:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load link submissions',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingLinks(false);
+    }
+  };
+
+  // Fetch data when tab changes
+  useEffect(() => {
+    if (activeTab === 'leads' && leads.length === 0) {
+      fetchLeads();
+    } else if (activeTab === 'partners' && partners.length === 0) {
+      fetchPartners();
+    } else if (activeTab === 'links' && links.length === 0) {
+      fetchLinks();
+    }
+  }, [activeTab]);
 
   const handleCreateForm = async () => {
     if (!newFormName.trim()) {
@@ -407,18 +536,19 @@ export default function FormsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Forms</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Forms & Submissions</h2>
             <p className="text-gray-600">
-              Create and manage custom forms for data collection
+              Create forms and view external submissions
             </p>
           </div>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Form
-              </Button>
-            </DialogTrigger>
+          {activeTab === 'forms' && (
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Form
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Create New Form</DialogTitle>
@@ -476,11 +606,35 @@ export default function FormsPage() {
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          )}
         </div>
 
-        {/* Search and Filters */}
-        <div className="flex items-center space-x-4">
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
+            <TabsTrigger value="forms" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Forms
+            </TabsTrigger>
+            <TabsTrigger value="leads" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Leads
+            </TabsTrigger>
+            <TabsTrigger value="partners" className="flex items-center gap-2">
+              <Handshake className="h-4 w-4" />
+              Partners
+            </TabsTrigger>
+            <TabsTrigger value="links" className="flex items-center gap-2">
+              <Link2 className="h-4 w-4" />
+              Links
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Forms Tab */}
+          <TabsContent value="forms" className="space-y-6">
+            {/* Search and Filters */}
+            <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
@@ -639,6 +793,188 @@ export default function FormsPage() {
             ))}
           </div>
         )}
+          </TabsContent>
+
+          {/* Leads Tab */}
+          <TabsContent value="leads" className="space-y-4">
+            {loadingLeads ? (
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : leads.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No lead submissions</h3>
+                <p className="text-gray-600">Lead form submissions will appear here</p>
+              </div>
+            ) : (
+              <Card>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Stage</TableHead>
+                      <TableHead>Source</TableHead>
+                      <TableHead>Deal Value</TableHead>
+                      <TableHead>Submitted</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {leads.map((lead) => (
+                      <TableRow key={lead.id}>
+                        <TableCell className="font-medium">{lead.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{lead.stage}</Badge>
+                        </TableCell>
+                        <TableCell>{lead.source || '-'}</TableCell>
+                        <TableCell>
+                          {lead.deal_value ? `$${lead.deal_value.toLocaleString()}` : '-'}
+                        </TableCell>
+                        <TableCell>{new Date(lead.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push('/crm/pipeline')}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View in CRM
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Partners Tab */}
+          <TabsContent value="partners" className="space-y-4">
+            {loadingPartners ? (
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : partners.length === 0 ? (
+              <div className="text-center py-12">
+                <Handshake className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No partner submissions</h3>
+                <p className="text-gray-600">Partner application submissions will appear here</p>
+              </div>
+            ) : (
+              <Card>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Contact</TableHead>
+                      <TableHead>Submitted</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {partners.map((partner) => (
+                      <TableRow key={partner.id}>
+                        <TableCell className="font-medium">{partner.name}</TableCell>
+                        <TableCell>{partner.category || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{partner.status}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {partner.poc_name && <div>{partner.poc_name}</div>}
+                            {partner.poc_email && <div className="text-gray-500">{partner.poc_email}</div>}
+                          </div>
+                        </TableCell>
+                        <TableCell>{new Date(partner.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push('/crm/network')}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View in CRM
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Links Tab */}
+          <TabsContent value="links" className="space-y-4">
+            {loadingLinks ? (
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : links.length === 0 ? (
+              <div className="text-center py-12">
+                <Link2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No link submissions</h3>
+                <p className="text-gray-600">Link form submissions will appear here</p>
+              </div>
+            ) : (
+              <Card>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>URL</TableHead>
+                      <TableHead>Submitted</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {links.map((link) => (
+                      <TableRow key={link.id}>
+                        <TableCell className="font-medium">{link.name}</TableCell>
+                        <TableCell>{link.client || '-'}</TableCell>
+                        <TableCell>
+                          {link.link_types?.map((type, i) => (
+                            <Badge key={i} variant="outline" className="mr-1">
+                              {type.charAt(0).toUpperCase() + type.slice(1)}
+                            </Badge>
+                          )) || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline flex items-center gap-1 max-w-[200px] truncate"
+                          >
+                            {link.url}
+                            <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                          </a>
+                        </TableCell>
+                        <TableCell>{new Date(link.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push('/links')}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View in Links
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
 
         {/* Share Form Dialog */}
         <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
