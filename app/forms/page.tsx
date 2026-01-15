@@ -825,9 +825,13 @@ export default function FormsPage() {
                       <TableRow key={lead.id}>
                         <TableCell className="font-medium">{lead.name}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{lead.stage}</Badge>
+                          <Badge variant="outline">
+                            {lead.stage.charAt(0).toUpperCase() + lead.stage.slice(1)}
+                          </Badge>
                         </TableCell>
-                        <TableCell>{lead.source || '-'}</TableCell>
+                        <TableCell>
+                          {lead.source ? lead.source.charAt(0).toUpperCase() + lead.source.slice(1) : '-'}
+                        </TableCell>
                         <TableCell>
                           {lead.deal_value ? `$${lead.deal_value.toLocaleString()}` : '-'}
                         </TableCell>
@@ -879,9 +883,13 @@ export default function FormsPage() {
                     {partners.map((partner) => (
                       <TableRow key={partner.id}>
                         <TableCell className="font-medium">{partner.name}</TableCell>
-                        <TableCell>{partner.category || '-'}</TableCell>
                         <TableCell>
-                          <Badge variant="outline">{partner.status}</Badge>
+                          {partner.category ? partner.category.charAt(0).toUpperCase() + partner.category.slice(1) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {partner.status.charAt(0).toUpperCase() + partner.status.slice(1)}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
