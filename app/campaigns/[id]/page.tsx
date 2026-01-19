@@ -1268,8 +1268,8 @@ const CampaignDetailsPage = () => {
   };
 
   // Add local utility functions
-  const formatDate = (dateString: string | undefined | null) => {
-    if (!dateString) return "-";
+  const formatDate = (dateString: string | undefined | null, fallback: string = "TBD") => {
+    if (!dateString) return fallback;
     return new Date(dateString).toLocaleDateString();
   };
   const getStatusBadge = (status: string) => {
@@ -3073,9 +3073,7 @@ const CampaignDetailsPage = () => {
     if (!campaign?.start_date) {
       missing.push({tab: 'information', field: 'start_date', label: 'Start Date'});
     }
-    if (!campaign?.end_date) {
-      missing.push({tab: 'information', field: 'end_date', label: 'End Date'});
-    }
+    // end_date is optional - campaigns can run indefinitely
     if (!campaign?.client_id) {
       missing.push({tab: 'information', field: 'client_id', label: 'Client'});
     }
@@ -10194,7 +10192,7 @@ const CampaignDetailsPage = () => {
                 </div>
                 <div className="flex justify-between mb-2">
                   <span className="font-medium">Dates:</span>
-                  <span>{campaign ? new Date(campaign.start_date).toLocaleDateString() : ''} - {campaign ? new Date(campaign.end_date).toLocaleDateString() : ''}</span>
+                  <span>{campaign ? new Date(campaign.start_date).toLocaleDateString() : ''} - {campaign?.end_date ? new Date(campaign.end_date).toLocaleDateString() : 'TBD'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium">Status:</span>

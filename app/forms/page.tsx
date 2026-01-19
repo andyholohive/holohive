@@ -61,6 +61,18 @@ const formatFieldValue = (value: string | null | undefined): string => {
     .join(' ');
 };
 
+// Category display map (consistent with network page)
+const categoryDisplayMap: Record<string, string> = {
+  'service_provider': 'Service Provider',
+  'investor_vc': 'Investor / VC',
+  'project': 'Project'
+};
+
+const formatCategory = (category: string | null | undefined): string => {
+  if (!category) return '-';
+  return categoryDisplayMap[category] || formatFieldValue(category);
+};
+
 export default function FormsPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -890,7 +902,7 @@ export default function FormsPage() {
                     {partners.map((partner) => (
                       <TableRow key={partner.id}>
                         <TableCell className="font-medium">{partner.name}</TableCell>
-                        <TableCell>{formatFieldValue(partner.category)}</TableCell>
+                        <TableCell>{formatCategory(partner.category)}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
                             {formatFieldValue(partner.status)}

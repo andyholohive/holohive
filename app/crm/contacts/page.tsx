@@ -13,8 +13,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Plus, Search, Edit, Trash2, UserPlus,
   Mail, MessageSquare, MoreHorizontal, Building2, Handshake, Users, TrendingUp,
-  Filter, ArrowUpDown, X, Link2
+  Filter, ArrowUpDown, X, Link2, Table as TableIcon, LayoutGrid
 } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -67,6 +68,9 @@ export default function ContactsPage() {
 
   // Sort state
   const [sortBy, setSortBy] = useState<string>('created_desc');
+
+  // View mode state
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards');
 
   useEffect(() => {
     fetchContacts();
@@ -457,91 +461,227 @@ export default function ContactsPage() {
         </Card>
       </div>
 
-      {/* Filters and Sort */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-gray-500" />
-          <span className="text-sm text-gray-600">Filters:</span>
+      {/* Filters, Sort, and View Toggle */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-500" />
+            <span className="text-sm text-gray-600">Filters:</span>
+          </div>
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <SelectTrigger className="w-40 h-9 text-sm auth-input">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories.map(cat => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterLinked} onValueChange={setFilterLinked}>
+            <SelectTrigger className="w-36 h-9 text-sm auth-input">
+              <SelectValue placeholder="Link status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Contacts</SelectItem>
+              <SelectItem value="linked">Linked</SelectItem>
+              <SelectItem value="unlinked">Unlinked</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="h-6 w-px bg-gray-300" />
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="h-4 w-4 text-gray-500" />
+            <span className="text-sm text-gray-600">Sort:</span>
+          </div>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-40 h-9 text-sm auth-input">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_desc">Newest First</SelectItem>
+              <SelectItem value="created_asc">Oldest First</SelectItem>
+              <SelectItem value="name_asc">Name A-Z</SelectItem>
+              <SelectItem value="name_desc">Name Z-A</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Clear Filters
+            </Button>
+          )}
         </div>
-        <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-40 h-9 text-sm auth-input">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            {categories.map(cat => (
-              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={filterLinked} onValueChange={setFilterLinked}>
-          <SelectTrigger className="w-36 h-9 text-sm auth-input">
-            <SelectValue placeholder="Link status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Contacts</SelectItem>
-            <SelectItem value="linked">Linked</SelectItem>
-            <SelectItem value="unlinked">Unlinked</SelectItem>
-          </SelectContent>
-        </Select>
-        <div className="h-6 w-px bg-gray-300" />
-        <div className="flex items-center gap-2">
-          <ArrowUpDown className="h-4 w-4 text-gray-500" />
-          <span className="text-sm text-gray-600">Sort:</span>
-        </div>
-        <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-40 h-9 text-sm auth-input">
-            <SelectValue placeholder="Sort by" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="created_desc">Newest First</SelectItem>
-            <SelectItem value="created_asc">Oldest First</SelectItem>
-            <SelectItem value="name_asc">Name A-Z</SelectItem>
-            <SelectItem value="name_desc">Name Z-A</SelectItem>
-          </SelectContent>
-        </Select>
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearFilters}
-            className="text-gray-500 hover:text-gray-700"
+
+        {/* View Toggle */}
+        <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+          <div
+            onClick={() => setViewMode('cards')}
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all cursor-pointer ${viewMode === 'cards' ? 'bg-background text-foreground shadow-sm' : ''}`}
           >
-            <X className="h-4 w-4 mr-1" />
-            Clear Filters
-          </Button>
-        )}
+            <LayoutGrid className="h-4 w-4 mr-2" />
+            Cards
+          </div>
+          <div
+            onClick={() => setViewMode('table')}
+            className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all cursor-pointer ${viewMode === 'table' ? 'bg-background text-foreground shadow-sm' : ''}`}
+          >
+            <TableIcon className="h-4 w-4 mr-2" />
+            Table
+          </div>
+        </div>
       </div>
 
-      {/* Contacts Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-        {filteredContacts.length === 0 ? (
-          <div className="col-span-full text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-            <UserPlus className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-600 font-medium">
-              {searchTerm ? 'No contacts found matching your search.' : 'No contacts yet'}
-            </p>
-            <p className="text-gray-400 text-sm mt-1">
-              {searchTerm ? 'Try adjusting your search or filters.' : 'Add your first contact to get started.'}
-            </p>
-            {!searchTerm && (
-              <Button
-                className="mt-4"
-                onClick={() => {
-                  setEditingContact(null);
-                  setContactForm({ name: '' });
-                  resetLinkState();
-                  setIsNewContactOpen(true);
-                }}
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Your First Contact
-              </Button>
-            )}
-          </div>
-        ) : (
-          filteredContacts.map((contact) => {
+      {/* Contacts Display */}
+      {filteredContacts.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+          <UserPlus className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-600 font-medium">
+            {searchTerm ? 'No contacts found matching your search.' : 'No contacts yet'}
+          </p>
+          <p className="text-gray-400 text-sm mt-1">
+            {searchTerm ? 'Try adjusting your search or filters.' : 'Add your first contact to get started.'}
+          </p>
+          {!searchTerm && (
+            <Button
+              className="mt-4"
+              onClick={() => {
+                setEditingContact(null);
+                setContactForm({ name: '' });
+                resetLinkState();
+                setIsNewContactOpen(true);
+              }}
+              style={{ backgroundColor: '#3e8692', color: 'white' }}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Your First Contact
+            </Button>
+          )}
+        </div>
+      ) : viewMode === 'table' ? (
+        /* Table View */
+        <div className="rounded-lg border bg-white overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50">
+                <TableHead className="w-10">#</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Telegram</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Linked To</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="w-16">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredContacts.map((contact, index) => {
+                const linkedOpps = getLinkedOpportunities(contact.id);
+                const linkedParts = getLinkedPartners(contact.id);
+                const linkedAffs = getLinkedAffiliates(contact.id);
+                const totalLinks = linkedOpps.length + linkedParts.length + linkedAffs.length;
+
+                return (
+                  <TableRow key={contact.id} className="group hover:bg-gray-50">
+                    <TableCell className="text-gray-400 text-sm">{index + 1}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-br from-blue-100 to-cyan-50 rounded-lg">
+                          <UserPlus className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <span className="font-medium">{contact.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-gray-600">{contact.role || <span className="text-gray-400">-</span>}</TableCell>
+                    <TableCell>
+                      {contact.email ? (
+                        <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline text-sm">
+                          {contact.email}
+                        </a>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {contact.telegram_id ? (
+                        <span className="text-gray-600 text-sm">@{contact.telegram_id}</span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {contact.category ? (
+                        <Badge variant="outline" className="text-xs">
+                          {contact.category}
+                        </Badge>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {totalLinks > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {linkedOpps.map(opp => (
+                            <Badge key={opp.id} variant="secondary" className="text-xs bg-emerald-50 text-emerald-700">
+                              {opp.name}
+                            </Badge>
+                          ))}
+                          {linkedParts.map(part => (
+                            <Badge key={part.id} variant="secondary" className="text-xs bg-blue-50 text-blue-700">
+                              {part.name}
+                            </Badge>
+                          ))}
+                          {linkedAffs.map(aff => (
+                            <Badge key={aff.id} variant="secondary" className="text-xs bg-purple-50 text-purple-700">
+                              {aff.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-gray-500 text-sm">
+                      {new Date(contact.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditContact(contact)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={() => handleDeleteContact(contact)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        /* Cards View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredContacts.map((contact) => {
             const linkedOpps = getLinkedOpportunities(contact.id);
             const linkedParts = getLinkedPartners(contact.id);
             const linkedAffs = getLinkedAffiliates(contact.id);
@@ -549,26 +689,24 @@ export default function ContactsPage() {
             const hasContactInfo = contact.email || contact.telegram_id || contact.x_id;
 
             return (
-              <Card key={contact.id} className="group hover:shadow-md transition-shadow duration-200 overflow-hidden">
-                {/* Card Header with gradient accent */}
-                <div className="h-0.5 bg-gradient-to-r from-blue-500 to-cyan-500" />
-                <CardHeader className="p-3 pb-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="p-1.5 bg-gradient-to-br from-blue-100 to-cyan-50 rounded-lg shrink-0">
-                        <UserPlus className="h-4 w-4 text-blue-600" />
+              <Card key={contact.id} className="group hover:shadow-md transition-shadow duration-200">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-gradient-to-br from-blue-100 to-cyan-50 rounded-lg">
+                        <UserPlus className="h-5 w-5 text-blue-600" />
                       </div>
-                      <div className="min-w-0">
-                        <CardTitle className="text-sm font-semibold truncate">{contact.name}</CardTitle>
+                      <div>
+                        <CardTitle className="text-base">{contact.name}</CardTitle>
                         {contact.role && (
-                          <p className="text-xs text-gray-500 truncate">{contact.role}</p>
+                          <p className="text-sm text-gray-500">{contact.role}</p>
                         )}
                       </div>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
@@ -587,26 +725,28 @@ export default function ContactsPage() {
                     </DropdownMenu>
                   </div>
                 </CardHeader>
-                <CardContent className="p-3 pt-0 space-y-2">
+                <CardContent className="pt-0 space-y-3">
                   {/* Contact Info Section */}
                   {hasContactInfo && (
-                    <div className="bg-gray-50 rounded-md p-2 space-y-1">
+                    <div className="bg-gray-50 rounded-lg p-3 space-y-2">
                       {contact.email && (
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <Mail className="h-3 w-3 text-gray-400 shrink-0" />
-                          <span className="text-gray-600 truncate">{contact.email}</span>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Mail className="h-4 w-4 text-gray-400" />
+                          <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline truncate">
+                            {contact.email}
+                          </a>
                         </div>
                       )}
                       {contact.telegram_id && (
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <MessageSquare className="h-3 w-3 text-gray-400 shrink-0" />
-                          <span className="text-gray-600 truncate">@{contact.telegram_id}</span>
+                        <div className="flex items-center gap-2 text-sm">
+                          <MessageSquare className="h-4 w-4 text-gray-400" />
+                          <span className="text-gray-600">@{contact.telegram_id}</span>
                         </div>
                       )}
                       {contact.x_id && (
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <span className="h-3 w-3 flex items-center justify-center font-bold text-[8px] text-gray-400 shrink-0">𝕏</span>
-                          <span className="text-gray-600 truncate">@{contact.x_id}</span>
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="h-4 w-4 flex items-center justify-center font-bold text-xs text-gray-400">𝕏</span>
+                          <span className="text-gray-600">@{contact.x_id}</span>
                         </div>
                       )}
                     </div>
@@ -614,47 +754,44 @@ export default function ContactsPage() {
 
                   {/* Category Badge */}
                   {contact.category && (
-                    <Badge variant="outline" className="text-[10px] bg-white px-1.5 py-0">
+                    <Badge variant="outline" className="text-xs">
                       {contact.category}
                     </Badge>
                   )}
 
                   {/* Linked Entities */}
                   {totalLinks > 0 && (
-                    <div className="pt-1.5 border-t border-gray-100 space-y-1.5">
-                      {/* Linked Opportunities */}
+                    <div className="pt-3 border-t border-gray-100 space-y-2">
                       {linkedOpps.length > 0 && (
-                        <div className="flex items-start gap-1">
-                          <TrendingUp className="h-3 w-3 text-emerald-600 mt-0.5 shrink-0" />
+                        <div className="flex items-start gap-2">
+                          <TrendingUp className="h-4 w-4 text-emerald-600 mt-0.5" />
                           <div className="flex flex-wrap gap-1">
                             {linkedOpps.map(opp => (
-                              <Badge key={opp.id} variant="secondary" className="text-[10px] bg-emerald-50 text-emerald-700 font-normal px-1.5 py-0">
+                              <Badge key={opp.id} variant="secondary" className="text-xs bg-emerald-50 text-emerald-700">
                                 {opp.name}
                               </Badge>
                             ))}
                           </div>
                         </div>
                       )}
-                      {/* Linked Partners */}
                       {linkedParts.length > 0 && (
-                        <div className="flex items-start gap-1">
-                          <Handshake className="h-3 w-3 text-blue-600 mt-0.5 shrink-0" />
+                        <div className="flex items-start gap-2">
+                          <Handshake className="h-4 w-4 text-blue-600 mt-0.5" />
                           <div className="flex flex-wrap gap-1">
                             {linkedParts.map(part => (
-                              <Badge key={part.id} variant="secondary" className="text-[10px] bg-blue-50 text-blue-700 font-normal px-1.5 py-0">
+                              <Badge key={part.id} variant="secondary" className="text-xs bg-blue-50 text-blue-700">
                                 {part.name}
                               </Badge>
                             ))}
                           </div>
                         </div>
                       )}
-                      {/* Linked Affiliates */}
                       {linkedAffs.length > 0 && (
-                        <div className="flex items-start gap-1">
-                          <Users className="h-3 w-3 text-purple-600 mt-0.5 shrink-0" />
+                        <div className="flex items-start gap-2">
+                          <Users className="h-4 w-4 text-purple-600 mt-0.5" />
                           <div className="flex flex-wrap gap-1">
                             {linkedAffs.map(aff => (
-                              <Badge key={aff.id} variant="secondary" className="text-[10px] bg-purple-50 text-purple-700 font-normal px-1.5 py-0">
+                              <Badge key={aff.id} variant="secondary" className="text-xs bg-purple-50 text-purple-700">
                                 {aff.name}
                               </Badge>
                             ))}
@@ -666,9 +803,9 @@ export default function ContactsPage() {
                 </CardContent>
               </Card>
             );
-          })
-        )}
-      </div>
+          })}
+        </div>
+      )}
 
       {/* Contact Dialog */}
       <Dialog open={isNewContactOpen} onOpenChange={setIsNewContactOpen}>
