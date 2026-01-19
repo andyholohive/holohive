@@ -1222,11 +1222,17 @@ export default function FormBuilderPage() {
 
   useEffect(() => {
     fetchForm();
-    fetchResponses(); // Fetch responses immediately to show count in tab
   }, [formId]);
 
+  // Fetch responses after form is loaded (need form.id for the query)
   useEffect(() => {
-    if (activeTab === 'responses') {
+    if (form?.id) {
+      fetchResponses();
+    }
+  }, [form?.id]);
+
+  useEffect(() => {
+    if (activeTab === 'responses' && form?.id) {
       fetchResponses(); // Refresh when tab is clicked
     }
   }, [activeTab]);
@@ -1288,11 +1294,10 @@ export default function FormBuilderPage() {
   };
 
   const fetchResponses = async () => {
+    if (!form?.id) return; // Wait for form to load
     try {
       setLoadingResponses(true);
-      // Use the actual form ID (UUID), not the URL parameter which could be a slug
-      const actualFormId = form?.id || formId;
-      const data = await FormService.getResponses(actualFormId);
+      const data = await FormService.getResponses(form.id);
       setResponses(data);
     } catch (error) {
       console.error('Error fetching responses:', error);
@@ -1316,10 +1321,19 @@ export default function FormBuilderPage() {
       return;
     }
 
+    if (!form?.id) {
+      toast({
+        title: 'Error',
+        description: 'Form not loaded',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setIsSavingInfo(true);
       await FormService.updateForm({
-        id: formId,
+        id: form.id,
         name: editedName,
         description: editedDescription,
         status: editedStatus,
@@ -1394,6 +1408,15 @@ export default function FormBuilderPage() {
       return;
     }
 
+    if (!editingField && !form?.id) {
+      toast({
+        title: 'Error',
+        description: 'Form not loaded',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setIsSavingField(true);
       if (editingField) {
@@ -1403,7 +1426,7 @@ export default function FormBuilderPage() {
         });
       } else {
         await FormService.createField({
-          form_id: formId,
+          form_id: form!.id,
           ...fieldForm,
         });
       }
@@ -1525,10 +1548,9 @@ export default function FormBuilderPage() {
   };
 
   const handleExportCSV = async () => {
+    if (!form?.id) return;
     try {
-      // Use actual form ID for API call
-      const actualFormId = form?.id || formId;
-      const csv = await FormService.exportResponsesToCSV(actualFormId);
+      const csv = await FormService.exportResponsesToCSV(form.id);
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -2191,9 +2213,10 @@ export default function FormBuilderPage() {
                       <Checkbox
                         checked={form.enable_thank_you_page || false}
                         onCheckedChange={async (checked) => {
+                          if (!form?.id) return;
                           try {
                             await FormService.updateForm({
-                              id: formId,
+                              id: form.id,
                               enable_thank_you_page: checked as boolean,
                             });
                             setForm(prev => prev ? { ...prev, enable_thank_you_page: checked as boolean } : null);

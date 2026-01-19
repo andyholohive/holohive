@@ -90,8 +90,12 @@ const getFileIcon = (fileType: string) => {
   return '📎';
 };
 
+// Helper to check if a string is a valid UUID
+const isUUID = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
 export default function PublicReportPage({ params }: { params: { id: string } }) {
-  const campaignId = params.id;
+  const idOrSlug = params.id;
+  const [campaignId, setCampaignId] = useState<string | null>(null); // Resolved UUID
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [campaignKOLs, setCampaignKOLs] = useState<CampaignKOL[]>([]);
   const [contents, setContents] = useState<ContentItem[]>([]);
@@ -106,11 +110,37 @@ export default function PublicReportPage({ params }: { params: { id: string } })
   const [loadingClientEmail, setLoadingClientEmail] = useState(true);
 
   // Cache key for this specific campaign
-  const cacheKey = `report_auth_${campaignId}`;
+  const cacheKey = `report_auth_${idOrSlug}`;
   const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
+  // Resolve slug to UUID on mount
   useEffect(() => {
-    fetchClientEmail();
+    async function resolveCampaignId() {
+      if (isUUID(idOrSlug)) {
+        setCampaignId(idOrSlug);
+      } else {
+        // Fetch by slug to get UUID
+        const { data, error } = await supabasePublic
+          .from('campaigns')
+          .select('id')
+          .eq('slug', idOrSlug)
+          .single();
+
+        if (error || !data) {
+          setError('Campaign not found');
+          setLoadingClientEmail(false);
+          return;
+        }
+        setCampaignId(data.id);
+      }
+    }
+    resolveCampaignId();
+  }, [idOrSlug]);
+
+  useEffect(() => {
+    if (campaignId) {
+      fetchClientEmail();
+    }
   }, [campaignId]);
 
   useEffect(() => {
@@ -120,7 +150,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
   }, [clientEmail]);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && campaignId) {
       fetchData();
     }
   }, [campaignId, isAuthenticated]);
@@ -169,6 +199,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
   };
 
   async function fetchClientEmail() {
+    if (!campaignId) return;
     try {
       setLoadingClientEmail(true);
       setError(null);
@@ -215,6 +246,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
 
   // Fetch client email directly (returns the email instead of only setting state)
   async function getClientEmail(): Promise<string | null> {
+    if (!campaignId) return null;
     try {
       const { data: campaignData, error: campaignError } = await supabasePublic
         .from('campaigns')
@@ -265,6 +297,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
   };
 
   async function fetchData() {
+    if (!campaignId) return;
     try {
       setLoading(true);
       setError(null);
@@ -542,7 +575,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
           </div>
           <div>
             <Button
-              onClick={() => window.open(`/public/campaigns/${campaignId}`, '_blank')}
+              onClick={() => window.open(`/public/campaigns/${idOrSlug}`, '_blank')}
               className="bg-[#3e8692] hover:bg-[#2d6570] text-white"
               size="sm"
             >
