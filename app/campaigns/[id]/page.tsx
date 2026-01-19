@@ -1229,14 +1229,24 @@ const CampaignDetailsPage = () => {
   };
 
   const handleTogglePublicReport = async (enabled: boolean) => {
-    if (!id) return;
+    if (!campaign?.id) return;
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('campaigns')
         .update({ share_report_publicly: enabled })
-        .eq('id', id);
+        .eq('id', campaign.id)
+        .select('id, share_report_publicly')
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error;
+      }
 
       setShareReportPublicly(enabled);
       if (campaign) {
@@ -1251,7 +1261,7 @@ const CampaignDetailsPage = () => {
       console.error('Error toggling public report:', err);
       toast({
         title: 'Error',
-        description: 'Failed to update public report setting',
+        description: err?.message || 'Failed to update public report setting',
         variant: 'destructive',
       });
     }
