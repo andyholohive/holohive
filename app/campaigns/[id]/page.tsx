@@ -3080,21 +3080,13 @@ const CampaignDetailsPage = () => {
     if (!campaign?.region) {
       missing.push({tab: 'information', field: 'region', label: 'Region'});
     }
-    if (!campaign?.total_budget || campaign.total_budget === 0) {
-      missing.push({tab: 'information', field: 'total_budget', label: 'Total Budget'});
-    }
+    // total_budget is optional - campaigns can have flexible/undefined budgets
 
     // KOL Dashboard validations
     if (!campaignKOLs || campaignKOLs.length === 0) {
       missing.push({tab: 'kols', field: 'kols', label: 'At least one KOL'});
     } else {
-      // Check if any KOLs are missing budget allocations
-      const kolsWithoutBudget = campaignKOLs.filter(kol =>
-        !kol.allocated_budget || kol.allocated_budget === 0
-      );
-      if (kolsWithoutBudget.length > 0) {
-        missing.push({tab: 'kols', field: 'budget', label: `Budget for ${kolsWithoutBudget.length} KOL(s)`});
-      }
+      // Budget allocations are optional for KOLs
 
       // Check if any KOLs are missing status
       const kolsWithoutStatus = campaignKOLs.filter(kol => !kol.hh_status);
