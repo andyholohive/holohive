@@ -865,7 +865,17 @@ const CampaignDetailsPage = () => {
   const handleUpdateKOLStatus = async (kolId: string, status: 'Curated' | 'Contacted' | 'Interested' | 'Onboarded' | 'Concluded') => {
     try {
       await CampaignKOLService.updateCampaignKOL(kolId, { hh_status: status });
-      setCampaignKOLs(prev => prev.map(kol => kol.id === kolId ? { ...kol, hh_status: status } : kol));
+      const updatedKOLs = campaignKOLs.map(kol => kol.id === kolId ? { ...kol, hh_status: status } : kol);
+      setCampaignKOLs(updatedKOLs);
+
+      // Auto-update campaign status to Completed when all KOLs are concluded
+      if (status === 'Concluded' && campaign?.status !== 'Completed') {
+        const allConcluded = updatedKOLs.every(k => k.hh_status === 'Concluded');
+        if (allConcluded && updatedKOLs.length > 0) {
+          await CampaignService.updateCampaign(campaign!.id, { status: 'Completed' });
+          setCampaign(prev => prev ? { ...prev, status: 'Completed' } : null);
+        }
+      }
     } catch (error) {
       console.error('Error updating KOL status:', error);
     }
@@ -2931,6 +2941,16 @@ const CampaignDetailsPage = () => {
       }
     }
 
+    // Auto-update campaign status to Active when content is posted
+    if (field === 'status' && newValue?.toLowerCase() === 'posted' && campaign?.status === 'Planning') {
+      try {
+        await CampaignService.updateCampaign(campaign.id, { status: 'Active' });
+        setCampaign(prev => prev ? { ...prev, status: 'Active' } : null);
+      } catch (err) {
+        console.error('Error auto-updating campaign status:', err);
+      }
+    }
+
     setEditingContentCell(null);
     setEditingContentValue(null);
   };
@@ -2957,13 +2977,27 @@ const CampaignDetailsPage = () => {
 
   const handleKolCellSaveImmediate = async (kol: any, field: string, newValue: any) => {
     // Update local state
-    setCampaignKOLs(prev => prev.map(k => k.id === kol.id ? { ...k, [field]: newValue } : k));
+    const updatedKOLs = campaignKOLs.map(k => k.id === kol.id ? { ...k, [field]: newValue } : k);
+    setCampaignKOLs(updatedKOLs);
 
     // Update database
     try {
       await supabase.from('campaign_kols').update({ [field]: newValue }).eq('id', kol.id);
     } catch (err) {
       console.error('Error updating KOL:', err);
+    }
+
+    // Auto-update campaign status to Completed when all KOLs are concluded
+    if (field === 'hh_status' && newValue === 'Concluded' && campaign?.status !== 'Completed') {
+      const allConcluded = updatedKOLs.every(k => k.hh_status === 'Concluded');
+      if (allConcluded && updatedKOLs.length > 0) {
+        try {
+          await CampaignService.updateCampaign(campaign!.id, { status: 'Completed' });
+          setCampaign(prev => prev ? { ...prev, status: 'Completed' } : null);
+        } catch (err) {
+          console.error('Error auto-updating campaign status to Completed:', err);
+        }
+      }
     }
 
     setEditingKolCell(null);
@@ -4976,8 +5010,23 @@ const CampaignDetailsPage = () => {
                           disabled={selectedKOLs.length === 0 || !bulkStatus}
                           onClick={async () => {
                             if (!bulkStatus || selectedKOLs.length === 0) return;
-                            setCampaignKOLs(prev => prev.map(kol => selectedKOLs.includes(kol.id) ? { ...kol, hh_status: bulkStatus } : kol));
+                            const updatedKOLs = campaignKOLs.map(kol => selectedKOLs.includes(kol.id) ? { ...kol, hh_status: bulkStatus } : kol);
+                            setCampaignKOLs(updatedKOLs);
                             await Promise.all(selectedKOLs.map(kolId => CampaignKOLService.updateCampaignKOL(kolId, { hh_status: bulkStatus })));
+
+                            // Auto-update campaign status to Completed when all KOLs are concluded
+                            if (bulkStatus === 'Concluded' && campaign?.status !== 'Completed') {
+                              const allConcluded = updatedKOLs.every(k => k.hh_status === 'Concluded');
+                              if (allConcluded && updatedKOLs.length > 0) {
+                                try {
+                                  await CampaignService.updateCampaign(campaign!.id, { status: 'Completed' });
+                                  setCampaign(prev => prev ? { ...prev, status: 'Completed' } : null);
+                                } catch (err) {
+                                  console.error('Error auto-updating campaign status to Completed:', err);
+                                }
+                              }
+                            }
+
                             setBulkStatus("");
                           }}
                         >

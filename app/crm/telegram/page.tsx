@@ -200,7 +200,7 @@ export default function TelegramChatsPage() {
   const [savingCommand, setSavingCommand] = useState(false);
 
   // Active tab
-  const [activeTab, setActiveTab] = useState('chats');
+  const [activeTab, setActiveTab] = useState('unassigned');
 
   useEffect(() => {
     fetchData();
@@ -779,6 +779,8 @@ export default function TelegramChatsPage() {
   const groupChats = displayChats.filter(chat => chat.chat_type === 'group' || chat.chat_type === 'supergroup');
   const dmChats = displayChats.filter(chat => chat.chat_type === 'private');
   const kolChats = displayChats.filter(chat => chat.master_kol_id !== null);
+  const unassignedChats = displayChats.filter(chat => !chat.opportunity_id && !chat.master_kol_id && chat.chat_type !== 'private');
+  const leadsChats = displayChats.filter(chat => chat.opportunity_id !== null);
 
   const filteredGroupChats = groupChats.filter(chat => {
     if (!searchQuery) return true;
@@ -806,6 +808,25 @@ export default function TelegramChatsPage() {
       chat.title?.toLowerCase().includes(query) ||
       chat.chat_id.includes(query) ||
       chat.master_kol?.name?.toLowerCase().includes(query)
+    );
+  });
+
+  const filteredUnassignedChats = unassignedChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query)
+    );
+  });
+
+  const filteredLeadsChats = leadsChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query) ||
+      chat.opportunity?.name?.toLowerCase().includes(query)
     );
   });
 
@@ -844,6 +865,20 @@ export default function TelegramChatsPage() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
         <TabsList>
+          <TabsTrigger value="unassigned" className="flex items-center gap-2">
+            <Unlink className="h-4 w-4" />
+            Unassigned
+            {unassignedChats.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{unassignedChats.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="leads" className="flex items-center gap-2">
+            <LinkIcon className="h-4 w-4" />
+            Leads
+            {leadsChats.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{leadsChats.length}</Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="chats" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Groups
@@ -870,6 +905,309 @@ export default function TelegramChatsPage() {
             Commands
           </TabsTrigger>
         </TabsList>
+
+        {/* Unassigned Tab */}
+        <TabsContent value="unassigned" className="mt-4 space-y-4">
+          {/* Unassigned Header */}
+          <div className="flex items-center justify-between">
+            <p className="text-gray-600">
+              Chats not linked to any opportunity or KOL ({unassignedChats.length} total)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Input
+                  placeholder="Search chats..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="auth-input pl-10 w-64"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* Unassigned Chat List */}
+          {filteredUnassignedChats.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Unlink className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {unassignedChats.length === 0 ? 'No unassigned chats' : 'No matching chats'}
+                </h3>
+                <p className="text-gray-500 max-w-md mx-auto">
+                  {unassignedChats.length === 0
+                    ? 'All chats have been assigned to opportunities or KOLs.'
+                    : 'Try a different search term.'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredUnassignedChats.map(chat => {
+                const activity = getActivityStatus(chat.last_message_at);
+                return (
+                  <Card key={chat.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        {/* Left: Chat Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                            <h3 className="font-semibold text-gray-900 truncate">
+                              {chat.title || 'Unnamed Chat'}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
+                            </Badge>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                                {chat.chat_id}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => copyToClipboard(chat.chat_id)}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{formatTimeAgo(chat.last_message_at)}</span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>{chat.message_count} messages</span>
+                            </div>
+                          </div>
+
+                          {/* Recent Messages */}
+                          {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <p className="text-xs font-medium text-gray-500 mb-2">Recent Messages:</p>
+                              <div className="space-y-1.5">
+                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => (
+                                  <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
+                                    <span className="font-medium text-gray-700">
+                                      {msg.from_user_name || msg.from_username || 'Unknown'}:
+                                    </span>{' '}
+                                    <span className="text-gray-600">
+                                      {msg.text && msg.text.length > 80
+                                        ? msg.text.substring(0, 80) + '...'
+                                        : msg.text || '[No text]'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openLinkDialog(chat)}
+                          >
+                            <LinkIcon className="h-4 w-4 mr-1.5" />
+                            Link to Lead
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openKolLinkDialog(chat)}
+                          >
+                            <Megaphone className="h-4 w-4 mr-1.5" />
+                            Link to KOL
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Leads Tab (Opportunities) */}
+        <TabsContent value="leads" className="mt-4 space-y-4">
+          {/* Leads Header */}
+          <div className="flex items-center justify-between">
+            <p className="text-gray-600">
+              Chats linked to opportunities ({leadsChats.length} total)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Input
+                  placeholder="Search leads..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="auth-input pl-10 w-64"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={refreshing}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* Leads Chat List */}
+          {filteredLeadsChats.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <LinkIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {leadsChats.length === 0 ? 'No leads linked yet' : 'No matching leads'}
+                </h3>
+                <p className="text-gray-500 max-w-md mx-auto">
+                  {leadsChats.length === 0
+                    ? 'Link chats to opportunities from the Unassigned tab to track them here.'
+                    : 'Try a different search term.'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredLeadsChats.map(chat => {
+                const activity = getActivityStatus(chat.last_message_at);
+                return (
+                  <Card key={chat.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        {/* Left: Chat Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                            <h3 className="font-semibold text-gray-900 truncate">
+                              {chat.title || 'Unnamed Chat'}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
+                            </Badge>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">
+                                {chat.chat_id}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => copyToClipboard(chat.chat_id)}
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{formatTimeAgo(chat.last_message_at)}</span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>{chat.message_count} messages</span>
+                            </div>
+                          </div>
+
+                          {/* Linked Opportunity */}
+                          {chat.opportunity && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                              <span className="text-sm text-gray-700">
+                                Linked to: <strong>{chat.opportunity.name}</strong>
+                              </span>
+                              <Badge variant="outline" className="text-xs">
+                                {chat.opportunity.stage.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                              </Badge>
+                            </div>
+                          )}
+
+                          {/* Recent Messages */}
+                          {displayMessages[chat.chat_id] && displayMessages[chat.chat_id].length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <p className="text-xs font-medium text-gray-500 mb-2">Recent Messages:</p>
+                              <div className="space-y-1.5">
+                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => (
+                                  <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
+                                    <span className="font-medium text-gray-700">
+                                      {msg.from_user_name || msg.from_username || 'Unknown'}:
+                                    </span>{' '}
+                                    <span className="text-gray-600">
+                                      {msg.text && msg.text.length > 80
+                                        ? msg.text.substring(0, 80) + '...'
+                                        : msg.text || '[No text]'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button
+                            size="sm"
+                            onClick={() => openMessageDialog(chat)}
+                            style={{ backgroundColor: '#3e8692', color: 'white' }}
+                            className="hover:opacity-90"
+                          >
+                            <MessageSquare className="h-4 w-4 mr-1.5" />
+                            Send Message
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUnlink(chat)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                          >
+                            <Unlink className="h-4 w-4 mr-1.5" />
+                            Unlink
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openLinkDialog(chat)}
+                          >
+                            <Edit className="h-4 w-4 mr-1.5" />
+                            Change Lead
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
 
         {/* Chats Tab (Groups only) */}
         <TabsContent value="chats" className="mt-4 space-y-4">
