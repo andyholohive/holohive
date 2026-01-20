@@ -246,10 +246,32 @@ async function handleMessage(message: any) {
   const botId = botToken ? botToken.split(':')[0] : null;
   const isFromBot = fromId === botId;
 
+  // Check if the sender is a team member (has telegram_id in users table)
+  let isTeamMember = false;
+  if (fromId && !isFromBot) {
+    const { data: teamMember } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('telegram_id', fromId)
+      .single();
+    isTeamMember = !!teamMember;
+  }
+
+  // Determine which field to update:
+  // - Bot messages → last_reply_at
+  // - Team member messages → last_team_message_at
+  // - Lead/others messages → last_message_at
+  const getUpdateField = () => {
+    if (isFromBot) return 'last_reply_at';
+    if (isTeamMember) return 'last_team_message_at';
+    return 'last_message_at';
+  };
+
   // Update all matching opportunities
   if (opportunities && opportunities.length > 0) {
     for (const opportunity of opportunities) {
-      const updateField = isFromBot ? 'last_reply_at' : 'last_message_at';
+      const updateField = getUpdateField();
+      const senderType = isFromBot ? 'bot' : (isTeamMember ? 'team' : 'lead');
 
       const { error: updateError } = await supabaseAdmin
         .from('crm_opportunities')
@@ -267,7 +289,7 @@ async function handleMessage(message: any) {
           name: opportunity.name,
           chatId,
           timestamp: messageDate.toISOString(),
-          isFromBot
+          senderType
         });
       }
     }

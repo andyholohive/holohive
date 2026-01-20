@@ -1081,15 +1081,21 @@ export default function PipelinePage() {
                     </div>
                     <div className="ml-4 text-xs space-y-0.5">
                       <div className="flex items-center gap-1 text-gray-500">
-                        <span>Their msg:</span>
+                        <span>Lead:</span>
                         <span className={opp.last_message_at ? 'text-gray-700' : 'text-gray-400'}>
-                          {opp.last_message_at ? formatShortDate(opp.last_message_at) : 'No messages yet'}
+                          {opp.last_message_at ? formatShortDate(opp.last_message_at) : '-'}
                         </span>
                       </div>
                       <div className="flex items-center gap-1 text-gray-500">
-                        <span>Our reply:</span>
+                        <span>Team:</span>
+                        <span className={opp.last_team_message_at ? 'text-gray-700' : 'text-gray-400'}>
+                          {opp.last_team_message_at ? formatShortDate(opp.last_team_message_at) : '-'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 text-gray-500">
+                        <span>Bot:</span>
                         <span className={opp.last_reply_at ? 'text-gray-700' : 'text-gray-400'}>
-                          {opp.last_reply_at ? formatShortDate(opp.last_reply_at) : 'No replies yet'}
+                          {opp.last_reply_at ? formatShortDate(opp.last_reply_at) : '-'}
                         </span>
                       </div>
                     </div>

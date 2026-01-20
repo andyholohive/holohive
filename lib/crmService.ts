@@ -50,8 +50,9 @@ export interface CRMOpportunity {
   deal_value: number | null;
   currency: string;
   last_contacted_at: string | null;
-  last_message_at: string | null;  // When they last messaged in TG group
-  last_reply_at: string | null;    // When we last messaged in TG group
+  last_message_at: string | null;       // When lead/others last messaged in TG group
+  last_reply_at: string | null;          // When our bot last messaged in TG group
+  last_team_message_at: string | null;   // When a team member last messaged in TG group
   owner_id: string | null;
   source: OpportunitySource | null;
   referrer: string | null;
