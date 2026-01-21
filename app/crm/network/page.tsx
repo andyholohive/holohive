@@ -258,7 +258,7 @@ export default function NetworkPage() {
       if (partnerDialogAffiliateMode === 'create' && newAffiliateInPartnerDialog.name.trim()) {
         const newAffiliate = await CRMService.createAffiliate({
           ...newAffiliateInPartnerDialog,
-          owner_id: user?.id
+          owner_id: newAffiliateInPartnerDialog.owner_id || user?.id
         });
         if (newAffiliate) {
           affiliateIdToLink = newAffiliate.id;
@@ -279,7 +279,7 @@ export default function NetworkPage() {
       } else {
         const newPartner = await CRMService.createPartner({
           ...partnerData,
-          owner_id: user?.id
+          owner_id: partnerData.owner_id || user?.id
         });
         partnerId = newPartner.id;
       }
@@ -289,7 +289,7 @@ export default function NetworkPage() {
         // Create and link new contact
         const newContact = await CRMService.createContact({
           ...newContactInPartnerDialog,
-          owner_id: user?.id
+          owner_id: newContactInPartnerDialog.owner_id || user?.id
         });
         if (newContact) {
           await CRMService.linkContactToPartner(
@@ -382,7 +382,7 @@ export default function NetworkPage() {
       } else {
         await CRMService.createAffiliate({
           ...affiliateForm,
-          owner_id: user?.id
+          owner_id: affiliateForm.owner_id || user?.id
         });
       }
       setIsNewAffiliateOpen(false);
@@ -561,7 +561,7 @@ export default function NetworkPage() {
       // Create the contact
       const newContact = await CRMService.createContact({
         ...newContactForm,
-        owner_id: user?.id
+        owner_id: newContactForm.owner_id || user?.id
       });
       if (newContact) {
         // Link it to the partner
@@ -665,7 +665,7 @@ export default function NetworkPage() {
       // Create the affiliate
       const newAffiliate = await CRMService.createAffiliate({
         ...newAffiliateFormForPartner,
-        owner_id: user?.id
+        owner_id: newAffiliateFormForPartner.owner_id || user?.id
       });
       if (newAffiliate) {
         // Link it to the partner
@@ -740,7 +740,7 @@ export default function NetworkPage() {
       // Create the contact
       const newContact = await CRMService.createContact({
         ...newContactForm,
-        owner_id: user?.id
+        owner_id: newContactForm.owner_id || user?.id
       });
       if (newContact) {
         // Link it to the affiliate
