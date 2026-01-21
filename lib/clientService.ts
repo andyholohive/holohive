@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { Database } from './database.types';
+import { generateUniqueSlug } from './slugUtils';
 
 type Client = Database['public']['Tables']['clients']['Row'];
 type ClientAccessMember = Database['public']['Tables']['client_access_members']['Row'];
@@ -53,6 +54,7 @@ export class ClientService {
               archived_at,
               created_at,
               updated_at,
+              logo_url,
               campaigns!campaigns_client_id_fkey(count),
               whitelist_partner:partners!clients_whitelist_partner_id_fkey(name)
             )
@@ -109,9 +111,12 @@ export class ClientService {
     whitelist_partner_id?: string | null
   ): Promise<Client> {
     try {
+      // Generate a unique slug from the client name
+      const slug = generateUniqueSlug(name);
+
       const { data, error } = await supabase
         .from('clients')
-        .insert({ name, email, location, source, onboarding_call_held, onboarding_call_date, is_whitelisted, whitelist_partner_id })
+        .insert({ name, email, location, source, onboarding_call_held, onboarding_call_date, is_whitelisted, whitelist_partner_id, slug })
         .select()
         .single();
       if (error) throw error;
@@ -125,7 +130,7 @@ export class ClientService {
   /**
    * Update client
    */
-  static async updateClient(id: string, updates: Partial<Pick<Client, 'name' | 'email' | 'location' | 'is_active' | 'is_whitelisted' | 'whitelist_partner_id'>>): Promise<Client> {
+  static async updateClient(id: string, updates: Partial<Pick<Client, 'name' | 'email' | 'location' | 'is_active' | 'is_whitelisted' | 'whitelist_partner_id' | 'logo_url'>>): Promise<Client> {
     try {
       const { data, error } = await supabase
         .from('clients')
@@ -196,6 +201,109 @@ export class ClientService {
       return data?.map(access => access.users) || [];
     } catch (error) {
       console.error('Error fetching client members:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get client by ID or slug (for portal access)
+   */
+  static async getClientByIdOrSlug(identifier: string): Promise<Client | null> {
+    try {
+      // Check if identifier is a UUID
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+
+      const query = supabase
+        .from('clients')
+        .select('*')
+        .is('archived_at', null);
+
+      if (isUUID) {
+        query.eq('id', identifier);
+      } else {
+        query.eq('slug', identifier);
+      }
+
+      const { data, error } = await query.single();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        throw error;
+      }
+      return data;
+    } catch (error) {
+      console.error('Error fetching client by ID or slug:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get client with their campaigns for portal display
+   */
+  static async getClientWithCampaigns(clientId: string): Promise<{
+    client: Client;
+    campaigns: any[];
+  } | null> {
+    try {
+      // Get client
+      const { data: client, error: clientError } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', clientId)
+        .is('archived_at', null)
+        .single();
+
+      if (clientError || !client) return null;
+
+      // Get campaigns for this client with KOL and content counts
+      const { data: campaigns, error: campaignsError } = await supabase
+        .from('campaigns')
+        .select(`
+          id,
+          name,
+          slug,
+          status,
+          total_budget,
+          start_date,
+          end_date,
+          region,
+          description,
+          share_report_publicly,
+          created_at,
+          campaign_kols(count),
+          contents(
+            impressions,
+            likes,
+            comments,
+            retweets,
+            bookmarks
+          )
+        `)
+        .eq('client_id', clientId)
+        .is('archived_at', null)
+        .order('start_date', { ascending: false });
+
+      if (campaignsError) throw campaignsError;
+
+      // Process campaigns to add aggregated metrics
+      const processedCampaigns = campaigns?.map(campaign => {
+        const contents = (campaign as any).contents || [];
+        const totalImpressions = contents.reduce((sum: number, c: any) => sum + (c.impressions || 0), 0);
+        const totalEngagement = contents.reduce((sum: number, c: any) =>
+          sum + (c.likes || 0) + (c.comments || 0) + (c.retweets || 0) + (c.bookmarks || 0), 0);
+
+        return {
+          ...campaign,
+          kol_count: (campaign as any).campaign_kols?.[0]?.count || 0,
+          content_count: contents.length,
+          total_impressions: totalImpressions,
+          total_engagement: totalEngagement,
+        };
+      }) || [];
+
+      return { client, campaigns: processedCampaigns };
+    } catch (error) {
+      console.error('Error fetching client with campaigns:', error);
       throw error;
     }
   }

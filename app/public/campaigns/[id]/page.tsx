@@ -345,6 +345,27 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     if (!clientEmail) return;
 
     try {
+      // First check for portal global auth (from client portal)
+      const portalAuth = localStorage.getItem('portal_global_auth');
+      if (portalAuth) {
+        const { email: portalEmail, clientEmail: portalClientEmail, timestamp: portalTimestamp } = JSON.parse(portalAuth);
+        const now = Date.now();
+
+        // Check if portal auth is still valid and email matches
+        if (now - portalTimestamp < CACHE_DURATION) {
+          const portalEmailLower = portalEmail?.toLowerCase();
+          const clientEmailLower = clientEmail.toLowerCase();
+          const portalClientEmailLower = portalClientEmail?.toLowerCase();
+
+          // If portal was authenticated with the same client email, auto-authenticate
+          if (portalEmail && (portalEmailLower === clientEmailLower || portalClientEmailLower === clientEmailLower)) {
+            setEmail(portalEmail);
+            setIsAuthenticated(true);
+            return;
+          }
+        }
+      }
+
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
         const { email: cachedEmail, timestamp } = JSON.parse(cached);

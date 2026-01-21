@@ -17,7 +17,9 @@ import { ClientService, ClientWithAccess } from '@/lib/clientService';
 import { UserService } from '@/lib/userService';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon } from 'lucide-react';
+import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon } from 'lucide-react';
+import Image from 'next/image';
+import { useToast } from '@/hooks/use-toast';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { KOLService } from '@/lib/kolService';
 import { CampaignService } from '@/lib/campaignService';
@@ -32,6 +34,7 @@ export default function ClientsPage() {
   const { user, userProfile } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { toast } = useToast();
   const partnerIdParam = searchParams.get('partnerId');
   const [clients, setClients] = useState<ClientWithAccess[]>([]);
   const [clientsWithStatus, setClientsWithStatus] = useState<ClientWithStatus[]>([]);
@@ -50,6 +53,8 @@ export default function ClientsPage() {
   const [allPartners, setAllPartners] = useState<any[]>([]);
   const [filteredPartnerName, setFilteredPartnerName] = useState<string | null>(null);
   const [linkedAccounts, setLinkedAccounts] = useState<Record<string, CRMOpportunity[]>>({});
+  const [isSharePortalOpen, setIsSharePortalOpen] = useState(false);
+  const [clientToShare, setClientToShare] = useState<ClientWithAccess | null>(null);
   // New client form state
   const [newClient, setNewClient] = useState({
     name: '',
@@ -61,7 +66,11 @@ export default function ClientsPage() {
     onboarding_call_date: undefined as Date | undefined,
     is_whitelisted: false,
     whitelist_partner_id: null as string | null,
+    logo_url: null as string | null,
   });
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   // Start client form state
   const [startClientForm, setStartClientForm] = useState({
     companyName: '',
@@ -133,6 +142,22 @@ export default function ClientsPage() {
     }
     return true;
   };
+
+  const openSharePortal = (client: ClientWithAccess) => {
+    setClientToShare(client);
+    setIsSharePortalOpen(true);
+  };
+
+  const copyPortalLink = () => {
+    if (!clientToShare) return;
+    const portalUrl = `${window.location.origin}/public/portal/${clientToShare.slug || clientToShare.id}`;
+    navigator.clipboard.writeText(portalUrl);
+    toast({
+      title: 'Link Copied',
+      description: 'Portal link has been copied to clipboard',
+    });
+  };
+
   const [isStartClientSubmitting, setIsStartClientSubmitting] = useState(false);
   const [startClientError, setStartClientError] = useState<string | null>(null);
   useEffect(() => {
@@ -239,7 +264,10 @@ export default function ClientsPage() {
       onboarding_call_date: client.onboarding_call_date ? new Date(client.onboarding_call_date) : undefined,
       is_whitelisted: client.is_whitelisted || false,
       whitelist_partner_id: client.whitelist_partner_id,
+      logo_url: (client as any).logo_url || null,
     });
+    setLogoPreview((client as any).logo_url || null);
+    setLogoFile(null);
     setIsEditMode(true);
     setIsNewClientOpen(true);
   };
@@ -247,17 +275,20 @@ export default function ClientsPage() {
     setIsNewClientOpen(false);
     setIsEditMode(false);
     setEditingClient(null);
-          setNewClient({
-        name: '',
-        email: '',
-        location: '',
-        is_active: true,
-        source: 'Inbound',
-        onboarding_call_held: false,
-        onboarding_call_date: undefined,
-        is_whitelisted: false,
-        whitelist_partner_id: null,
-      });
+    setLogoFile(null);
+    setLogoPreview(null);
+    setNewClient({
+      name: '',
+      email: '',
+      location: '',
+      is_active: true,
+      source: 'Inbound',
+      onboarding_call_held: false,
+      onboarding_call_date: undefined,
+      is_whitelisted: false,
+      whitelist_partner_id: null,
+      logo_url: null,
+    });
   };
   const handleDeleteClient = (client: ClientWithAccess) => {
     setClientToDelete(client);
@@ -283,12 +314,85 @@ export default function ClientsPage() {
       setClientToDelete(null);
     }
   };
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: 'Invalid file type',
+          description: 'Please upload an image file (PNG, JPG, etc.)',
+          variant: 'destructive',
+        });
+        return;
+      }
+      // Validate file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        toast({
+          title: 'File too large',
+          description: 'Please upload an image smaller than 2MB',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setLogoFile(file);
+      setLogoPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const uploadLogo = async (clientId: string): Promise<string | null> => {
+    if (!logoFile) return newClient.logo_url;
+
+    try {
+      setUploadingLogo(true);
+      const fileExt = logoFile.name.split('.').pop();
+      const fileName = `${clientId}/logo-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('client-logos')
+        .upload(fileName, logoFile, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('client-logos')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      toast({
+        title: 'Upload failed',
+        description: 'Failed to upload logo. Please try again.',
+        variant: 'destructive',
+      });
+      return null;
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const removeLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    setNewClient({ ...newClient, logo_url: null });
+  };
+
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newClient.name.trim() || !newClient.email.trim()) return;
     try {
       setIsSubmitting(true);
       if (isEditMode && editingClient) {
+        // Upload logo first if there's a new file
+        let logoUrl = newClient.logo_url;
+        if (logoFile) {
+          logoUrl = await uploadLogo(editingClient.id);
+        }
+
         await ClientService.updateClient(editingClient.id, {
           name: newClient.name.trim(),
           email: newClient.email.trim(),
@@ -296,9 +400,10 @@ export default function ClientsPage() {
           is_active: newClient.is_active,
           is_whitelisted: newClient.is_whitelisted,
           whitelist_partner_id: newClient.whitelist_partner_id,
+          logo_url: logoUrl,
         });
       } else {
-        await ClientService.createClient(
+        const client = await ClientService.createClient(
           newClient.name.trim(),
           newClient.email.trim(),
           newClient.location.trim() || undefined,
@@ -308,6 +413,14 @@ export default function ClientsPage() {
           newClient.is_whitelisted,
           newClient.whitelist_partner_id
         );
+
+        // Upload logo after client is created
+        if (logoFile && client) {
+          const logoUrl = await uploadLogo(client.id);
+          if (logoUrl) {
+            await ClientService.updateClient(client.id, { logo_url: logoUrl });
+          }
+        }
       }
       handleCloseClientModal();
       await fetchClients();
@@ -1174,6 +1287,48 @@ export default function ClientsPage() {
                         <Input id="name" value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} placeholder="Enter company name" className="auth-input" required />
                       </div>
                       <div className="grid gap-2">
+                        <Label>Company Logo</Label>
+                        <div className="flex items-center gap-4">
+                          {logoPreview ? (
+                            <div className="relative">
+                              <img
+                                src={logoPreview}
+                                alt="Logo preview"
+                                className="h-16 w-16 object-contain rounded-lg border border-gray-200"
+                              />
+                              <button
+                                type="button"
+                                onClick={removeLogo}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="h-16 w-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
+                              <ImageIcon className="h-6 w-6 text-gray-400" />
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <input
+                              type="file"
+                              id="logo-upload"
+                              accept="image/*"
+                              onChange={handleLogoChange}
+                              className="hidden"
+                            />
+                            <label
+                              htmlFor="logo-upload"
+                              className="inline-flex items-center px-3 py-2 text-sm border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
+                            >
+                              <Upload className="h-4 w-4 mr-2" />
+                              {logoPreview ? 'Change Logo' : 'Upload Logo'}
+                            </label>
+                            <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 2MB</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="grid gap-2">
                         <Label htmlFor="email">Email</Label>
                         <Input id="email" type="email" value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} placeholder="Enter email address" className="auth-input" required />
                       </div>
@@ -1327,9 +1482,17 @@ export default function ClientsPage() {
                     <div className="mb-3">
                       <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
                         <div className="flex items-center gap-2">
-                          <div className="bg-gray-100 p-1.5 rounded-lg">
-                            <Building2 className="h-5 w-5 text-gray-600" />
-                          </div>
+                          {(client as any).logo_url ? (
+                            <img
+                              src={(client as any).logo_url}
+                              alt={client.name}
+                              className="h-8 w-8 object-contain rounded-lg"
+                            />
+                          ) : (
+                            <div className="bg-gray-100 p-1.5 rounded-lg">
+                              <Building2 className="h-5 w-5 text-gray-600" />
+                            </div>
+                          )}
                           <span>{client.name}</span>
                           {linkedAccounts[client.id] && linkedAccounts[client.id].length > 0 && (
                             linkedAccounts[client.id].map((account) => (
@@ -1347,6 +1510,9 @@ export default function ClientsPage() {
                         </div>
                         {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                           <div className="flex items-center space-x-1">
+                            <Button variant="ghost" size="sm" onClick={() => openSharePortal(client)} className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2" title="Share portal">
+                              <Share2 className="h-4 w-4 text-gray-600" />
+                            </Button>
                             <Button variant="ghost" size="sm" onClick={() => handleEditClient(client)} className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2" title="Edit client">
                               <Edit className="h-4 w-4 text-gray-600" />
                             </Button>
@@ -1467,6 +1633,52 @@ export default function ClientsPage() {
                 Archive Client
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Share Portal Dialog */}
+        <Dialog open={isSharePortalOpen} onOpenChange={setIsSharePortalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Share Portal: {clientToShare?.name}</DialogTitle>
+              <DialogDescription>
+                Share this client portal by copying the link below.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="share-portal-link">Portal Link</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="share-portal-link"
+                    value={`${typeof window !== 'undefined' ? window.location.origin : ''}/public/portal/${clientToShare?.slug || clientToShare?.id}`}
+                    readOnly
+                    className="flex-1 auth-input"
+                  />
+                  <Button
+                    variant="outline"
+                    className="h-10"
+                    onClick={copyPortalLink}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-10"
+                    onClick={() => {
+                      if (typeof window !== 'undefined' && clientToShare) {
+                        window.open(`${window.location.origin}/public/portal/${clientToShare.slug || clientToShare.id}`, '_blank');
+                      }
+                    }}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500">
+                Clients can access this portal using their registered email address ({clientToShare?.email}).
+              </p>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

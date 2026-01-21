@@ -227,7 +227,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
 
           for (const file of uploadedFiles[fieldId]) {
             const fileExt = file.name.split('.').pop();
-            const fileName = `${formId}/${fieldId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const fileName = `${form!.id}/${fieldId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
             const { data, error } = await supabasePublic.storage
               .from('form-attachments')
@@ -253,7 +253,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
 
       await FormService.submitResponse(
         {
-          form_id: formId,
+          form_id: form!.id,
           response_data: responseDataWithFiles,
         },
         supabasePublic
