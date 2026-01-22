@@ -2,10 +2,10 @@
 
 import { CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { FileUploadComponent } from './FileUploadComponent';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Image as ImageIcon, Video, File, Download, Eye, EyeOff, Trash2, Copy, FileText, ExternalLink } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
 
@@ -328,12 +328,10 @@ export function ReportTabContent({
             </div>
           </div>
           <div className="space-y-4">
-            <Textarea
-              placeholder="Add a custom message that will be displayed in the public report..."
+            <RichTextEditor
               value={customMessage}
-              onChange={(e) => onCustomMessageChange(e.target.value)}
-              rows={5}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3e8692] focus:border-transparent"
+              onChange={onCustomMessageChange}
+              placeholder="Add a custom message that will be displayed in the public report..."
             />
             <Button
               onClick={onSaveCustomMessage}

@@ -636,7 +636,14 @@ export default function PublicReportPage({ params }: { params: { id: string } })
           {customMessage && (
             <div className="bg-white p-8 rounded-lg border shadow-sm">
               <h3 className="text-xl font-bold text-gray-900 mb-6">Message from Team</h3>
-              <p className="text-gray-700 whitespace-pre-wrap">{customMessage}</p>
+              <div
+                className="prose prose-gray max-w-none text-gray-700
+                  prose-headings:text-gray-900 prose-headings:font-semibold
+                  prose-p:my-2 prose-ul:my-2 prose-ol:my-2
+                  prose-li:my-0 prose-a:text-[#3e8692] prose-a:no-underline hover:prose-a:underline
+                  prose-strong:font-semibold prose-em:italic"
+                dangerouslySetInnerHTML={{ __html: customMessage }}
+              />
             </div>
           )}
 
