@@ -10,7 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Copy, ExternalLink, Archive, AlertTriangle } from "lucide-react";
+import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Copy, ExternalLink, Archive, AlertTriangle, LayoutGrid, List, ChevronLeft, ChevronRight } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/AuthContext";
 import { ClientService, ClientWithAccess } from "@/lib/clientService";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
@@ -31,6 +33,10 @@ export default function CampaignsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"card" | "table">("card");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
   const [isNewCampaignOpen, setIsNewCampaignOpen] = useState(false);
   const [isSubmittingCampaign, setIsSubmittingCampaign] = useState(false);
   const [isShareCampaignOpen, setIsShareCampaignOpen] = useState(false);
@@ -275,8 +281,30 @@ export default function CampaignsPage() {
     const matchesClient = clientIdParam && addParam !== '1' ? campaign.client_id === clientIdParam : true;
     const matchesSearch = campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       campaign.client_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesClient && matchesSearch;
+    const matchesStatus = statusFilter === "all" || campaign.status === statusFilter;
+    return matchesClient && matchesSearch && matchesStatus;
   });
+
+  // Count campaigns by status for tab badges
+  const statusCounts = {
+    all: campaigns.filter(c => clientIdParam && addParam !== '1' ? c.client_id === clientIdParam : true).length,
+    Planning: campaigns.filter(c => c.status === "Planning" && (clientIdParam && addParam !== '1' ? c.client_id === clientIdParam : true)).length,
+    Active: campaigns.filter(c => c.status === "Active" && (clientIdParam && addParam !== '1' ? c.client_id === clientIdParam : true)).length,
+    Paused: campaigns.filter(c => c.status === "Paused" && (clientIdParam && addParam !== '1' ? c.client_id === clientIdParam : true)).length,
+    Completed: campaigns.filter(c => c.status === "Completed" && (clientIdParam && addParam !== '1' ? c.client_id === clientIdParam : true)).length,
+  };
+
+  // Pagination
+  const totalPages = Math.ceil(filteredCampaigns.length / itemsPerPage);
+  const paginatedCampaigns = filteredCampaigns.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, clientIdParam]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString();
@@ -423,6 +451,20 @@ export default function CampaignsPage() {
               className="pl-10 auth-input"
               disabled
             />
+          </div>
+        </div>
+        {/* Status Tabs and View Toggle Skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-16 rounded-md" />
+            <Skeleton className="h-9 w-24 rounded-md" />
+            <Skeleton className="h-9 w-20 rounded-md" />
+            <Skeleton className="h-9 w-20 rounded-md" />
+            <Skeleton className="h-9 w-28 rounded-md" />
+          </div>
+          <div className="flex gap-1">
+            <Skeleton className="h-9 w-9 rounded-md" />
+            <Skeleton className="h-9 w-9 rounded-md" />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -927,35 +969,104 @@ export default function CampaignsPage() {
           />
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredCampaigns.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-600">
-              {searchTerm
-                ? "No campaigns found matching your search."
-                : "No campaigns found."}
-            </p>
-            {(userProfile?.role === "super_admin" || userProfile?.role === "admin") && !searchTerm && (
-              <Button
-                className="mt-4 hover:opacity-90"
-                style={{ backgroundColor: "#3e8692", color: "white" }}
-                onClick={() => setIsNewCampaignOpen(true)}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Your First Campaign
-              </Button>
-            )}
-          </div>
-        ) : (
-          filteredCampaigns.map((campaign) => (
+      {/* Status Tabs and View Toggle */}
+      <div className="flex items-center justify-between gap-4">
+        <Tabs value={statusFilter} onValueChange={setStatusFilter} className="flex-1">
+          <TabsList className="bg-gray-100 p-1 h-auto flex-wrap">
+            <TabsTrigger
+              value="all"
+              className="data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm px-4 py-2"
+            >
+              All
+              <span className="ml-2 text-xs bg-gray-200 data-[state=active]:bg-gray-100 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.all}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="Planning"
+              className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm px-4 py-2"
+            >
+              Planning
+              <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.Planning}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="Active"
+              className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm px-4 py-2"
+            >
+              Active
+              <span className="ml-2 text-xs bg-[#e8f4f5] text-[#3e8692] px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.Active}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="Paused"
+              className="data-[state=active]:bg-white data-[state=active]:text-yellow-700 data-[state=active]:shadow-sm px-4 py-2"
+            >
+              Paused
+              <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.Paused}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="Completed"
+              className="data-[state=active]:bg-white data-[state=active]:text-gray-700 data-[state=active]:shadow-sm px-4 py-2"
+            >
+              Completed
+              <span className="ml-2 text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.Completed}</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        {/* View Toggle */}
+        <div className="flex bg-gray-100 p-1 rounded-lg">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`px-3 py-2 ${viewMode === 'card' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
+            onClick={() => setViewMode('card')}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={`px-3 py-2 ${viewMode === 'table' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
+            onClick={() => setViewMode('table')}
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      {filteredCampaigns.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-600">
+            {searchTerm || statusFilter !== "all"
+              ? "No campaigns found matching your filters."
+              : "No campaigns found."}
+          </p>
+          {(userProfile?.role === "super_admin" || userProfile?.role === "admin") && !searchTerm && statusFilter === "all" && (
+            <Button
+              className="mt-4 hover:opacity-90"
+              style={{ backgroundColor: "#3e8692", color: "white" }}
+              onClick={() => setIsNewCampaignOpen(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Your First Campaign
+            </Button>
+          )}
+        </div>
+      ) : viewMode === "card" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {paginatedCampaigns.map((campaign) => (
             <Card key={campaign.id} className="transition-shadow group h-full flex flex-col">
               <CardHeader className="pb-4">
                 <div className="mb-3">
                   <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
                     <div className="flex items-center">
-                      <div className="bg-gray-100 p-1.5 rounded-lg mr-2">
-                        <Megaphone className="h-5 w-5 text-gray-600" />
-                      </div>
+                      {campaign.client_logo_url ? (
+                        <img
+                          src={campaign.client_logo_url}
+                          alt={campaign.client_name || 'Client'}
+                          className="h-8 w-8 rounded-lg mr-2 object-cover"
+                        />
+                      ) : (
+                        <div className="bg-gray-100 p-1.5 rounded-lg mr-2">
+                          <Megaphone className="h-5 w-5 text-gray-600" />
+                        </div>
+                      )}
                       {campaign.name}
                     </div>
                     <Badge
@@ -1041,9 +1152,134 @@ export default function CampaignsPage() {
                 </div>
               </CardContent>
             </Card>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      ) : (
+        /* Table View */
+        <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50">
+                <TableHead className="font-semibold">Campaign</TableHead>
+                <TableHead className="font-semibold">Client</TableHead>
+                <TableHead className="font-semibold">Status</TableHead>
+                <TableHead className="font-semibold">Budget</TableHead>
+                <TableHead className="font-semibold">Dates</TableHead>
+                <TableHead className="font-semibold">Progress</TableHead>
+                <TableHead className="font-semibold text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedCampaigns.map((campaign) => {
+                const counts = contentCounts[campaign.id];
+                const progress = counts && counts.total > 0 ? Math.round((counts.posted / counts.total) * 100) : 0;
+                return (
+                  <TableRow
+                    key={campaign.id}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => router.push(`/campaigns/${campaign.slug || campaign.id}`)}
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {campaign.client_logo_url ? (
+                          <img
+                            src={campaign.client_logo_url}
+                            alt={campaign.client_name || 'Client'}
+                            className="h-7 w-7 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <div className="bg-gray-100 p-1.5 rounded-lg">
+                            <Megaphone className="h-4 w-4 text-gray-600" />
+                          </div>
+                        )}
+                        <span className="font-medium text-gray-900">{campaign.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-gray-600">{campaign.client_name}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={getStatusVariant(campaign.status)}
+                        className="text-xs"
+                        style={campaign.status === "Active" ? { backgroundColor: "#3e8692", color: "white", borderColor: "#3e8692" } : {}}
+                      >
+                        {campaign.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-gray-600">{CampaignService.formatCurrency(campaign.total_budget)}</TableCell>
+                    <TableCell className="text-gray-600 text-sm">
+                      {formatDate(campaign.start_date)}
+                      {campaign.end_date ? ` - ${formatDate(campaign.end_date)}` : ''}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-gray-200 rounded-full h-2 w-20">
+                          <div
+                            className="h-2 rounded-full"
+                            style={{ width: `${progress}%`, backgroundColor: '#3e8692' }}
+                          />
+                        </div>
+                        <span className="text-xs text-gray-600 w-8">{progress}%</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleShareCampaign(campaign)}
+                        >
+                          <Share2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                          onClick={() => handleArchiveCampaign(campaign)}
+                        >
+                          <Archive className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {filteredCampaigns.length > itemsPerPage && (
+        <div className="flex items-center justify-between pt-4">
+          <p className="text-sm text-gray-600">
+            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredCampaigns.length)} of {filteredCampaigns.length} campaigns
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Previous
+            </Button>
+            <span className="text-sm text-gray-600">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage >= totalPages}
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Share Campaign Dialog */}
       <Dialog open={isShareCampaignOpen} onOpenChange={setIsShareCampaignOpen}>

@@ -15,7 +15,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2, ChevronDown, Star, Copy, ExternalLink, Eye } from 'lucide-react';
+import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2, ChevronDown, Star, Copy, ExternalLink, Eye, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/lib/supabase';
 import { KOLService } from '@/lib/kolService';
 import { useToast } from '@/hooks/use-toast';
@@ -151,6 +152,10 @@ export default function ListsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
   const [isNewListOpen, setIsNewListOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingList, setEditingList] = useState<ListItem | null>(null);
@@ -454,14 +459,66 @@ export default function ListsPage() {
 
 
 
-  const filteredLists = lists.filter(list =>
-    list.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    list.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    list.kols?.some(kol => 
-      kol.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      kol.region?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+  const filteredLists = lists.filter(list => {
+    const matchesSearch = list.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      list.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      list.kols?.some(kol =>
+        kol.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        kol.region?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    const matchesStatus = statusFilter === 'all' || list.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const statusCounts = {
+    all: lists.filter(list =>
+      list.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      list.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      list.kols?.some(kol =>
+        kol.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        kol.region?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    ).length,
+    curated: lists.filter(list =>
+      list.status === 'curated' &&
+      (list.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      list.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      list.kols?.some(kol =>
+        kol.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        kol.region?.toLowerCase().includes(searchTerm.toLowerCase())
+      ))
+    ).length,
+    approved: lists.filter(list =>
+      list.status === 'approved' &&
+      (list.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      list.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      list.kols?.some(kol =>
+        kol.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        kol.region?.toLowerCase().includes(searchTerm.toLowerCase())
+      ))
+    ).length,
+    denied: lists.filter(list =>
+      list.status === 'denied' &&
+      (list.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      list.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      list.kols?.some(kol =>
+        kol.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        kol.region?.toLowerCase().includes(searchTerm.toLowerCase())
+      ))
+    ).length,
+  };
+
+  // Pagination
+  const totalPages = Math.ceil(filteredLists.length / itemsPerPage);
+  const paginatedLists = filteredLists.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   const handleEditList = (list: ListItem) => {
     setEditingList(list);
@@ -1030,6 +1087,14 @@ export default function ListsPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input placeholder="Search lists by name, notes, or KOLs..." className="pl-10 auth-input" disabled />
             </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex space-x-1">
+              {['All', 'Curated', 'Approved', 'Denied'].map((tab) => (
+                <Skeleton key={tab} className="h-9 w-24 rounded-lg" />
+              ))}
+            </div>
+            <Skeleton className="h-9 w-20 rounded-lg" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -2157,31 +2222,75 @@ export default function ListsPage() {
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input 
-              placeholder="Search lists by name, notes, or KOLs..." 
-              className="pl-10 auth-input" 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
+            <Input
+              placeholder="Search lists by name, notes, or KOLs..."
+              className="pl-10 auth-input"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredLists.length === 0 ? (
-            <div className="col-span-full text-center py-8">
-              <p className="text-gray-600">{searchTerm ? 'No lists found matching your search.' : 'No lists found.'}</p>
-              {!searchTerm && (
-                <Button 
-                  className="mt-4 hover:opacity-90" 
-                  style={{ backgroundColor: '#3e8692', color: 'white' }} 
-                  onClick={() => { setIsEditMode(false); setIsNewListOpen(true); }}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Your First List
-                </Button>
-              )}
-            </div>
-          ) : (
-            filteredLists.map((list) => (
+        <div className="flex items-center justify-between">
+          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+            <TabsList>
+              <TabsTrigger value="all">
+                All
+                <Badge variant="secondary" className="ml-2 bg-gray-200 text-gray-700 pointer-events-none">{statusCounts.all}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="curated">
+                Curated
+                <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 pointer-events-none">{statusCounts.curated}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="approved">
+                Approved
+                <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800 pointer-events-none">{statusCounts.approved}</Badge>
+              </TabsTrigger>
+              <TabsTrigger value="denied">
+                Denied
+                <Badge variant="secondary" className="ml-2 bg-red-100 text-red-800 pointer-events-none">{statusCounts.denied}</Badge>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <div className="flex bg-gray-100 p-1 rounded-lg">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`px-3 py-2 ${viewMode === 'card' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
+              onClick={() => setViewMode('card')}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`px-3 py-2 ${viewMode === 'table' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
+              onClick={() => setViewMode('table')}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        {filteredLists.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-gray-600">
+              {searchTerm || statusFilter !== 'all'
+                ? 'No lists found matching your criteria.'
+                : 'No lists found.'}
+            </p>
+            {!searchTerm && statusFilter === 'all' && (
+              <Button
+                className="mt-4 hover:opacity-90"
+                style={{ backgroundColor: '#3e8692', color: 'white' }}
+                onClick={() => { setIsEditMode(false); setIsNewListOpen(true); }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First List
+              </Button>
+            )}
+          </div>
+        ) : viewMode === 'card' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {paginatedLists.map((list) => (
               <Card key={list.id} className="transition-shadow group h-full flex flex-col">
                 <CardHeader className="pb-4">
                   <div className="mb-3">
@@ -2193,20 +2302,20 @@ export default function ListsPage() {
                         {list.name}
                       </div>
                       <div className="flex items-center space-x-1">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => handleEditList(list)} 
-                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditList(list)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2"
                           title="Edit list"
                         >
                           <Edit className="h-4 w-4 text-gray-600" />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => handleDeleteList(list.id)} 
-                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteList(list.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2"
                           title="Delete list"
                         >
                           <Trash2 className="h-4 w-4 text-red-600" />
@@ -2283,9 +2392,133 @@ export default function ListsPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        ) : (
+          /* Table View */
+          <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="font-semibold">List Name</TableHead>
+                  <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="font-semibold">KOLs</TableHead>
+                  <TableHead className="font-semibold">Created</TableHead>
+                  <TableHead className="font-semibold">Notes</TableHead>
+                  <TableHead className="font-semibold text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedLists.map((list) => (
+                  <TableRow
+                    key={list.id}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => handleViewList(list)}
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div className="bg-gray-100 p-1.5 rounded-lg">
+                          <List className="h-4 w-4 text-gray-600" />
+                        </div>
+                        <span className="font-medium text-gray-900">{list.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {list.status && (
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getListStatusColor(list.status)}`}>
+                          {list.status.charAt(0).toUpperCase() + list.status.slice(1)}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {list.kols?.length || 0} KOL{(list.kols?.length || 0) !== 1 ? 's' : ''}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-gray-600 text-sm">
+                      {formatDate(list.created_at)}
+                    </TableCell>
+                    <TableCell className="text-gray-600 text-sm max-w-[200px] truncate">
+                      {list.notes || '-'}
+                    </TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleViewList(list)}
+                          title="View list"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleShareList(list)}
+                          title="Share list"
+                        >
+                          <Share2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleEditList(list)}
+                          title="Edit list"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => handleDeleteList(list.id)}
+                          title="Delete list"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {filteredLists.length > itemsPerPage && (
+          <div className="flex items-center justify-between pt-4">
+            <p className="text-sm text-gray-600">
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredLists.length)} of {filteredLists.length} lists
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <span className="text-sm text-gray-600">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </ProtectedRoute>
   );

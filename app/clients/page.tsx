@@ -18,6 +18,7 @@ import { UserService } from '@/lib/userService';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -41,6 +42,7 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientWithAccess | null>(null);
@@ -244,14 +246,25 @@ export default function ClientsPage() {
     const matchesSearch = client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (client.location && client.location.toLowerCase().includes(searchTerm.toLowerCase()));
-    
+
     let matchesPartner = true;
     if (partnerIdParam) {
       matchesPartner = client.is_whitelisted === true && client.whitelist_partner_id === partnerIdParam;
     }
-    
-    return matchesSearch && matchesPartner;
+
+    const matchesStatus = statusFilter === 'all' ||
+      (statusFilter === 'active' && client.is_active) ||
+      (statusFilter === 'inactive' && !client.is_active);
+
+    return matchesSearch && matchesPartner && matchesStatus;
   });
+
+  // Count clients by status
+  const statusCounts = {
+    all: clientsWithStatus.filter(c => partnerIdParam ? c.is_whitelisted && c.whitelist_partner_id === partnerIdParam : true).length,
+    active: clientsWithStatus.filter(c => c.is_active && (partnerIdParam ? c.is_whitelisted && c.whitelist_partner_id === partnerIdParam : true)).length,
+    inactive: clientsWithStatus.filter(c => !c.is_active && (partnerIdParam ? c.is_whitelisted && c.whitelist_partner_id === partnerIdParam : true)).length,
+  };
   const handleEditClient = (client: ClientWithAccess) => {
     setEditingClient(client);
     setNewClient({
@@ -588,6 +601,12 @@ export default function ClientsPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input placeholder="Search clients by name, email, or location..." className="pl-10 auth-input" disabled />
             </div>
+          </div>
+          {/* Status Tabs Skeleton */}
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-16 rounded-md" />
+            <Skeleton className="h-9 w-20 rounded-md" />
+            <Skeleton className="h-9 w-24 rounded-md" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -1457,16 +1476,42 @@ export default function ClientsPage() {
             <Input placeholder="Search clients by name, email, or location..." className="pl-10 auth-input" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
         </div>
+        {/* Status Tabs */}
+        <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full">
+          <TabsList className="bg-gray-100 p-1 h-auto">
+            <TabsTrigger
+              value="all"
+              className="data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm px-4 py-2"
+            >
+              All
+              <span className="ml-2 text-xs bg-gray-200 data-[state=active]:bg-gray-100 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.all}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="active"
+              className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm px-4 py-2"
+            >
+              Active
+              <span className="ml-2 text-xs bg-[#e8f4f5] text-[#3e8692] px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.active}</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="inactive"
+              className="data-[state=active]:bg-white data-[state=active]:text-gray-700 data-[state=active]:shadow-sm px-4 py-2"
+            >
+              Inactive
+              <span className="ml-2 text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.inactive}</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredClients.length === 0 ? (
             <div className="col-span-full text-center py-8">
               <p className="text-gray-600">
-                {searchTerm || filteredPartnerName 
-                  ? 'No clients found matching your search.' 
+                {searchTerm || filteredPartnerName || statusFilter !== 'all'
+                  ? 'No clients found matching your filters.'
                   : 'No clients found.'
                 }
               </p>
-              {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && !searchTerm && !filteredPartnerName && (
+              {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && !searchTerm && !filteredPartnerName && statusFilter === 'all' && (
                 <Button className="mt-4 hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={() => { setIsEditMode(false); setIsNewClientOpen(true); }}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Your First Client

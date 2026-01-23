@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Bell, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2 } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChangelog } from '@/contexts/ChangelogContext';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -30,6 +30,8 @@ export default function Sidebar({ children }: SidebarProps) {
     return false;
   });
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
+  const [changelogPage, setChangelogPage] = useState(0);
+  const changelogsPerPage = 3;
 
   // Get changelog data from context (fetched once at app level)
   const { changelogs, latestVersion } = useChangelog();
@@ -119,9 +121,6 @@ export default function Sidebar({ children }: SidebarProps) {
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm">
-              <Bell className="h-4 w-4" />
-            </Button>
               <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -399,6 +398,23 @@ export default function Sidebar({ children }: SidebarProps) {
                     </span>
                   </Button>
                 </Link>
+                {/* SOPs tab - Admin only */}
+                {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
+                  <Link href="/sops" legacyBehavior>
+                    <Button
+                      asChild
+                      variant={pathname.startsWith('/sops') ? 'default' : 'ghost'}
+                      className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                      style={pathname.startsWith('/sops') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                      title={isSidebarCollapsed ? 'SOPs' : undefined}
+                    >
+                      <span>
+                        <BookOpen className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                        {!isSidebarCollapsed && 'SOPs'}
+                      </span>
+                    </Button>
+                  </Link>
+                )}
               </div>
 
               {/* Admin Section */}
@@ -484,7 +500,10 @@ export default function Sidebar({ children }: SidebarProps) {
       </div>
 
       {/* Changelog History Dialog */}
-      <Dialog open={isChangelogOpen} onOpenChange={setIsChangelogOpen}>
+      <Dialog open={isChangelogOpen} onOpenChange={(open) => {
+        setIsChangelogOpen(open);
+        if (open) setChangelogPage(0);
+      }}>
         <DialogContent className="sm:max-w-lg max-h-[80vh]">
           <DialogHeader>
             <div className="flex items-center gap-2">
@@ -495,9 +514,11 @@ export default function Sidebar({ children }: SidebarProps) {
               Version history and updates
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh] pr-4">
+          <ScrollArea className="max-h-[50vh] pr-4">
             <div className="space-y-6">
-              {changelogs.map((changelog, idx) => (
+              {changelogs
+                .slice(changelogPage * changelogsPerPage, (changelogPage + 1) * changelogsPerPage)
+                .map((changelog, idx) => (
                 <div key={changelog.id} className={idx > 0 ? 'border-t pt-6' : ''}>
                   <div className="flex items-center gap-2 mb-2">
                     <Badge
@@ -527,6 +548,31 @@ export default function Sidebar({ children }: SidebarProps) {
               )}
             </div>
           </ScrollArea>
+          {changelogs.length > changelogsPerPage && (
+            <div className="flex items-center justify-between pt-4 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setChangelogPage(p => Math.max(0, p - 1))}
+                disabled={changelogPage === 0}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <span className="text-sm text-gray-500">
+                Page {changelogPage + 1} of {Math.ceil(changelogs.length / changelogsPerPage)}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setChangelogPage(p => Math.min(Math.ceil(changelogs.length / changelogsPerPage) - 1, p + 1))}
+                disabled={changelogPage >= Math.ceil(changelogs.length / changelogsPerPage) - 1}
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

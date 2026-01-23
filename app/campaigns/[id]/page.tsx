@@ -3758,10 +3758,12 @@ const CampaignDetailsPage = () => {
                           (() => {
                             const clientName = campaign?.client_name || '-';
                             const clientEmail = campaign?.client_email || '';
+                            const clientLogoUrl = campaign?.client_logo_url;
                             const initials = clientName !== '-' ? clientName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : '?';
                             return (
                               <div className="flex items-center gap-3">
-                                <Avatar className="h-10 w-10 border-2 border-[#3e8692]">
+                                <Avatar className="h-10 w-10">
+                                  {clientLogoUrl && <AvatarImage src={clientLogoUrl} alt={clientName} className="object-cover" />}
                                   <AvatarFallback className="bg-[#3e8692] text-white font-semibold">
                                     {initials}
                                   </AvatarFallback>
@@ -3914,10 +3916,12 @@ const CampaignDetailsPage = () => {
                           (() => {
                             const manager = allUsers.find(u => u.id === campaign.manager);
                             const managerName = manager?.name || manager?.email || '-';
+                            const managerPhotoUrl = manager?.profile_photo_url;
                             const initials = managerName !== '-' ? managerName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) : '?';
                             return (
                               <div className="flex items-center gap-3">
-                                <Avatar className="h-10 w-10 border-2 border-[#3e8692]">
+                                <Avatar className="h-10 w-10">
+                                  {managerPhotoUrl && <AvatarImage src={managerPhotoUrl} alt={managerName} className="object-cover" />}
                                   <AvatarFallback className="bg-[#3e8692] text-white font-semibold">
                                     {initials}
                                   </AvatarFallback>

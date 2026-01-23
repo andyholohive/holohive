@@ -639,9 +639,13 @@ export default function PublicReportPage({ params }: { params: { id: string } })
               <div
                 className="prose prose-gray max-w-none text-gray-700
                   prose-headings:text-gray-900 prose-headings:font-semibold
-                  prose-p:my-2 prose-ul:my-2 prose-ol:my-2
-                  prose-li:my-0 prose-a:text-[#3e8692] prose-a:no-underline hover:prose-a:underline
-                  prose-strong:font-semibold prose-em:italic"
+                  prose-h2:mt-6 prose-h2:mb-3 first:prose-h2:mt-0
+                  prose-h3:mt-5 prose-h3:mb-2
+                  prose-p:my-3 prose-p:leading-relaxed
+                  prose-ul:my-3 prose-ol:my-3
+                  prose-li:my-1 prose-a:text-[#3e8692] prose-a:no-underline hover:prose-a:underline
+                  prose-strong:font-semibold prose-em:italic
+                  [&>h2:first-child]:mt-0"
                 dangerouslySetInnerHTML={{ __html: customMessage }}
               />
             </div>

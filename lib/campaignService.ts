@@ -8,6 +8,7 @@ type CampaignBudgetAllocation = Database['public']['Tables']['campaign_budget_al
 export interface CampaignWithDetails extends Campaign {
   client_name?: string;
   client_email?: string;
+  client_logo_url?: string | null;
   budget_allocations?: CampaignBudgetAllocation[];
   total_allocated?: number;
   share_creator_type?: boolean;
@@ -32,7 +33,7 @@ export class CampaignService {
         .from('campaigns')
         .select(`
           *,
-          clients!campaigns_client_id_fkey(name, email),
+          clients!campaigns_client_id_fkey(name, email, logo_url),
           campaign_budget_allocations(*)
         `)
         .is('archived_at', null)
@@ -44,6 +45,7 @@ export class CampaignService {
         ...campaign,
         client_name: (campaign.clients as any)?.name,
         client_email: (campaign.clients as any)?.email,
+        client_logo_url: (campaign.clients as any)?.logo_url,
         budget_allocations: campaign.campaign_budget_allocations || [],
         total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
       })) || [];
@@ -63,7 +65,7 @@ export class CampaignService {
         .from('campaigns')
         .select(`
           *,
-          clients!campaigns_client_id_fkey(name, email),
+          clients!campaigns_client_id_fkey(name, email, logo_url),
           campaign_budget_allocations(*)
         `)
         .eq('id', campaignId)
@@ -76,6 +78,7 @@ export class CampaignService {
         ...campaign,
         client_name: (campaign.clients as any)?.name,
         client_email: (campaign.clients as any)?.email,
+        client_logo_url: (campaign.clients as any)?.logo_url,
         budget_allocations: campaign.campaign_budget_allocations || [],
         total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
 
@@ -154,7 +157,7 @@ export class CampaignService {
         .from('campaigns')
         .select(`
           *,
-          clients!campaigns_client_id_fkey(name, email),
+          clients!campaigns_client_id_fkey(name, email, logo_url),
           campaign_budget_allocations(*)
         `)
         .eq('slug', slug)
@@ -167,6 +170,7 @@ export class CampaignService {
         ...campaign,
         client_name: (campaign.clients as any)?.name,
         client_email: (campaign.clients as any)?.email,
+        client_logo_url: (campaign.clients as any)?.logo_url,
         budget_allocations: campaign.campaign_budget_allocations || [],
         total_allocated: campaign.campaign_budget_allocations?.reduce((sum: number, allocation: any) => sum + allocation.allocated_budget, 0) || 0,
       };
