@@ -12,6 +12,10 @@ const supabaseAdmin = createClient(
 // Telegram webhook secret for verification (optional but recommended)
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET;
 
+// Content thread in HH Operations for KOL social links
+const CONTENT_THREAD_CHAT_ID = '-1002636253963';
+const CONTENT_THREAD_ID = 4280;
+
 /**
  * Telegram Webhook Endpoint
  * POST /api/telegram/webhook
@@ -127,6 +131,131 @@ async function sendTelegramPhoto(chatId: string, photoUrl: string, caption: stri
   } catch (error) {
     console.error('[Telegram Webhook] Error sending photo:', error);
     return false;
+  }
+}
+
+/**
+ * Send a message to a Telegram chat with thread support
+ */
+async function sendTelegramMessageToThread(chatId: string, threadId: number, text: string, parseMode: 'HTML' | 'Markdown' | '' = '') {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) {
+    console.error('[Telegram Webhook] Bot token not configured');
+    return false;
+  }
+
+  try {
+    const payload: any = {
+      chat_id: chatId,
+      message_thread_id: threadId,
+      text
+    };
+    if (parseMode) {
+      payload.parse_mode = parseMode;
+    }
+
+    const response = await fetch(
+      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[Telegram Webhook] Send message to thread error:', error);
+      return false;
+    }
+
+    console.log('[Telegram Webhook] Sent message to thread:', { chatId, threadId });
+    return true;
+  } catch (error) {
+    console.error('[Telegram Webhook] Error sending message to thread:', error);
+    return false;
+  }
+}
+
+/**
+ * Detect and extract Telegram/Twitter links from text
+ */
+function extractSocialLinks(text: string): { telegram: string[]; twitter: string[] } {
+  const telegramRegex = /(https?:\/\/)?(t\.me|telegram\.me)\/[^\s]+/gi;
+  const twitterRegex = /(https?:\/\/)?(twitter\.com|x\.com)\/[^\s]+/gi;
+
+  const telegramMatches = text.match(telegramRegex) || [];
+  const twitterMatches = text.match(twitterRegex) || [];
+
+  return {
+    telegram: telegramMatches.map(url => url.startsWith('http') ? url : `https://${url}`),
+    twitter: twitterMatches.map(url => url.startsWith('http') ? url : `https://${url}`)
+  };
+}
+
+/**
+ * Forward social links from KOL chats to the Content thread
+ */
+async function forwardKolSocialLinks(
+  chatId: string,
+  chatTitle: string | undefined,
+  fromName: string,
+  messageText: string,
+  messageDate: Date
+) {
+  try {
+    // Check if this chat is linked to a KOL
+    const { data: chat, error } = await supabaseAdmin
+      .from('telegram_chats')
+      .select('master_kol_id, title, master_kols:master_kol_id(name)')
+      .eq('chat_id', chatId)
+      .single();
+
+    if (error || !chat || !chat.master_kol_id) {
+      // Not a KOL-linked chat, skip
+      return;
+    }
+
+    // Extract social links from the message
+    const links = extractSocialLinks(messageText);
+    const hasLinks = links.telegram.length > 0 || links.twitter.length > 0;
+
+    if (!hasLinks) {
+      return;
+    }
+
+    // Format the notification message
+    const kolName = (chat.master_kols as any)?.name || 'Unknown KOL';
+    const chatName = chat.title || chatTitle || 'Unknown Chat';
+    const dateStr = messageDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    let message = `🔗 New KOL Link Detected\n\n`;
+    message += `KOL: ${kolName}\n`;
+    message += `Chat: ${chatName}\n`;
+    message += `From: ${fromName}\n`;
+    message += `Date: ${dateStr}\n\n`;
+
+    if (links.telegram.length > 0) {
+      message += `📱 Telegram:\n`;
+      links.telegram.forEach(link => {
+        message += `${link}\n`;
+      });
+    }
+
+    if (links.twitter.length > 0) {
+      if (links.telegram.length > 0) message += `\n`;
+      message += `𝕏 Twitter/X:\n`;
+      links.twitter.forEach(link => {
+        message += `${link}\n`;
+      });
+    }
+
+    // Send to Content thread
+    await sendTelegramMessageToThread(CONTENT_THREAD_CHAT_ID, CONTENT_THREAD_ID, message);
+    console.log('[Telegram Webhook] Forwarded KOL social links to Content thread:', { kolName, links });
+  } catch (error) {
+    console.error('[Telegram Webhook] Error forwarding KOL social links:', error);
+    // Non-critical, don't throw
   }
 }
 
@@ -254,6 +383,9 @@ async function handleMessage(message: any) {
   // Store the message for chat identification
   const fromName = [fromFirstName, fromLastName].filter(Boolean).join(' ') || 'Unknown';
   await storeMessage(chatId, messageId, fromId, fromName, fromUsername, messageText, messageDate);
+
+  // Check for Telegram/X links in KOL chats and forward to Content thread
+  await forwardKolSocialLinks(chatId, chatTitle, fromName, messageText, messageDate);
 
   // Check if this chat ID matches any opportunity's gc field
   const { data: opportunities, error } = await supabaseAdmin
