@@ -711,22 +711,22 @@ export default function SOPsPage() {
                       </div>
                       <h3 className="font-semibold text-gray-900 truncate">{sop.name}</h3>
                     </div>
-                    <Badge className={`flex-shrink-0 ${getStatusColor(sop.status)}`}>
+                    <Badge className={`flex-shrink-0 pointer-events-none ${getStatusColor(sop.status)}`}>
                       {sop.status.charAt(0).toUpperCase() + sop.status.slice(1)}
                     </Badge>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    <Badge variant="outline" className={getCategoryColor(sop.category)}>
+                    <Badge variant="outline" className={`pointer-events-none ${getCategoryColor(sop.category)}`}>
                       {CATEGORIES.find(c => c.value === sop.category)?.label || sop.category}
                     </Badge>
                     {sop.automation_review_requested && !sop.automation_review_completed && (
-                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 pointer-events-none">
                         <Clock className="h-3 w-3 mr-1" />
                         Review Pending
                       </Badge>
                     )}
                     {sop.automation_review_completed && (
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 pointer-events-none">
                         <CheckCircle className="h-3 w-3 mr-1" />
                         Reviewed
                       </Badge>
@@ -926,7 +926,31 @@ export default function SOPsPage() {
                 </div>
                 <div className="col-span-2">
                   <Label htmlFor="content">SOP Content / Steps</Label>
-                  <div className="mt-1">
+                  <div className="mt-1 sop-editor-wrapper">
+                    <style jsx global>{`
+                      .sop-editor-wrapper {
+                        height: 300px;
+                        min-height: 150px;
+                        max-height: 70vh;
+                        overflow-y: auto;
+                        border: 1px solid #e5e7eb;
+                        border-radius: 0.375rem;
+                        resize: vertical;
+                      }
+                      .sop-editor-wrapper .ql-toolbar {
+                        position: sticky;
+                        top: 0;
+                        z-index: 10;
+                        background: white;
+                        border-top: none;
+                        border-left: none;
+                        border-right: none;
+                      }
+                      .sop-editor-wrapper .ql-container {
+                        border: none;
+                        min-height: 200px;
+                      }
+                    `}</style>
                     <ReactQuill
                       theme="snow"
                       value={formData.content}
@@ -936,6 +960,7 @@ export default function SOPsPage() {
                       className="bg-white"
                     />
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">Drag the bottom-right corner to resize</p>
                 </div>
               </div>
               <DialogFooter>
@@ -965,7 +990,7 @@ export default function SOPsPage() {
                   {viewingSOP?.name}
                 </DialogTitle>
                 {viewingSOP && (
-                  <Badge className={getStatusColor(viewingSOP.status)}>
+                  <Badge className={`pointer-events-none ${getStatusColor(viewingSOP.status)}`}>
                     {viewingSOP.status.charAt(0).toUpperCase() + viewingSOP.status.slice(1)}
                   </Badge>
                 )}
@@ -974,11 +999,11 @@ export default function SOPsPage() {
             {viewingSOP && (
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline" className={getCategoryColor(viewingSOP.category)}>
+                  <Badge variant="outline" className={`pointer-events-none ${getCategoryColor(viewingSOP.category)}`}>
                     {CATEGORIES.find(c => c.value === viewingSOP.category)?.label}
                   </Badge>
                   {viewingSOP.owner && (
-                    <Badge variant="outline">
+                    <Badge variant="outline" className="pointer-events-none">
                       <User className="h-3 w-3 mr-1" />
                       {viewingSOP.owner.name}
                     </Badge>

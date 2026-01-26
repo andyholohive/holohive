@@ -137,6 +137,23 @@ async function handleCommand(chatId: string, command: string, args: string[], me
   // Remove leading slash and bot mention
   const cmd = command.toLowerCase().replace(/^\//, '').replace('@holo_hive_bot', '');
 
+  // Built-in /test command - sends chat ID and thread ID
+  if (cmd === 'test') {
+    const threadId = message.message_thread_id || null;
+    const chatType = message.chat?.type || 'unknown';
+    const chatTitle = message.chat?.title || 'Private Chat';
+
+    const response = `<b>🔧 Chat Info</b>\n\n` +
+      `<b>Chat ID:</b> <code>${chatId}</code>\n` +
+      `<b>Thread ID:</b> <code>${threadId || 'N/A (not a forum topic)'}</code>\n` +
+      `<b>Chat Type:</b> ${chatType}\n` +
+      `<b>Chat Title:</b> ${chatTitle}`;
+
+    await sendTelegramMessage(chatId, response);
+    console.log('[Telegram Webhook] Executed /test command:', { chatId, threadId });
+    return;
+  }
+
   try {
     // Look up command in database
     const { data: commandData, error } = await supabaseAdmin

@@ -285,6 +285,89 @@ export default function TelegramChatsPage() {
     }
   };
 
+  // Detect Telegram and Twitter/X links in message text
+  const detectSocialLinks = (text: string | null): { hasTelegram: boolean; hasTwitter: boolean; links: { type: 'telegram' | 'twitter'; url: string }[] } => {
+    if (!text) return { hasTelegram: false, hasTwitter: false, links: [] };
+
+    const telegramRegex = /(https?:\/\/)?(t\.me|telegram\.me)\/[^\s]+/gi;
+    const twitterRegex = /(https?:\/\/)?(twitter\.com|x\.com)\/[^\s]+/gi;
+
+    const telegramMatches = text.match(telegramRegex) || [];
+    const twitterMatches = text.match(twitterRegex) || [];
+
+    const links: { type: 'telegram' | 'twitter'; url: string }[] = [
+      ...telegramMatches.map(url => ({ type: 'telegram' as const, url: url.startsWith('http') ? url : `https://${url}` })),
+      ...twitterMatches.map(url => ({ type: 'twitter' as const, url: url.startsWith('http') ? url : `https://${url}` }))
+    ];
+
+    return {
+      hasTelegram: telegramMatches.length > 0,
+      hasTwitter: twitterMatches.length > 0,
+      links
+    };
+  };
+
+  // Render message text with clickable links
+  const renderMessageWithLinks = (text: string | null, maxLength?: number): React.ReactNode => {
+    if (!text) return '[No text]';
+
+    const displayText = maxLength && text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+
+    // Combined regex for both Telegram and Twitter links
+    const linkRegex = /(https?:\/\/)?(t\.me|telegram\.me|twitter\.com|x\.com)\/[^\s]+/gi;
+
+    const parts = displayText.split(linkRegex);
+    const matches = displayText.match(linkRegex) || [];
+
+    if (matches.length === 0) return displayText;
+
+    const result: React.ReactNode[] = [];
+    let matchIndex = 0;
+    let lastIndex = 0;
+
+    displayText.replace(linkRegex, (match, _p1, _p2, offset) => {
+      // Add text before the match
+      if (offset > lastIndex) {
+        result.push(displayText.substring(lastIndex, offset));
+      }
+
+      // Add the link
+      const url = match.startsWith('http') ? match : `https://${match}`;
+      const isTelegram = match.includes('t.me') || match.includes('telegram.me');
+
+      result.push(
+        <a
+          key={`link-${matchIndex}`}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`inline-flex items-center gap-0.5 ${isTelegram ? 'text-blue-500' : 'text-gray-800'} hover:underline font-medium`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {isTelegram ? (
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+            </svg>
+          ) : (
+            <span className="font-bold text-xs">𝕏</span>
+          )}
+          {match.length > 30 ? match.substring(0, 30) + '...' : match}
+        </a>
+      );
+
+      lastIndex = offset + match.length;
+      matchIndex++;
+      return match;
+    });
+
+    // Add remaining text after last match
+    if (lastIndex < displayText.length) {
+      result.push(displayText.substring(lastIndex));
+    }
+
+    return result;
+  };
+
   const fetchMessages = async () => {
     try {
       const { data, error } = await supabase
@@ -1001,18 +1084,35 @@ export default function TelegramChatsPage() {
                             <div className="mt-3 pt-3 border-t border-gray-100">
                               <p className="text-xs font-medium text-gray-500 mb-2">Recent Messages:</p>
                               <div className="space-y-1.5">
-                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => (
-                                  <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
-                                    <span className="font-medium text-gray-700">
-                                      {msg.from_user_name || msg.from_username || 'Unknown'}:
-                                    </span>{' '}
-                                    <span className="text-gray-600">
-                                      {msg.text && msg.text.length > 80
-                                        ? msg.text.substring(0, 80) + '...'
-                                        : msg.text || '[No text]'}
-                                    </span>
-                                  </div>
-                                ))}
+                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => {
+                                  const socialLinks = detectSocialLinks(msg.text);
+                                  return (
+                                    <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
+                                      <div className="flex items-start gap-1">
+                                        {(socialLinks.hasTelegram || socialLinks.hasTwitter) && (
+                                          <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
+                                            {socialLinks.hasTelegram && (
+                                              <svg className="h-3 w-3 text-blue-500" viewBox="0 0 24 24" fill="currentColor" title="Contains Telegram link">
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                                              </svg>
+                                            )}
+                                            {socialLinks.hasTwitter && (
+                                              <span className="font-bold text-black" style={{ fontSize: '10px' }} title="Contains X/Twitter link">𝕏</span>
+                                            )}
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <span className="font-medium text-gray-700">
+                                            {msg.from_user_name || msg.from_username || 'Unknown'}:
+                                          </span>{' '}
+                                          <span className="text-gray-600">
+                                            {renderMessageWithLinks(msg.text, 80)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
@@ -1154,18 +1254,35 @@ export default function TelegramChatsPage() {
                             <div className="mt-3 pt-3 border-t border-gray-100">
                               <p className="text-xs font-medium text-gray-500 mb-2">Recent Messages:</p>
                               <div className="space-y-1.5">
-                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => (
-                                  <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
-                                    <span className="font-medium text-gray-700">
-                                      {msg.from_user_name || msg.from_username || 'Unknown'}:
-                                    </span>{' '}
-                                    <span className="text-gray-600">
-                                      {msg.text && msg.text.length > 80
-                                        ? msg.text.substring(0, 80) + '...'
-                                        : msg.text || '[No text]'}
-                                    </span>
-                                  </div>
-                                ))}
+                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => {
+                                  const socialLinks = detectSocialLinks(msg.text);
+                                  return (
+                                    <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
+                                      <div className="flex items-start gap-1">
+                                        {(socialLinks.hasTelegram || socialLinks.hasTwitter) && (
+                                          <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
+                                            {socialLinks.hasTelegram && (
+                                              <svg className="h-3 w-3 text-blue-500" viewBox="0 0 24 24" fill="currentColor" title="Contains Telegram link">
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                                              </svg>
+                                            )}
+                                            {socialLinks.hasTwitter && (
+                                              <span className="font-bold text-black" style={{ fontSize: '10px' }} title="Contains X/Twitter link">𝕏</span>
+                                            )}
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <span className="font-medium text-gray-700">
+                                            {msg.from_user_name || msg.from_username || 'Unknown'}:
+                                          </span>{' '}
+                                          <span className="text-gray-600">
+                                            {renderMessageWithLinks(msg.text, 80)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
@@ -1514,18 +1631,35 @@ export default function TelegramChatsPage() {
                             <div className="mt-3 pt-3 border-t border-gray-100">
                               <p className="text-xs font-medium text-gray-500 mb-2">Recent Messages:</p>
                               <div className="space-y-1.5">
-                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => (
-                                  <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
-                                    <span className="font-medium text-gray-700">
-                                      {msg.from_user_name || msg.from_username || 'Unknown'}:
-                                    </span>{' '}
-                                    <span className="text-gray-600">
-                                      {msg.text && msg.text.length > 80
-                                        ? msg.text.substring(0, 80) + '...'
-                                        : msg.text || '[No text]'}
-                                    </span>
-                                  </div>
-                                ))}
+                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => {
+                                  const socialLinks = detectSocialLinks(msg.text);
+                                  return (
+                                    <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
+                                      <div className="flex items-start gap-1">
+                                        {(socialLinks.hasTelegram || socialLinks.hasTwitter) && (
+                                          <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
+                                            {socialLinks.hasTelegram && (
+                                              <svg className="h-3 w-3 text-blue-500" viewBox="0 0 24 24" fill="currentColor" title="Contains Telegram link">
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                                              </svg>
+                                            )}
+                                            {socialLinks.hasTwitter && (
+                                              <span className="font-bold text-black" style={{ fontSize: '10px' }} title="Contains X/Twitter link">𝕏</span>
+                                            )}
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <span className="font-medium text-gray-700">
+                                            {msg.from_user_name || msg.from_username || 'Unknown'}:
+                                          </span>{' '}
+                                          <span className="text-gray-600">
+                                            {renderMessageWithLinks(msg.text, 80)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
@@ -1683,18 +1817,35 @@ export default function TelegramChatsPage() {
                             <div className="mt-3 pt-3 border-t border-gray-100">
                               <p className="text-xs font-medium text-gray-500 mb-2">Recent Messages:</p>
                               <div className="space-y-1.5">
-                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => (
-                                  <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
-                                    <span className="font-medium text-gray-700">
-                                      {msg.from_user_name || msg.from_username || 'Unknown'}:
-                                    </span>{' '}
-                                    <span className="text-gray-600">
-                                      {msg.text && msg.text.length > 80
-                                        ? msg.text.substring(0, 80) + '...'
-                                        : msg.text || '[No text]'}
-                                    </span>
-                                  </div>
-                                ))}
+                                {displayMessages[chat.chat_id].slice(0, 3).map((msg) => {
+                                  const socialLinks = detectSocialLinks(msg.text);
+                                  return (
+                                    <div key={msg.id} className="text-xs bg-gray-50 rounded px-2 py-1.5">
+                                      <div className="flex items-start gap-1">
+                                        {(socialLinks.hasTelegram || socialLinks.hasTwitter) && (
+                                          <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
+                                            {socialLinks.hasTelegram && (
+                                              <svg className="h-3 w-3 text-blue-500" viewBox="0 0 24 24" fill="currentColor" title="Contains Telegram link">
+                                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                                              </svg>
+                                            )}
+                                            {socialLinks.hasTwitter && (
+                                              <span className="font-bold text-black" style={{ fontSize: '10px' }} title="Contains X/Twitter link">𝕏</span>
+                                            )}
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <span className="font-medium text-gray-700">
+                                            {msg.from_user_name || msg.from_username || 'Unknown'}:
+                                          </span>{' '}
+                                          <span className="text-gray-600">
+                                            {renderMessageWithLinks(msg.text, 80)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
