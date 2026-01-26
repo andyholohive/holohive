@@ -137,20 +137,28 @@ async function handleCommand(chatId: string, command: string, args: string[], me
   // Remove leading slash and bot mention
   const cmd = command.toLowerCase().replace(/^\//, '').replace('@holo_hive_bot', '');
 
-  // Built-in /test command - sends chat ID and thread ID
+  // Built-in /test command - sends chat ID and thread ID to Andy Lee
   if (cmd === 'test') {
+    const ANDY_LEE_TELEGRAM_ID = '6281931733';
     const threadId = message.message_thread_id || null;
     const chatType = message.chat?.type || 'unknown';
     const chatTitle = message.chat?.title || 'Private Chat';
+    const fromUser = message.from?.first_name || message.from?.username || 'Unknown';
 
-    const response = `<b>🔧 Chat Info</b>\n\n` +
+    const response = `<b>🔧 /test Command Triggered</b>\n\n` +
       `<b>Chat ID:</b> <code>${chatId}</code>\n` +
       `<b>Thread ID:</b> <code>${threadId || 'N/A (not a forum topic)'}</code>\n` +
       `<b>Chat Type:</b> ${chatType}\n` +
-      `<b>Chat Title:</b> ${chatTitle}`;
+      `<b>Chat Title:</b> ${chatTitle}\n` +
+      `<b>Triggered by:</b> ${fromUser}`;
 
-    await sendTelegramMessage(chatId, response);
-    console.log('[Telegram Webhook] Executed /test command:', { chatId, threadId });
+    // Send to Andy Lee's DM
+    await sendTelegramMessage(ANDY_LEE_TELEGRAM_ID, response);
+
+    // Send confirmation in the original chat
+    await sendTelegramMessage(chatId, '✅ Chat info sent to Andy Lee.');
+
+    console.log('[Telegram Webhook] Executed /test command:', { chatId, threadId, sentTo: 'Andy Lee' });
     return;
   }
 
