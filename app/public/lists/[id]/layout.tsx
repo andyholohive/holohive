@@ -34,6 +34,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     metadataBase: new URL(baseUrl),
+    robots: {
+      index: false,
+      follow: false,
+      googleBot: {
+        index: false,
+        follow: false,
+      },
+    },
     openGraph: {
       title,
       description,
