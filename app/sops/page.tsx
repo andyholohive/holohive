@@ -737,13 +737,13 @@ export default function SOPsPage() {
                   {sop.trigger && (
                     <div className="mb-2">
                       <p className="text-xs text-gray-500 font-medium">Trigger:</p>
-                      <p className="text-sm text-gray-700 line-clamp-1">{sop.trigger}</p>
+                      <p className="text-sm text-gray-700 line-clamp-1 whitespace-pre-wrap">{sop.trigger}</p>
                     </div>
                   )}
                   {sop.outcome && (
                     <div className="mb-3">
                       <p className="text-xs text-gray-500 font-medium">Outcome:</p>
-                      <p className="text-sm text-gray-700 line-clamp-2">{sop.outcome}</p>
+                      <p className="text-sm text-gray-700 line-clamp-2 whitespace-pre-wrap">{sop.outcome}</p>
                     </div>
                   )}
                   <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
@@ -1013,14 +1013,14 @@ export default function SOPsPage() {
                 {viewingSOP.trigger && (
                   <div>
                     <h4 className="font-semibold text-sm text-gray-700 mb-1">Trigger</h4>
-                    <p className="text-gray-600 bg-gray-50 p-3 rounded-lg">{viewingSOP.trigger}</p>
+                    <p className="text-gray-600 bg-gray-50 p-3 rounded-lg whitespace-pre-wrap">{viewingSOP.trigger}</p>
                   </div>
                 )}
 
                 {viewingSOP.outcome && (
                   <div>
                     <h4 className="font-semibold text-sm text-gray-700 mb-1">Outcome</h4>
-                    <p className="text-gray-600 bg-gray-50 p-3 rounded-lg">{viewingSOP.outcome}</p>
+                    <p className="text-gray-600 bg-gray-50 p-3 rounded-lg whitespace-pre-wrap">{viewingSOP.outcome}</p>
                   </div>
                 )}
 

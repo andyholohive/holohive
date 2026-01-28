@@ -2703,7 +2703,7 @@ const CampaignDetailsPage = () => {
 
   const renderEditableContentCell = (value: any, field: string, content: any) => {
     const isEditing = editingContentCell?.contentId === content.id && editingContentCell?.field === field;
-    const textFields = ["content_link", "activation_date", "impressions", "likes", "retweets", "comments", "bookmarks"];
+    const textFields = ["content_link", "activation_date", "impressions", "likes", "retweets", "comments", "bookmarks", "notes"];
     const numberFields = ["impressions", "likes", "retweets", "comments", "bookmarks"];
     const selectFields = ["platform", "type", "status", "campaign_kols_id"];
 
@@ -7596,13 +7596,14 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none" style={{ minWidth: '150px' }}>Notes</TableHead>
                           <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {[...Array(5)].map((_, i) => (
                           <TableRow key={i}>
-                            {[...Array(12)].map((_, j) => (
+                            {[...Array(13)].map((_, j) => (
                               <TableCell key={j}><Skeleton className="h-4 w-24" /></TableCell>
                             ))}
                           </TableRow>
@@ -8044,13 +8045,14 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
+                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none" style={{ minWidth: '150px' }}>Notes</TableHead>
                           <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody className="bg-white">
                         {filteredContents.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={13} className="text-center py-12">
+                            <TableCell colSpan={14} className="text-center py-12">
                               <div className="flex flex-col items-center justify-center text-gray-500">
                                 <FileText className="h-12 w-12 mb-4 text-gray-300" />
                                 <p className="text-lg font-medium mb-2">No content matches your filters</p>
@@ -8197,6 +8199,16 @@ const CampaignDetailsPage = () => {
                                 }}
                               >
                                 {renderEditableContentCell(content.bookmarks, 'bookmarks', content)}
+                              </TableCell>
+                              <TableCell
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'notes')}
+                                onClick={(e) => {
+                                  if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'notes') {
+                                    handleCellSelect('contents', content.id, 'notes', content.notes);
+                                  }
+                                }}
+                              >
+                                {renderEditableContentCell(content.notes, 'notes', content)}
                               </TableCell>
                               <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
                                 <Button size="sm" variant="outline" onClick={() => { setContentToDelete(content); setShowDeleteDialog(true); }}>
