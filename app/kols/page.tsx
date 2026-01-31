@@ -64,7 +64,8 @@ export default function KOLsPage() {
     creator_type: true,
     content_type: true,
     deliverables: true,
-    pricing: true,
+    pricing: false,
+    latest_cost: true,
     rating: true,
     community: true,
     group_chat: true,
@@ -120,6 +121,9 @@ export default function KOLsPage() {
 
   // Telegram chat links for KOLs
   const [kolTelegramChats, setKolTelegramChats] = useState<Record<string, { chat_id: string; title: string | null }>>({});
+
+  // Latest cost per KOL (master_kol_id -> { amount, campaignSlug })
+  const [latestCostMap, setLatestCostMap] = useState<Map<string, { amount: number; campaignSlug: string }>>(new Map());
 
   const fieldOptions = KOLService.getFieldOptions();
   const { toast } = useToast();
@@ -266,10 +270,36 @@ export default function KOLsPage() {
     }
   };
 
+  const fetchLatestCosts = async () => {
+    try {
+      const { data: rawData, error: rawError } = await supabase
+        .from('payments')
+        .select('amount, payment_date, campaign:campaigns!inner(id, slug), campaign_kol:campaign_kols!inner(master_kol_id)')
+        .order('payment_date', { ascending: false });
+      if (!rawError && rawData) {
+        const map = new Map<string, { amount: number; campaignSlug: string }>();
+        for (const row of rawData) {
+          const masterKolId = (row.campaign_kol as any)?.master_kol_id;
+          const campaign = row.campaign as any;
+          if (masterKolId && !map.has(masterKolId)) {
+            map.set(masterKolId, {
+              amount: row.amount,
+              campaignSlug: campaign?.slug || campaign?.id || '',
+            });
+          }
+        }
+        setLatestCostMap(map);
+      }
+    } catch (err) {
+      console.error('Error fetching latest costs:', err);
+    }
+  };
+
   useEffect(() => {
     fetchKOLs();
     loadDynamicFieldOptions();
     fetchTelegramChats();
+    fetchLatestCosts();
   }, []);
 
   // Debounce search term for performance (300ms delay)
@@ -787,6 +817,7 @@ export default function KOLsPage() {
             {visibleColumns.content_type && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Content Type</TableHead>}
             {visibleColumns.deliverables && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Deliverables</TableHead>}
             {visibleColumns.pricing && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>}
+            {visibleColumns.latest_cost && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>}
             {visibleColumns.rating && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Rating</TableHead>}
             {visibleColumns.community && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Community</TableHead>}
             {visibleColumns.group_chat && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Group Chat</TableHead>}
@@ -810,6 +841,7 @@ export default function KOLsPage() {
               {visibleColumns.content_type && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-20 rounded-md" /></div></TableCell>}
               {visibleColumns.deliverables && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-18 rounded-md" /><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-14 rounded-md" /></div></TableCell>}
               {visibleColumns.pricing && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.latest_cost && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
               {visibleColumns.rating && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><div className="flex items-center space-x-1 w-full">{[1, 2, 3, 4, 5].map(star => (<Skeleton key={star} className="h-3 w-3 rounded" />))}</div></TableCell>}
               {visibleColumns.community && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
               {visibleColumns.group_chat && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
@@ -2209,7 +2241,8 @@ export default function KOLsPage() {
                   creator_type: 'Creator Type',
                   content_type: 'Content Type',
                   deliverables: 'Deliverables',
-                  pricing: 'Pricing',
+                  pricing: 'Pricing Tier',
+                  latest_cost: 'Pricing',
                   rating: 'Rating',
                   community: 'Community',
                   group_chat: 'Group Chat',
@@ -2627,6 +2660,9 @@ export default function KOLsPage() {
                   </div>
                 </TableHead>
               )}
+              {visibleColumns.latest_cost && (
+                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>
+              )}
               {visibleColumns.rating && (
                 <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
                   <div className="flex items-center gap-1 cursor-pointer group">
@@ -2933,6 +2969,25 @@ export default function KOLsPage() {
                   {visibleColumns.pricing && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-visible`}>
                     <div>{renderEditableCell(kol.pricing, 'pricing', kol.id, 'select')}</div>
+                  </TableCell>
+                  )}
+                  {visibleColumns.latest_cost && (
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                    <div className="truncate text-sm">
+                      {latestCostMap.has(kol.id) ? (
+                        <button
+                          className="text-[#3e8692] hover:underline cursor-pointer"
+                          onClick={() => {
+                            const entry = latestCostMap.get(kol.id)!;
+                            if (entry.campaignSlug) {
+                              router.push(`/campaigns/${entry.campaignSlug}`);
+                            }
+                          }}
+                        >
+                          ${latestCostMap.get(kol.id)!.amount.toLocaleString()}
+                        </button>
+                      ) : '-'}
+                    </div>
                   </TableCell>
                   )}
                   {visibleColumns.rating && (

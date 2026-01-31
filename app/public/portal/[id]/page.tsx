@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -20,8 +21,15 @@ import {
   FileText,
   TrendingUp,
   Eye,
-  Megaphone
+  Megaphone,
+  StickyNote,
+  Briefcase,
+  Activity,
+  ChevronDown,
+  ChevronUp,
+  MessageSquare
 } from 'lucide-react';
+import 'react-quill/dist/quill.snow.css';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -33,6 +41,41 @@ type Client = {
   email: string;
   slug: string | null;
   logo_url: string | null;
+};
+
+type MeetingNote = {
+  id: string;
+  title: string;
+  content: string | null;
+  attendees: string | null;
+  action_items: string | null;
+  meeting_date: string;
+  created_at: string;
+};
+
+type ClientContext = {
+  id: string;
+  engagement_type: string | null;
+  scope: string | null;
+  start_date: string | null;
+  milestones: string | null;
+  client_contacts: string | null;
+  holohive_contacts: string | null;
+};
+
+type DecisionLogEntry = {
+  id: string;
+  decision_date: string;
+  summary: string;
+};
+
+type WeeklyUpdate = {
+  id: string;
+  week_of: string;
+  current_focus: string;
+  active_initiatives: string | null;
+  next_checkin: string | null;
+  open_questions: string | null;
 };
 
 type Campaign = {
@@ -101,12 +144,19 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
   // Data states
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [meetingNotes, setMeetingNotes] = useState<MeetingNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [clientContext, setClientContext] = useState<ClientContext | null>(null);
+  const [decisionLog, setDecisionLog] = useState<DecisionLogEntry[]>([]);
+  const [weeklyUpdates, setWeeklyUpdates] = useState<WeeklyUpdate[]>([]);
+  const [showPreviousUpdates, setShowPreviousUpdates] = useState(false);
 
   // UI states
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [viewingNote, setViewingNote] = useState<MeetingNote | null>(null);
 
   // Cache key for this specific client portal
   const cacheKey = `portal_auth_${idOrSlug}`;
@@ -171,6 +221,10 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   useEffect(() => {
     if (isAuthenticated && clientId) {
       fetchCampaigns();
+      fetchMeetingNotes();
+      fetchClientContext();
+      fetchDecisionLog();
+      fetchWeeklyUpdates();
     }
   }, [clientId, isAuthenticated]);
 
@@ -300,6 +354,64 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       setError('Failed to load campaigns');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchMeetingNotes() {
+    if (!clientId) return;
+    try {
+      const { data, error } = await supabasePublic
+        .from('client_meeting_notes')
+        .select('id, title, content, attendees, action_items, meeting_date, created_at')
+        .eq('client_id', clientId)
+        .order('meeting_date', { ascending: false });
+
+      if (error) throw error;
+      setMeetingNotes(data || []);
+    } catch (err) {
+      console.error('Error fetching meeting notes:', err);
+    }
+  }
+
+  async function fetchClientContext() {
+    if (!clientId) return;
+    try {
+      const { data } = await supabasePublic
+        .from('client_context')
+        .select('id, engagement_type, scope, start_date, milestones, client_contacts, holohive_contacts')
+        .eq('client_id', clientId)
+        .single();
+      setClientContext(data || null);
+    } catch (err) {
+      // No context yet
+    }
+  }
+
+  async function fetchDecisionLog() {
+    if (!clientId) return;
+    try {
+      const { data } = await supabasePublic
+        .from('client_decision_log')
+        .select('id, decision_date, summary')
+        .eq('client_id', clientId)
+        .order('decision_date', { ascending: false });
+      setDecisionLog(data || []);
+    } catch (err) {
+      console.error('Error fetching decision log:', err);
+    }
+  }
+
+  async function fetchWeeklyUpdates() {
+    if (!clientId) return;
+    try {
+      const { data } = await supabasePublic
+        .from('client_weekly_updates')
+        .select('id, week_of, current_focus, active_initiatives, next_checkin, open_questions')
+        .eq('client_id', clientId)
+        .order('week_of', { ascending: false });
+      setWeeklyUpdates(data || []);
+    } catch (err) {
+      console.error('Error fetching weekly updates:', err);
     }
   }
 
@@ -453,6 +565,76 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </p>
         </div>
 
+        {/* Client Context Section */}
+        {clientContext && (
+          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10">
+            <CardHeader className="bg-gradient-to-r from-[#3e8692]/5 to-transparent pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                  <Briefcase className="h-5 w-5 text-white" />
+                </div>
+                <CardTitle className="text-xl font-bold text-gray-900">Engagement Overview</CardTitle>
+                {clientContext.engagement_type && (
+                  <span className="px-3 py-1 bg-[#e8f4f5] text-[#3e8692] text-sm font-medium rounded-full">{clientContext.engagement_type}</span>
+                )}
+                {clientContext.start_date && (
+                  <span className="ml-auto text-sm text-gray-400 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" />
+                    Since {new Date(clientContext.start_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
+                  </span>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 pt-2">
+              {/* Scope — full width */}
+              {clientContext.scope && (
+                <div className="mb-5">
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{clientContext.scope}</p>
+                </div>
+              )}
+
+              {/* Milestones as a timeline */}
+              {clientContext.milestones && (
+                <div className="mb-5 bg-gray-50 rounded-lg p-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Milestones</p>
+                  <div className="space-y-2">
+                    {clientContext.milestones.split('\n').filter(Boolean).map((milestone, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <div className="mt-1.5 h-2 w-2 rounded-full bg-[#3e8692] flex-shrink-0" />
+                        <p className="text-sm text-gray-700">{milestone}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Contacts side by side */}
+              {(clientContext.client_contacts || clientContext.holohive_contacts) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {clientContext.client_contacts && (
+                    <div className="flex items-start gap-3 bg-gray-50 rounded-lg p-3">
+                      <Users className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-0.5">Client Contacts</p>
+                        <p className="text-sm text-gray-700">{clientContext.client_contacts}</p>
+                      </div>
+                    </div>
+                  )}
+                  {clientContext.holohive_contacts && (
+                    <div className="flex items-start gap-3 bg-gray-50 rounded-lg p-3">
+                      <Users className="h-4 w-4 text-[#3e8692] mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-0.5">Holo Hive Contacts</p>
+                        <p className="text-sm text-gray-700">{clientContext.holohive_contacts}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-10">
           <Card className="group relative hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-0 shadow-md overflow-hidden">
@@ -515,6 +697,83 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             </CardContent>
           </Card>
         </div>
+
+        {/* Weekly Status Section */}
+        {weeklyUpdates.length > 0 && (
+          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10 border-l-4 border-l-[#3e8692]">
+            <CardHeader className="bg-white border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
+                  <Activity className="h-5 w-5 text-white" />
+                </div>
+                <CardTitle className="text-xl font-bold text-gray-900">What's Active Now</CardTitle>
+                <span className="text-sm text-gray-500">Week of {new Date(weeklyUpdates[0].week_of + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <div>
+                  <p className="font-semibold text-gray-900 text-lg">{weeklyUpdates[0].current_focus}</p>
+                </div>
+                {weeklyUpdates[0].active_initiatives && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 mb-2">Active Initiatives</p>
+                    <ul className="space-y-1">
+                      {weeklyUpdates[0].active_initiatives.split('\n').filter(Boolean).map((item, i) => (
+                        <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                          <span className="text-[#3e8692] mt-0.5">•</span>
+                          <span>{item.replace(/^[-•]\s*/, '')}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-6">
+                  {weeklyUpdates[0].next_checkin && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Next Check-in</p>
+                      <p className="text-sm text-gray-700 font-medium">{new Date(weeklyUpdates[0].next_checkin + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                    </div>
+                  )}
+                </div>
+                {weeklyUpdates[0].open_questions && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                    <p className="text-sm font-medium text-orange-800 mb-1">Open Questions / Blockers</p>
+                    <p className="text-sm text-orange-700 whitespace-pre-wrap">{weeklyUpdates[0].open_questions}</p>
+                  </div>
+                )}
+                {weeklyUpdates.length > 1 && (
+                  <div>
+                    <button
+                      onClick={() => setShowPreviousUpdates(!showPreviousUpdates)}
+                      className="flex items-center gap-1 text-sm text-[#3e8692] hover:text-[#2d6570] font-medium"
+                    >
+                      {showPreviousUpdates ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      {showPreviousUpdates ? 'Hide' : 'Show'} Previous Updates ({weeklyUpdates.length - 1})
+                    </button>
+                    {showPreviousUpdates && (
+                      <div className="mt-3 space-y-3">
+                        {weeklyUpdates.slice(1).map((update) => (
+                          <div key={update.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <p className="text-xs text-gray-400 mb-1">Week of {new Date(update.week_of + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                            <p className="text-sm font-medium text-gray-700">{update.current_focus}</p>
+                            {update.active_initiatives && (
+                              <div className="mt-1">
+                                {update.active_initiatives.split('\n').filter(Boolean).map((item, i) => (
+                                  <p key={i} className="text-xs text-gray-600">• {item.replace(/^[-•]\s*/, '')}</p>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Campaigns Section */}
         <Card className="border-0 shadow-lg rounded-xl overflow-hidden">
@@ -586,7 +845,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                               <h3 className="font-bold text-lg text-gray-900 truncate group-hover:text-[#3e8692] transition-colors">
                                 {campaign.name}
                               </h3>
-                              <Badge className={`${getStatusBadge(campaign.status)} font-medium px-2.5 py-0.5`}>
+                              <Badge className={`${getStatusBadge(campaign.status)} font-medium px-2.5 py-0.5 cursor-default pointer-events-none`}>
                                 {campaign.status}
                               </Badge>
                             </div>
@@ -674,6 +933,125 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             )}
           </CardContent>
         </Card>
+
+        {/* Meeting Notes Section */}
+        {meetingNotes.length > 0 && (
+          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mt-8">
+            <CardHeader className="bg-white border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                  <StickyNote className="h-5 w-5 text-white" />
+                </div>
+                <CardTitle className="text-xl font-bold text-gray-900">Meeting Notes</CardTitle>
+                <span className="text-sm text-gray-500">({meetingNotes.length})</span>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                {meetingNotes.map((note, index) => (
+                  <div
+                    key={note.id}
+                    className="group bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 overflow-hidden border-l-4 border-l-[#3e8692] cursor-pointer"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                    onClick={() => setViewingNote(note)}
+                  >
+                    <div className="p-5">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-bold text-lg text-gray-900 truncate group-hover:text-[#3e8692] transition-colors">
+                            {note.title}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
+                            <div className="p-1 bg-gray-100 rounded">
+                              <Calendar className="h-3.5 w-3.5 text-gray-500" />
+                            </div>
+                            <span>{new Date(note.meeting_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-lg border-gray-200 hover:border-[#3e8692] hover:text-[#3e8692] transition-colors flex-shrink-0 ml-4"
+                          onClick={(e) => { e.stopPropagation(); setViewingNote(note); }}
+                        >
+                          <ExternalLink className="h-4 w-4 mr-1.5" />
+                          View Note
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Meeting Note Detail Dialog */}
+        <Dialog open={!!viewingNote} onOpenChange={(open) => { if (!open) setViewingNote(null); }}>
+          <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden border-l-4 border-l-[#3e8692] rounded-xl">
+            <DialogHeader className="pb-4 border-b border-gray-100">
+              <DialogTitle className="text-xl font-bold text-gray-900">{viewingNote?.title}</DialogTitle>
+              <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                <div className="p-1 bg-gray-100 rounded">
+                  <Calendar className="h-3.5 w-3.5 text-gray-500" />
+                </div>
+                <span>
+                  {viewingNote && new Date(viewingNote.meeting_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                </span>
+              </div>
+            </DialogHeader>
+            <div className="overflow-y-auto max-h-[60vh] pr-2 pt-2 space-y-4">
+              {viewingNote?.attendees && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Users className="h-4 w-4 text-gray-400" />
+                  <span><span className="font-medium">Attendees:</span> {viewingNote.attendees}</span>
+                </div>
+              )}
+              {viewingNote?.content ? (
+                <div className="ql-snow">
+                  <div className="ql-editor !px-0 !text-gray-600" dangerouslySetInnerHTML={{ __html: viewingNote.content }} />
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No content for this note.</p>
+              )}
+              {viewingNote?.action_items && (
+                <div className="border-t border-gray-100 pt-3">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Action Items</p>
+                  <div className="ql-snow">
+                    <div className="ql-editor !px-0 !text-gray-600 !text-sm" dangerouslySetInnerHTML={{ __html: viewingNote.action_items }} />
+                  </div>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Decision Log Section */}
+        {decisionLog.length > 0 && (
+          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mt-8">
+            <CardHeader className="bg-white border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
+                  <MessageSquare className="h-5 w-5 text-white" />
+                </div>
+                <CardTitle className="text-xl font-bold text-gray-900">Decision Log</CardTitle>
+                <span className="text-sm text-gray-500">({decisionLog.length})</span>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="space-y-3">
+                {decisionLog.map((dec) => (
+                  <div key={dec.id} className="flex items-start gap-4 border-l-4 border-l-purple-300 pl-4 py-2">
+                    <div className="text-xs text-gray-400 whitespace-nowrap mt-0.5">
+                      {new Date(dec.decision_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </div>
+                    <p className="text-sm text-gray-700">{dec.summary}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Footer */}
         <div className="mt-12 pt-8 border-t border-gray-200">
