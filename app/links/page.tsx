@@ -224,11 +224,11 @@ export default function LinksPage() {
         if (error) throw error;
         toast({ title: 'Link created' });
 
-        // Send Telegram notification (same format as form submission)
+        // Send Telegram notification to terminal chat (same as form submission)
         try {
           const baseUrl = window.location.origin;
           const linkUrl = `${baseUrl}/links`;
-          const message = `<b>New Link Added</b>\n\n` +
+          const message = `<b>New Link Submitted</b>\n\n` +
             `<b>Name:</b> ${formData.name.trim()}\n` +
             `<b>Client:</b> ${formData.client.trim() || 'N/A'}\n` +
             `<b>Type:</b> ${formData.link_types.map((t: string) => t.charAt(0).toUpperCase() + t.slice(1)).join(', ') || 'N/A'}\n\n` +
@@ -237,7 +237,7 @@ export default function LinksPage() {
           await fetch('/api/telegram/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message })
+            body: JSON.stringify({ message, useTerminalChat: true })
           });
         } catch (telegramError) {
           // Don't fail the link creation if notification fails

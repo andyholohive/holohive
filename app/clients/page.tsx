@@ -95,7 +95,7 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('active');
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingClient, setEditingClient] = useState<ClientWithAccess | null>(null);
@@ -467,14 +467,45 @@ export default function ClientsPage() {
     }
   };
 
+  // Helper to get linked CRM account for a client
+  const getLinkedCRMAccount = (clientId: string) => {
+    const accounts = linkedAccounts[clientId];
+    // Get the first account-stage opportunity (account_active, account_at_risk, account_churned)
+    return accounts?.find(a => a.stage.startsWith('account_')) || accounts?.[0] || null;
+  };
+
+  // Scope options mapping (consistent with pipeline page)
+  const scopeLabels: Record<string, string> = {
+    'fundraising': 'Fundraising',
+    'advisory': 'Advisory',
+    'kol_activation': 'KOL Activation',
+    'gtm': 'GTM',
+    'bd_partnerships': 'BD/Partnerships',
+    'apac': 'APAC',
+  };
+
+  // Format CRM scope for display (uses same labels as pipeline page)
+  const formatCRMScope = (scope: string | null) => {
+    if (!scope) return '';
+    return scope.split(',').map(s => scopeLabels[s.trim()] || s.trim()).join(', ');
+  };
+
   // Context CRUD
   const openContextModal = (client: ClientWithAccess) => {
     const ctx = clientContexts[client.id];
+    const crmAccount = getLinkedCRMAccount(client.id);
+
+    // If CRM account exists, use its scope and closed_at/qualified_at for start_date
+    const crmScope = crmAccount?.scope ? formatCRMScope(crmAccount.scope) : '';
+    const crmStartDate = crmAccount?.closed_at || crmAccount?.qualified_at || crmAccount?.created_at;
+
     setContextModalClient(client);
     setContextForm({
       engagement_type: ctx?.engagement_type || '',
-      scope: ctx?.scope || '',
-      start_date: ctx?.start_date ? new Date(ctx.start_date + 'T00:00:00') : undefined,
+      scope: crmAccount ? crmScope : (ctx?.scope || ''),
+      start_date: crmAccount && crmStartDate
+        ? new Date(crmStartDate)
+        : (ctx?.start_date ? new Date(ctx.start_date + 'T00:00:00') : undefined),
       milestones: ctx?.milestones || '',
       client_contacts: ctx?.client_contacts || '',
       holohive_contacts: ctx?.holohive_contacts || '',
@@ -1736,49 +1767,6 @@ export default function ClientsPage() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="onboarding_call_held"
-                          checked={newClient.onboarding_call_held}
-                          onCheckedChange={(checked) => setNewClient({ ...newClient, onboarding_call_held: checked as boolean, onboarding_call_date: checked ? newClient.onboarding_call_date : undefined })}
-                        />
-                        <Label htmlFor="onboarding_call_held" className="text-sm">Onboarding Call Held?</Label>
-                      </div>
-                      {newClient.onboarding_call_held && (
-                        <div className="grid gap-2">
-                          <Label htmlFor="onboarding_call_date">Onboarding Call Date</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
-                                style={{
-                                  borderColor: '#e5e7eb',
-                                  backgroundColor: 'white',
-                                  color: newClient.onboarding_call_date ? '#111827' : '#9ca3af'
-                                }}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {newClient.onboarding_call_date ? newClient.onboarding_call_date.toLocaleDateString() : 'Select onboarding call date'}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={newClient.onboarding_call_date}
-                                onSelect={(date) => setNewClient({ ...newClient, onboarding_call_date: date || undefined })}
-                                initialFocus
-                                classNames={{
-                                  day_selected: 'text-white hover:text-white focus:text-white',
-                                }}
-                                modifiersStyles={{
-                                  selected: { backgroundColor: '#3e8692' }
-                                }}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      )}
                       <div className="grid gap-2">
                         <Label htmlFor="client-status">Status</Label>
                         <Select value={newClient.is_active ? 'active' : 'inactive'} onValueChange={(value) => setNewClient({ ...newClient, is_active: value === 'active' })}>
@@ -2371,22 +2359,43 @@ export default function ClientsPage() {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>Scope</Label>
-                <Textarea value={contextForm.scope} onChange={(e) => setContextForm({ ...contextForm, scope: e.target.value })} placeholder="Project description, regions, etc." className="auth-input" rows={3} />
+                <div className="flex items-center justify-between">
+                  <Label>Scope</Label>
+                  {contextModalClient && getLinkedCRMAccount(contextModalClient.id) && (
+                    <span className="text-xs text-[#3e8692] font-medium">From Pipeline</span>
+                  )}
+                </div>
+                {contextModalClient && getLinkedCRMAccount(contextModalClient.id) ? (
+                  <div className="flex h-auto min-h-[80px] w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">{contextForm.scope || '—'}</div>
+                ) : (
+                  <Textarea value={contextForm.scope} onChange={(e) => setContextForm({ ...contextForm, scope: e.target.value })} placeholder="Project description, regions, etc." className="auth-input" rows={3} />
+                )}
               </div>
               <div className="grid gap-2">
-                <Label>Start Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="auth-input justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: contextForm.start_date ? '#111827' : '#9ca3af' }}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {contextForm.start_date ? contextForm.start_date.toLocaleDateString() : 'Select start date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar mode="single" selected={contextForm.start_date} onSelect={(date) => setContextForm({ ...contextForm, start_date: date || undefined })} initialFocus classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }} modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }} />
-                  </PopoverContent>
-                </Popover>
+                <div className="flex items-center justify-between">
+                  <Label>Start Date</Label>
+                  {contextModalClient && getLinkedCRMAccount(contextModalClient.id) && (
+                    <span className="text-xs text-[#3e8692] font-medium">From Pipeline</span>
+                  )}
+                </div>
+                {contextModalClient && getLinkedCRMAccount(contextModalClient.id) ? (
+                  <div className="flex h-10 w-full items-center rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                    <CalendarIcon className="mr-2 h-4 w-4 text-gray-400" />
+                    {contextForm.start_date ? contextForm.start_date.toLocaleDateString() : '—'}
+                  </div>
+                ) : (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" className="auth-input justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: contextForm.start_date ? '#111827' : '#9ca3af' }}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {contextForm.start_date ? contextForm.start_date.toLocaleDateString() : 'Select start date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar mode="single" selected={contextForm.start_date} onSelect={(date) => setContextForm({ ...contextForm, start_date: date || undefined })} initialFocus classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }} modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }} />
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label>Milestones</Label>

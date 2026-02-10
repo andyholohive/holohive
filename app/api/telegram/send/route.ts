@@ -18,7 +18,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, chatId, threadId } = body;
+    const { message, chatId, threadId, useTerminalChat } = body;
 
     if (!message) {
       return NextResponse.json(
@@ -36,8 +36,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use provided chatId or default to operations chat
-    const targetChatId = chatId || OPERATIONS_CHAT_ID;
+    // Use terminal chat if requested, otherwise use provided chatId or default to operations chat
+    const terminalChatId = process.env.TELEGRAM_TERMINAL_CHAT_ID;
+    const targetChatId = useTerminalChat && terminalChatId ? terminalChatId : (chatId || OPERATIONS_CHAT_ID);
 
     const messagePayload: any = {
       chat_id: targetChatId,
@@ -45,9 +46,12 @@ export async function POST(request: NextRequest) {
       parse_mode: 'HTML'
     };
 
-    // Add thread_id for topic-based messaging if provided
-    if (threadId) {
-      messagePayload.message_thread_id = parseInt(threadId);
+    // Add thread_id for topic-based messaging
+    // Use terminal thread ID if using terminal chat, otherwise use provided threadId
+    const terminalThreadId = process.env.TELEGRAM_TERMINAL_THREAD_ID;
+    const targetThreadId = useTerminalChat && terminalThreadId ? terminalThreadId : threadId;
+    if (targetThreadId) {
+      messagePayload.message_thread_id = parseInt(targetThreadId);
     }
 
     const response = await fetch(

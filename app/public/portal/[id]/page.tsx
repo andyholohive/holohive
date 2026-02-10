@@ -149,6 +149,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   const [error, setError] = useState<string | null>(null);
 
   const [clientContext, setClientContext] = useState<ClientContext | null>(null);
+  const [linkedCRMAccount, setLinkedCRMAccount] = useState<{ scope: string | null; closed_at: string | null; qualified_at: string | null; created_at: string } | null>(null);
   const [decisionLog, setDecisionLog] = useState<DecisionLogEntry[]>([]);
   const [weeklyUpdates, setWeeklyUpdates] = useState<WeeklyUpdate[]>([]);
   const [showPreviousUpdates, setShowPreviousUpdates] = useState(false);
@@ -385,6 +386,20 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     } catch (err) {
       // No context yet
     }
+
+    // Also fetch linked CRM account for scope and start_date
+    try {
+      const { data: crmData } = await supabasePublic
+        .from('crm_opportunities')
+        .select('scope, closed_at, qualified_at, created_at')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      setLinkedCRMAccount(crmData || null);
+    } catch (err) {
+      // No CRM account linked
+    }
   }
 
   async function fetchDecisionLog() {
@@ -566,7 +581,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         </div>
 
         {/* Client Context Section */}
-        {clientContext && (
+        {(clientContext || linkedCRMAccount) && (
           <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10">
             <CardHeader className="bg-gradient-to-r from-[#3e8692]/5 to-transparent pb-4">
               <div className="flex items-center gap-3">
@@ -574,27 +589,44 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   <Briefcase className="h-5 w-5 text-white" />
                 </div>
                 <CardTitle className="text-xl font-bold text-gray-900">Engagement Overview</CardTitle>
-                {clientContext.engagement_type && (
+                {clientContext?.engagement_type && (
                   <span className="px-3 py-1 bg-[#e8f4f5] text-[#3e8692] text-sm font-medium rounded-full">{clientContext.engagement_type}</span>
                 )}
-                {clientContext.start_date && (
-                  <span className="ml-auto text-sm text-gray-400 flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5" />
-                    Since {new Date(clientContext.start_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
-                  </span>
-                )}
+                {(() => {
+                  const startDate = linkedCRMAccount?.closed_at || linkedCRMAccount?.qualified_at || linkedCRMAccount?.created_at || clientContext?.start_date;
+                  return startDate ? (
+                    <span className="ml-auto text-sm text-gray-400 flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5" />
+                      Since {new Date(startDate.includes('T') ? startDate : startDate + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}
+                    </span>
+                  ) : null;
+                })()}
               </div>
             </CardHeader>
             <CardContent className="p-6 pt-2">
-              {/* Scope — full width */}
-              {clientContext.scope && (
-                <div className="mb-5">
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{clientContext.scope}</p>
-                </div>
-              )}
+              {/* Scope — full width (use CRM scope if available, formatted nicely) */}
+              {(() => {
+                const crmScope = linkedCRMAccount?.scope;
+                // Scope labels (consistent with pipeline page)
+                const scopeLabels: Record<string, string> = {
+                  'fundraising': 'Fundraising',
+                  'advisory': 'Advisory',
+                  'kol_activation': 'KOL Activation',
+                  'gtm': 'GTM',
+                  'bd_partnerships': 'BD/Partnerships',
+                  'apac': 'APAC',
+                };
+                const formattedCRMScope = crmScope ? crmScope.split(',').map(s => scopeLabels[s.trim()] || s.trim()).join(', ') : null;
+                const displayScope = formattedCRMScope || clientContext?.scope;
+                return displayScope ? (
+                  <div className="mb-5">
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{displayScope}</p>
+                  </div>
+                ) : null;
+              })()}
 
               {/* Milestones as a timeline */}
-              {clientContext.milestones && (
+              {clientContext?.milestones && (
                 <div className="mb-5 bg-gray-50 rounded-lg p-4">
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Milestones</p>
                   <div className="space-y-2">
@@ -609,23 +641,23 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
               )}
 
               {/* Contacts side by side */}
-              {(clientContext.client_contacts || clientContext.holohive_contacts) && (
+              {(clientContext?.client_contacts || clientContext?.holohive_contacts) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {clientContext.client_contacts && (
+                  {clientContext?.client_contacts && (
                     <div className="flex items-start gap-3 bg-gray-50 rounded-lg p-3">
                       <Users className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-0.5">Client Contacts</p>
-                        <p className="text-sm text-gray-700">{clientContext.client_contacts}</p>
+                        <p className="text-sm text-gray-700">{clientContext?.client_contacts}</p>
                       </div>
                     </div>
                   )}
-                  {clientContext.holohive_contacts && (
+                  {clientContext?.holohive_contacts && (
                     <div className="flex items-start gap-3 bg-gray-50 rounded-lg p-3">
                       <Users className="h-4 w-4 text-[#3e8692] mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-0.5">Holo Hive Contacts</p>
-                        <p className="text-sm text-gray-700">{clientContext.holohive_contacts}</p>
+                        <p className="text-sm text-gray-700">{clientContext?.holohive_contacts}</p>
                       </div>
                     </div>
                   )}

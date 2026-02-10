@@ -152,7 +152,7 @@ export default function ListsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('curated');
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;

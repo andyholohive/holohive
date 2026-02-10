@@ -215,6 +215,20 @@ const CampaignDetailsPage = () => {
   } | null>(null);
   const [sendingPaymentNotification, setSendingPaymentNotification] = useState(false);
 
+  // Latest pricing suggestion state
+  const [latestCostMap, setLatestCostMap] = useState<Map<string, number>>(new Map());
+  const [pricingSuggestionDialog, setPricingSuggestionDialog] = useState<{
+    open: boolean;
+    kolId: string;
+    kolName: string;
+    masterKolId: string;
+    latestCost: number;
+    paymentIndex: number;
+    // For content-created payments, we track payment IDs instead of index
+    paymentIds?: string[];
+    mode: 'payment-dialog' | 'content-created';
+  } | null>(null);
+
   // Helper function to filter payments
   const getFilteredPayments = () => {
     return payments.filter(payment => {
@@ -433,6 +447,7 @@ const CampaignDetailsPage = () => {
       fetchCampaignUpdates();
       fetchPayments();
       fetchKolTelegramChats();
+      fetchLatestCosts();
     }
   }, [campaign]);
 
@@ -798,6 +813,29 @@ const CampaignDetailsPage = () => {
       setAvailableKOLs(kols);
     } catch (error) {
       console.error('Error fetching available KOLs:', error);
+    }
+  };
+
+  // Fetch latest costs for all KOLs (most recent payment amount per master_kol_id)
+  const fetchLatestCosts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('amount, payment_date, campaign_kol:campaign_kols!inner(master_kol_id)')
+        .order('payment_date', { ascending: false });
+
+      if (!error && data) {
+        const map = new Map<string, number>();
+        for (const row of data) {
+          const masterKolId = (row.campaign_kol as any)?.master_kol_id;
+          if (masterKolId && !map.has(masterKolId)) {
+            map.set(masterKolId, row.amount);
+          }
+        }
+        setLatestCostMap(map);
+      }
+    } catch (err) {
+      console.error('Error fetching latest costs:', err);
     }
   };
 
@@ -1624,7 +1662,7 @@ const CampaignDetailsPage = () => {
     // Send the notification
     setSendingPaymentNotification(true);
     try {
-      const message = `$${amount.toLocaleString()} has been deposited to ${wallet}!\nThanks for being part of the Holo Hive network 🙌`;
+      const message = `$${amount.toLocaleString()} has been deposited to ${wallet}!\n\nThanks for being part of the Holo Hive network 🙌`;
 
       const response = await fetch('/api/telegram/send', {
         method: 'POST',
@@ -5897,9 +5935,10 @@ const CampaignDetailsPage = () => {
                                                       notes: null
                                                     }));
 
-                                                    const { error: paymentError } = await supabase
+                                                    const { error: paymentError, data: paymentData } = await supabase
                                                       .from('payments')
-                                                      .insert(paymentPayloads);
+                                                      .insert(paymentPayloads)
+                                                      .select();
 
                                                     if (paymentError) {
                                                       console.error('Error creating payments:', paymentError);
@@ -5910,6 +5949,23 @@ const CampaignDetailsPage = () => {
                                                       });
                                                     } else {
                                                       fetchPayments();
+
+                                                      // Check if KOL has latest pricing and show suggestion dialog
+                                                      const masterKolId = campaignKOL.master_kol?.id;
+                                                      const latestCost = masterKolId ? latestCostMap.get(masterKolId) : undefined;
+                                                      if (latestCost && latestCost > 0 && paymentData && paymentData.length > 0) {
+                                                        const paymentIds = paymentData.map((p: any) => p.id);
+                                                        setPricingSuggestionDialog({
+                                                          open: true,
+                                                          kolId: campaignKOL.id,
+                                                          kolName: campaignKOL.master_kol?.name || 'Unknown',
+                                                          masterKolId: masterKolId,
+                                                          latestCost: latestCost,
+                                                          paymentIndex: 0,
+                                                          paymentIds: paymentIds,
+                                                          mode: 'content-created'
+                                                        });
+                                                      }
                                                     }
                                                   }
 
@@ -6677,9 +6733,10 @@ const CampaignDetailsPage = () => {
                                     notes: null
                                   };
 
-                                  const { error: paymentError } = await supabase
+                                  const { error: paymentError, data: paymentData } = await supabase
                                     .from('payments')
-                                    .insert(paymentPayload);
+                                    .insert(paymentPayload)
+                                    .select();
 
                                   if (paymentError) {
                                     console.error('Error creating payment:', paymentError);
@@ -6691,6 +6748,22 @@ const CampaignDetailsPage = () => {
                                   } else {
                                     // Refetch payments to update the table
                                     fetchPayments();
+
+                                    // Check if KOL has latest pricing and show suggestion dialog
+                                    const masterKolId = kol.master_kol?.id;
+                                    const latestCost = masterKolId ? latestCostMap.get(masterKolId) : undefined;
+                                    if (latestCost && latestCost > 0 && paymentData && paymentData.length > 0) {
+                                      setPricingSuggestionDialog({
+                                        open: true,
+                                        kolId: kol.id,
+                                        kolName: kol.master_kol?.name || 'Unknown',
+                                        masterKolId: masterKolId,
+                                        latestCost: latestCost,
+                                        paymentIndex: 0,
+                                        paymentIds: [paymentData[0].id],
+                                        mode: 'content-created'
+                                      });
+                                    }
                                   }
                                 }
                               }
@@ -8315,6 +8388,20 @@ const CampaignDetailsPage = () => {
                                           }]
                                         }
                                       }));
+                                      // Check if this KOL has a latest cost and show suggestion dialog
+                                      const masterKolId = kol.master_kol?.id;
+                                      const latestCost = masterKolId ? latestCostMap.get(masterKolId) : undefined;
+                                      if (latestCost && latestCost > 0) {
+                                        setPricingSuggestionDialog({
+                                          open: true,
+                                          kolId: kol.id,
+                                          kolName: kol.master_kol?.name || 'Unknown',
+                                          masterKolId: masterKolId,
+                                          latestCost: latestCost,
+                                          paymentIndex: 0,
+                                          mode: 'payment-dialog'
+                                        });
+                                      }
                                     } else {
                                       setSelectedKOLsForPayment(prev => prev.filter(id => id !== kol.id));
                                       const newPayments = { ...multiKOLPayments };
@@ -8323,7 +8410,14 @@ const CampaignDetailsPage = () => {
                                     }
                                   }}
                                 />
-                                <span className="font-medium flex-1">{kol.master_kol.name}</span>
+                                <span className="font-medium flex-1">
+                                  {kol.master_kol.name}
+                                  {latestCostMap.get(kol.master_kol?.id) && (
+                                    <span className="ml-2 text-xs text-gray-500">
+                                      (Latest: ${latestCostMap.get(kol.master_kol?.id)?.toLocaleString()})
+                                    </span>
+                                  )}
+                                </span>
                                 {selectedKOLsForPayment.includes(kol.id) && (
                                   <div className="flex items-center gap-2">
                                     <Label className="text-xs text-gray-600 whitespace-nowrap">Payments:</Label>
@@ -10493,6 +10587,95 @@ const CampaignDetailsPage = () => {
               className="hover:opacity-90"
             >
               {sendingPaymentNotification ? 'Sending...' : 'Send Notification'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pricing Suggestion Dialog */}
+      <Dialog
+        open={pricingSuggestionDialog?.open || false}
+        onOpenChange={(open) => {
+          if (!open) setPricingSuggestionDialog(null);
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Use Latest Pricing?</DialogTitle>
+            <DialogDescription>
+              {pricingSuggestionDialog?.kolName}'s last payment was <strong>${pricingSuggestionDialog?.latestCost?.toLocaleString()}</strong>. Would you like to use this amount?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setPricingSuggestionDialog(null)}
+            >
+              No, Enter Manually
+            </Button>
+            <Button
+              onClick={async () => {
+                if (pricingSuggestionDialog) {
+                  const { kolId, latestCost, paymentIndex, paymentIds, mode } = pricingSuggestionDialog;
+
+                  if (mode === 'payment-dialog') {
+                    // Update the payment form in the dialog
+                    setMultiKOLPayments(prev => {
+                      const currentPayments = [...(prev[kolId]?.payments || [])];
+                      if (currentPayments[paymentIndex]) {
+                        currentPayments[paymentIndex] = {
+                          ...currentPayments[paymentIndex],
+                          amount: latestCost
+                        };
+                      }
+                      return {
+                        ...prev,
+                        [kolId]: { ...prev[kolId], payments: currentPayments }
+                      };
+                    });
+                  } else if (mode === 'content-created' && paymentIds && paymentIds.length > 0) {
+                    // Update the payments in the database
+                    try {
+                      for (const paymentId of paymentIds) {
+                        await supabase
+                          .from('payments')
+                          .update({ amount: latestCost })
+                          .eq('id', paymentId);
+                      }
+                      // Also update the campaign_kol's paid amount
+                      const kol = campaignKOLs.find(k => k.id === kolId);
+                      if (kol) {
+                        const currentPaid = kol.paid || 0;
+                        const newPaid = currentPaid + (latestCost * paymentIds.length);
+                        await supabase
+                          .from('campaign_kols')
+                          .update({ paid: newPaid })
+                          .eq('id', kolId);
+                        setCampaignKOLs(prev => prev.map(k =>
+                          k.id === kolId ? { ...k, paid: newPaid } : k
+                        ));
+                      }
+                      fetchPayments();
+                      toast({
+                        title: 'Success',
+                        description: `Updated ${paymentIds.length} payment(s) to $${latestCost.toLocaleString()}`,
+                      });
+                    } catch (error) {
+                      console.error('Error updating payments:', error);
+                      toast({
+                        title: 'Error',
+                        description: 'Failed to update payment amounts',
+                        variant: 'destructive'
+                      });
+                    }
+                  }
+                  setPricingSuggestionDialog(null);
+                }
+              }}
+              style={{ backgroundColor: '#3e8692', color: 'white' }}
+              className="hover:opacity-90"
+            >
+              Yes, Use ${pricingSuggestionDialog?.latestCost?.toLocaleString()}
             </Button>
           </DialogFooter>
         </DialogContent>
