@@ -3279,7 +3279,7 @@ const CampaignDetailsPage = () => {
     <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
       <div className="w-full">
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between relative">
             <Button
               variant="ghost"
               className="py-2 px-3 rounded-md text-gray-600 hover:text-[#3e8692] transition-colors mb-1 text-sm"
@@ -3287,6 +3287,9 @@ const CampaignDetailsPage = () => {
             >
               <ArrowLeft className="h-4 w-4 mr-2" />Back to Campaigns
             </Button>
+            {campaign && (
+              <span className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-gray-900 mb-1 pointer-events-none">{campaign.name}</span>
+            )}
             <div className="flex items-center gap-2">
               {hasWarnings && (
                 <Button

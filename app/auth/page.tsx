@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { SignUpForm } from '@/components/auth/SignUpForm'
@@ -14,12 +14,19 @@ export default function AuthPage() {
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const { user, loading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     if (user && !loading) {
-      router.push('/')
+      const redirectTo = searchParams.get('redirectTo')
+      // Only allow relative paths to prevent open redirect
+      if (redirectTo && redirectTo.startsWith('/')) {
+        router.push(redirectTo)
+      } else {
+        router.push('/')
+      }
     }
-  }, [user, loading, router])
+  }, [user, loading, router, searchParams])
 
   const toggleMode = () => {
     setIsLogin(!isLogin)

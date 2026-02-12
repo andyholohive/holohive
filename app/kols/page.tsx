@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -114,6 +115,9 @@ export default function KOLsPage() {
   } | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const scrollableRef = useRef<HTMLElement | null>(null);
+
+  // Tab state
+  const [kolTab, setKolTab] = useState<string>('all');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -445,10 +449,31 @@ export default function KOLsPage() {
     });
   }, [kols, debouncedSearchTerm, filters]);
 
-  // Reset to page 1 when filters or search changes
+  const STALE_THRESHOLD_MS = 90 * 24 * 60 * 60 * 1000;
+
+  // Apply tab filter on top of filteredKOLs
+  const tabbedKOLs = useMemo(() => {
+    if (kolTab === 'need_update') {
+      return filteredKOLs.filter(kol => {
+        if (!kol.updated_at) return true;
+        return (Date.now() - new Date(kol.updated_at).getTime()) > STALE_THRESHOLD_MS;
+      });
+    }
+    return filteredKOLs;
+  }, [filteredKOLs, kolTab]);
+
+  // Count for need update tab badge
+  const needUpdateCount = useMemo(() => {
+    return filteredKOLs.filter(kol => {
+      if (!kol.updated_at) return true;
+      return (Date.now() - new Date(kol.updated_at).getTime()) > STALE_THRESHOLD_MS;
+    }).length;
+  }, [filteredKOLs]);
+
+  // Reset to page 1 when filters, search, or tab changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchTerm, filters]);
+  }, [debouncedSearchTerm, filters, kolTab]);
 
   // Sticky scrollbar effect
   useEffect(() => {
@@ -546,11 +571,11 @@ export default function KOLsPage() {
 
   // Pagination calculations (memoized for performance)
   const paginationData = useMemo(() => {
-    const totalItems = filteredKOLs.length;
+    const totalItems = tabbedKOLs.length;
     const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
-    const paginatedKOLs = filteredKOLs.slice(startIndex, endIndex);
+    const paginatedKOLs = tabbedKOLs.slice(startIndex, endIndex);
 
     return {
       totalItems,
@@ -560,7 +585,7 @@ export default function KOLsPage() {
       paginatedKOLs,
       currentPage,
     };
-  }, [filteredKOLs, currentPage, ITEMS_PER_PAGE]);
+  }, [tabbedKOLs, currentPage, ITEMS_PER_PAGE]);
 
   const handleCellDoubleClick = (kolId: string, field: keyof MasterKOL, currentValue: any) => {
     setEditingCell({ kolId, field });
@@ -1444,6 +1469,12 @@ export default function KOLsPage() {
           </div>
         </div>
 
+        {/* Tabs skeleton */}
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-md w-fit">
+          <Skeleton className="h-8 w-16 rounded" />
+          <Skeleton className="h-8 w-28 rounded" />
+        </div>
+
         <KOLTableSkeleton />
       </div>
     );
@@ -2282,6 +2313,26 @@ export default function KOLsPage() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <Tabs value={kolTab} onValueChange={setKolTab}>
+        <TabsList className="bg-gray-100 p-1 h-auto">
+          <TabsTrigger
+            value="all"
+            className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-sm px-4 py-1.5"
+          >
+            All
+            <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full data-[state=active]:bg-[#e8f4f5] data-[state=active]:text-[#3e8692]">{filteredKOLs.length}</span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="need_update"
+            className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-sm px-4 py-1.5"
+          >
+            <span className="text-red-500 font-bold mr-1">!</span> Need Update
+            <span className="ml-2 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">{needUpdateCount}</span>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <div ref={tableContainerRef} className="border rounded-lg overflow-auto">
         <Table className="min-w-full" style={{
           tableLayout: 'auto',
@@ -3012,7 +3063,7 @@ export default function KOLsPage() {
                   )}
                   {visibleColumns.description && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2`}>
-                      <div className="max-w-xs whitespace-pre-wrap break-words">{renderEditableCell(kol.description, 'description', kol.id, 'text')}</div>
+                      <div className="min-w-[300px] max-w-2xl whitespace-pre-wrap break-words">{renderEditableCell(kol.description, 'description', kol.id, 'text')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.wallet && (

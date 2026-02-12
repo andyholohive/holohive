@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChangelog } from '@/contexts/ChangelogContext';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -343,6 +343,50 @@ export default function Sidebar({ children }: SidebarProps) {
                 )}
               </div>
 
+              {/* Workspace Section - only visible to Andy (testing) */}
+              {userProfile?.email === 'andy@holohive.io' && (
+                <>
+                  {!isSidebarCollapsed && (
+                    <div className="flex items-center space-x-2">
+                      <Briefcase className="h-4 w-4 text-gray-400" />
+                      <div className="flex-1 h-px bg-gray-200"></div>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {/* Daily Stand-Up tab */}
+                    <Link href="/daily-standup" legacyBehavior>
+                      <Button
+                        asChild
+                        variant={pathname.startsWith('/daily-standup') ? 'default' : 'ghost'}
+                        className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                        style={pathname.startsWith('/daily-standup') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                        title={isSidebarCollapsed ? 'Daily Stand-Up' : undefined}
+                      >
+                        <span>
+                          <CheckCircle className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                          {!isSidebarCollapsed && 'Daily Stand-Up'}
+                        </span>
+                      </Button>
+                    </Link>
+                    {/* Tasks tab */}
+                    <Link href="/tasks" legacyBehavior>
+                      <Button
+                        asChild
+                        variant={pathname.startsWith('/tasks') ? 'default' : 'ghost'}
+                        className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                        style={pathname.startsWith('/tasks') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                        title={isSidebarCollapsed ? 'Tasks' : undefined}
+                      >
+                        <span>
+                          <ListTodo className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                          {!isSidebarCollapsed && 'Tasks'}
+                        </span>
+                      </Button>
+                    </Link>
+                  </div>
+                </>
+              )}
+
               {/* Documents Section */}
               {!isSidebarCollapsed && (
                 <div className="flex items-center space-x-2">
@@ -351,6 +395,21 @@ export default function Sidebar({ children }: SidebarProps) {
                 </div>
               )}
               <div className="space-y-2">
+                {/* Delivery Logs tab */}
+                <Link href="/delivery-logs" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/delivery-logs') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/delivery-logs') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Delivery Logs' : undefined}
+                  >
+                    <span>
+                      <ClipboardList className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Delivery Logs'}
+                    </span>
+                  </Button>
+                </Link>
                 {/* Forms tab - Admin only */}
                 {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                   <Link href="/forms" legacyBehavior>

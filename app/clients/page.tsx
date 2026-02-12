@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import mammoth from 'mammoth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -117,6 +118,8 @@ export default function ClientsPage() {
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [isNoteFormOpen, setIsNoteFormOpen] = useState(false);
   const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
+  const [isParsingDoc, setIsParsingDoc] = useState(false);
+  const docUploadRef = useRef<HTMLInputElement>(null);
   // Client context state
   const [clientContexts, setClientContexts] = useState<Record<string, ClientContext>>({});
   const [contextModalClient, setContextModalClient] = useState<ClientWithAccess | null>(null);
@@ -442,6 +445,122 @@ export default function ClientsPage() {
       setMeetingNoteForm({ title: '', content: '', meeting_date: undefined, attendees: '', action_items: '' });
     }
     setIsNoteFormOpen(true);
+  };
+
+  // Parse Gemini meeting notes .docx
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input so the same file can be re-uploaded
+    e.target.value = '';
+
+    if (!file.name.endsWith('.docx')) {
+      toast({ title: 'Invalid file', description: 'Please upload a .docx file (Gemini meeting notes export).', variant: 'destructive' });
+      return;
+    }
+
+    setIsParsingDoc(true);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      const text = result.value;
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+      // Parse Gemini meeting notes format
+      let title = '';
+      let meetingDate: Date | undefined;
+      let attendees = '';
+      let content = '';
+      let actionItems = '';
+
+      // Line 1: Date (e.g. "Feb 10, 2026")
+      // Line 2: Title
+      // Line starting with "Invited": attendees
+      // After "Summary" or "Details": content
+      // After "Suggested next steps": action items
+
+      let section = 'header'; // header | summary | details | actions | footer
+      let lineIndex = 0;
+
+      for (const line of lines) {
+        // Skip footer lines from Gemini
+        if (line.startsWith('You should review Gemini') || line.startsWith('Please provide feedback')) continue;
+        if (line.startsWith('Get tips and learn how Gemini')) continue;
+
+        if (lineIndex === 0) {
+          // First line is the date
+          const parsed = new Date(line);
+          if (!isNaN(parsed.getTime())) {
+            meetingDate = parsed;
+          }
+          lineIndex++;
+          continue;
+        }
+
+        if (lineIndex === 1) {
+          title = line;
+          lineIndex++;
+          continue;
+        }
+
+        if (line.startsWith('Invited ')) {
+          attendees = line.replace('Invited ', '').trim();
+          lineIndex++;
+          continue;
+        }
+
+        if (line.startsWith('Attachments ')) {
+          lineIndex++;
+          continue;
+        }
+
+        if (line === 'Summary') {
+          section = 'summary';
+          lineIndex++;
+          continue;
+        }
+
+        if (line === 'Details') {
+          section = 'details';
+          lineIndex++;
+          continue;
+        }
+
+        if (line === 'Suggested next steps') {
+          section = 'actions';
+          lineIndex++;
+          continue;
+        }
+
+        if (section === 'summary' || section === 'details') {
+          content += (content ? '\n\n' : '') + line;
+        } else if (section === 'actions') {
+          actionItems += (actionItems ? '\n' : '') + line;
+        }
+
+        lineIndex++;
+      }
+
+      // Convert content and action items to basic HTML for ReactQuill
+      const toHtml = (text: string) => text.split('\n').map(p => p.trim() ? `<p>${p.trim()}</p>` : '').join('');
+
+      setMeetingNoteForm({
+        title,
+        meeting_date: meetingDate,
+        attendees,
+        content: toHtml(content),
+        action_items: toHtml(actionItems),
+      });
+      setIsNoteFormOpen(true);
+      setEditingNoteId(null);
+
+      toast({ title: 'Document parsed', description: 'Meeting note fields have been filled from the document.' });
+    } catch (err) {
+      console.error('Error parsing .docx:', err);
+      toast({ title: 'Parse error', description: 'Failed to parse the document. Make sure it is a Gemini meeting notes .docx export.', variant: 'destructive' });
+    } finally {
+      setIsParsingDoc(false);
+    }
   };
 
   const handleNoteFormSubmit = async () => {
@@ -2009,7 +2128,7 @@ export default function ClientsPage() {
                     {/* Client Tracker — compact row */}
                     <div className="mt-3 pt-3 border-t border-gray-100">
                       <p className="font-bold text-sm text-gray-700 mb-2">Client Tracker</p>
-                      <div className="grid grid-cols-4 gap-2">
+                      <div className="grid grid-cols-3 gap-2">
                         {/* Context */}
                         <button
                           onClick={() => openContextModal(client)}
@@ -2048,14 +2167,6 @@ export default function ClientsPage() {
                           ) : (
                             <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-gray-300" />
                           )}
-                        </button>
-                        {/* Delivery Log */}
-                        <button
-                          onClick={() => router.push(`/clients/${client.id}/delivery-log`)}
-                          className="flex flex-col items-center gap-1.5 p-2.5 rounded-lg border border-gray-200 hover:border-[#3e8692] hover:bg-[#e8f4f5]/30 transition-colors group"
-                        >
-                          <ClipboardList className="h-4 w-4 text-gray-400 group-hover:text-[#3e8692]" />
-                          <span className="text-[11px] font-medium text-gray-600 group-hover:text-[#3e8692]">Delivery</span>
                         </button>
                       </div>
                     </div>
@@ -2210,9 +2321,32 @@ export default function ClientsPage() {
               </TabsContent>
               <TabsContent value="notes" className="space-y-4 max-h-[55vh] overflow-y-auto px-1 pb-4">
               {!isNoteFormOpen && (
-                <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={() => openNoteForm()}>
-                  <Plus className="h-4 w-4 mr-1" /> Add Note
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={() => openNoteForm()}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Note
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => docUploadRef.current?.click()}
+                    disabled={isParsingDoc}
+                  >
+                    {isParsingDoc ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-1" />
+                    ) : (
+                      <Upload className="h-4 w-4 mr-1" />
+                    )}
+                    Upload .docx
+                  </Button>
+                  <span className="text-xs text-gray-400">Gemini meeting notes only</span>
+                  <input
+                    ref={docUploadRef}
+                    type="file"
+                    accept=".docx"
+                    className="hidden"
+                    onChange={handleDocUpload}
+                  />
+                </div>
               )}
               {isNoteFormOpen && (
                 <div className="border rounded-lg p-4 space-y-3 bg-gray-50">

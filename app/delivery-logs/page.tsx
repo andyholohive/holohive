@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,14 +10,12 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { UserService } from '@/lib/userService';
-import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft,
   Plus,
-  Edit,
   Trash2,
   Calendar as CalendarIcon,
   Search,
@@ -54,6 +51,7 @@ type Client = {
   id: string;
   name: string;
   logo_url: string | null;
+  is_active: boolean;
 };
 
 const WORK_TYPES = ['Client-Facing', 'Internal'] as const;
@@ -77,20 +75,20 @@ const triggerBadge = (trigger: string) => {
 
 type EditingCell = { entryId: string; field: string } | null;
 
-export default function DeliveryLogPage({ params }: { params: { id: string } }) {
+export default function DeliveryLogsPage() {
   const { user } = useAuth();
-  const router = useRouter();
-  const clientId = params.id;
 
-  const [client, setClient] = useState<Client | null>(null);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [entries, setEntries] = useState<DeliveryLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clientsLoading, setClientsLoading] = useState(true);
   const [teamMembers, setTeamMembers] = useState<{ id: string; name: string }[]>([]);
   const [whoMode, setWhoMode] = useState<'team' | 'custom'>('team');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterWorkType, setFilterWorkType] = useState<string>('all');
   const [filterTrigger, setFilterTrigger] = useState<string>('all');
-  const [sortAsc, setSortAsc] = useState(true); // true = earliest first (Day 0 at top)
+  const [sortAsc, setSortAsc] = useState(true);
 
   // Inline editing state
   const [editingCell, setEditingCell] = useState<EditingCell>(null);
@@ -139,36 +137,57 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
     return Math.round((d - dayZeroDate) / (1000 * 60 * 60 * 24));
   };
 
+  // Fetch clients on mount
   useEffect(() => {
-    fetchClient();
-    fetchEntries(true);
+    const fetchClients = async () => {
+      setClientsLoading(true);
+      const { data } = await supabase
+        .from('clients')
+        .select('id, name, logo_url, is_active')
+        .eq('is_active', true)
+        .is('archived_at', null)
+        .order('name');
+      setClients(data || []);
+      if (data && data.length > 0 && !selectedClientId) {
+        setSelectedClientId(data[0].id);
+      }
+      setClientsLoading(false);
+    };
+    fetchClients();
     UserService.getAllUsers().then((users) => {
       setTeamMembers(users.filter(u => u.role !== 'client').map(u => ({ id: u.id, name: u.name || u.email })));
     });
-  }, [clientId]);
+  }, []);
 
-  const fetchClient = async () => {
-    const { data } = await supabase
-      .from('clients')
-      .select('id, name, logo_url')
-      .eq('id', clientId)
-      .single();
-    setClient(data);
-  };
+  // Fetch entries when client changes
+  useEffect(() => {
+    if (selectedClientId) {
+      fetchEntries(true);
+      // Reset filters when switching clients
+      setSearchTerm('');
+      setFilterWorkType('all');
+      setFilterTrigger('all');
+      setIsAddingInline(false);
+      setEditingCell(null);
+    }
+  }, [selectedClientId]);
 
   const fetchEntries = async (showLoading = false) => {
+    if (!selectedClientId) return;
     if (showLoading) setLoading(true);
     const { data } = await supabase
       .from('client_delivery_log')
       .select('*')
-      .eq('client_id', clientId)
+      .eq('client_id', selectedClientId)
       .order('logged_at', { ascending: false })
       .order('sort_order', { ascending: true });
     setEntries(data || []);
     setLoading(false);
   };
 
-  // --- Inline cell editing (KOL-style: double-click, blur-to-save) ---
+  const selectedClient = clients.find(c => c.id === selectedClientId);
+
+  // --- Inline cell editing ---
   const startEditing = (entryId: string, field: string, currentValue: string) => {
     setEditingCell({ entryId, field });
     setEditingValue(currentValue);
@@ -189,7 +208,6 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
     const value = editingValue.trim() || null;
     setEditingCell(null);
     setEditingValue('');
-    // Optimistic update
     setEntries(prev => prev.map(e => e.id === entryId ? { ...e, [field]: value, updated_at: new Date().toISOString() } : e));
     try {
       await supabase.from('client_delivery_log').update({
@@ -198,13 +216,11 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
       }).eq('id', entryId);
     } catch (error) {
       console.error('Error saving:', error);
-      await fetchEntries(); // revert on error
+      await fetchEntries();
     }
   };
 
-  // Immediate save for select fields (work_type, trigger)
   const saveSelectField = async (entryId: string, field: string, value: string) => {
-    // Optimistic update
     setEntries(prev => prev.map(e => e.id === entryId ? { ...e, [field]: value || null, updated_at: new Date().toISOString() } : e));
     try {
       await supabase.from('client_delivery_log').update({
@@ -213,17 +229,15 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
       }).eq('id', entryId);
     } catch (error) {
       console.error('Error saving:', error);
-      await fetchEntries(); // revert on error
+      await fetchEntries();
     }
   };
 
-  // Save date via Popover+Calendar
   const saveDateField = async (entryId: string, date: Date | undefined) => {
     if (!date) return;
     const dateStr = date.toISOString().split('T')[0];
     setEditingCell(null);
     setEditingValue('');
-    // Optimistic update
     setEntries(prev => prev.map(e => e.id === entryId ? { ...e, logged_at: dateStr, updated_at: new Date().toISOString() } : e));
     try {
       await supabase.from('client_delivery_log').update({
@@ -240,7 +254,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
   const handleInlineAdd = async () => {
     if (!inlineNew.work_type || !inlineNew.action.trim() || !inlineNew.logged_at) return;
     await supabase.from('client_delivery_log').insert({
-      client_id: clientId,
+      client_id: selectedClientId,
       work_type: inlineNew.work_type,
       action: inlineNew.action.trim(),
       who: inlineNew.who.trim() || null,
@@ -293,7 +307,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
   const handleSubmit = async () => {
     if (!form.work_type || !form.action.trim() || !form.logged_at) return;
     const payload = {
-      client_id: clientId,
+      client_id: selectedClientId,
       work_type: form.work_type,
       action: form.action.trim(),
       who: form.who.trim() || null,
@@ -306,7 +320,6 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
     };
     setIsFormOpen(false);
     if (editingId) {
-      // Optimistic update for edits
       setEntries(prev => prev.map(e => e.id === editingId ? { ...e, ...payload } : e));
       setEditingId(null);
       try {
@@ -318,13 +331,12 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
     } else {
       setEditingId(null);
       await supabase.from('client_delivery_log').insert({ ...payload, created_by: user?.id });
-      await fetchEntries(); // need server-generated ID
+      await fetchEntries();
     }
   };
 
   const handleDelete = async (id: string) => {
     setDeletingId(null);
-    // Optimistic delete
     setEntries(prev => prev.filter(e => e.id !== id));
     try {
       await supabase.from('client_delivery_log').delete().eq('id', id);
@@ -336,7 +348,6 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
 
   // Reorder entries within the same date
   const handleReorder = async (entryId: string, direction: 'up' | 'down') => {
-    // Get entries for the same date, sorted by sort_order
     const entry = entries.find(e => e.id === entryId);
     if (!entry) return;
     const sameDateEntries = entries
@@ -349,10 +360,8 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
     const current = sameDateEntries[idx];
     const swap = sameDateEntries[swapIdx];
 
-    // Swap sort_order values
     const currentOrder = current.sort_order;
     const swapOrder = swap.sort_order;
-    // If they have the same sort_order (both 0), assign distinct values
     const newCurrentOrder = currentOrder === swapOrder
       ? (direction === 'up' ? swapOrder - 1 : swapOrder + 1)
       : swapOrder;
@@ -360,7 +369,6 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
       ? currentOrder
       : currentOrder;
 
-    // Optimistic update
     setEntries(prev => prev.map(e => {
       if (e.id === current.id) return { ...e, sort_order: newCurrentOrder };
       if (e.id === swap.id) return { ...e, sort_order: newSwapOrder };
@@ -393,19 +401,15 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
     return a.sort_order - b.sort_order;
   });
 
-  // Render an editable cell (KOL-style: double-click to edit text, blur to save, selects save immediately)
+  // Render an editable cell
   const renderEditableCell = (entry: DeliveryLogEntry, field: string, type: 'text' | 'textarea' | 'select-type' | 'select-trigger' | 'who' = 'text') => {
     const value = (entry as any)[field] || '';
     const isEditing = editingCell?.entryId === entry.id && editingCell?.field === field;
 
-    // Select fields: always-visible inline dropdown, saves immediately on change (no hover effect)
     if (type === 'select-type') {
       return (
         <td className="py-3 px-4">
-          <Select
-            value={entry.work_type}
-            onValueChange={(v) => saveSelectField(entry.id, 'work_type', v)}
-          >
+          <Select value={entry.work_type} onValueChange={(v) => saveSelectField(entry.id, 'work_type', v)}>
             <SelectTrigger
               className={`border-none shadow-none bg-transparent w-auto h-auto ${workTypeBadge(entry.work_type)} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
               style={{ outline: 'none', boxShadow: 'none' }}
@@ -423,10 +427,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
     if (type === 'select-trigger') {
       return (
         <td className="py-3 px-4">
-          <Select
-            value={entry.trigger || ''}
-            onValueChange={(v) => saveSelectField(entry.id, 'trigger', v)}
-          >
+          <Select value={entry.trigger || ''} onValueChange={(v) => saveSelectField(entry.id, 'trigger', v)}>
             <SelectTrigger
               className={`border-none shadow-none bg-transparent w-auto h-auto ${entry.trigger ? triggerBadge(entry.trigger) : 'text-gray-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
               style={{ outline: 'none', boxShadow: 'none' }}
@@ -441,7 +442,6 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
       );
     }
 
-    // Who field: double-click to edit with team/manual toggle
     if (type === 'who') {
       if (isEditing) {
         return (
@@ -480,17 +480,12 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
         );
       }
       return (
-        <td
-          className="py-3 px-4 cursor-pointer whitespace-nowrap"
-          onDoubleClick={() => startEditing(entry.id, field, value)}
-          title="Double-click to edit"
-        >
+        <td className="py-3 px-4 cursor-pointer whitespace-nowrap" onDoubleClick={() => startEditing(entry.id, field, value)} title="Double-click to edit">
           <span className="text-gray-600">{value || '—'}</span>
         </td>
       );
     }
 
-    // Textarea fields: double-click to edit, blur to save
     if (type === 'textarea') {
       if (isEditing) {
         return (
@@ -509,17 +504,12 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
         );
       }
       return (
-        <td
-          className="py-3 px-4 cursor-pointer max-w-[200px]"
-          onDoubleClick={() => startEditing(entry.id, field, value)}
-          title="Double-click to edit"
-        >
+        <td className="py-3 px-4 cursor-pointer max-w-[200px]" onDoubleClick={() => startEditing(entry.id, field, value)} title="Double-click to edit">
           <span className="text-gray-600 line-clamp-2 whitespace-pre-wrap">{value || '—'}</span>
         </td>
       );
     }
 
-    // Default text fields: double-click to edit, blur to save
     if (isEditing) {
       return (
         <td className="py-1 px-2">
@@ -556,84 +546,110 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
     <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
       <div className="w-full">
         <div className="space-y-4">
-          {/* Back button */}
-          <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              className="py-2 px-3 rounded-md text-gray-600 hover:text-[#3e8692] transition-colors mb-1 text-sm"
-              onClick={() => router.push('/clients')}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />Back to Clients
-            </Button>
-          </div>
-
-          {/* Header card */}
+          {/* Header */}
           <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-            <div className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
+            <div className="pb-5 border-b border-gray-100 flex flex-row items-center justify-between">
               <div className="flex items-center gap-3">
-                {client?.logo_url ? (
-                  <img src={client.logo_url} alt={client.name} className="h-10 w-10 object-contain rounded-lg" />
-                ) : (
-                  <div className="bg-gray-100 p-2 rounded-lg"><Building2 className="h-6 w-6 text-gray-600" /></div>
-                )}
+                <div className="bg-gray-100 p-2 rounded-lg">
+                  <ClipboardList className="h-6 w-6 text-gray-600" />
+                </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Delivery Log</h2>
-                  <p className="text-sm text-gray-500">{client?.name || 'Loading...'}</p>
+                  <h2 className="text-2xl font-bold text-gray-900">Delivery Logs</h2>
+                  <p className="text-sm text-gray-500">Track work delivered for each client</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => { setIsAddingInline(true); }}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Inline
-                </Button>
-                <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={() => openForm()}>
-                  <Expand className="h-4 w-4 mr-2" />
-                  Add via Form
-                </Button>
-              </div>
-            </div>
-
-            {/* Filters */}
-            <div className="flex flex-wrap items-center gap-3 pt-5">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search actions, who, notes..."
-                  className="pl-10 auth-input"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Select value={filterWorkType} onValueChange={setFilterWorkType}>
-                <SelectTrigger className="w-[160px] auth-input">
-                  <Filter className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                  <SelectValue placeholder="Work Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {WORK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filterTrigger} onValueChange={setFilterTrigger}>
-                <SelectTrigger className="w-[180px] auth-input">
-                  <Filter className="h-3.5 w-3.5 mr-2 text-gray-400" />
-                  <SelectValue placeholder="Trigger" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Triggers</SelectItem>
-                  {TRIGGERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              {(filterWorkType !== 'all' || filterTrigger !== 'all' || searchTerm) && (
-                <Button variant="ghost" size="sm" onClick={() => { setFilterWorkType('all'); setFilterTrigger('all'); setSearchTerm(''); }}>
-                  Clear
-                </Button>
+              {selectedClientId && (
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => { setIsAddingInline(true); }}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Inline
+                  </Button>
+                  <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={() => openForm()}>
+                    <Expand className="h-4 w-4 mr-2" />
+                    Add via Form
+                  </Button>
+                </div>
               )}
             </div>
 
+            {/* Client Tabs */}
+            <div className="pt-4">
+              {clientsLoading ? (
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-24 rounded" />)}
+                </div>
+              ) : clients.length === 0 ? (
+                <p className="text-sm text-gray-500">No active clients found.</p>
+              ) : (
+                <Tabs value={selectedClientId} onValueChange={setSelectedClientId}>
+                  <TabsList className="bg-gray-100 p-1 h-auto flex-wrap">
+                    {clients.map((client) => (
+                      <TabsTrigger
+                        key={client.id}
+                        value={client.id}
+                        className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-sm px-4 py-2"
+                      >
+                        {client.logo_url ? (
+                          <img src={client.logo_url} alt="" className="h-4 w-4 object-contain rounded mr-2 inline-block" />
+                        ) : (
+                          <Building2 className="h-3.5 w-3.5 mr-2 inline-block" />
+                        )}
+                        {client.name}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              )}
+            </div>
+
+            {/* Filters */}
+            {selectedClientId && (
+              <div className="flex flex-wrap items-center gap-3 pt-4">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search actions, who, notes..."
+                    className="pl-10 auth-input"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <Select value={filterWorkType} onValueChange={setFilterWorkType}>
+                  <SelectTrigger className="w-[160px] auth-input">
+                    <Filter className="h-3.5 w-3.5 mr-2 text-gray-400" />
+                    <SelectValue placeholder="Work Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    {WORK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterTrigger} onValueChange={setFilterTrigger}>
+                  <SelectTrigger className="w-[180px] auth-input">
+                    <Filter className="h-3.5 w-3.5 mr-2 text-gray-400" />
+                    <SelectValue placeholder="Trigger" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Triggers</SelectItem>
+                    {TRIGGERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {(filterWorkType !== 'all' || filterTrigger !== 'all' || searchTerm) && (
+                  <Button variant="ghost" size="sm" onClick={() => { setFilterWorkType('all'); setFilterTrigger('all'); setSearchTerm(''); }}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+            )}
+
             {/* Table */}
             <div className="mt-5 -mx-6 -mb-6">
-              {loading ? (
+              {!selectedClientId ? (
+                <div className="text-center py-16">
+                  <Building2 className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 font-medium">Select a client to view their delivery log.</p>
+                </div>
+              ) : loading ? (
                 <div className="p-6 space-y-3">
                   {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-12 w-full rounded" />)}
                 </div>
@@ -805,11 +821,9 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                       )}
                       {filtered.map((entry) => (
                         <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors group">
-                          {/* Day number — not editable */}
                           <td className="py-3 px-4">
                             <span className="inline-flex items-center justify-center bg-gray-100 text-gray-600 text-xs font-bold rounded-full h-6 w-6">{getDayNumber(entry.logged_at)}</span>
                           </td>
-                          {/* Date — Popover+Calendar picker */}
                           <td className="py-3 px-4 whitespace-nowrap">
                             <Popover>
                               <PopoverTrigger asChild>
@@ -829,28 +843,19 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                               </PopoverContent>
                             </Popover>
                           </td>
-                          {/* Type — inline select, saves immediately */}
                           {renderEditableCell(entry, 'work_type', 'select-type')}
-                          {/* Action */}
                           {renderEditableCell(entry, 'action', 'text')}
-                          {/* Who */}
                           {renderEditableCell(entry, 'who', 'who')}
-                          {/* How */}
                           {renderEditableCell(entry, 'method', 'textarea')}
-                          {/* Where */}
                           {renderEditableCell(entry, 'location', 'text')}
-                          {/* Trigger — inline select, saves immediately */}
                           {renderEditableCell(entry, 'trigger', 'select-trigger')}
-                          {/* Notes */}
                           {renderEditableCell(entry, 'notes', 'textarea')}
-                          {/* Actions */}
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                              {/* Reorder arrows — only show if there are other entries with the same date */}
                               {(() => {
                                 const sameDateEntries = filtered.filter(e => e.logged_at === entry.logged_at);
                                 if (sameDateEntries.length <= 1) return null;
-                                const sameDateSorted = sameDateEntries.sort((a, b) => a.sort_order - b.sort_order);
+                                const sameDateSorted = [...sameDateEntries].sort((a, b) => a.sort_order - b.sort_order);
                                 const posInGroup = sameDateSorted.findIndex(e => e.id === entry.id);
                                 return (
                                   <>
@@ -901,7 +906,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
         <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>{editingId ? 'Edit Entry' : 'Add Delivery Log Entry'}</DialogTitle>
-            <DialogDescription>Log work delivered for {client?.name}.</DialogDescription>
+            <DialogDescription>Log work delivered for {selectedClient?.name}.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1 pb-4">
             <div className="grid grid-cols-2 gap-4">
