@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sales Playbook x CRM Integration Plan | HoloHive</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #3e8692;
+      --primary-dark: #2d6470;
+      --primary-light: #e8f4f6;
+      --accent: #4A3FA8;
+      --accent-light: #F0EEFF;
+      --dark: #1a1a2e;
+      --gray-900: #111827;
+      --gray-700: #374151;
+      --gray-500: #6B7280;
+      --gray-400: #9CA3AF;
+      --gray-200: #E5E7EB;
+      --gray-100: #F3F4F6;
+      --gray-50: #F9FAFB;
+      --white: #FFFFFF;
+      --green: #059669;
+      --green-light: #D1FAE5;
+      --red: #DC2626;
+      --red-light: #FEE2E2;
+      --amber: #D97706;
+      --amber-light: #FEF3C7;
+      --blue: #2563EB;
+      --blue-light: #DBEAFE;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+      color: var(--gray-700);
+      background: var(--gray-50);
+      line-height: 1.7;
+      font-size: 15px;
+    }
+
+    /* HEADER */
+    .hero {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 50%, #1a3a40 100%);
+      color: white;
+      padding: 80px 40px 60px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 50%, rgba(255,255,255,0.05) 0%, transparent 50%);
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 24px;
+    }
+    .hero h1 {
+      font-size: 42px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      line-height: 1.2;
+      position: relative;
+    }
+    .hero p {
+      font-size: 18px;
+      opacity: 0.9;
+      max-width: 700px;
+      margin: 0 auto 32px;
+      line-height: 1.6;
+    }
+    .hero-meta {
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+      font-size: 13px;
+      opacity: 0.7;
+    }
+
+    /* LAYOUT */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* NAV */
+    .toc {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 12px;
+      padding: 32px;
+      margin: -40px auto 48px;
+      position: relative;
+      z-index: 10;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    }
+    .toc h2 {
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--gray-400);
+      margin-bottom: 16px;
+    }
+    .toc-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 8px;
+    }
+    .toc a {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      color: var(--gray-700);
+      text-decoration: none;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.15s;
+    }
+    .toc a:hover {
+      background: var(--primary-light);
+      color: var(--primary-dark);
+    }
+    .toc-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background: var(--gray-100);
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--gray-500);
+      flex-shrink: 0;
+    }
+
+    /* SECTIONS */
+    .section {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: 12px;
+      padding: 40px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid var(--gray-100);
+    }
+    .section-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      background: var(--primary);
+      color: white;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .section-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--gray-900);
+    }
+    .section-subtitle {
+      font-size: 13px;
+      color: var(--gray-500);
+      margin-top: 2px;
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin: 28px 0 12px;
+    }
+    h4 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--gray-700);
+      margin: 20px 0 8px;
+    }
+    p { margin-bottom: 12px; }
+    ul, ol { margin: 12px 0 12px 20px; }
+    li { margin-bottom: 8px; }
+
+    /* CARDS */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+    .card {
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      padding: 20px;
+      background: var(--gray-50);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .card-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .card-title {
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--gray-900);
+    }
+    .card p {
+      font-size: 13px;
+      color: var(--gray-500);
+      margin: 0;
+    }
+
+    /* STATUS BADGES */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-green { background: var(--green-light); color: var(--green); }
+    .badge-amber { background: var(--amber-light); color: var(--amber); }
+    .badge-red { background: var(--red-light); color: var(--red); }
+    .badge-blue { background: var(--blue-light); color: var(--blue); }
+    .badge-gray { background: var(--gray-100); color: var(--gray-500); }
+
+    /* TABLES */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    th {
+      background: var(--gray-50);
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--gray-500);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 2px solid var(--gray-200);
+    }
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--gray-100);
+      vertical-align: top;
+    }
+    tr:hover td { background: var(--gray-50); }
+
+    /* CALLOUTS */
+    .callout {
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin: 16px 0;
+      font-size: 14px;
+      border-left: 4px solid;
+    }
+    .callout-info {
+      background: var(--blue-light);
+      border-color: var(--blue);
+    }
+    .callout-success {
+      background: var(--green-light);
+      border-color: var(--green);
+    }
+    .callout-warning {
+      background: var(--amber-light);
+      border-color: var(--amber);
+    }
+    .callout-primary {
+      background: var(--primary-light);
+      border-color: var(--primary);
+    }
+    .callout strong { display: block; margin-bottom: 4px; }
+
+    /* FLOW DIAGRAMS */
+    .flow {
+      display: flex;
+      align-items: center;
+      gap: 8px 0;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    .flow-step {
+      background: var(--white);
+      border: 2px solid var(--gray-200);
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gray-700);
+      text-align: center;
+      min-width: 120px;
+    }
+    .flow-step.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+    .flow-step.new {
+      background: var(--accent-light);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .flow-arrow {
+      font-size: 18px;
+      color: var(--gray-400);
+      padding: 0 6px;
+    }
+
+    /* COMPARISON */
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 16px 0;
+    }
+    .compare-col {
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .compare-header {
+      padding: 14px 20px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .compare-header.current {
+      background: var(--gray-100);
+      color: var(--gray-700);
+    }
+    .compare-header.proposed {
+      background: var(--primary);
+      color: white;
+    }
+    .compare-body {
+      padding: 16px 20px;
+    }
+    .compare-body li {
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    /* PHASE TIMELINE */
+    .timeline {
+      position: relative;
+      margin: 24px 0;
+      padding-left: 32px;
+    }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 12px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--gray-200);
+    }
+    .timeline-item {
+      position: relative;
+      margin-bottom: 24px;
+    }
+    .timeline-dot {
+      position: absolute;
+      left: -26px;
+      top: 4px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: 3px solid var(--white);
+      box-shadow: 0 0 0 2px var(--primary);
+    }
+    .timeline-label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--primary);
+      margin-bottom: 4px;
+    }
+    .timeline-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin-bottom: 4px;
+    }
+    .timeline-desc {
+      font-size: 13px;
+      color: var(--gray-500);
+    }
+
+    /* FEATURE LIST */
+    .feature-list {
+      list-style: none;
+      margin: 12px 0;
+      padding: 0;
+    }
+    .feature-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--gray-100);
+      font-size: 14px;
+    }
+    .feature-list li:last-child { border-bottom: none; }
+    .feature-check {
+      color: var(--green);
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .feature-new {
+      color: var(--accent);
+      font-weight: 700;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* MOCKUP FRAMES */
+    .mockup {
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 16px 0;
+    }
+    .mockup-bar {
+      background: var(--gray-100);
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .mockup-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--gray-300);
+    }
+    .mockup-body {
+      padding: 20px;
+      background: var(--white);
+      font-size: 13px;
+    }
+
+    /* KPI CARDS */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .kpi {
+      text-align: center;
+      padding: 20px 12px;
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      background: var(--gray-50);
+    }
+    .kpi-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--primary);
+    }
+    .kpi-label {
+      font-size: 12px;
+      color: var(--gray-500);
+      margin-top: 4px;
+    }
+
+    /* FOOTER */
+    .footer {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--gray-400);
+      font-size: 13px;
+    }
+
+    /* RESPONSIVE */
+    @media (max-width: 768px) {
+      .hero { padding: 48px 20px 40px; }
+      .hero h1 { font-size: 28px; }
+      .section { padding: 24px; }
+      .compare-grid { grid-template-columns: 1fr; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .hero-meta { flex-direction: column; gap: 8px; }
+    }
+
+    @media print {
+      .hero { padding: 40px 20px; }
+      .section { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">Internal Proposal</div>
+  <h1>Sales Playbook &times; CRM<br>Integration Plan</h1>
+  <p>How we transform the HoloHive Sales Playbook v2.0 into a system-driven workflow inside our existing CRM &mdash; eliminating manual tracking, automating follow-ups, and giving the team a single source of truth.</p>
+  <div class="hero-meta">
+    <span>Prepared: February 2026</span>
+    <span>For: Management Review</span>
+    <span>Version: 1.0</span>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+  <h2>Contents</h2>
+  <div class="toc-grid">
+    <a href="#section-1"><span class="toc-num">01</span> Executive Summary</a>
+    <a href="#section-2"><span class="toc-num">02</span> What We Already Have</a>
+    <a href="#section-3"><span class="toc-num">03</span> Gap Analysis</a>
+    <a href="#section-4"><span class="toc-num">04</span> Proposed Features</a>
+    <a href="#section-5"><span class="toc-num">05</span> Pipeline Redesign</a>
+    <a href="#section-6"><span class="toc-num">06</span> Automated Sequences</a>
+    <a href="#section-7"><span class="toc-num">07</span> Sales Dashboard</a>
+    <a href="#section-8"><span class="toc-num">08</span> AI Integration</a>
+    <a href="#section-9"><span class="toc-num">09</span> Database Schema Changes</a>
+    <a href="#section-10"><span class="toc-num">10</span> Implementation Roadmap</a>
+  </div>
+</div>
+
+<!-- SECTION 1: EXECUTIVE SUMMARY -->
+<div class="section" id="section-1">
+  <div class="section-header">
+    <div class="section-num">01</div>
+    <div>
+      <div class="section-title">Executive Summary</div>
+      <div class="section-subtitle">The 30-second version for decision-makers</div>
+    </div>
+  </div>
+
+  <p>The Sales Playbook v2.0 defines a proven process &mdash; from first DM to signed deal &mdash; but it currently lives as a static document. Meanwhile, our CRM already has a strong foundation: a unified pipeline, client tracker, KOL database, and Telegram integration.</p>
+
+  <p><strong>The opportunity:</strong> By embedding the playbook directly into the CRM, we turn a reference document into an executable system. Every stage, script, template, and follow-up cadence becomes a trackable, automated, and measurable workflow.</p>
+
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-value">70%</div>
+      <div class="kpi-label">of playbook steps can map to existing CRM features</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-value">6</div>
+      <div class="kpi-label">new modules needed to close the gaps</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-value">3</div>
+      <div class="kpi-label">phases of implementation</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-value">2x</div>
+      <div class="kpi-label">target deal velocity improvement</div>
+    </div>
+  </div>
+
+  <div class="callout callout-primary">
+    <strong>Core Thesis</strong>
+    The playbook says "Phil sends DMs, books calls, Jdot runs discovery, follows BAMFAM." The CRM should enforce this rhythm automatically &mdash; surfacing the right action, for the right lead, at the right time &mdash; so the team executes instead of remembering.
+  </div>
+</div>
+
+<!-- SECTION 2: WHAT WE ALREADY HAVE -->
+<div class="section" id="section-2">
+  <div class="section-header">
+    <div class="section-num">02</div>
+    <div>
+      <div class="section-title">What We Already Have</div>
+      <div class="section-subtitle">Mapping current CRM capabilities to playbook requirements</div>
+    </div>
+  </div>
+
+  <p>Our CRM is not starting from zero. Many playbook concepts already have a home. Here's the mapping:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Playbook Concept</th>
+        <th>CRM Feature</th>
+        <th>Status</th>
+        <th>Gap</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Lead Buckets (A/B/C)</strong></td>
+        <td>Pipeline stages (new &rarr; contacted &rarr; qualified)</td>
+        <td><span class="badge badge-amber">Partial</span></td>
+        <td>No bucket classification or temperature scoring</td>
+      </tr>
+      <tr>
+        <td><strong>Discovery Call Prep</strong></td>
+        <td>Opportunity notes + client context</td>
+        <td><span class="badge badge-amber">Partial</span></td>
+        <td>No structured prep checklist or auto-research</td>
+      </tr>
+      <tr>
+        <td><strong>BAMFAM (Next Meeting)</strong></td>
+        <td>No meeting/calendar tracking</td>
+        <td><span class="badge badge-red">Missing</span></td>
+        <td>No meeting scheduling or reminders</td>
+      </tr>
+      <tr>
+        <td><strong>Follow-up Cadences</strong></td>
+        <td>No automated sequences</td>
+        <td><span class="badge badge-red">Missing</span></td>
+        <td>No timed follow-up automation</td>
+      </tr>
+      <tr>
+        <td><strong>Message Templates</strong></td>
+        <td>Templates page + learning examples</td>
+        <td><span class="badge badge-green">Exists</span></td>
+        <td>Not linked to pipeline stages</td>
+      </tr>
+      <tr>
+        <td><strong>Objection Handling</strong></td>
+        <td>SOPs page (static docs)</td>
+        <td><span class="badge badge-amber">Partial</span></td>
+        <td>Not context-aware or searchable in-flow</td>
+      </tr>
+      <tr>
+        <td><strong>Proposal Framework</strong></td>
+        <td>No proposal builder</td>
+        <td><span class="badge badge-red">Missing</span></td>
+        <td>Proposals built outside the system</td>
+      </tr>
+      <tr>
+        <td><strong>Contact/Stakeholder Mapping</strong></td>
+        <td>CRM Contacts + contact linking</td>
+        <td><span class="badge badge-green">Exists</span></td>
+        <td>No decision-maker flag or org chart</td>
+      </tr>
+      <tr>
+        <td><strong>Telegram Messaging</strong></td>
+        <td>TG bot + webhook integration</td>
+        <td><span class="badge badge-green">Exists</span></td>
+        <td>Not integrated with pipeline sequences</td>
+      </tr>
+      <tr>
+        <td><strong>Stage History / Audit Trail</strong></td>
+        <td>crm_stage_history table</td>
+        <td><span class="badge badge-green">Exists</span></td>
+        <td>No velocity metrics computed</td>
+      </tr>
+      <tr>
+        <td><strong>Client Onboarding</strong></td>
+        <td>Clients page + Client Tracker</td>
+        <td><span class="badge badge-green">Exists</span></td>
+        <td>No handoff workflow from pipeline</td>
+      </tr>
+      <tr>
+        <td><strong>Sales Metrics / Tracking</strong></td>
+        <td>Basic pipeline views</td>
+        <td><span class="badge badge-amber">Partial</span></td>
+        <td>No dashboards, KPI tracking, or weekly rhythm reports</td>
+      </tr>
+      <tr>
+        <td><strong>Trigger Event Monitoring</strong></td>
+        <td>Not implemented</td>
+        <td><span class="badge badge-red">Missing</span></td>
+        <td>No competitor/market event tracking</td>
+      </tr>
+      <tr>
+        <td><strong>Content Calendar</strong></td>
+        <td>Not implemented</td>
+        <td><span class="badge badge-red">Missing</span></td>
+        <td>Content planning lives outside CRM</td>
+      </tr>
+      <tr>
+        <td><strong>Phil's Weekly DM Outreach</strong></td>
+        <td>Not tracked</td>
+        <td><span class="badge badge-red">Missing</span></td>
+        <td>No outreach volume tracking</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-success">
+    <strong>Bottom Line</strong>
+    4 features fully exist, 5 partially exist, and 6 are missing entirely. The foundation is strong &mdash; we need to add the playbook-specific layer on top.
+  </div>
+</div>
+
+<!-- SECTION 3: GAP ANALYSIS -->
+<div class="section" id="section-3">
+  <div class="section-header">
+    <div class="section-num">03</div>
+    <div>
+      <div class="section-title">Gap Analysis</div>
+      <div class="section-subtitle">The six modules needed to close the gap</div>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background: var(--red-light); color: var(--red);">&#9873;</div>
+        <div class="card-title">1. Lead Scoring &amp; Bucket System</div>
+      </div>
+      <p>Classify every opportunity as Bucket A/B/C with auto-scoring based on signals (budget mentioned, timeline given, decision-maker present). Drive all downstream automation from the bucket.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background: var(--blue-light); color: var(--blue);">&#128197;</div>
+        <div class="card-title">2. Activity &amp; Meeting Tracker</div>
+      </div>
+      <p>Log calls, meetings, and messages tied to opportunities. Track BAMFAM compliance (did the call end with a booked next step?). Surface overdue follow-ups.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background: var(--amber-light); color: var(--amber);">&#9889;</div>
+        <div class="card-title">3. Automated Sequences</div>
+      </div>
+      <p>Bucket-driven follow-up cadences. When a lead enters Bucket B, the 21-day nurture sequence auto-queues. When a proposal is sent, the Day 3/7/14 follow-ups queue automatically.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background: var(--green-light); color: var(--green);">&#128200;</div>
+        <div class="card-title">4. Sales Dashboard</div>
+      </div>
+      <p>Real-time metrics: Phil's DMs sent, response rate, meetings booked. Jdot's close rate, avg deal size, pipeline value. Weekly rhythm scorecards.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background: var(--accent-light); color: var(--accent);">&#128196;</div>
+        <div class="card-title">5. Proposal &amp; Document Builder</div>
+      </div>
+      <p>Generate proposals from opportunity data. Auto-populate situation recap, scope, pricing. Track proposal status (sent, viewed, signed). Step-down to Korea Market Audit.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background: #FFF0F5; color: #DB2777;">&#128161;</div>
+        <div class="card-title">6. Trigger Event Monitor</div>
+      </div>
+      <p>Track competitor movements, exchange listings, funding rounds, and team hires. Auto-flag relevant Bucket B/C leads for re-engagement when triggers fire.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 4: PROPOSED FEATURES -->
+<div class="section" id="section-4">
+  <div class="section-header">
+    <div class="section-num">04</div>
+    <div>
+      <div class="section-title">Proposed Features in Detail</div>
+      <div class="section-subtitle">What each module looks like inside the CRM</div>
+    </div>
+  </div>
+
+  <!-- 4A: BUCKET SYSTEM -->
+  <h3>4A. Lead Bucket System</h3>
+  <p>Every opportunity gets a <strong>bucket</strong> field and a <strong>temperature score</strong> (0-100). The bucket determines the playbook track.</p>
+
+  <div class="compare-grid">
+    <div class="compare-col">
+      <div class="compare-header current">Current Pipeline Stages</div>
+      <div class="compare-body">
+        <ul>
+          <li>new &rarr; contacted &rarr; qualified &rarr; unqualified</li>
+          <li>deal_qualified &rarr; proposal &rarr; negotiation &rarr; contract &rarr; closed_won/lost</li>
+          <li>No temperature or readiness indicator</li>
+          <li>Manual stage progression only</li>
+        </ul>
+      </div>
+    </div>
+    <div class="compare-col">
+      <div class="compare-header proposed">Proposed: Stages + Buckets</div>
+      <div class="compare-body">
+        <ul>
+          <li>Same stages, PLUS a <strong>bucket</strong> field (A/B/C) on every opportunity</li>
+          <li><strong>Auto-scoring</strong> based on: budget signal, timeline given, decision-maker identified, Korea mentioned unprompted</li>
+          <li>Bucket drives which <strong>sequence</strong> fires and which <strong>templates</strong> surface</li>
+          <li>Bucket can change as new signals arrive</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-bar">
+      <div class="mockup-dot"></div>
+      <div class="mockup-dot"></div>
+      <div class="mockup-dot"></div>
+      <span style="margin-left: 8px; font-size: 12px; color: var(--gray-500);">Pipeline &mdash; Kanban View</span>
+    </div>
+    <div class="mockup-body">
+      <div style="display: flex; gap: 16px;">
+        <div style="flex: 1; background: var(--gray-50); border-radius: 8px; padding: 12px;">
+          <div style="font-size: 12px; font-weight: 700; color: var(--gray-400); margin-bottom: 8px;">QUALIFIED</div>
+          <div style="background: white; border: 1px solid var(--gray-200); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 600; font-size: 13px;">Nexus Protocol</span>
+              <span class="badge badge-green" style="font-size: 10px;">A</span>
+            </div>
+            <div style="font-size: 11px; color: var(--gray-500); margin-top: 4px;">$60K &middot; DeFi &middot; Score: 85</div>
+            <div style="font-size: 11px; color: var(--green); margin-top: 4px;">&#10003; BAMFAM: Proposal call Thu 2pm</div>
+          </div>
+          <div style="background: white; border: 1px solid var(--gray-200); border-radius: 6px; padding: 10px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 600; font-size: 13px;">Orbit Finance</span>
+              <span class="badge badge-amber" style="font-size: 10px;">B</span>
+            </div>
+            <div style="font-size: 11px; color: var(--gray-500); margin-top: 4px;">$45K &middot; L2 &middot; Score: 52</div>
+            <div style="font-size: 11px; color: var(--amber); margin-top: 4px;">&#9200; Nurture Day 8 &mdash; Value touch due</div>
+          </div>
+          <div style="background: white; border: 1px solid var(--gray-200); border-radius: 6px; padding: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 600; font-size: 13px;">ChainVault</span>
+              <span class="badge badge-gray" style="font-size: 10px;">C</span>
+            </div>
+            <div style="font-size: 11px; color: var(--gray-500); margin-top: 4px;">TBD &middot; Infra &middot; Score: 20</div>
+            <div style="font-size: 11px; color: var(--gray-400); margin-top: 4px;">&#128337; Monthly nurture &mdash; Next: Mar 5</div>
+          </div>
+        </div>
+        <div style="flex: 1; background: var(--gray-50); border-radius: 8px; padding: 12px;">
+          <div style="font-size: 12px; font-weight: 700; color: var(--gray-400); margin-bottom: 8px;">PROPOSAL</div>
+          <div style="background: white; border: 1px solid var(--gray-200); border-radius: 6px; padding: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-weight: 600; font-size: 13px;">MetaGrid</span>
+              <span class="badge badge-green" style="font-size: 10px;">A</span>
+            </div>
+            <div style="font-size: 11px; color: var(--gray-500); margin-top: 4px;">$80K &middot; Gaming &middot; Score: 92</div>
+            <div style="font-size: 11px; color: var(--red); margin-top: 4px;">&#9888; Proposal sent 5 days ago &mdash; follow up overdue</div>
+          </div>
+        </div>
+        <div style="flex: 1; background: var(--gray-50); border-radius: 8px; padding: 12px;">
+          <div style="font-size: 12px; font-weight: 700; color: var(--gray-400); margin-bottom: 8px;">NEGOTIATION</div>
+          <div style="font-size: 12px; color: var(--gray-400); text-align: center; padding: 20px;">No deals</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4B: ACTIVITY TRACKER -->
+  <h3>4B. Activity &amp; Meeting Tracker</h3>
+  <p>Every opportunity gets an activity timeline. Calls, messages, proposals, and meetings are logged with metadata. BAMFAM compliance is tracked automatically.</p>
+
+  <ul class="feature-list">
+    <li><span class="feature-new">NEW</span> <strong>Activity log per opportunity:</strong> Call happened, message sent, proposal delivered, meeting booked &mdash; each with timestamp, owner, and notes</li>
+    <li><span class="feature-new">NEW</span> <strong>BAMFAM tracker:</strong> Every call/meeting must have a "Next Step" field. If empty, the card shows a warning badge.</li>
+    <li><span class="feature-new">NEW</span> <strong>Meeting scheduler:</strong> Book next meetings inline. Calendar view of upcoming sales meetings across all opportunities.</li>
+    <li><span class="feature-new">NEW</span> <strong>Pre-call prep checklist:</strong> Structured form that auto-fills from opportunity data (project basics, token status, competitors, prepared insight drops)</li>
+    <li><span class="feature-check">&#10003;</span> <strong>Telegram integration (exists):</strong> Link TG messages to the activity timeline automatically via existing webhook</li>
+  </ul>
+
+  <!-- 4C: TEMPLATES IN CONTEXT -->
+  <h3>4C. Stage-Linked Message Templates</h3>
+  <p>The playbook has specific messages for every touchpoint. Instead of making the team search the Templates page, we surface the right template at the right time.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Pipeline Stage</th>
+        <th>Bucket</th>
+        <th>Template Surfaced</th>
+        <th>Owner</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Contacted</td>
+        <td>All</td>
+        <td>Pre-call agenda setting message</td>
+        <td>Phil</td>
+      </tr>
+      <tr>
+        <td>Qualified (post-call)</td>
+        <td>A</td>
+        <td>Bucket A: same-day follow-up + case studies</td>
+        <td>Phil</td>
+      </tr>
+      <tr>
+        <td>Qualified (post-call)</td>
+        <td>B</td>
+        <td>Bucket B: same-day follow-up + data walkthrough offer</td>
+        <td>Phil</td>
+      </tr>
+      <tr>
+        <td>Qualified (post-call)</td>
+        <td>C</td>
+        <td>Bucket C: soft close, keep in loop</td>
+        <td>Phil</td>
+      </tr>
+      <tr>
+        <td>Nurture (Day 4-5)</td>
+        <td>B</td>
+        <td>Value touch V1/V2/V3 (competitor, data, results)</td>
+        <td>Phil</td>
+      </tr>
+      <tr>
+        <td>Nurture (Day 8-10)</td>
+        <td>B</td>
+        <td>Market signal message</td>
+        <td>Phil</td>
+      </tr>
+      <tr>
+        <td>Nurture (Day 14-21)</td>
+        <td>B</td>
+        <td>Soft re-engagement</td>
+        <td>Phil</td>
+      </tr>
+      <tr>
+        <td>Proposal (Day 3-4)</td>
+        <td>A</td>
+        <td>Post-proposal check-in</td>
+        <td>Phil</td>
+      </tr>
+      <tr>
+        <td>Proposal (Day 7)</td>
+        <td>A</td>
+        <td>Market intel value add</td>
+        <td>Phil</td>
+      </tr>
+      <tr>
+        <td>Proposal (Day 14)</td>
+        <td>A</td>
+        <td>Final check-in / reclassify to B</td>
+        <td>Phil</td>
+      </tr>
+      <tr>
+        <td>Monthly Nurture</td>
+        <td>B/C</td>
+        <td>Rotating: competitor intel, exchange data, case study, KOL signal</td>
+        <td>Phil</td>
+      </tr>
+      <tr>
+        <td>Re-engagement</td>
+        <td>B/C</td>
+        <td>Competitive / Social Proof / Breakup / Event re-engagement</td>
+        <td>Jdot</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-info">
+    <strong>Implementation Detail</strong>
+    Templates already exist in the <code>message_templates</code> table. We add a <code>stage</code> and <code>bucket</code> field to each template. When a user opens an opportunity at a given stage, the relevant templates auto-appear in a "Suggested Messages" panel.
+  </div>
+</div>
+
+<!-- SECTION 5: PIPELINE REDESIGN -->
+<div class="section" id="section-5">
+  <div class="section-header">
+    <div class="section-num">05</div>
+    <div>
+      <div class="section-title">Pipeline Redesign</div>
+      <div class="section-subtitle">Aligning pipeline stages with playbook workflow</div>
+    </div>
+  </div>
+
+  <h3>Current Pipeline Flow</h3>
+  <div class="flow">
+    <div class="flow-step active">New</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step active">Contacted</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step active">Qualified</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step active">Deal Qualified</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step active">Proposal</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step active">Negotiation</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step active">Contract</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step active">Won/Lost</div>
+  </div>
+
+  <h3>Proposed Pipeline Flow (Playbook-Aligned)</h3>
+  <div class="flow">
+    <div class="flow-step active">DM Sent</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step active">Response</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step new">Discovery<br><small>Booked</small></div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step new">Discovery<br><small>Done</small></div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step new">Proposal<br><small>Sent</small></div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step new">Proposal<br><small>Call</small></div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step active">Contract</div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step active">Won</div>
+  </div>
+  <p style="text-align: center; font-size: 12px; color: var(--gray-400); margin-top: 4px;"><span class="badge badge-blue" style="font-size: 10px;">NEW</span> = New stages aligned with playbook touchpoints</p>
+
+  <h3>Key Changes</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Change</th>
+        <th>Why</th>
+        <th>Playbook Reference</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Split "Contacted" into <strong>DM Sent</strong> + <strong>Response</strong></td>
+        <td>Track Phil's outreach volume separately from response rate</td>
+        <td>Section 15: Phil's Metrics &mdash; DMs sent, response rate</td>
+      </tr>
+      <tr>
+        <td>Add <strong>Discovery Booked</strong> stage</td>
+        <td>Track BAMFAM compliance &mdash; every response should lead to a booked call</td>
+        <td>Section 4: BAMFAM principle</td>
+      </tr>
+      <tr>
+        <td>Add <strong>Discovery Done</strong> stage</td>
+        <td>Trigger bucket assignment (A/B/C) and post-call sequences</td>
+        <td>Section 5: Post-Call First 24 Hours</td>
+      </tr>
+      <tr>
+        <td>Split "Proposal" into <strong>Sent</strong> + <strong>Call</strong></td>
+        <td>Track proposal-to-call conversion and follow-up cadence</td>
+        <td>Section 6: Fast Track Day 4-5</td>
+      </tr>
+      <tr>
+        <td>Add side-tracks: <strong>Nurture</strong> and <strong>Monthly</strong></td>
+        <td>Bucket B enters 21-day nurture. Bucket C enters monthly touches.</td>
+        <td>Sections 7, 10: Nurture Track, Monthly Nurture</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-warning">
+    <strong>Migration Note</strong>
+    Existing opportunities in old stages will be auto-mapped to the nearest new stage. No data loss. Stage history will preserve the original stage names.
+  </div>
+</div>
+
+<!-- SECTION 6: AUTOMATED SEQUENCES -->
+<div class="section" id="section-6">
+  <div class="section-header">
+    <div class="section-num">06</div>
+    <div>
+      <div class="section-title">Automated Sequences</div>
+      <div class="section-subtitle">The playbook cadences, running on autopilot</div>
+    </div>
+  </div>
+
+  <p>The playbook defines specific timing for every follow-up. Today, the team tracks this manually (or forgets). The CRM should queue these actions automatically and surface them as tasks.</p>
+
+  <h3>Sequence 1: Bucket A &mdash; Fast Track</h3>
+  <div class="mockup">
+    <div class="mockup-bar">
+      <div class="mockup-dot"></div><div class="mockup-dot"></div><div class="mockup-dot"></div>
+      <span style="margin-left: 8px; font-size: 12px; color: var(--gray-500);">Sequence Timeline &mdash; Bucket A</span>
+    </div>
+    <div class="mockup-body" style="padding: 24px;">
+      <div style="display: flex; gap: 0; align-items: stretch;">
+        <div style="flex: 1; text-align: center; padding: 12px 8px; border-right: 2px solid var(--gray-200); position: relative;">
+          <div style="font-size: 11px; font-weight: 700; color: var(--green);">DAY 0</div>
+          <div style="font-size: 12px; font-weight: 600; margin-top: 4px;">Discovery Call</div>
+          <div style="font-size: 11px; color: var(--gray-400); margin-top: 2px;">Jdot runs CLOSER</div>
+          <div style="font-size: 11px; color: var(--green); margin-top: 4px;">&#10003; BAMFAM: Book proposal call</div>
+        </div>
+        <div style="flex: 1; text-align: center; padding: 12px 8px; border-right: 2px solid var(--gray-200);">
+          <div style="font-size: 11px; font-weight: 700; color: var(--green);">DAY 0</div>
+          <div style="font-size: 12px; font-weight: 600; margin-top: 4px;">Post-Call TG</div>
+          <div style="font-size: 11px; color: var(--gray-400); margin-top: 2px;">Phil sends case studies</div>
+          <div style="font-size: 11px; color: var(--blue); margin-top: 4px;">&#128172; Auto-queued template</div>
+        </div>
+        <div style="flex: 1; text-align: center; padding: 12px 8px; border-right: 2px solid var(--gray-200);">
+          <div style="font-size: 11px; font-weight: 700; color: var(--primary);">DAY 2-3</div>
+          <div style="font-size: 12px; font-weight: 600; margin-top: 4px;">Proposal Prep</div>
+          <div style="font-size: 11px; color: var(--gray-400); margin-top: 2px;">Jdot builds custom proposal</div>
+          <div style="font-size: 11px; color: var(--blue); margin-top: 4px;">&#128196; Auto-generate from data</div>
+        </div>
+        <div style="flex: 1; text-align: center; padding: 12px 8px; border-right: 2px solid var(--gray-200);">
+          <div style="font-size: 11px; font-weight: 700; color: var(--primary);">DAY 4-5</div>
+          <div style="font-size: 12px; font-weight: 600; margin-top: 4px;">Proposal Call</div>
+          <div style="font-size: 11px; color: var(--gray-400); margin-top: 2px;">Walk through + BAMFAM</div>
+          <div style="font-size: 11px; color: var(--green); margin-top: 4px;">&#10003; BAMFAM: Book contract review</div>
+        </div>
+        <div style="flex: 1; text-align: center; padding: 12px 8px;">
+          <div style="font-size: 11px; font-weight: 700; color: var(--primary);">DAY 7-14</div>
+          <div style="font-size: 12px; font-weight: 600; margin-top: 4px;">Close</div>
+          <div style="font-size: 11px; color: var(--gray-400); margin-top: 2px;">Contract &rarr; Signed &rarr; Work begins</div>
+          <div style="font-size: 11px; color: var(--green); margin-top: 4px;">&#127881; Won! Create client record</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Sequence 2: Bucket B &mdash; 21-Day Nurture</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Day</th>
+        <th>Action</th>
+        <th>Owner</th>
+        <th>Auto-Triggered?</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>0</td>
+        <td>Discovery call done. Bucket classified as B. Post-call TG sent.</td>
+        <td>Jdot / Phil</td>
+        <td><span class="badge badge-green">Yes</span> Post-call template surfaces</td>
+      </tr>
+      <tr>
+        <td>4-5</td>
+        <td>First value touch: competitor intel OR market data OR campaign results</td>
+        <td>Phil</td>
+        <td><span class="badge badge-green">Yes</span> Task created, 3 template options shown</td>
+      </tr>
+      <tr>
+        <td>8-10</td>
+        <td>Second value touch: exchange/market signal</td>
+        <td>Phil</td>
+        <td><span class="badge badge-green">Yes</span> Task created with template</td>
+      </tr>
+      <tr>
+        <td>14-21</td>
+        <td>Soft re-engagement: "worth 15 min to walk through what changed?"</td>
+        <td>Phil</td>
+        <td><span class="badge badge-green">Yes</span> Task created with template</td>
+      </tr>
+      <tr>
+        <td>21</td>
+        <td>Temperature check. If warm &rarr; move to Bucket A. If cold &rarr; Monthly nurture.</td>
+        <td>Phil / Jdot</td>
+        <td><span class="badge badge-amber">Semi</span> System prompts for assessment</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Sequence 3: Post-Proposal Silence</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Day</th>
+        <th>Action</th>
+        <th>Auto-Triggered?</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>3-4</td><td>"any questions come up from the proposal?"</td><td><span class="badge badge-green">Yes</span></td></tr>
+      <tr><td>7</td><td>Market intel value add (no pressure)</td><td><span class="badge badge-green">Yes</span></td></tr>
+      <tr><td>14</td><td>Final follow-up. Auto-reclassify to Bucket B if no response.</td><td><span class="badge badge-green">Yes</span></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Sequence 4: Monthly Nurture (Bucket B/C)</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Month</th>
+        <th>Message Type</th>
+        <th>Auto-Triggered?</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>Competitor move OR exchange listing</td><td><span class="badge badge-green">Yes</span> Monthly task</td></tr>
+      <tr><td>2</td><td>Campaign results OR volume data</td><td><span class="badge badge-green">Yes</span></td></tr>
+      <tr><td>3</td><td>Content piece OR KOL signal</td><td><span class="badge badge-green">Yes</span></td></tr>
+      <tr><td>4-5 (no response)</td><td>Breakup message. Pause nurture. Door stays open.</td><td><span class="badge badge-green">Yes</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-primary">
+    <strong>How Sequences Work Technically</strong>
+    A new <code>crm_sequences</code> table stores queued actions per opportunity. A cron job (Supabase Edge Function) runs daily, checks for due actions, and creates tasks in the Tasks system with the appropriate template pre-loaded. Phil/Jdot see these as action items on their dashboard.
+  </div>
+</div>
+
+<!-- SECTION 7: SALES DASHBOARD -->
+<div class="section" id="section-7">
+  <div class="section-header">
+    <div class="section-num">07</div>
+    <div>
+      <div class="section-title">Sales Dashboard</div>
+      <div class="section-subtitle">The metrics from Section 15 of the playbook, live in the CRM</div>
+    </div>
+  </div>
+
+  <p>The playbook defines exact metrics for Phil, Jdot, and the overall business. Today these aren't tracked anywhere. The Sales Dashboard makes them real-time.</p>
+
+  <h3>Dashboard Mockup</h3>
+  <div class="mockup">
+    <div class="mockup-bar">
+      <div class="mockup-dot"></div><div class="mockup-dot"></div><div class="mockup-dot"></div>
+      <span style="margin-left: 8px; font-size: 12px; color: var(--gray-500);">Sales Dashboard &mdash; This Week</span>
+    </div>
+    <div class="mockup-body">
+      <!-- Phil's Row -->
+      <div style="margin-bottom: 20px;">
+        <div style="font-size: 13px; font-weight: 700; color: var(--gray-500); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Phil's Metrics</div>
+        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;">
+          <div style="background: var(--gray-50); border-radius: 8px; padding: 14px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--primary);">73</div>
+            <div style="font-size: 11px; color: var(--gray-500);">DMs Sent</div>
+            <div style="font-size: 10px; color: var(--amber);">Target: 100</div>
+          </div>
+          <div style="background: var(--gray-50); border-radius: 8px; padding: 14px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--primary);">3.2%</div>
+            <div style="font-size: 11px; color: var(--gray-500);">Response Rate</div>
+            <div style="font-size: 10px; color: var(--green);">Target: 3-4%</div>
+          </div>
+          <div style="background: var(--gray-50); border-radius: 8px; padding: 14px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--primary);">3</div>
+            <div style="font-size: 11px; color: var(--gray-500);">Meetings Booked</div>
+            <div style="font-size: 10px; color: var(--amber);">Target: 4-5</div>
+          </div>
+          <div style="background: var(--gray-50); border-radius: 8px; padding: 14px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--primary);">68%</div>
+            <div style="font-size: 11px; color: var(--gray-500);">Qualified (A+B)</div>
+            <div style="font-size: 10px; color: var(--green);">Target: 70%+</div>
+          </div>
+          <div style="background: var(--gray-50); border-radius: 8px; padding: 14px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--primary);">12/14</div>
+            <div style="font-size: 11px; color: var(--gray-500);">Value Touches</div>
+            <div style="font-size: 10px; color: var(--green);">86% coverage</div>
+          </div>
+        </div>
+      </div>
+      <!-- Jdot's Row -->
+      <div style="margin-bottom: 20px;">
+        <div style="font-size: 13px; font-weight: 700; color: var(--gray-500); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Jdot's Metrics</div>
+        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px;">
+          <div style="background: var(--gray-50); border-radius: 8px; padding: 14px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--primary);">3</div>
+            <div style="font-size: 11px; color: var(--gray-500);">Discovery Calls</div>
+            <div style="font-size: 10px; color: var(--green);">Target: 3-4</div>
+          </div>
+          <div style="background: var(--gray-50); border-radius: 8px; padding: 14px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--primary);">72%</div>
+            <div style="font-size: 11px; color: var(--gray-500);">Close Rate (A)</div>
+            <div style="font-size: 10px; color: var(--amber);">Target: 75%+</div>
+          </div>
+          <div style="background: var(--gray-50); border-radius: 8px; padding: 14px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--primary);">$58K</div>
+            <div style="font-size: 11px; color: var(--gray-500);">Avg Deal Size</div>
+            <div style="font-size: 10px; color: var(--amber);">Target: $60K+</div>
+          </div>
+          <div style="background: var(--gray-50); border-radius: 8px; padding: 14px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--primary);">11d</div>
+            <div style="font-size: 11px; color: var(--gray-500);">Avg Close Time</div>
+            <div style="font-size: 10px; color: var(--green);">Target: 7-14d</div>
+          </div>
+          <div style="background: var(--gray-50); border-radius: 8px; padding: 14px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--primary);">48%</div>
+            <div style="font-size: 11px; color: var(--gray-500);">Bucket A %</div>
+            <div style="font-size: 10px; color: var(--amber);">Target: 50%</div>
+          </div>
+        </div>
+      </div>
+      <!-- Pipeline Summary -->
+      <div>
+        <div style="font-size: 13px; font-weight: 700; color: var(--gray-500); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Pipeline Summary</div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+          <div style="background: var(--green-light); border-radius: 8px; padding: 14px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--green);">$340K</div>
+            <div style="font-size: 11px; color: var(--green);">Pipeline Value</div>
+          </div>
+          <div style="background: var(--blue-light); border-radius: 8px; padding: 14px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--blue);">6</div>
+            <div style="font-size: 11px; color: var(--blue);">Active Deals</div>
+          </div>
+          <div style="background: var(--amber-light); border-radius: 8px; padding: 14px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--amber);">3</div>
+            <div style="font-size: 11px; color: var(--amber);">Overdue Follow-ups</div>
+          </div>
+          <div style="background: var(--red-light); border-radius: 8px; padding: 14px; text-align: center;">
+            <div style="font-size: 24px; font-weight: 800; color: var(--red);">1</div>
+            <div style="font-size: 11px; color: var(--red);">BAMFAM Violations</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Weekly Rhythm Report (Auto-generated every Monday)</h3>
+  <p>The playbook defines a weekly rhythm (Section 16). Every Monday morning, the CRM auto-generates a report sent to the team TG channel:</p>
+  <ul>
+    <li><strong>Last week:</strong> Deals closed, revenue, conversion rates, DMs sent, meetings run</li>
+    <li><strong>This week:</strong> Scheduled calls, proposals due, nurture touches queued, follow-ups overdue</li>
+    <li><strong>Alerts:</strong> Stale leads (no contact in 7+ days), BAMFAM violations, Bucket B leads ready for re-assessment</li>
+  </ul>
+</div>
+
+<!-- SECTION 8: AI INTEGRATION -->
+<div class="section" id="section-8">
+  <div class="section-header">
+    <div class="section-num">08</div>
+    <div>
+      <div class="section-title">AI Integration</div>
+      <div class="section-subtitle">Making Holo GPT the playbook's co-pilot</div>
+    </div>
+  </div>
+
+  <p>We already have Holo GPT with agent orchestration. Here's how we level it up with playbook knowledge:</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background: var(--accent-light); color: var(--accent);">&#129302;</div>
+        <div class="card-title">Pre-Call Research Agent</div>
+      </div>
+      <p>Before a discovery call, Holo GPT auto-generates the pre-call prep doc: project basics (from CRM data), token data (from external APIs), competitor Korea presence, 2-3 suggested insight drops, and recommended bucket prediction.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background: var(--green-light); color: var(--green);">&#128172;</div>
+        <div class="card-title">Message Composer</div>
+      </div>
+      <p>Given the opportunity context and playbook stage, AI drafts personalized messages using the playbook templates as a base &mdash; filling in project name, competitor intel, market data. Phil reviews and sends.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background: var(--amber-light); color: var(--amber);">&#128200;</div>
+        <div class="card-title">Bucket Scoring Engine</div>
+      </div>
+      <p>After call notes are logged, AI analyzes the notes against playbook criteria (budget mentioned? timeline given? decision-maker present?) and suggests a bucket classification with reasoning.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background: var(--blue-light); color: var(--blue);">&#128270;</div>
+        <div class="card-title">Objection Coach</div>
+      </div>
+      <p>When Jdot logs an objection type on a call, Holo GPT surfaces the playbook's specific response script plus relevant NEPQ framework steps &mdash; available in real-time during the call if needed.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background: var(--red-light); color: var(--red);">&#128161;</div>
+        <div class="card-title">Trigger Event Scanner</div>
+      </div>
+      <p>AI monitors competitor announcements, exchange listings, and funding rounds (via RSS/APIs). When a trigger matches a Bucket B/C lead's category, it auto-creates a re-engagement task with a drafted message.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon" style="background: #FFF0F5; color: #DB2777;">&#128196;</div>
+        <div class="card-title">Proposal Generator</div>
+      </div>
+      <p>AI drafts a proposal from opportunity data: situation recap, Korea opportunity sizing, scope of work, timeline, pricing. Jdot reviews, customizes, and sends &mdash; cutting proposal prep from 2 hours to 20 minutes.</p>
+    </div>
+  </div>
+
+  <div class="callout callout-success">
+    <strong>Leveraging What Exists</strong>
+    The <code>agentOrchestrator.ts</code>, <code>agentTools.ts</code>, and <code>advancedAIService.ts</code> already provide the agent framework. We add new tools: <code>getOpportunityContext</code>, <code>draftPlaybookMessage</code>, <code>scoreBucket</code>, <code>generateProposal</code>, <code>scanTriggers</code>. The chat interface (<code>/chat</code>) becomes the playbook co-pilot.
+  </div>
+</div>
+
+<!-- SECTION 9: DATABASE SCHEMA -->
+<div class="section" id="section-9">
+  <div class="section-header">
+    <div class="section-num">09</div>
+    <div>
+      <div class="section-title">Database Schema Changes</div>
+      <div class="section-subtitle">New tables and columns needed</div>
+    </div>
+  </div>
+
+  <h3>Modified Tables</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Table</th>
+        <th>Change</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>crm_opportunities</code></td>
+        <td>Add: <code>bucket</code> (A/B/C), <code>temperature_score</code> (0-100), <code>next_meeting_at</code>, <code>next_meeting_type</code>, <code>bucket_changed_at</code>, <code>proposal_sent_at</code>, <code>discovery_call_at</code></td>
+        <td>Bucket system, BAMFAM tracking, sequence triggers</td>
+      </tr>
+      <tr>
+        <td><code>crm_contacts</code></td>
+        <td>Add: <code>is_decision_maker</code> (boolean), <code>influence_level</code> (champion/influencer/blocker)</td>
+        <td>Decision-maker mapping (Playbook Section 3)</td>
+      </tr>
+      <tr>
+        <td><code>message_templates</code></td>
+        <td>Add: <code>pipeline_stage</code>, <code>bucket</code>, <code>sequence_day</code>, <code>playbook_section</code></td>
+        <td>Context-aware template surfacing</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>New Tables</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Table</th>
+        <th>Key Columns</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>crm_activities</code></td>
+        <td><code>opportunity_id</code>, <code>type</code> (call/message/meeting/proposal/note), <code>title</code>, <code>description</code>, <code>outcome</code>, <code>next_step</code>, <code>next_step_date</code>, <code>owner_id</code>, <code>created_at</code></td>
+        <td>Activity timeline per opportunity. BAMFAM enforcement via next_step field.</td>
+      </tr>
+      <tr>
+        <td><code>crm_sequences</code></td>
+        <td><code>opportunity_id</code>, <code>sequence_type</code> (fast_track/nurture_21/post_proposal/monthly), <code>started_at</code>, <code>status</code> (active/paused/completed), <code>current_step</code></td>
+        <td>Track which automated sequence an opportunity is on.</td>
+      </tr>
+      <tr>
+        <td><code>crm_sequence_steps</code></td>
+        <td><code>sequence_id</code>, <code>step_number</code>, <code>due_date</code>, <code>action_type</code>, <code>template_id</code>, <code>status</code> (pending/done/skipped), <code>completed_at</code>, <code>completed_by</code></td>
+        <td>Individual steps within a sequence. Links to message templates. Creates tasks when due.</td>
+      </tr>
+      <tr>
+        <td><code>crm_trigger_events</code></td>
+        <td><code>event_type</code> (competitor_move/exchange_listing/funding_round/team_hire), <code>description</code>, <code>source_url</code>, <code>relevant_categories</code> (array), <code>matched_opportunities</code> (array), <code>created_at</code></td>
+        <td>Market trigger events that flag re-engagement opportunities.</td>
+      </tr>
+      <tr>
+        <td><code>crm_call_preps</code></td>
+        <td><code>opportunity_id</code>, <code>project_basics</code>, <code>token_status</code>, <code>recent_news</code>, <code>competitors</code>, <code>korea_presence</code>, <code>insight_drops</code> (array), <code>case_study_ref</code>, <code>call_objective</code>, <code>created_by</code></td>
+        <td>Structured pre-call preparation document (Playbook Section 3).</td>
+      </tr>
+      <tr>
+        <td><code>crm_proposals</code></td>
+        <td><code>opportunity_id</code>, <code>proposal_type</code> (full/audit), <code>situation_recap</code>, <code>opportunity_section</code>, <code>scope_section</code>, <code>results_roadmap</code>, <code>investment_terms</code>, <code>status</code> (draft/sent/viewed/accepted/rejected), <code>sent_at</code>, <code>created_by</code></td>
+        <td>Proposal builder and tracking (Playbook Section 8).</td>
+      </tr>
+      <tr>
+        <td><code>sales_metrics_daily</code></td>
+        <td><code>date</code>, <code>user_id</code>, <code>dms_sent</code>, <code>responses_received</code>, <code>meetings_booked</code>, <code>discovery_calls</code>, <code>proposals_sent</code>, <code>deals_closed</code>, <code>revenue_closed</code></td>
+        <td>Daily metric snapshots for dashboard and weekly reports.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- SECTION 10: ROADMAP -->
+<div class="section" id="section-10">
+  <div class="section-header">
+    <div class="section-num">10</div>
+    <div>
+      <div class="section-title">Implementation Roadmap</div>
+      <div class="section-subtitle">Three phases, incremental value at each step</div>
+    </div>
+  </div>
+
+  <div class="timeline">
+    <div class="timeline-item">
+      <div class="timeline-dot"></div>
+      <div class="timeline-label">Phase 1 &mdash; Foundation</div>
+      <div class="timeline-title">Pipeline Alignment + Activity Tracking</div>
+      <div class="timeline-desc">
+        <ul style="margin-top: 8px; font-size: 13px; color: var(--gray-500);">
+          <li>Add bucket field + temperature score to opportunities</li>
+          <li>Add new pipeline stages (DM Sent, Response, Discovery Booked/Done, Proposal Sent/Call)</li>
+          <li>Build <code>crm_activities</code> table and activity timeline UI on opportunity detail</li>
+          <li>Add BAMFAM next_meeting tracking with warning badges</li>
+          <li>Add decision-maker flag to contacts</li>
+          <li>Link message templates to stages + buckets</li>
+          <li>Build pre-call prep checklist form</li>
+        </ul>
+        <p style="margin-top: 8px;"><strong>Value delivered:</strong> Every opportunity has a clear bucket, activity history, and BAMFAM compliance. Templates surface at the right stage. Pre-call prep is structured.</p>
+      </div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot" style="background: var(--accent); box-shadow: 0 0 0 2px var(--accent);"></div>
+      <div class="timeline-label" style="color: var(--accent);">Phase 2 &mdash; Automation</div>
+      <div class="timeline-title">Sequences + Dashboard + Weekly Reports</div>
+      <div class="timeline-desc">
+        <ul style="margin-top: 8px; font-size: 13px; color: var(--gray-500);">
+          <li>Build sequence engine (<code>crm_sequences</code> + <code>crm_sequence_steps</code>)</li>
+          <li>Implement all 4 sequences: Fast Track, 21-Day Nurture, Post-Proposal, Monthly Nurture</li>
+          <li>Build Sales Dashboard page with Phil/Jdot metrics and pipeline summary</li>
+          <li>Build <code>sales_metrics_daily</code> table with auto-snapshot Edge Function</li>
+          <li>Auto-generate weekly Monday report to TG channel</li>
+          <li>Build proposal tracker (<code>crm_proposals</code> table + UI)</li>
+        </ul>
+        <p style="margin-top: 8px;"><strong>Value delivered:</strong> Follow-ups happen automatically. No lead falls through the cracks. Metrics are real-time. Monday standups have data.</p>
+      </div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot" style="background: var(--amber); box-shadow: 0 0 0 2px var(--amber);"></div>
+      <div class="timeline-label" style="color: var(--amber);">Phase 3 &mdash; Intelligence</div>
+      <div class="timeline-title">AI Co-pilot + Trigger Monitoring + Proposal Generator</div>
+      <div class="timeline-desc">
+        <ul style="margin-top: 8px; font-size: 13px; color: var(--gray-500);">
+          <li>Add playbook knowledge to Holo GPT (new agent tools)</li>
+          <li>Auto-generate pre-call research docs via AI</li>
+          <li>AI-assisted bucket scoring from call notes</li>
+          <li>Build trigger event scanner (RSS/API monitoring)</li>
+          <li>Auto-match triggers to Bucket B/C leads and create re-engagement tasks</li>
+          <li>AI proposal generator from opportunity context</li>
+          <li>Objection handling coach (real-time script surfacing)</li>
+        </ul>
+        <p style="margin-top: 8px;"><strong>Value delivered:</strong> The CRM doesn't just track &mdash; it thinks. Prep time drops 80%. Proposals are drafted in minutes. No market signal is missed.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>Summary: Before &amp; After</h3>
+  <div class="compare-grid">
+    <div class="compare-col">
+      <div class="compare-header current">Before (Playbook as Document)</div>
+      <div class="compare-body">
+        <ul>
+          <li>Team reads 17-section PDF and tries to remember</li>
+          <li>Follow-ups tracked in heads or scattered notes</li>
+          <li>No visibility into DM volume, response rates, or meeting counts</li>
+          <li>Proposals built from scratch each time</li>
+          <li>Bucket classification is a mental exercise</li>
+          <li>Trigger events noticed by chance</li>
+          <li>BAMFAM is aspirational, not enforced</li>
+          <li>Weekly rhythm depends on discipline</li>
+          <li>No way to measure playbook compliance</li>
+        </ul>
+      </div>
+    </div>
+    <div class="compare-col">
+      <div class="compare-header proposed">After (Playbook in CRM)</div>
+      <div class="compare-body">
+        <ul>
+          <li>Playbook actions are the CRM workflow &mdash; no memorization needed</li>
+          <li>Every follow-up is queued, templated, and tracked</li>
+          <li>Real-time dashboard with all playbook KPIs</li>
+          <li>AI generates proposal drafts from opportunity data</li>
+          <li>Auto-scoring classifies buckets from call data</li>
+          <li>Trigger events auto-scanned and matched to leads</li>
+          <li>BAMFAM enforced with warnings on every opportunity</li>
+          <li>Monday report auto-generated and sent to TG</li>
+          <li>Full audit trail of playbook execution per deal</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-primary">
+    <strong>The Goal</strong>
+    When a new salesperson joins, they don't read the playbook &mdash; they open the CRM, and the playbook tells them exactly what to do next. Every lead, every day, every touchpoint. No guesswork.
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  HoloHive &middot; Sales Playbook x CRM Integration Plan &middot; February 2026<br>
+  Prepared for management review. All features described are proposed enhancements to the existing KOL Campaign Manager.
+</div>
+
+</body>
+</html>

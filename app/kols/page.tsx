@@ -832,8 +832,8 @@ export default function KOLsPage() {
       <Table className="min-w-max whitespace-nowrap">
         <TableHeader>
           <TableRow className="bg-gray-50 border-b border-gray-200">
-            <TableHead className="bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
-            {visibleColumns.name && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Name</TableHead>}
+            <TableHead className="bg-gray-50 text-center whitespace-nowrap sticky left-0 z-20" style={{ width: 48, minWidth: 48, maxWidth: 48 }}>#</TableHead>
+            {visibleColumns.name && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap sticky left-[48px] z-20" style={{ boxShadow: '-1px 0 0 0 #e5e7eb, 2px 0 4px -2px rgba(0,0,0,0.1)' }}>Name</TableHead>}
             {visibleColumns.link && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Link</TableHead>}
             {visibleColumns.platform && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Platform</TableHead>}
             {visibleColumns.followers && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Followers</TableHead>}
@@ -2336,13 +2336,14 @@ export default function KOLsPage() {
       <div ref={tableContainerRef} className="border rounded-lg overflow-auto">
         <Table className="min-w-full" style={{
           tableLayout: 'auto',
-          borderCollapse: 'collapse',
+          borderCollapse: 'separate',
+          borderSpacing: 0,
           whiteSpace: 'nowrap'
         }} suppressHydrationWarning>
           <TableHeader>
             <TableRow className="bg-gray-50 border-b border-gray-200">
-              <TableHead className="bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
-              {visibleColumns.name && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Name</TableHead>}
+              <TableHead className="bg-gray-50 text-center whitespace-nowrap sticky left-0 z-20" style={{ width: 48, minWidth: 48, maxWidth: 48 }}>#</TableHead>
+              {visibleColumns.name && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap sticky left-[48px] z-20" style={{ boxShadow: '-1px 0 0 0 #e5e7eb, 2px 0 4px -2px rgba(0,0,0,0.1)' }}>Name</TableHead>}
               {visibleColumns.link && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Link</TableHead>}
               {visibleColumns.platform && (
                 <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">
@@ -2929,7 +2930,7 @@ export default function KOLsPage() {
               const isChecked = selectedKOLs.includes(kol.id);
               return (
                 <TableRow key={kol.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center text-gray-600 group`} style={{ verticalAlign: 'middle', width: 48 }}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden text-center text-gray-600 group sticky left-0 z-10`} style={{ verticalAlign: 'middle', width: 48, minWidth: 48, maxWidth: 48 }}>
                     <div className="flex items-center justify-center w-full h-full">
                       {isChecked ? (
                         <Checkbox
@@ -2964,7 +2965,7 @@ export default function KOLsPage() {
                     </div>
                   </TableCell>
                   {visibleColumns.name && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden sticky left-[48px] z-10`} style={{ boxShadow: '-1px 0 0 0 #e5e7eb, 2px 0 4px -2px rgba(0,0,0,0.1)' }}>
                       <div className="truncate flex items-center gap-1">
                         {(() => {
                           const isStale = kol.updated_at ?
@@ -3104,7 +3105,7 @@ export default function KOLsPage() {
 
       {/* Pagination Controls */}
       {paginationData.totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 px-4">
+        <div className="flex items-center justify-between mt-4 pb-14 px-4">
           <div className="text-sm text-gray-600">
             Showing {paginationData.startIndex + 1}-{Math.min(paginationData.endIndex, paginationData.totalItems)} of {paginationData.totalItems} KOLs
           </div>

@@ -2339,17 +2339,37 @@ export default function ClientsPage() {
                     Upload .docx
                   </Button>
                   <span className="text-xs text-gray-400">Gemini meeting notes only</span>
-                  <input
-                    ref={docUploadRef}
-                    type="file"
-                    accept=".docx"
-                    className="hidden"
-                    onChange={handleDocUpload}
-                  />
                 </div>
               )}
+              <input
+                ref={docUploadRef}
+                type="file"
+                accept=".docx"
+                className="hidden"
+                onChange={handleDocUpload}
+              />
               {isNoteFormOpen && (
                 <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">{editingNoteId ? 'Edit Note' : 'New Note'}</span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => docUploadRef.current?.click()}
+                        disabled={isParsingDoc}
+                      >
+                        {isParsingDoc ? (
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-600 mr-1" />
+                        ) : (
+                          <Upload className="h-3 w-3 mr-1" />
+                        )}
+                        Upload .docx
+                      </Button>
+                      <span className="text-[10px] text-gray-400">Gemini notes only</span>
+                    </div>
+                  </div>
                   <div className="grid gap-2">
                     <Label>Title <span className="text-red-500">*</span></Label>
                     <Input value={meetingNoteForm.title} onChange={(e) => setMeetingNoteForm({ ...meetingNoteForm, title: e.target.value })} placeholder="Meeting title" className="auth-input" />
