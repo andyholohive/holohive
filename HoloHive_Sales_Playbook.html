@@ -1,0 +1,2099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HoloHive Ultimate Sales Playbook v2.0</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --accent: #4A3FA8;
+      --accent-light: #F8F7FE;
+      --dark: #2C3E50;
+      --gray: #7F8C8D;
+      --light-gray: #F5F5F5;
+      --bg: #FAFAFA;
+      --white: #FFFFFF;
+      --green: #27AE60;
+      --green-light: #E8F5E9;
+      --red: #E74C3C;
+      --red-light: #FDEDEC;
+      --blue: #2980B9;
+      --blue-light: #E3F2FD;
+      --orange: #E67E22;
+      --orange-light: #FFF3E0;
+      --yellow: #F39C12;
+      --yellow-light: #FFF8E1;
+      --border: #D5D8DC;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      color: var(--dark);
+      background: var(--bg);
+      line-height: 1.6;
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 260px;
+      height: 100vh;
+      background: var(--white);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 32px 20px;
+      z-index: 100;
+    }
+
+    .sidebar-header {
+      margin-bottom: 32px;
+      padding-bottom: 24px;
+      border-bottom: 2px solid var(--accent);
+    }
+
+    .sidebar-logo {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .sidebar-subtitle {
+      font-size: 12px;
+      color: var(--gray);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .sidebar-search {
+      margin-bottom: 24px;
+    }
+
+    .sidebar-search input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--dark);
+    }
+
+    .sidebar-search input::placeholder {
+      color: var(--gray);
+    }
+
+    .toc-list {
+      list-style: none;
+    }
+
+    .toc-item {
+      margin-bottom: 8px;
+    }
+
+    .toc-link {
+      display: block;
+      padding: 12px 16px;
+      color: var(--dark);
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border-left: 3px solid transparent;
+    }
+
+    .toc-link:hover {
+      background: var(--light-gray);
+      border-left-color: var(--accent);
+    }
+
+    .toc-link.active {
+      background: var(--accent);
+      color: var(--white);
+      border-left-color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* MAIN CONTENT */
+    .main {
+      margin-left: 260px;
+      padding: 48px 40px;
+      max-width: 1000px;
+    }
+
+    .content-area {
+      max-width: 780px;
+    }
+
+    /* COVER SECTION */
+    .cover {
+      background: linear-gradient(135deg, var(--accent) 0%, #5a4fb3 100%);
+      color: var(--white);
+      padding: 80px 40px;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 48px;
+      box-shadow: 0 4px 12px rgba(74, 63, 168, 0.15);
+    }
+
+    .cover-title {
+      font-size: 48px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      line-height: 1.2;
+    }
+
+    .cover-divider {
+      width: 100px;
+      height: 3px;
+      background: var(--white);
+      margin: 20px auto;
+    }
+
+    .cover-version {
+      font-size: 28px;
+      color: rgba(255, 255, 255, 0.9);
+      margin-bottom: 32px;
+    }
+
+    .cover-subtitle {
+      font-size: 18px;
+      font-style: italic;
+      opacity: 0.95;
+      margin-bottom: 40px;
+      line-height: 1.5;
+    }
+
+    .cover-footer {
+      font-size: 14px;
+      opacity: 0.85;
+    }
+
+    /* SECTIONS */
+    .section {
+      background: var(--white);
+      border-radius: 8px;
+      padding: 40px;
+      margin-bottom: 32px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .section::before {
+      content: attr(data-number);
+      position: absolute;
+      top: 0;
+      right: 0;
+      font-size: 120px;
+      font-weight: 800;
+      color: rgba(74, 63, 168, 0.05);
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    .section-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 3px solid var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    h1::before {
+      content: '';
+      display: inline-block;
+      width: 40px;
+      height: 40px;
+      background: var(--accent);
+      color: var(--white);
+      border-radius: 50%;
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    h2 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--dark);
+      margin-top: 32px;
+      margin-bottom: 16px;
+      padding-left: 16px;
+      border-left: 4px solid var(--accent);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+
+    h2::after {
+      content: '▼';
+      font-size: 12px;
+      transition: transform 0.3s ease;
+      margin-left: 12px;
+    }
+
+    h2.collapsed::after {
+      transform: rotate(-90deg);
+    }
+
+    h3 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #555;
+      margin-top: 24px;
+      margin-bottom: 12px;
+    }
+
+    /* COLLAPSIBLE CONTENT */
+    .subsection {
+      margin-left: 0;
+      max-height: 10000px;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .subsection.collapsed {
+      max-height: 0;
+    }
+
+    /* PARAGRAPHS AND TEXT */
+    p {
+      margin-bottom: 16px;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    /* LISTS */
+    ul, ol {
+      margin: 16px 0 16px 24px;
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    li {
+      margin-bottom: 12px;
+    }
+
+    ul li::marker {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    /* MESSAGE BOXES */
+    .msg-box {
+      background: var(--accent-light);
+      border-left: 4px solid var(--accent);
+      border-radius: 0 8px 8px 0;
+      padding: 24px;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+
+    .msg-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--gray);
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    .msg-sender {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .msg-text {
+      font-size: 14px;
+      color: #333;
+      font-style: italic;
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .msg-text:last-child {
+      margin-bottom: 0;
+    }
+
+    /* CALLOUT BOXES */
+    .callout {
+      border-left: 4px solid;
+      border-radius: 0 8px 8px 0;
+      padding: 24px;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+
+    .callout-red {
+      border-color: var(--red);
+      background: rgba(231, 76, 60, 0.05);
+    }
+
+    .callout-green {
+      border-color: var(--green);
+      background: rgba(39, 174, 96, 0.05);
+    }
+
+    .callout-blue {
+      border-color: var(--blue);
+      background: rgba(41, 128, 185, 0.05);
+    }
+
+    .callout-orange {
+      border-color: var(--orange);
+      background: rgba(230, 126, 34, 0.05);
+    }
+
+    .callout p {
+      margin-bottom: 12px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .callout p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* TABLES */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+
+    th {
+      background: var(--accent);
+      color: var(--white);
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 700;
+      border: 1px solid var(--border);
+    }
+
+    th:first-child {
+      border-top-left-radius: 6px;
+    }
+
+    th:last-child {
+      border-top-right-radius: 6px;
+    }
+
+    td {
+      padding: 12px 16px;
+      border: 1px solid var(--border);
+    }
+
+    tr:nth-child(even) td {
+      background: #F8F9FA;
+    }
+
+    tr:nth-child(odd) td {
+      background: var(--white);
+    }
+
+    /* SCROLL SPY */
+    .toc-link {
+      opacity: 0.6;
+    }
+
+    .toc-link.active {
+      opacity: 1;
+    }
+
+    /* PRINT STYLES */
+    @media print {
+      .sidebar {
+        display: none;
+      }
+
+      .main {
+        margin-left: 0;
+        padding: 20px;
+      }
+
+      .content-area {
+        max-width: 100%;
+      }
+
+      section {
+        page-break-inside: avoid;
+      }
+    }
+
+    /* MOBILE STYLES */
+    @media (max-width: 768px) {
+      .sidebar {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: auto;
+        max-height: 60vh;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 16px;
+      }
+
+      .sidebar.collapsed {
+        max-height: 60px;
+      }
+
+      .main {
+        margin-left: 0;
+        padding: 20px;
+        margin-top: 80px;
+      }
+
+      h1 {
+        font-size: 24px;
+      }
+
+      h2 {
+        font-size: 18px;
+      }
+
+      .cover-title {
+        font-size: 32px;
+      }
+
+      .section {
+        padding: 24px;
+      }
+    }
+
+    .toc-item {
+      font-size: 12px;
+    }
+
+    .toc-link {
+      padding: 10px 12px;
+    }
+
+    /* Additional spacing */
+    .spacer {
+      height: 8px;
+    }
+
+    strong {
+      font-weight: 700;
+    }
+
+    em {
+      font-style: italic;
+    }
+
+    /* Section numbering */
+    .section-num {
+      display: inline-block;
+      background: var(--accent);
+      color: var(--white);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 36px;
+      font-weight: 700;
+      font-size: 14px;
+      margin-right: 12px;
+    }
+  </style>
+</head>
+<body>
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">HoloHive</div>
+      <div class="sidebar-subtitle">Sales Playbook v2.0</div>
+    </div>
+
+    <div class="sidebar-search">
+      <input type="text" id="searchInput" placeholder="Search sections...">
+    </div>
+
+    <ul class="toc-list">
+      <li class="toc-item"><a class="toc-link" href="#section-01">01. The Philosophy</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-02">02. The Three Lead Buckets</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-03">03. Pre-Call Preparation</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-04">04. Discovery Call Script</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-05">05. Post-Call: First 24 Hours</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-06">06. Fast Track</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-07">07. Nurture Track: 21 Days</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-08">08. Proposal Framework</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-09">09. Objection Handling</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-10">10. Monthly Nurture</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-11">11. Re-Engagement</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-12">12. Email Templates</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-13">13. Content Calendar</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-14">14. Materials Checklist</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-15">15. Metrics & Tracking</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-16">16. Weekly Rhythm</a></li>
+      <li class="toc-item"><a class="toc-link" href="#section-17">Summary: 7-Step Framework</a></li>
+    </ul>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main">
+    <div class="content-area">
+
+      <!-- COVER -->
+      <div class="cover">
+        <h1 style="border: none; color: var(--white); font-size: 48px; margin-bottom: 16px;">HoloHive Ultimate Sales Playbook</h1>
+        <div class="cover-divider"></div>
+        <div class="cover-version">v2.0</div>
+        <div class="cover-subtitle">From First DM to Signed Deal. Every Step, Script, Template, and Sequence. Built for Jdot, Phil, and Yano. No Guesswork.</div>
+        <div class="cover-footer">Last Updated: February 2025</div>
+      </div>
+
+      <!-- SECTION 01 -->
+      <section class="section" id="section-01" data-number="01">
+        <div class="section-content">
+          <h1>01. The Philosophy</h1>
+
+          <p>Everything in this playbook comes from one place: we succeed when we understand the problem better than the client does.</p>
+
+          <p>We are not here to convince. We are here to diagnose. The ones who move are the ones who already know, in their gut, that they need Korea. Our job is to crystallize that gut feeling into a clear path forward.</p>
+
+          <p>Seven principles guide this entire approach.</p>
+
+          <h2 onclick="toggleSubsection(event)">Principle 1: Hormozi's Value Equation</h2>
+          <div class="subsection">
+            <p>Value = (Quality of Offer + Clarity + Scarcity of Opportunity) / (Time to Implementation + Effort Required + Skepticism Friction)</p>
+
+            <p>Everything we do increases the numerator and decreases the denominator. Better insight drops increase perceived value. Clear outcomes and timelines reduce friction. Scarcity of the Korea window decreases perceived friction.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Principle 2: Give Away Secrets</h2>
+          <div class="subsection">
+            <p>Every discovery call includes 2-3 insight drops. These insights are diagnostic. They show we understand the market, the category, the competitive landscape, the cultural nuances. The ones who get it will feel like we are the only ones who see clearly. That feeling earns the right to propose.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Principle 3: Chet Holmes' Pyramid</h2>
+          <div class="subsection">
+            <p>Most of your market is in education mode. Maybe 3% are ready to buy right now. Your job is not to convert that 3%. It is to move people up the pyramid. From 'I don't know this exists' to 'I know this exists' to 'I'm considering it' to 'I'm ready.' This playbook is structured around that movement.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Principle 4: Priestley's Oversubscribed</h2>
+          <div class="subsection">
+            <p>Jdot operates as if HoloHive is booked up. We don't chase. We qualify. We have done this before. We know what works. Teams that are ready move fast. Teams that aren't don't. We respect both.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Principle 5: Blair Enns' Win Without Pitching</h2>
+          <div class="subsection">
+            <p>A pitch is a presentation. A pitch assumes they need convincing. We do diagnosis instead. We ask the questions they should have already asked themselves. When they sit with those questions for a moment, they realize we are the only ones asking them. That realization IS the sale.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Principle 6: Hormozi's CLOSER Framework</h2>
+          <div class="subsection">
+            <p>Every call follows this structure:</p>
+            <p><strong>Clarify.</strong> Ask the right diagnostic questions. Understand where they are and where they want to be.</p>
+            <p><strong>Label.</strong> Reflect back what you heard. Show them you understand.</p>
+            <p><strong>Overview.</strong> Share the market reality. Plant insight drops. Show them the opportunity.</p>
+            <p><strong>Sell the Vacation.</strong> Paint the picture of what success looks like. Not the tasks. The destination.</p>
+            <p><strong>Explain Away Concerns.</strong> Preempt objections. Address the bear market. Acknowledge the risk. Show why now still makes sense.</p>
+            <p><strong>Reinforce the Decision.</strong> Book the next meeting. Momentum only lives in the booked meeting.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Principle 7: Expert Diagnosis, Not Free Consulting</h2>
+          <div class="subsection">
+            <p>The discovery call is diagnostic. Share WHAT is happening. Why the Korea window is closing. Why this category is moving. Why their competitors are positioned differently. That is diagnosis.</p>
+
+            <p>Keep the HOW for the engagement. The strategy. The specific campaigns. The KOL strategy for their token. The community playbook. That is what they pay for.</p>
+
+            <p>The moment you start explaining tactics, you become a consultant giving away the value. You become one of the agencies they're comparing. Stay in diagnosis mode.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">What This Means Practically</h2>
+          <div class="subsection">
+            <ul>
+              <li>Before every call, Jdot knows what insights to drop. Not generic. Specific to the project.</li>
+              <li>Every message sounds human. Casual but knowledgeable. Not corporate. Not salesy.</li>
+              <li>Every call ends with a booked next meeting. BAMFAM. Book A Meeting From A Meeting. Momentum dies the moment a call ends without a follow-up booked.</li>
+              <li>Objections are prevented, not fought. If Jdot runs the CLOSER framework correctly, 70% of objections never come up.</li>
+              <li>Scarcity is real. The Korea window is actually closing. We are not making this up. This is the only sales tactic that works in this playbook because it is true.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 02 -->
+      <section class="section" id="section-02" data-number="02">
+        <div class="section-content">
+          <h1>02. The Three Lead Buckets</h1>
+
+          <p>Not all qualified leads are equally ready. The difference between a Bucket A and a Bucket B is weeks. Maybe a month. So we treat them differently.</p>
+
+          <p>The question that sorts them: If I offered you to start next week, would you say yes?</p>
+
+          <h2 onclick="toggleSubsection(event)">Bucket A: Ready Now</h2>
+          <div class="subsection">
+            <p>These leads are warm. They know Korea matters. They have allocated budget. They want to move but they don't know who to trust or how to start.</p>
+
+            <p><strong>Characteristics:</strong></p>
+            <ul>
+              <li>Mentioned Korea unprompted</li>
+              <li>Asked about timeline and pricing on the first call</li>
+              <li>Budget already approved or available</li>
+              <li>Decision-maker is on the call</li>
+              <li>No significant blockers (no 'need to talk to my team')</li>
+            </ul>
+
+            <p><strong>Jdot's move:</strong></p>
+            <ul>
+              <li>Discovery call happens Tuesday or Wednesday</li>
+              <li>Proposal call happens that Friday or the following Monday</li>
+              <li>Contract signed by mid-week or the following week</li>
+              <li>Work starts within 1-2 weeks</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Bucket B: Interested, Not Ready</h2>
+          <div class="subsection">
+            <p>These leads are warm but not hot. They see Korea as strategic but there is friction. Budget is there but needs approval. Team is skeptical. Timing might be off.</p>
+
+            <p><strong>Characteristics:</strong></p>
+            <ul>
+              <li>Asked good questions on discovery call</li>
+              <li>Saw the value in the insight drops</li>
+              <li>Need to talk to their team or partner</li>
+              <li>Budget exists but might be allocated elsewhere</li>
+              <li>Market conditions make them hesitant</li>
+            </ul>
+
+            <p><strong>Jdot's move:</strong></p>
+            <ul>
+              <li>Discovery call to map the real blocker</li>
+              <li>A 2-3 week nurture sequence with market data and social proof</li>
+              <li>Soft re-engagement when the blocker changes (market shifts, competitor moves, etc.)</li>
+              <li>Proposal call when they're warm</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Bucket C: Early Stage / Exploratory</h2>
+          <div class="subsection">
+            <p>These leads are cold. Korea is not yet on the priority list. They are checking. They are curious. But they are not ready. No timeline. No budget allocated. No real decision-making pressure.</p>
+
+            <p><strong>Characteristics:</strong></p>
+            <ul>
+              <li>Asked about Korea out of curiosity, not conviction</li>
+              <li>No budget allocated</li>
+              <li>Team hasn't discussed Korea at all</li>
+              <li>Timing unclear</li>
+              <li>Someone said 'maybe later'</li>
+            </ul>
+
+            <p><strong>Jdot's move:</strong></p>
+            <ul>
+              <li>No proposal call</li>
+              <li>Monthly value touches</li>
+              <li>Watch for trigger events: competitor moves, market shift, new funding, new team hire</li>
+              <li>When a trigger fires, Jdot re-engages and moves them up to Bucket B</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">The Decision Framework</h2>
+          <div class="subsection">
+            <p>At the end of every discovery call, Jdot knows which bucket they are in. This determines what happens next.</p>
+            <ul>
+              <li><strong>Bucket A.</strong> Book proposal call before hanging up.</li>
+              <li><strong>Bucket B.</strong> Book a data walkthrough before hanging up. This is different. Not a proposal. Just value sharing.</li>
+              <li><strong>Bucket C.</strong> No next meeting booked. Monthly nurture only.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 03 -->
+      <section class="section" id="section-03" data-number="03">
+        <div class="section-content">
+          <h1>03. Pre-Call Preparation</h1>
+
+          <p>The 10 minutes before a discovery call matter more than most people think. Jdot's natural expertise is the weapon. Preparation loads that weapon.</p>
+
+          <h2 onclick="toggleSubsection(event)">Research Checklist (10 min before every call)</h2>
+          <div class="subsection">
+            <p>Before Jdot gets on a discovery call, Phil sends a quick research document covering:</p>
+            <ul>
+              <li>Project basics. What do they do? What stage? Pre-TGE, post-TGE, or established?</li>
+              <li>Token status. Launched? Price trajectory? Volume distribution by region?</li>
+              <li>Recent news. Last 2 weeks of announcements, tweets, partnerships.</li>
+              <li>Funding. How much raised? From who? When?</li>
+              <li>Team. Who are the decision-makers? Is the person on the call the one who signs?</li>
+              <li>Competitors. Are any of their competitors already in Korea?</li>
+              <li>Korea presence. Do they already have any Korean community, KOLs, or exchange listings?</li>
+              <li>Prepared insight drops. 2-3 tailored insights based on the above.</li>
+              <li>Case study ready. Have a relevant example loaded and ready to reference.</li>
+              <li>Call objective clear. Bucket A close? Bucket B nurture setup? Or exploratory?</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Decision-Maker Mapping</h2>
+          <div class="subsection">
+            <p>Before the call, try to figure out who makes the decision on a $30-100K spend. If the person on the call isn't the decision-maker, your discovery call strategy shifts. Instead of closing, you are building an internal champion.</p>
+
+            <p>Early in the call, ask: 'Walk me through how your team makes decisions on new partners or vendors. Is this something you'd decide, or does it go through a team review?'</p>
+
+            <p>This one question saves weeks of back-and-forth later.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Agenda Setting (Send 24-48 Hours Before)</h2>
+          <div class="subsection">
+            <p>Phil sends this message via TG:</p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">hey [name]. looking forward to our call [day]. here's what i'm thinking for our time together: i want to understand where you're at with Korea, share a few things i'm seeing in the market that might be relevant, and if it makes sense we can talk about what working together could look like. if there's anything specific you want to cover, let me know.</div>
+            </div>
+
+            <p>Why this works. Sets expectations. Positions Jdot as the one driving the agenda (frame control). Gives them permission to add their own topics. Makes the call feel structured, not salesy.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 04 -->
+      <section class="section" id="section-04" data-number="04">
+        <div class="section-content">
+          <h1>04. Discovery Call Script and Framework</h1>
+
+          <p>The discovery call is the most important touchpoint in the entire process. It is where trust is built or broken. This framework is built on Hormozi's CLOSER structure adapted for HoloHive.</p>
+
+          <h2 onclick="toggleSubsection(event)">The Discovery Call Has 5 Jobs</h2>
+          <div class="subsection">
+            <ol>
+              <li>Diagnose their Korea situation. Where they are, where they want to be, what is blocking them.</li>
+              <li>Demonstrate expertise through diagnosis, not free consulting. Show you understand their problem at a level they did not expect.</li>
+              <li>Plant repeatable soundbites they will share with their team after the call.</li>
+              <li>Map the decision-making process. Who decides? What is the timeline?</li>
+              <li>Book the next meeting before hanging up. BAMFAM.</li>
+            </ol>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Phase 1: Open and Agenda (2 min)</h2>
+          <div class="subsection">
+            <p><strong>What Jdot says:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Opening:</div>
+              <div class="msg-text">Appreciate you jumping on. Before we dive in, here is what I am thinking. I want to understand where you are at with Korea, share a few things I am seeing in the market for [their category], and if it makes sense we can talk about next steps. Sound good? Anything you want to make sure we cover?</div>
+            </div>
+
+            <p>Why. Sets the frame. Jdot owns the agenda. Gives them space to add topics.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Phase 2: Clarify and Diagnose (8-12 min)</h2>
+          <div class="subsection">
+            <p>Run the SPIN questions adapted for Korea context.</p>
+
+            <h3>Situation Questions</h3>
+            <ul>
+              <li>Tell me about your current community strategy.</li>
+              <li>How are you currently building presence outside the US?</li>
+              <li>What regions or markets are on your radar right now?</li>
+            </ul>
+
+            <h3>Problem Questions</h3>
+            <ul>
+              <li>What is the biggest challenge you are facing in non-US markets?</li>
+              <li>How has the bear market affected your community building plans?</li>
+              <li>What would change for you if one of your competitors had significant Korea presence and you did not?</li>
+            </ul>
+
+            <h3>Implication Questions</h3>
+            <ul>
+              <li>So if you had strong Korea presence, what would that look like for your token metrics?</li>
+              <li>If you did not build this in the next 6 months, what happens when competition increases?</li>
+            </ul>
+
+            <h3>Need-Payoff Questions</h3>
+            <ul>
+              <li>What would be valuable about having a Korea strategy that actually moves the needle?</li>
+              <li>What would success look like in Korea for your project?</li>
+            </ul>
+
+            <h3>Decision-Maker Question</h3>
+            <ul>
+              <li>Quick question on logistics. If Korea made sense for you, walk me through how that decision would get made on your end. Is this your call, or does it go through a team review?</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Phase 3: The Insight Drop (5-8 min)</h2>
+          <div class="subsection">
+            <div class="callout callout-red">
+              <p><strong>Critical Rule:</strong> Share 2-3 diagnostic insights, not free strategy. Show them WHAT is happening (diagnosis). Keep the HOW (implementation strategy) for the paid engagement. You are proving you understand their world better than anyone. That is what earns the right to propose.</p>
+            </div>
+
+            <p>Five insight drop types:</p>
+
+            <h3>Competitor Intel</h3>
+            <div class="msg-box">
+              <div class="msg-label">Example:</div>
+              <div class="msg-sender">Jdot:</div>
+              <div class="msg-text">I actually know [competitor]. They signed with a Korean agency last month. Already running KOL campaigns. About 60 days ahead of where you would be starting.</div>
+            </div>
+
+            <h3>Market Data</h3>
+            <div class="msg-box">
+              <div class="msg-label">Example:</div>
+              <div class="msg-sender">Jdot:</div>
+              <div class="msg-text">Korean exchanges process more spot volume for [their category] tokens than any other region. The volume opportunity alone is significant for a token like yours.</div>
+            </div>
+
+            <h3>Exchange Intel</h3>
+            <div class="msg-box">
+              <div class="msg-label">Example:</div>
+              <div class="msg-sender">Jdot:</div>
+              <div class="msg-text">Upbit and Bithumb are actively looking for [their category] projects right now. The listing window is favorable, which isn't always the case.</div>
+            </div>
+
+            <h3>Cultural Insight</h3>
+            <div class="msg-box">
+              <div class="msg-label">Example:</div>
+              <div class="msg-sender">Jdot:</div>
+              <div class="msg-text">Korean crypto community moves differently than Western markets. When a KOL picks up a project, the community follows fast. But if you try to enter without a Korean-speaking team, it backfires.</div>
+            </div>
+
+            <h3>Client Result</h3>
+            <div class="msg-box">
+              <div class="msg-label">Example:</div>
+              <div class="msg-sender">Jdot:</div>
+              <div class="msg-text">We ran a campaign for a project similar to yours. Same category, similar stage. Got them [specific metric] in about [timeline].</div>
+            </div>
+
+            <p><strong>Soundbite Rule.</strong> After each insight, pause. Let them react. Then ask: 'Does that line up with what you are seeing?' or 'How does that land for you?' This forces them to talk themselves through the implication.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Phase 4: The Bridge (2-3 min)</h2>
+          <div class="subsection">
+            <p>This is between insight drops and close:</p>
+
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Bridge:</div>
+              <div class="msg-text">Based on everything we talked about, here is what I think the path looks like for [their project]. The opportunity in Korea is [specific to their situation]. The timing window is [specific]. And the risk of waiting is [specific competitor or market dynamic].</div>
+            </div>
+
+            <p>Why. You are selling the destination (Korea market success), not the plane ticket (HoloHive services). Hormozi's principle: sell the vacation, not the flight.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Phase 5: The BAMFAM Close (2-3 min)</h2>
+          <div class="subsection">
+            <div class="callout callout-green">
+              <p><strong>BAMFAM: Book A Meeting From A Meeting.</strong> Never end a call without the next meeting on the calendar. This is non-negotiable. The moment a call ends without a next step scheduled, momentum dies.</p>
+            </div>
+
+            <h3>Bucket A Close</h3>
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Close:</div>
+              <div class="msg-text">I want to put together a scope and breakdown specific to what we discussed. Let me pull up my calendar. Can you do Thursday afternoon or Friday morning for a 30-min walkthrough?</div>
+            </div>
+
+            <p>Note. Don't ask 'would you like to schedule a follow-up?' That is asking for permission to continue selling. Instead, assume the next step and offer two times. Either.or, not yes.no.</p>
+
+            <h3>Bucket B Close</h3>
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Close:</div>
+              <div class="msg-text">I am going to send you some case studies and our offer breakdown. I also want to share some data specific to [their category] in Korea. Let us grab 15 min next week so I can walk you through it. Tuesday or Wednesday work?</div>
+            </div>
+
+            <p>Note. Even Bucket B gets a booked follow-up. The difference is framing: you are not pitching, you are sharing data. The follow-up is a value delivery, not a sales call. This is BAMFAM in action.</p>
+
+            <h3>Bucket C Close</h3>
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Close:</div>
+              <div class="msg-text">Sounds like Korea is on the radar but timing might be early. Totally get it. I will keep you posted on anything relevant to [their space]. When things shift, let us reconnect.</div>
+            </div>
+
+            <p>Note. Bucket C is the ONLY bucket where you do not book a next meeting. If they are not ready, pushing a calendar invite feels desperate.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 05 -->
+      <section class="section" id="section-05" data-number="05">
+        <div class="section-content">
+          <h1>05. Post-Call: The First 24 Hours</h1>
+
+          <p>What happens in the first 24 hours determines momentum. Move fast. Move hard. Move with specificity.</p>
+
+          <h2 onclick="toggleSubsection(event)">Bucket A: Same-Day TG Message</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">great call today. sending over those case studies. the [specific project] one is probably closest to your situation. offer breakdown is in there too. see you [day] at [time] for the walkthrough.</div>
+            </div>
+
+            <p>Note the BAMFAM reference. The proposal call is already booked from the discovery call.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Bucket B: Same-Day TG Message</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">good connecting today. sending over a couple case studies. [specific project] is closest to what you are building. offer breakdown is in there too, no rush. talk [day] when I walk you through the Korea data for [their category].</div>
+            </div>
+
+            <p>Note the BAMFAM reference. The data walkthrough is already booked.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Bucket C: Same-Day TG Message</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">good talking. when Korea is closer to the front of mind, hit me up. going to keep you in the loop on [their space].</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Phil's Same-Day Tasks</h2>
+          <div class="subsection">
+            <ul>
+              <li>Send case studies within 2 hours of call end.</li>
+              <li>Tag the lead with bucket (A, B, or C).</li>
+              <li>Create the follow-up meeting note in the database.</li>
+              <li>Flag any key information from the call (decision-makers, blockers, timeline).</li>
+              <li>Prepare Jdot's talking points for the next call (if Bucket A or B).</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 06 -->
+      <section class="section" id="section-06" data-number="06">
+        <div class="section-content">
+          <h1>06. Fast Track</h1>
+
+          <p>Bucket A moves fast. If all conditions are met, the entire process from discovery to signed deal is 1-2 weeks.</p>
+
+          <h2 onclick="toggleSubsection(event)">Day 1: Discovery Call</h2>
+          <div class="subsection">
+            <p>Already scheduled via BAMFAM.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Day 2-3: Proposal Prep</h2>
+          <div class="subsection">
+            <p>Jdot builds a custom proposal.</p>
+            <ul>
+              <li>Their specific situation. Not a template.</li>
+              <li>The Korea opportunity, quantified.</li>
+              <li>Timeline and milestones.</li>
+              <li>Pricing.</li>
+              <li>What success looks like (metrics).</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Day 4-5: Proposal Call</h2>
+          <div class="subsection">
+            <p>Jdot walks through the proposal on a 30-min call.</p>
+
+            <h3>Proposal Call Structure</h3>
+            <ol>
+              <li><strong>Context Setting.</strong> Remind them what you discussed and why Korea matters. 2 min.</li>
+              <li><strong>The Scope.</strong> Walk through what you will do, who will do it, timeline. 10 min.</li>
+              <li><strong>The Results Roadmap.</strong> Show them the expected metrics. Volume, community size, KOL reach, etc. 5 min.</li>
+              <li><strong>Investment and Terms.</strong> State the price clearly. No hemming. 2 min.</li>
+              <li><strong>BAMFAM.</strong> Book the next meeting. See below.</li>
+            </ol>
+
+            <h3>BAMFAM on the Proposal Call</h3>
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Close:</div>
+              <div class="msg-text">I can get the contract over to you today. Let us grab 15 min on [day] to go through any questions and get things moving. Does [time] work?</div>
+            </div>
+
+            <p>Note. The contract review is booked ON the proposal call. Not 'let me know when you have had a chance to review.' BAMFAM.</p>
+
+            <h3>Enhanced Decision-Maker Call</h3>
+            <p>When a Bucket A lead says 'I need to discuss with my team,' Jdot should ask: 'Who else is involved in this decision?' Then: 'Happy to jump on a quick call with them to walk through it directly. Usually easier than relaying everything. Can we set that up for later this week?'</p>
+
+            <p>Book the team call right there. BAMFAM.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Day 7-10: Contract and Close</h2>
+          <div class="subsection">
+            <p>Contract is reviewed on the booked call. Questions answered. Deal signed.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Day 10-14: Work Begins</h2>
+          <div class="subsection">
+            <p>Launch day. Kickoff call with client team. Work starts.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">If They Go Silent After Proposal</h2>
+          <div class="subsection">
+            <p><strong>Day 3-4:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">hey. any questions come up from the proposal? happy to clarify anything or jump on a quick call.</div>
+            </div>
+
+            <p><strong>Day 7:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">quick heads up. [relevant market intel]. figured you would want to know given what we discussed. no rush on the proposal.</div>
+            </div>
+
+            <p><strong>Day 14:</strong></p>
+
+            <p>Reclassify to Bucket B. Shift to nurture. Momentum is broken. You are now in warm-up mode.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 07 -->
+      <section class="section" id="section-07" data-number="07">
+        <div class="section-content">
+          <h1>07. Nurture Track: 21-Day Warm-Up</h1>
+
+          <p>Bucket B is interested but not ready. The goal is to move them from 'that makes sense' to 'we need to do this.' Scarcity and social proof do that.</p>
+
+          <h2 onclick="toggleSubsection(event)">Day 4-5: First Value Touch</h2>
+          <div class="subsection">
+            <p>Send ONE of these. Not all. Pick the one that hits closest to their situation.</p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">V1:</div>
+              <div class="msg-text">hey. saw that [competitor] just announced a Korean KOL partnership. thought you would want to know since we talked about the timing window.</div>
+            </div>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">V2:</div>
+              <div class="msg-text">random data point. [their category] tokens saw a 34% volume spike on Korean exchanges last month. lines up with what we were discussing.</div>
+            </div>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">V3:</div>
+              <div class="msg-text">just got results from a campaign for a project similar to yours. [specific metric]. happy to share more if useful.</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Day 8-10: Second Value Touch</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">interesting move this week. [exchange name] just listed two [their category] tokens in the same week. haven't seen that clustering before. might be a signal.</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Day 14-21: Soft Re-engagement</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">been a couple weeks. a few things shifted in the Korea landscape for [their category] projects. worth 15 min to walk through what changed?</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Temperature Check</h2>
+          <div class="subsection">
+            <p>At Day 21, assess. If they are warm again, Jdot re-engages. If not, move to monthly nurture.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 08 -->
+      <section class="section" id="section-08" data-number="08">
+        <div class="section-content">
+          <h1>08. Proposal Framework and Pricing</h1>
+
+          <h2 onclick="toggleSubsection(event)">Step 1: Situation Recap</h2>
+          <div class="subsection">
+            <p>Start the proposal with a summary of what you learned on the discovery call. Show them you listened. Show them you understand.</p>
+            <ul>
+              <li>Their current state. Where they are with Korea.</li>
+              <li>Their goal. Where they want to be.</li>
+              <li>The gap. What is blocking them.</li>
+              <li>Why now. The market window and competitive context.</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Step 2: The Opportunity</h2>
+          <div class="subsection">
+            <p>Quantify Korea for them. Not generic. Specific to their token and category.</p>
+            <ul>
+              <li>Volume opportunity. Korean exchange volume for their category.</li>
+              <li>Community opportunity. Addressable Korean crypto users in their category.</li>
+              <li>Competitive position. Who is already in Korea. Who is not.</li>
+              <li>Timeline pressure. When the window closes. Why now is better than later.</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Step 3: The Scope</h2>
+          <div class="subsection">
+            <p>Here is what we will do.</p>
+            <ul>
+              <li>Community building. Day 1-30.</li>
+              <li>KOL partnerships. Day 15-60.</li>
+              <li>Exchange strategy. Day 30-90.</li>
+              <li>Ongoing content. Day 1-90 and beyond.</li>
+            </ul>
+
+            <p>Be specific. Not 'we will build community.' Specific actions, specific timeline.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Step 4: Results Roadmap</h2>
+          <div class="subsection">
+            <p>This is what success looks like.</p>
+            <ul>
+              <li>Month 1: [specific metric]. Community size, first KOL partnership, exchange listing.</li>
+              <li>Month 2: [specific metric]. Community growth rate, trading volume lift, sentiment shift.</li>
+              <li>Month 3: [specific metric]. Sustained metrics, foundations for Phase 2.</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Step 5: Investment and Terms</h2>
+          <div class="subsection">
+            <p>State the price. Be clear. No ambiguity.</p>
+            <ul>
+              <li>Engagement fee: $[amount].</li>
+              <li>Timeline: 90 days (with 30-day extension available).</li>
+              <li>Payment terms: 50% upfront, 50% at Day 45.</li>
+              <li>What happens after 90 days: Transition plan. Can move to retainer or project-based work.</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">BAMFAM on the Proposal Call</h2>
+          <div class="subsection">
+            <div class="callout callout-green">
+              <p>Every proposal call ends with a booked next step. Period.</p>
+
+              <p>If buying signals strong. 'I can send the contract today. Let us grab 15 min on [day] to go through any final questions. [time] work?'</p>
+
+              <p>If they need to discuss. 'Who else needs to weigh in? Let me set up a call with them. How is [day]?'</p>
+
+              <p>If they need time. 'Take the time you need. Let us touch base [specific day] so I can answer anything that comes up. Does [time] work?'</p>
+
+              <p>Notice. every single path ends with a specific day and time. Not 'let me know.' Not 'whenever you are ready.' A specific booked time.</p>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Mutual Action Plan (For $50K+ Deals)</h2>
+          <div class="subsection">
+            <p>For larger deals or deals with multiple stakeholders, create a simple shared doc that maps the path from 'interested' to 'signed.' Include:</p>
+            <ul>
+              <li>Key stakeholders and their roles.</li>
+              <li>Timeline with milestones.</li>
+              <li>What HoloHive provides at each step.</li>
+              <li>What their team provides.</li>
+              <li>Decision date.</li>
+            </ul>
+
+            <p>This does two things. (1) It makes the deal feel real and organized. (2) It surfaces hidden blockers early. If they cannot fill in the stakeholder section, you know the decision-maker mapping is not done yet.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Scarcity and the Korea Window</h2>
+          <div class="subsection">
+            <p>Mention it. Do not oversell it. The Korea window is real.</p>
+            <ul>
+              <li>KOL prices are lower in a bear market. They will not stay that way.</li>
+              <li>Exchanges are hungry for new projects. That shifts when the market heats up.</li>
+              <li>Competitors are waiting. The ones moving now will own the narrative.</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Step-Down Option: The Korea Market Audit</h2>
+          <div class="subsection">
+            <p>For leads who say 'we want to explore but $50K is too much,' offer the Korea Market Audit.</p>
+            <ul>
+              <li>Price: $2-5K.</li>
+              <li>Timeline: 2 weeks.</li>
+              <li>Deliverable: A 20-page research report on their opportunity in Korea. Market size, competitor analysis, KOL landscape, exchange strategy, 90-day roadmap.</li>
+            </ul>
+
+            <p>Why this works. They get clarity without full commitment. You get to show your work. Half the time, they upgrade from Audit to full engagement after seeing the report.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 09 -->
+      <section class="section" id="section-09" data-number="09">
+        <div class="section-content">
+          <h1>09. Objection Handling Scripts</h1>
+
+          <p>Most objections can be prevented during discovery. If Jdot runs the CLOSER framework properly, 70% of objections never come up. When they do, the approach is: acknowledge, ask a deeper question, and let them talk themselves through it. Never fight an objection with facts.</p>
+
+          <h2 onclick="toggleSubsection(event)">We need to think about it</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Response:</div>
+              <div class="msg-text">Absolutely. It is a big decision. What specifically do you want to think through? I might be able to help clarify right now.</div>
+            </div>
+
+            <p>Move. If they cannot name what they want to think about, the blocker is emotional, not logical. Ask deeper: 'Is it timing? Is it the scope? Is it the investment?' Let them land on it.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Timing isn't right / Bear market</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Response:</div>
+              <div class="msg-text">I hear you. Most teams feel the same pressure. The ones who moved forward in this market actually have an advantage. Less noise, lower KOL costs, exchanges more open to partnerships. But I am not going to push you on timing. I will keep you posted on what is happening.</div>
+            </div>
+
+            <p>Note. Acknowledge. Reframe the bear market as an advantage. Then REMOVE the pressure. Move to nurture.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Too expensive</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Response:</div>
+              <div class="msg-text">What is the Korean market worth to your token over the next 12 months? If volume increased 30-40% from Korean exchanges alone, what does that look like in dollar terms? ... Our fee is a fraction of that upside. But if the full scope is too much to start, we have a Korea Market Audit that gives you a concrete picture before committing to the full thing.</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Talking to other agencies</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Response:</div>
+              <div class="msg-text">Good. You should be. A few things to look for when comparing. ask them about direct relationships with Korean exchanges. Ask for specific results in your category. And ask if they operate in-country. There is a big difference between a remote team saying they 'do Korea' and a team that is actually in Seoul. Happy to answer those same questions right now.</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">We can do this in-house</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Response:</div>
+              <div class="msg-text">Some teams do. The challenge we have seen is that it takes 6-12 months to build the relationships and cultural knowledge you would need. That is with a full-time Korean-speaking hire. Most teams end up spending more on the hire plus the learning curve. But if you go that route, happy to share what to look for in a Korean market lead.</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Burned by agencies before</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Response:</div>
+              <div class="msg-text">Yeah, crypto is full of agencies that overpromise. I won't pretend otherwise. The best I can do is show you results. [reference case study]. And if trust is the concern, the Korea Market Audit is designed exactly for that. You see our work quality before committing to anything bigger.</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Korea isn't a priority</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Response:</div>
+              <div class="msg-text">Makes sense. I will keep you in the loop on what is happening in Korea for [their category]. If a competitor moves or the landscape shifts, you will want to know even if you are not acting on it.</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">NEW: I need to talk to my partner / cofounder / team</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Response:</div>
+              <div class="msg-text">Totally get it. Who else is involved in this decision? ... Happy to jump on a quick call with them to walk through it. Usually makes it easier than relaying everything. Can we set that up for later this week?</div>
+            </div>
+
+            <p>Move. This is where decision-maker mapping from discovery pays off. If you already know who the other stakeholders are, you can be specific. 'Want me to set up a 20-min call with [name] and walk them through it?' BAMFAM. Book the call right there.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">NEW: The Negative Close (For On-the-Fence Prospects)</h2>
+          <div class="subsection">
+            <p>When someone is interested but cannot commit, sometimes the most powerful move is the takeaway.</p>
+
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Script:</div>
+              <div class="msg-text">Look, I want to be upfront. This is not for every project. Korea expansion is a real commitment and it only works when the team is ready to move. If the timing does not feel right, that is completely fine. We would rather work with teams who are all-in than try to convince someone who is not there yet.</div>
+            </div>
+
+            <p>Why this works. Hormozi and Klaff both use this. When you take the option away, it forces a real decision. If they were on the fence, the fear of losing access pushes them to commit. If they truly are not ready, you have saved yourself weeks of chasing.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Using the NEPQ Framework for Objections</h2>
+          <div class="subsection">
+            <p>When an objection comes up, use NEPQ to dig deeper.</p>
+            <ul>
+              <li><strong>N. Name it.</strong> 'So timing is the concern?'</li>
+              <li><strong>E. Explore it.</strong> 'What specifically about timing is holding you back?'</li>
+              <li><strong>P. Probe deeper.</strong> 'If we could start in 60 days instead of 30, would that change things?'</li>
+              <li><strong>Q. Quote them.</strong> 'So what I am hearing is you need 60 days before you can move. Is that right?'</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 10 -->
+      <section class="section" id="section-10" data-number="10">
+        <div class="section-content">
+          <h1>10. Monthly Nurture System</h1>
+
+          <p>Every lead who does not close gets monthly touches. One value message per month. Bucket C lives here. Bucket B lives here too if they do not convert in the first 21 days.</p>
+
+          <h2 onclick="toggleSubsection(event)">Triggers and Templates</h2>
+          <div class="subsection">
+            <p>Send one of these every month. Pick based on what is actually happening.</p>
+
+            <p><strong>Month 1:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Option A:</div>
+              <div class="msg-text">[Competitor] just [action] in Korea. Thought you would want to know.</div>
+            </div>
+
+            <p>or</p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Option B:</div>
+              <div class="msg-text">[Exchange name] just listed [category] tokens. Could be a signal for what is coming.</div>
+            </div>
+
+            <p><strong>Month 2:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Option A:</div>
+              <div class="msg-text">Just got results from a [similar category] campaign. [metric]. Korea is moving.</div>
+            </div>
+
+            <p>or</p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Option B:</div>
+              <div class="msg-text">[Your category] volume on Korean exchanges jumped [%] this month.</div>
+            </div>
+
+            <p><strong>Month 3:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Option A:</div>
+              <div class="msg-text">Wrote about [topic relevant to them]. Thought you would find it useful: [link].</div>
+            </div>
+
+            <p>or</p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Option B:</div>
+              <div class="msg-text">Interesting. [KOL name] just started talking about [their category]. Building momentum.</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Phil Management</h2>
+          <div class="subsection">
+            <p>Every month, Phil reviews all Bucket B and C leads.</p>
+            <ul>
+              <li>Has anything changed for them? New funding? New team hire? New announcement?</li>
+              <li>Is there a trigger event? Competitor move? Market shift?</li>
+              <li>If warm, flag to Jdot for re-engagement.</li>
+              <li>If cold, send the monthly touch and keep watching.</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Trigger Events (Watch for These)</h2>
+          <div class="subsection">
+            <ul>
+              <li>Competitor raises funding. Means they are building out. Means Korea expansion could be next.</li>
+              <li>Competitor launches marketing campaign. Means they are spending. Korea could be part of it.</li>
+              <li>New exchange listing in their category. Means exchanges are active. Window is open.</li>
+              <li>New team hire announced. If it is an operations or partnerships hire, they might be prepping for growth.</li>
+              <li>New funding round. Biggest trigger of all. If they just raised, Korea is suddenly on the table.</li>
+            </ul>
+
+            <p>When a trigger fires, Jdot reaches out directly. Not Phil. Jdot.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 11 -->
+      <section class="section" id="section-11" data-number="11">
+        <div class="section-content">
+          <h1>11. Re-Engagement Sequences</h1>
+
+          <p>When a lead warms up. When a trigger fires. When they come back. Jdot re-engages with a specific reason.</p>
+
+          <h2 onclick="toggleSubsection(event)">Sequence 1: Competitive Re-engagement</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">hey [name]. been a while. had to reach out because [specific event]. this changes things for [their category] in Korea. worth a quick chat if you have 15 min?</div>
+            </div>
+
+            <p>Use when. Competitor moved. Market shifted. Something concrete changed.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Sequence 2: Social Proof Re-engagement</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">hey [name]. just wrapped a campaign for a [their category] project. got some wild results. [one metric]. your project was on my mind. want me to send over the breakdown?</div>
+            </div>
+
+            <p>Use when. You have new case study results. New data. Proof that the approach works.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Sequence 3: Breakup</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">[name]. been sending Korea updates for a few months without hearing back. totally fine. going to pause for now. if Korea comes back on the radar, you know where to find me.</div>
+            </div>
+
+            <p>Use when. You have been nurturing for 4-5 months with no response. No triggers. No warm signals. Let them go. Keep the door open.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Sequence 4: Event Re-engagement</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">hey [name]. you going to [event]? going to be in [city] meeting with teams. would be good to catch up in person.</div>
+            </div>
+
+            <p>Use when. You are speaking at an event. Attending a conference. In their city. In-person is a different leverage point.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 12 -->
+      <section class="section" id="section-12" data-number="12">
+        <div class="section-content">
+          <h1>12. All Email and Message Templates</h1>
+
+          <p>Quick-reference library. Copy. Paste. Personalize. Send.</p>
+
+          <h2 onclick="toggleSubsection(event)">Pre-Call (24-48 Hours Before)</h2>
+          <div class="subsection">
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Agenda Setting:</div>
+              <div class="msg-text">hey [name]. looking forward to our call [day]. here is what i am thinking for our time together: i want to understand where you are at with Korea, share a few things i am seeing in the market that might be relevant, and if it makes sense we can talk about what working together could look like. if there is anything specific you want to cover, let me know.</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Post-Discovery (Same Day)</h2>
+          <div class="subsection">
+            <p><strong>Bucket A:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">great call today. sending over those case studies. the [specific project] one is probably closest to your situation. offer breakdown is in there too. see you [day] at [time] for the walkthrough.</div>
+            </div>
+
+            <p><strong>Bucket B:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">good connecting today. sending over a couple case studies. [specific project] is closest to what you are building. offer breakdown is in there too, no rush. talk [day] when I walk you through the Korea data for [their category].</div>
+            </div>
+
+            <p><strong>Bucket C:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">good talking. when Korea is closer to the front of mind, hit me up. I will keep you posted on [their space].</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Value Touches (Nurture Track - Days 4-21)</h2>
+          <div class="subsection">
+            <p><strong>Day 4-5, V1:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">hey. saw that [competitor] just announced a Korean KOL partnership. thought you would want to know since we talked about the timing window.</div>
+            </div>
+
+            <p><strong>Day 4-5, V2:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">random data point. [their category] tokens saw a 34% volume spike on Korean exchanges last month. lines up with what we were discussing.</div>
+            </div>
+
+            <p><strong>Day 4-5, V3:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">just got results from a campaign for a project similar to yours. [specific metric]. happy to share more if useful.</div>
+            </div>
+
+            <p><strong>Day 8-10:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">interesting move this week. [exchange name] just listed two [their category] tokens in the same week. haven't seen that clustering before. might be a signal.</div>
+            </div>
+
+            <p><strong>Day 14-21:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">been a couple weeks. a few things shifted in the Korea landscape for [their category] projects. worth 15 min to walk through what changed?</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Post-Proposal Follow-Ups</h2>
+          <div class="subsection">
+            <p><strong>Day 3-4:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">hey. any questions come up from the proposal? happy to clarify anything or jump on a quick call.</div>
+            </div>
+
+            <p><strong>Day 7:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">quick heads up. [market intel]. figured you would want to know given what we discussed. no rush on the proposal.</div>
+            </div>
+
+            <p><strong>Day 14:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">[name]. want to make sure you have everything you need. if something is making the decision harder, whether that is budget, scope, or timing, happy to work through it. if the timing is just not right, totally get it.</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Monthly Nurture</h2>
+          <div class="subsection">
+            <p><strong>Month 1 Option A:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">[Competitor] just [action] in Korea. Thought you would want to know.</div>
+            </div>
+
+            <p><strong>Month 1 Option B:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">[Exchange name] just listed [category] tokens. Could be a signal for what is coming.</div>
+            </div>
+
+            <p><strong>Month 2 Option A:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">Just got results from a [similar category] campaign. [metric]. Korea is moving.</div>
+            </div>
+
+            <p><strong>Month 2 Option B:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">[Your category] volume on Korean exchanges jumped [%] this month.</div>
+            </div>
+
+            <p><strong>Month 3 Option A:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">Wrote about [topic relevant to them]. Thought you would find it useful: [link].</div>
+            </div>
+
+            <p><strong>Month 3 Option B:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Phil</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">Interesting. [KOL name] just started talking about [their category]. Building momentum.</div>
+            </div>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Re-Engagement</h2>
+          <div class="subsection">
+            <p><strong>Competitive Re-engagement:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">hey [name]. been a while. had to reach out because [specific event]. this changes things for [their category] in Korea. worth a quick chat if you have 15 min?</div>
+            </div>
+
+            <p><strong>Social Proof Re-engagement:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">hey [name]. just wrapped a campaign for a [their category] project. got some wild results. [one metric]. your project was on my mind. want me to send over the breakdown?</div>
+            </div>
+
+            <p><strong>Breakup:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">[name]. been sending Korea updates for a few months without hearing back. totally fine. going to pause for now. if Korea comes back on the radar, you know where to find me.</div>
+            </div>
+
+            <p><strong>Event Re-engagement:</strong></p>
+
+            <div class="msg-box">
+              <div class="msg-label">Jdot</div>
+              <div class="msg-sender">Message:</div>
+              <div class="msg-text">hey [name]. you going to [event]? going to be in [city] meeting with teams. would be good to catch up in person.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 13 -->
+      <section class="section" id="section-13" data-number="13">
+        <div class="section-content">
+          <h1>13. Trust-Building Content Calendar</h1>
+
+          <p>Jdot and Yano publish content that builds credibility and gives away diagnostic secrets. This becomes the fuel for outreach.</p>
+
+          <h2 onclick="toggleSubsection(event)">Content Pillars</h2>
+          <div class="subsection">
+            <ul>
+              <li><strong>Korea Market Intel.</strong> What is happening in Korea right now. Price movements. Exchange updates. KOL signals.</li>
+              <li><strong>Category Specific Analysis.</strong> Deep dives into [DeFi/NFT/Layer2/whatever] projects and their Korea opportunity.</li>
+              <li><strong>Case Study Breakdowns.</strong> Results from past campaigns. What worked. Why. Numbers.</li>
+              <li><strong>Mistakes Web3 Teams Make in Korea.</strong> Cultural misses. Marketing fails. What not to do.</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Publishing Schedule</h2>
+          <div class="subsection">
+            <ul>
+              <li>Twitter. 3-4 posts per week. Mix of intel, analysis, and takes.</li>
+              <li>Long-form. 1 article per month. Substack or Medium. Deep dive into one pillar.</li>
+              <li>Case study. 1 per quarter. Full breakdown of a campaign.</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Content Repurposing</h2>
+          <div class="subsection">
+            <ul>
+              <li>Every Twitter thread becomes a talking point in calls.</li>
+              <li>Every article becomes a value touch in nurture sequences.</li>
+              <li>Every case study becomes a reference in proposals.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 14 -->
+      <section class="section" id="section-14" data-number="14">
+        <div class="section-content">
+          <h1>14. Materials Checklist</h1>
+
+          <p>Here is what needs to exist for this playbook to work.</p>
+
+          <h2 onclick="toggleSubsection(event)">Already Created</h2>
+          <div class="subsection">
+            <ul>
+              <li>Case study deck (2-3 examples).</li>
+              <li>Pricing sheet.</li>
+              <li>Services overview.</li>
+              <li>Team bios.</li>
+            </ul>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Need to Create</h2>
+          <div class="subsection">
+            <ul>
+              <li>Korea Market Audit template. A 20-page research report framework. Use for $2-5K audit offers. 2 hours to create.</li>
+              <li>Pre-Call Prep Template. A 1-page checklist Phil fills in before every discovery call. Research, decision-maker mapping, insight drop ideas. 15 minutes to create.</li>
+              <li>Proposal template. Custom. Not generic. Situation-specific. 30 minutes per proposal.</li>
+              <li>Mutual Action Plan template. For $50K+ deals. Simple shared doc. Stakeholders, timeline, milestones, action items. 30 minutes to create.</li>
+              <li>Case study framework. Template for writing up campaign results. Use consistently. 1 hour to create.</li>
+              <li>Monthly trigger tracking spreadsheet. Lists all Bucket B and C leads. Tracks trigger events. Notes warm signals. 1 hour to set up.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 15 -->
+      <section class="section" id="section-15" data-number="15">
+        <div class="section-content">
+          <h1>15. Metrics and Tracking</h1>
+
+          <h2 onclick="toggleSubsection(event)">Phil's Metrics</h2>
+          <div class="subsection">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Current</th>
+                  <th>Target</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>DMs sent per week</td>
+                  <td>.75</td>
+                  <td>100</td>
+                </tr>
+                <tr>
+                  <td>Response rate</td>
+                  <td>2.75%</td>
+                  <td>3-4%</td>
+                </tr>
+                <tr>
+                  <td>Meetings booked per week</td>
+                  <td>.2-3</td>
+                  <td>4-5</td>
+                </tr>
+                <tr>
+                  <td>Qualified leads (Bucket A+B)</td>
+                  <td>60%</td>
+                  <td>70%+</td>
+                </tr>
+                <tr>
+                  <td>Value touches sent per month</td>
+                  <td>Inconsistent</td>
+                  <td>100% of Bucket B+C</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Jdot's Metrics</h2>
+          <div class="subsection">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Current</th>
+                  <th>Target</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Discovery calls per week</td>
+                  <td>.2-3</td>
+                  <td>3-4</td>
+                </tr>
+                <tr>
+                  <td>Close rate (Bucket A)</td>
+                  <td>.60-70%</td>
+                  <td>75%+</td>
+                </tr>
+                <tr>
+                  <td>Avg deal size</td>
+                  <td>$50K</td>
+                  <td>$60K+</td>
+                </tr>
+                <tr>
+                  <td>Time to close (Bucket A)</td>
+                  <td>1-2 weeks</td>
+                  <td>1-2 weeks</td>
+                </tr>
+                <tr>
+                  <td>Bucket A percentage of total</td>
+                  <td>.40%</td>
+                  <td>50%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Overall Playbook Metrics</h2>
+          <div class="subsection">
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>Current</th>
+                  <th>Target</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Deals closed per quarter</td>
+                  <td>.3-4</td>
+                  <td>6-8</td>
+                </tr>
+                <tr>
+                  <td>Revenue per quarter</td>
+                  <td>~$150-200K</td>
+                  <td>$300-400K</td>
+                </tr>
+                <tr>
+                  <td>Conversion rate (discovery to close)</td>
+                  <td>.45%</td>
+                  <td>60%+</td>
+                </tr>
+                <tr>
+                  <td>Average sales cycle</td>
+                  <td>2-3 weeks</td>
+                  <td>2-3 weeks</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Dashboard Focus</h2>
+          <div class="subsection">
+            <ul>
+              <li><strong>Weekly.</strong> Phil's booking rate. Jdot's close rate. Bucket distribution.</li>
+              <li><strong>Monthly.</strong> Revenue closed. Average deal size. Sales cycle duration. Re-engagement results.</li>
+              <li><strong>Quarterly.</strong> Trend analysis. What is working. What needs adjustment.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 16 -->
+      <section class="section" id="section-16" data-number="16">
+        <div class="section-content">
+          <h1>16. Weekly Rhythm</h1>
+
+          <h2 onclick="toggleSubsection(event)">Monday Morning</h2>
+          <div class="subsection">
+            <table>
+              <thead>
+                <tr>
+                  <th>Owner</th>
+                  <th>Task</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Jdot</td>
+                  <td>Review deals in pipeline. Bucket A calls this week? Bucket B warm signals?</td>
+                </tr>
+                <tr>
+                  <td>Phil</td>
+                  <td>Plan DM outreach for the week. Prep research docs for upcoming calls.</td>
+                </tr>
+                <tr>
+                  <td>Team</td>
+                  <td>15-min standup. What is being worked on. Any blockers.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Tuesday - Thursday</h2>
+          <div class="subsection">
+            <table>
+              <thead>
+                <tr>
+                  <th>Owner</th>
+                  <th>Task</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Phil</td>
+                  <td>Send 75-100 DMs. Book discovery calls. Follow up on warm leads.</td>
+                </tr>
+                <tr>
+                  <td>Jdot</td>
+                  <td>Run discovery calls (Tue, Wed, Thu). Follow up same day.</td>
+                </tr>
+                <tr>
+                  <td>Jdot + Phil</td>
+                  <td>Proposal work for closed Bucket A deals.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Friday</h2>
+          <div class="subsection">
+            <table>
+              <thead>
+                <tr>
+                  <th>Owner</th>
+                  <th>Task</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Jdot</td>
+                  <td>Proposal calls (if scheduled). Close deals.</td>
+                </tr>
+                <tr>
+                  <td>Phil</td>
+                  <td>End of week admin. Update pipeline. Prepare next week prep docs.</td>
+                </tr>
+                <tr>
+                  <td>Team</td>
+                  <td>Weekly recap. Deals closed. Metrics. What we learned.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Monday (Next Week)</h2>
+          <div class="subsection">
+            <p>Repeat.</p>
+
+            <p>Key rule. Every Monday, the pipeline is reset. What got done last week. What is happening this week. No surprises on Friday.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 17 - SUMMARY -->
+      <section class="section" id="section-17" data-number="SUM">
+        <div class="section-content">
+          <h1>The 7-Step Framework</h1>
+
+          <p>Everything in this playbook compresses to seven steps.</p>
+
+          <ol>
+            <li>Phil sends DMs, gets responses, books discovery calls with Jdot.</li>
+            <li>Jdot preps (10 min research). Sends agenda 24-48 hrs before.</li>
+            <li>Discovery call. Diagnose. Share insights. Map decision-makers. Plant soundbites. End with BAMFAM.</li>
+            <li>BAMFAM. Book the next meeting before hanging up.</li>
+            <li>Step 5A (Bucket A). Proposal call already booked. Close in 1.2 weeks.</li>
+            <li>Step 5B (Bucket B). Data walkthrough already booked. 2.3 value touches over 21 days. Proposal when warm.</li>
+            <li>Step 5C (Bucket C). Monthly nurture. One value message per month. Watch for triggers. When a lead warms up, go to Step 5A or 5B.</li>
+          </ol>
+
+          <p>Every proposal call ends with a booked next step. Contract review, team call, or decision date. BAMFAM.</p>
+
+          <p>Every month. Watch all Bucket B and C leads for trigger events. When something changes for them. When a competitor moves. When they fundraise. Jdot re-engages directly and starts the cycle again at Step 3.</p>
+
+          <p>This is the playbook. No guesswork. Every step has a script. Every call has a framework. Every message is written. Use it. Repeat it. Watch the deals flow.</p>
+
+          <h2 onclick="toggleSubsection(event)">The Team</h2>
+          <div class="subsection">
+            <p><strong>Phil.</strong> 2K Twitter followers. SDRs outreach from Jdot's account. Books discovery calls. Runs nurture. Tracks pipeline. Owns volume.</p>
+
+            <p><strong>Jdot.</strong> 60K Twitter followers. Cofounder. In Seoul. Runs discovery calls. Runs proposal calls. Closes deals. Owns relationships.</p>
+
+            <p><strong>Yano.</strong> 17K Twitter followers. CEO. Publishes content. Owns thought leadership. Available for specific objection closes or team calls if needed.</p>
+          </div>
+
+          <h2 onclick="toggleSubsection(event)">Market Context</h2>
+          <div class="subsection">
+            <p>$30-100K deal size. $2M+ funded Web3.crypto projects. Korea as a growth market. Bear market conditions. Team cutting, not scaling. Deals that close move in 1.2 weeks. Teams that move are teams that are already ready.</p>
+
+            <p>Built for HoloHive. Synthesized from Hormozi, Brunson, Voss, Cardone, Klaff, Priestley, Holmes, Enns. Plus HoloHive's actual data.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <script>
+    // Sidebar active link management
+    const links = document.querySelectorAll('.toc-link');
+    const sections = document.querySelectorAll('section');
+
+    function updateActiveLink() {
+      let currentSection = '';
+      sections.forEach(section => {
+        const rect = section.getBoundingClientRect();
+        if (rect.top < window.innerHeight / 2) {
+          currentSection = section.id;
+        }
+      });
+
+      links.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + currentSection) {
+          link.classList.add('active');
+        }
+      });
+    }
+
+    window.addEventListener('scroll', updateActiveLink);
+    updateActiveLink();
+
+    // Collapsible sections
+    function toggleSubsection(event) {
+      const h2 = event.target;
+      if (h2.tagName !== 'H2') return;
+
+      const subsection = h2.nextElementSibling;
+      if (!subsection || !subsection.classList.contains('subsection')) return;
+
+      subsection.classList.toggle('collapsed');
+      h2.classList.toggle('collapsed');
+    }
+
+    // Search functionality
+    const searchInput = document.getElementById('searchInput');
+    searchInput.addEventListener('keyup', function(e) {
+      const query = e.target.value.toLowerCase();
+      const toc = document.querySelectorAll('.toc-item');
+
+      toc.forEach(item => {
+        const text = item.textContent.toLowerCase();
+        if (query === '' || text.includes(query)) {
+          item.style.display = 'block';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    });
+
+    // Smooth scroll on link click
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth' });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

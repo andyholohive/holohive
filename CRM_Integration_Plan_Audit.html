@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM Integration Plan — Audit | HoloHive</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
+    background: #0A0A0A;
+    color: #E5E7EB;
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  .header {
+    text-align: center;
+    padding: 48px 24px 32px;
+    border-bottom: 1px solid #2D2D2D;
+  }
+  .header h1 { font-size: 28px; font-weight: 700; color: #F9FAFB; }
+  .header h1 span { color: #00D4AA; }
+  .header p { color: #6B7280; font-size: 13px; margin-top: 6px; }
+  .container { max-width: 800px; margin: 0 auto; padding: 32px 24px 60px; }
+
+  .context-box {
+    background: #111;
+    border: 1px solid #2D2D2D;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 32px;
+    font-size: 13px;
+    color: #9CA3AF;
+  }
+  .context-box strong { color: #F9FAFB; }
+
+  .section { margin-bottom: 36px; }
+  .section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #F9FAFB;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #2D2D2D;
+  }
+  .section-title .count {
+    font-size: 12px;
+    font-weight: 600;
+    color: #0A0A0A;
+    background: #EF4444;
+    padding: 2px 8px;
+    border-radius: 8px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .section-title .count.amber { background: #D97706; }
+  .section-title .count.green { background: #059669; }
+
+  .issue {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 10px;
+  }
+  .issue h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #F9FAFB;
+    margin-bottom: 8px;
+  }
+  .issue p { font-size: 14px; color: #9CA3AF; margin-bottom: 8px; }
+  .issue p:last-child { margin-bottom: 0; }
+
+  .fix {
+    background: #0A0A0A;
+    border: 1px solid #1E3A2F;
+    border-radius: 8px;
+    padding: 14px;
+    margin-top: 10px;
+    font-size: 13px;
+    color: #D1D5DB;
+  }
+  .fix strong { color: #00D4AA; font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; display: block; margin-bottom: 6px; }
+  .fix ul { padding-left: 16px; margin: 0; }
+  .fix li { margin-bottom: 3px; }
+
+  code {
+    background: #1a1a1a;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 12px;
+    color: #00D4AA;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .flow-box {
+    background: #0D0D0D;
+    border: 1px solid #222;
+    border-radius: 8px;
+    padding: 14px;
+    margin: 10px 0;
+    font-size: 13px;
+    font-family: 'SF Mono', monospace;
+    color: #9CA3AF;
+    line-height: 1.9;
+  }
+  .flow-box .label { color: #60A5FA; font-weight: 700; font-family: -apple-system, sans-serif; }
+  .flow-box .label.yellow { color: #FBBF24; }
+  .flow-box .arr { color: #4B5563; }
+
+  .fields-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin-top: 8px;
+  }
+  .fields-table th {
+    text-align: left;
+    font-size: 11px;
+    color: #6B7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 6px 8px;
+    border-bottom: 1px solid #222;
+  }
+  .fields-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #1a1a1a;
+    color: #D1D5DB;
+  }
+
+  .keep-list {
+    list-style: none;
+    padding: 0;
+  }
+  .keep-list li {
+    font-size: 14px;
+    color: #9CA3AF;
+    padding: 5px 0 5px 20px;
+    position: relative;
+    border-bottom: 1px solid #1a1a1a;
+  }
+  .keep-list li::before {
+    content: '\2713';
+    position: absolute;
+    left: 0;
+    color: #059669;
+    font-weight: 700;
+  }
+
+  .footer {
+    text-align: center;
+    padding: 32px;
+    color: #4B5563;
+    font-size: 11px;
+    border-top: 1px solid #1F1F1F;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>CRM Integration Plan — <span>Audit</span></h1>
+  <p>Feb 2026 &middot; Reviewed against Sales Playbook v2.0 + Dev Walkthrough + Process Updates</p>
+</div>
+
+<div class="container">
+
+<!-- CONTEXT -->
+<div class="context-box">
+  <strong>Key context the dev is missing:</strong> The SDR [Phil] now DMs from the Closer's [Jdot's] account in addition to his own. This creates two booking paths &mdash; the dev's plan predates this update and doesn't account for it. That's the root cause of most issues below.
+</div>
+
+<!-- ===== CRITICAL FIXES ===== -->
+<div class="section">
+  <div class="section-title">Critical Fixes &mdash; Must Address Before Building <span class="count">4</span></div>
+
+  <!-- 1 -->
+  <div class="issue">
+    <h3>1. Two-Path Booking Flow Is Missing</h3>
+    <p>The plan jumps from "Response" to "Discovery Booked" with no concept of how booking actually works. Where the Calendly link gets sent depends on which account the SDR uses.</p>
+
+    <div class="flow-box">
+      <span class="label">Path A &mdash; Closer's [Jdot's] Account:</span><br>
+      Cold DM <span class="arr">&rarr;</span> Warm <span class="arr">&rarr;</span> Calendly sent in DM <span class="arr">&rarr;</span> Booked<br>
+      <em style="color:#6B7280;">No TG. No GC. Lead thinks they're talking to the Closer.</em><br><br>
+      <span class="label yellow">Path B &mdash; SDR's [Phil's] / Other Account:</span><br>
+      Cold DM <span class="arr">&rarr;</span> Warm <span class="arr">&rarr;</span> Get TG <span class="arr">&rarr;</span> Calendly sent in TG <span class="arr">&rarr;</span> Booked <span class="arr">&rarr;</span> Open GC (add Closer)<br>
+      <em style="color:#6B7280;">Lead doesn't know the Closer yet, so TG + GC handoff are required.</em>
+    </div>
+
+    <div class="fix">
+      <strong>What the CRM needs</strong>
+      <ul>
+        <li><code>dm_account</code> &mdash; which account sent the first DM. This is the routing key for the whole pipeline.</li>
+        <li><code>calendly_sent_via</code> (dm / tg / not_yet), <code>calendly_sent_date</code>, <code>calendly_booked_date</code></li>
+        <li><code>tg_handle</code>, <code>gc_opened</code> (na / not_yet / opened), <code>gc_opened_date</code></li>
+        <li>Pipeline logic branches on <code>dm_account</code>: Path A skips TG + GC. Path B requires them.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 2 -->
+  <div class="issue">
+    <h3>2. Pipeline Stages Don't Match the Process</h3>
+    <p>The plan proposes: DM Sent &rarr; Response &rarr; Discovery Booked &rarr; Discovery Done &rarr; Proposal &rarr; Contract &rarr; Won. Several stages are wrong or missing.</p>
+
+    <div class="flow-box">
+      <span class="label">Correct pipeline:</span><br>
+      Cold DM <span class="arr">&rarr;</span> Warm (Interested / Silent) <span class="arr">&rarr;</span> TG* <span class="arr">&rarr;</span> Booked <span class="arr">&rarr;</span> Discovery Done <span class="arr">&rarr;</span> Nurture** <span class="arr">&rarr;</span> Proposal Sent <span class="arr">&rarr;</span> Proposal Call <span class="arr">&rarr;</span> Contract <span class="arr">&rarr;</span> Closed Won<br><br>
+      <em style="color:#6B7280;">*TG skipped for Path A &nbsp; **Nurture for Bucket B only</em><br>
+      <em style="color:#6B7280;">Exit lanes at every stage: Orbit (with reason) or Closed Lost</em>
+    </div>
+
+    <div class="fix">
+      <strong>Key fixes</strong>
+      <ul>
+        <li>"DM Sent" &rarr; <strong>Cold DM</strong> (it's a stage, not an action &mdash; leads sit here through 5 bumps)</li>
+        <li>"Response" &rarr; <strong>Warm</strong> with sub-states: Interested vs Silent (Silent triggers re-bump)</li>
+        <li>Add <strong>TG</strong> stage (Path B only), <strong>Orbit</strong> (with reason), <strong>Closed Lost</strong> (with reason)</li>
+        <li>Add <code>warm_sub_state</code>, <code>orbit_reason</code>, <code>closed_lost_reason</code> fields</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 3 -->
+  <div class="issue">
+    <h3>3. 5-Bump Cold Outreach Sequence Is Missing</h3>
+    <p>The plan treats Cold as if one DM goes out. In reality there's a 5-bump sequence &mdash; the highest-volume automation in the system. The plan's 4 sequences all start after discovery. Nothing covers pre-discovery outreach.</p>
+
+    <div class="flow-box">
+      Bump 0: Opener <span class="arr">&rarr; 3-4d &rarr;</span> Bump 1: Value <span class="arr">&rarr; 4d &rarr;</span> Bump 2: Credibility <span class="arr">&rarr; 5d &rarr;</span> Bump 3: Direct Ask <span class="arr">&rarr; 6d &rarr;</span> Bump 4: Breakup <span class="arr">&rarr; 7d &rarr;</span> Orbit
+    </div>
+
+    <div class="fix">
+      <strong>What the CRM needs</strong>
+      <ul>
+        <li><code>bump_number</code> (0-4), <code>last_bump_date</code> on crm_opportunities</li>
+        <li>New sequence type: <code>cold_outreach</code> &mdash; 5 steps with timing rules</li>
+        <li>Bump 4 + 7 days silence &rarr; auto-move to Orbit (reason: no_response)</li>
+        <li>Warm-Silent &rarr; reset bump to 0, restart the sequence</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 4 -->
+  <div class="issue">
+    <h3>4. Calendly Isn't Mentioned Anywhere</h3>
+    <p>The word "Calendly" doesn't appear once. But it's the mechanism by which leads go from interested to booked. The plan has "Discovery Booked" as a stage but nothing about what triggers that transition.</p>
+
+    <div class="fix">
+      <strong>What the CRM needs</strong>
+      <ul>
+        <li>Calendly tracking fields (listed in #1 above)</li>
+        <li>Calendly webhook (<code>invitee.created</code>) &rarr; auto-move lead to Booked (Phase 2 if needed)</li>
+        <li>Dashboard: leads where Calendly sent but not booked = follow up</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PHASE 2 BACKLOG ===== -->
+<div class="section">
+  <div class="section-title">Phase 2 Backlog &mdash; Fix After Foundation Works <span class="count amber">6</span></div>
+
+  <div class="issue">
+    <h3>5. Orbit System Needs Full Build-Out</h3>
+    <p>Plan mentions nurture side-tracks but the actual Orbit system has 5 reasons (No Response, Not Now, Ghost, Has Team, Hard No), two cadences (45d / 60d), and a resurrection flow. Add <code>orbit_reason</code>, <code>orbit_cadence_days</code>, <code>orbit_touch_number</code>, <code>resurrect_count</code>.</p>
+  </div>
+
+  <div class="issue">
+    <h3>6. TG Stage Has Its Own Nudge Cadence</h3>
+    <p>Path B leads in TG get nudged Day 2, 5, 10. Day 14 no booking &rarr; Orbit. New sequence type: <code>tg_booking</code> (Path B only).</p>
+  </div>
+
+  <div class="issue">
+    <h3>7. Template Mapping Uses Old Stages</h3>
+    <p>Section 4C maps templates to "Contacted" and "Qualified" &mdash; old stages. Re-map to new pipeline. Warm templates need to branch on <code>dm_account</code> (Path A &rarr; Calendly in DM; Path B &rarr; "drop your TG").</p>
+  </div>
+
+  <div class="issue">
+    <h3>8. No Dedup Across Accounts</h3>
+    <p>SDR DMs from multiple accounts &mdash; risk of same project contacted twice. Add <code>dedup_key</code> (project name + handle) and block duplicate creation.</p>
+  </div>
+
+  <div class="issue">
+    <h3>9. Dashboard Doesn't Split by Account</h3>
+    <p>"DMs Sent = 73" &mdash; from which account? Add <code>dm_account</code> as a dimension so the team can compare Path A vs Path B performance.</p>
+  </div>
+
+  <div class="issue">
+    <h3>10. No-Show + Contract Alerts</h3>
+    <p>Two gaps: (a) No-show &mdash; booked lead ghosts, 3-day reschedule window then Orbit. Add <code>no_show</code> flag. (b) Contract unsigned 3 days &rarr; alert Closer + Founder. Add <code>contract_sent_date</code>, <code>contract_signed_date</code>.</p>
+  </div>
+</div>
+
+<!-- ===== DB FIELDS ===== -->
+<div class="section">
+  <div class="section-title">Missing Fields &mdash; Phase 1 Essentials</div>
+  <p style="font-size: 13px; color: #6B7280; margin-bottom: 12px;">On <code>crm_opportunities</code> unless noted.</p>
+
+  <table class="fields-table">
+    <thead>
+      <tr><th>Field</th><th>Type</th><th>Why</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>dm_account</code></td><td>enum</td><td>Routing key &mdash; Path A vs B</td></tr>
+      <tr><td><code>tg_handle</code></td><td>text</td><td>Lead's Telegram (Path B required)</td></tr>
+      <tr><td><code>calendly_sent_via</code></td><td>enum (dm/tg/not_yet)</td><td>Where Calendly was sent</td></tr>
+      <tr><td><code>calendly_sent_date</code></td><td>timestamp</td><td>Speed to booking attempt</td></tr>
+      <tr><td><code>calendly_booked_date</code></td><td>timestamp</td><td>When they booked</td></tr>
+      <tr><td><code>gc_opened</code></td><td>enum (na/not_yet/opened)</td><td>GC status (Path B only)</td></tr>
+      <tr><td><code>bump_number</code></td><td>int (0-4)</td><td>Current bump in cold sequence</td></tr>
+      <tr><td><code>last_bump_date</code></td><td>timestamp</td><td>Drives auto-queue timing</td></tr>
+      <tr><td><code>warm_sub_state</code></td><td>enum (interested/silent)</td><td>Different next actions</td></tr>
+      <tr><td><code>orbit_reason</code></td><td>enum (5 values)</td><td>Drives resurrection cadence</td></tr>
+      <tr><td><code>closed_lost_reason</code></td><td>enum</td><td>Terminal exit tracking</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size: 12px; color: #4B5563; margin-top: 8px;">Phase 2 adds: orbit_cadence_days, orbit_touch_number, resurrect_count, dedup_key, no_show, contract_sent_date, contract_signed_date, gc_opened_date, kickoff_date</p>
+</div>
+
+<!-- ===== NEW SEQUENCES ===== -->
+<div class="section">
+  <div class="section-title">Missing Sequence Types</div>
+  <p style="font-size: 13px; color: #6B7280; margin-bottom: 12px;">Plan has: fast_track, nurture_21, post_proposal, monthly. Add:</p>
+
+  <table class="fields-table">
+    <thead>
+      <tr><th>Type</th><th>When</th><th>Steps</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>cold_outreach</code></td><td>New lead at Cold DM</td><td>5 bumps over ~19 days</td></tr>
+      <tr><td><code>tg_booking</code></td><td>Lead enters TG (Path B)</td><td>4 nudges over 14 days</td></tr>
+      <tr><td><code>orbit</code></td><td>Lead moved to Orbit</td><td>Touch every 45d or 60d based on reason</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ===== WHAT'S GOOD ===== -->
+<div class="section">
+  <div class="section-title">What the Plan Gets Right <span class="count green">Keep</span></div>
+  <ul class="keep-list">
+    <li>Bucket system (A/B/C) with auto-scoring &mdash; exactly matches the playbook</li>
+    <li>Sequence engine architecture (crm_sequences + steps + daily cron) &mdash; right approach, just needs more types</li>
+    <li>Dashboard layout and core metrics (SDR + Closer split, BAMFAM tracker, weekly TG report)</li>
+    <li>AI integration roadmap (Phase 3) &mdash; well-scoped, correct timing</li>
+    <li>Phased rollout (Foundation &rarr; Automation &rarr; Intelligence) &mdash; right order</li>
+  </ul>
+</div>
+
+<!-- ===== THE 70% CLAIM ===== -->
+<div class="section">
+  <div class="section-title">On the "70% Already Exists" Claim</div>
+  <div class="issue">
+    <p>Data infrastructure is at ~70% (templates, contacts, TG bot, stage history exist). But the playbook-driven workflow &mdash; two-path routing, bump sequences, Calendly tracking, Orbit &mdash; is new work. Phase 1 is bigger than the plan implies. Consider splitting into <strong>1a</strong> (correct pipeline + core fields + cold sequence) and <strong>1b</strong> (Calendly webhook + Orbit + dashboard splits).</p>
+  </div>
+</div>
+
+</div>
+
+<div class="footer">
+  HoloHive &middot; CRM Integration Plan Audit &middot; February 2026
+</div>
+
+</body>
+</html>

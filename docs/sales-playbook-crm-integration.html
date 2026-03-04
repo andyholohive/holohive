@@ -545,7 +545,7 @@
   <div class="hero-meta">
     <span>Prepared: February 2026</span>
     <span>For: Management Review</span>
-    <span>Version: 1.0</span>
+    <span>Version: 1.1 (Post-Audit)</span>
   </div>
 </div>
 
@@ -584,21 +584,26 @@
 
   <div class="kpi-grid">
     <div class="kpi">
-      <div class="kpi-value">70%</div>
-      <div class="kpi-label">of playbook steps can map to existing CRM features</div>
+      <div class="kpi-value">~70%</div>
+      <div class="kpi-label">data infrastructure exists &mdash; but workflow layer is new</div>
     </div>
     <div class="kpi">
-      <div class="kpi-value">6</div>
+      <div class="kpi-value">9</div>
       <div class="kpi-label">new modules needed to close the gaps</div>
     </div>
     <div class="kpi">
-      <div class="kpi-value">3</div>
-      <div class="kpi-label">phases of implementation</div>
+      <div class="kpi-value">4</div>
+      <div class="kpi-label">phases of implementation (1a, 1b, 2, 3)</div>
     </div>
     <div class="kpi">
       <div class="kpi-value">2x</div>
       <div class="kpi-label">target deal velocity improvement</div>
     </div>
+  </div>
+
+  <div class="callout callout-warning">
+    <strong>Key Context (from Audit)</strong>
+    The SDR (Phil) now DMs from the Closer's (Jdot's) account in addition to his own. This creates <strong>two booking paths</strong> &mdash; Path A (Closer's account, Calendly in DM, no TG/GC needed) and Path B (SDR's account, requires TG handoff + GC creation). This two-path model is the routing key for the entire pipeline and affects stages, sequences, and templates.
   </div>
 
   <div class="callout callout-primary">
@@ -719,12 +724,42 @@
         <td><span class="badge badge-red">Missing</span></td>
         <td>No outreach volume tracking</td>
       </tr>
+      <tr>
+        <td><strong>Two-Path Booking (Path A / B)</strong></td>
+        <td>Not implemented</td>
+        <td><span class="badge badge-red">Missing</span></td>
+        <td>SDR DMs from Closer's account (Path A) vs own account (Path B) &mdash; different routing</td>
+      </tr>
+      <tr>
+        <td><strong>Calendly Integration</strong></td>
+        <td>Not implemented</td>
+        <td><span class="badge badge-red">Missing</span></td>
+        <td>No Calendly tracking, webhook, or sent-vs-booked visibility</td>
+      </tr>
+      <tr>
+        <td><strong>Cold Outreach 5-Bump Sequence</strong></td>
+        <td>Not implemented</td>
+        <td><span class="badge badge-red">Missing</span></td>
+        <td>Pre-discovery outreach is the highest-volume automation &mdash; not tracked at all</td>
+      </tr>
+      <tr>
+        <td><strong>Orbit / Exit System</strong></td>
+        <td>Pipeline has "nurture" stage</td>
+        <td><span class="badge badge-amber">Partial</span></td>
+        <td>No orbit reasons, resurrection cadences, or exit tracking</td>
+      </tr>
+      <tr>
+        <td><strong>Dedup Across Accounts</strong></td>
+        <td>Not implemented</td>
+        <td><span class="badge badge-red">Missing</span></td>
+        <td>Risk of contacting same project from multiple accounts</td>
+      </tr>
     </tbody>
   </table>
 
-  <div class="callout callout-success">
-    <strong>Bottom Line</strong>
-    4 features fully exist, 5 partially exist, and 6 are missing entirely. The foundation is strong &mdash; we need to add the playbook-specific layer on top.
+  <div class="callout callout-warning">
+    <strong>Bottom Line (Updated After Audit)</strong>
+    Data infrastructure is at ~70% (templates, contacts, TG bot, stage history exist). But the playbook-driven <em>workflow</em> &mdash; two-path routing, bump sequences, Calendly tracking, Orbit system &mdash; is new work. Phase 1 is larger than initially scoped. We've split it into Phase 1a and 1b to manage complexity.
   </div>
 </div>
 
@@ -734,7 +769,7 @@
     <div class="section-num">03</div>
     <div>
       <div class="section-title">Gap Analysis</div>
-      <div class="section-subtitle">The six modules needed to close the gap</div>
+      <div class="section-subtitle">Nine modules needed to close the gap</div>
     </div>
   </div>
 
@@ -785,6 +820,30 @@
         <div class="card-title">6. Trigger Event Monitor</div>
       </div>
       <p>Track competitor movements, exchange listings, funding rounds, and team hires. Auto-flag relevant Bucket B/C leads for re-engagement when triggers fire.</p>
+    </div>
+
+    <div class="card" style="border-color: var(--red); border-width: 2px;">
+      <div class="card-header">
+        <div class="card-icon" style="background: var(--red-light); color: var(--red);">&#128268;</div>
+        <div class="card-title">7. Two-Path Booking Router</div>
+      </div>
+      <p><span class="badge badge-red" style="margin-bottom: 6px;">CRITICAL</span> SDR DMs from Closer's account (Path A: Calendly in DM, no TG/GC) vs SDR's own account (Path B: get TG, send Calendly in TG, open GC). <code>dm_account</code> is the routing key for the whole pipeline.</p>
+    </div>
+
+    <div class="card" style="border-color: var(--red); border-width: 2px;">
+      <div class="card-header">
+        <div class="card-icon" style="background: var(--red-light); color: var(--red);">&#128227;</div>
+        <div class="card-title">8. Cold Outreach 5-Bump Sequence</div>
+      </div>
+      <p><span class="badge badge-red" style="margin-bottom: 6px;">CRITICAL</span> The highest-volume automation: 5 bumps over ~19 days (Opener &rarr; Value &rarr; Credibility &rarr; Direct Ask &rarr; Breakup). Bump 4 + 7 days silence auto-moves to Orbit. Currently zero pre-discovery tracking.</p>
+    </div>
+
+    <div class="card" style="border-color: var(--red); border-width: 2px;">
+      <div class="card-header">
+        <div class="card-icon" style="background: var(--red-light); color: var(--red);">&#128197;</div>
+        <div class="card-title">9. Calendly Integration</div>
+      </div>
+      <p><span class="badge badge-red" style="margin-bottom: 6px;">CRITICAL</span> Calendly is the booking mechanism. Track where it was sent (DM vs TG), when it was sent, and when the lead booked. Webhook (<code>invitee.created</code>) auto-moves lead to Booked stage. Dashboard: "Calendly sent but not booked = follow up."</p>
     </div>
   </div>
 </div>
@@ -883,6 +942,42 @@
     </div>
   </div>
 
+  <!-- 4A2: TWO-PATH BOOKING -->
+  <h3>4A-ii. Two-Path Booking Router</h3>
+  <p>The SDR DMs from two accounts. Which account determines the entire downstream flow:</p>
+
+  <div class="compare-grid">
+    <div class="compare-col">
+      <div class="compare-header proposed" style="background: var(--blue);">Path A &mdash; Closer's Account</div>
+      <div class="compare-body">
+        <ul>
+          <li>Cold DM &rarr; Warm &rarr; <strong>Calendly sent in DM</strong> &rarr; Booked</li>
+          <li>No TG exchange needed</li>
+          <li>No GC creation needed</li>
+          <li>Lead thinks they're talking to the Closer</li>
+          <li>Faster path &mdash; fewer steps to booking</li>
+        </ul>
+      </div>
+    </div>
+    <div class="compare-col">
+      <div class="compare-header proposed" style="background: var(--amber);">Path B &mdash; SDR's / Other Account</div>
+      <div class="compare-body">
+        <ul>
+          <li>Cold DM &rarr; Warm &rarr; <strong>Get TG</strong> &rarr; Calendly in TG &rarr; Booked &rarr; <strong>Open GC</strong> (add Closer)</li>
+          <li>TG handoff required before Calendly</li>
+          <li>GC opened after booking confirmed</li>
+          <li>Lead doesn't know the Closer yet</li>
+          <li>TG stage has its own nudge cadence (Day 2, 5, 10, 14)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout callout-info">
+    <strong>Implementation Detail</strong>
+    A <code>dm_account</code> field on every opportunity is the routing key. Pipeline logic branches on this value: Path A skips the TG and GC stages entirely. Path B requires them. Templates also branch &mdash; Path A sends Calendly link directly in DM, Path B asks "drop your TG" first.
+  </div>
+
   <!-- 4B: ACTIVITY TRACKER -->
   <h3>4B. Activity &amp; Meeting Tracker</h3>
   <p>Every opportunity gets an activity timeline. Calls, messages, proposals, and meetings are logged with metadata. BAMFAM compliance is tracked automatically.</p>
@@ -910,25 +1005,43 @@
     </thead>
     <tbody>
       <tr>
-        <td>Contacted</td>
+        <td>Cold DM (Bump 0-4)</td>
         <td>All</td>
-        <td>Pre-call agenda setting message</td>
+        <td>5-bump cold outreach sequence templates (Opener, Value, Credibility, Direct Ask, Breakup)</td>
         <td>Phil</td>
       </tr>
       <tr>
-        <td>Qualified (post-call)</td>
+        <td>Warm (Path A)</td>
+        <td>All</td>
+        <td>Send Calendly link in DM</td>
+        <td>Phil</td>
+      </tr>
+      <tr>
+        <td>Warm (Path B)</td>
+        <td>All</td>
+        <td>"Drop your TG" &rarr; then send Calendly in TG</td>
+        <td>Phil</td>
+      </tr>
+      <tr>
+        <td>Booked</td>
+        <td>All</td>
+        <td>Pre-call agenda setting message (24-48h before)</td>
+        <td>Phil</td>
+      </tr>
+      <tr>
+        <td>Discovery Done</td>
         <td>A</td>
         <td>Bucket A: same-day follow-up + case studies</td>
         <td>Phil</td>
       </tr>
       <tr>
-        <td>Qualified (post-call)</td>
+        <td>Discovery Done</td>
         <td>B</td>
         <td>Bucket B: same-day follow-up + data walkthrough offer</td>
         <td>Phil</td>
       </tr>
       <tr>
-        <td>Qualified (post-call)</td>
+        <td>Discovery Done</td>
         <td>C</td>
         <td>Bucket C: soft close, keep in loop</td>
         <td>Phil</td>
@@ -986,7 +1099,7 @@
 
   <div class="callout callout-info">
     <strong>Implementation Detail</strong>
-    Templates already exist in the <code>message_templates</code> table. We add a <code>stage</code> and <code>bucket</code> field to each template. When a user opens an opportunity at a given stage, the relevant templates auto-appear in a "Suggested Messages" panel.
+    Templates already exist in the <code>message_templates</code> table. We add <code>pipeline_stage</code>, <code>bucket</code>, <code>dm_account</code> (for path-specific templates), and <code>sequence_day</code> fields. When a user opens an opportunity, the relevant templates auto-appear based on current stage, bucket, and path. Warm-stage templates branch on <code>dm_account</code>: Path A surfaces "send Calendly in DM," Path B surfaces "drop your TG."
   </div>
 </div>
 
@@ -1019,13 +1132,15 @@
     <div class="flow-step active">Won/Lost</div>
   </div>
 
-  <h3>Proposed Pipeline Flow (Playbook-Aligned)</h3>
+  <h3>Proposed Pipeline Flow (Corrected Per Audit)</h3>
   <div class="flow">
-    <div class="flow-step active">DM Sent</div>
+    <div class="flow-step new">Cold DM<br><small>5 bumps</small></div>
     <div class="flow-arrow">&rarr;</div>
-    <div class="flow-step active">Response</div>
+    <div class="flow-step new">Warm<br><small>Int. / Silent</small></div>
     <div class="flow-arrow">&rarr;</div>
-    <div class="flow-step new">Discovery<br><small>Booked</small></div>
+    <div class="flow-step new">TG*<br><small>Path B only</small></div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step new">Booked</div>
     <div class="flow-arrow">&rarr;</div>
     <div class="flow-step new">Discovery<br><small>Done</small></div>
     <div class="flow-arrow">&rarr;</div>
@@ -1035,9 +1150,22 @@
     <div class="flow-arrow">&rarr;</div>
     <div class="flow-step active">Contract</div>
     <div class="flow-arrow">&rarr;</div>
-    <div class="flow-step active">Won</div>
+    <div class="flow-step active">Closed Won</div>
   </div>
-  <p style="text-align: center; font-size: 12px; color: var(--gray-400); margin-top: 4px;"><span class="badge badge-blue" style="font-size: 10px;">NEW</span> = New stages aligned with playbook touchpoints</p>
+  <p style="text-align: center; font-size: 12px; color: var(--gray-400); margin-top: 4px;">
+    <span class="badge badge-blue" style="font-size: 10px;">NEW</span> = New/renamed stages &nbsp;&nbsp;
+    *TG stage skipped for Path A &nbsp;&nbsp;
+    Exit lanes at every stage: <strong>Orbit</strong> (with reason) or <strong>Closed Lost</strong> (with reason)
+  </p>
+
+  <h4 style="margin-top: 24px;">Nurture side-track (Bucket B after Discovery)</h4>
+  <div class="flow">
+    <div class="flow-step new">Nurture<br><small>21 days</small></div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step" style="background: var(--gray-100); border-color: var(--gray-400); color: var(--gray-500);">Re-assess<br><small>Warm? &rarr; A</small></div>
+    <div class="flow-arrow">&rarr;</div>
+    <div class="flow-step" style="background: var(--gray-100); border-color: var(--gray-400); color: var(--gray-500);">Orbit<br><small>Monthly touch</small></div>
+  </div>
 
   <h3>Key Changes</h3>
   <table>
@@ -1045,41 +1173,51 @@
       <tr>
         <th>Change</th>
         <th>Why</th>
-        <th>Playbook Reference</th>
+        <th>Audit Reference</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td>Split "Contacted" into <strong>DM Sent</strong> + <strong>Response</strong></td>
-        <td>Track Phil's outreach volume separately from response rate</td>
-        <td>Section 15: Phil's Metrics &mdash; DMs sent, response rate</td>
+        <td>"DM Sent" renamed to <strong>Cold DM</strong></td>
+        <td>It's a stage, not an action &mdash; leads sit here through 5 bumps over ~19 days</td>
+        <td>Audit #2: "It's a stage, not an action"</td>
       </tr>
       <tr>
-        <td>Add <strong>Discovery Booked</strong> stage</td>
-        <td>Track BAMFAM compliance &mdash; every response should lead to a booked call</td>
-        <td>Section 4: BAMFAM principle</td>
+        <td>"Response" renamed to <strong>Warm</strong> with sub-states</td>
+        <td><code>warm_sub_state</code>: <strong>Interested</strong> (actively engaging) vs <strong>Silent</strong> (opened but no reply &mdash; triggers re-bump)</td>
+        <td>Audit #2: Warm sub-states</td>
       </tr>
       <tr>
-        <td>Add <strong>Discovery Done</strong> stage</td>
-        <td>Trigger bucket assignment (A/B/C) and post-call sequences</td>
-        <td>Section 5: Post-Call First 24 Hours</td>
+        <td>Add <strong>TG</strong> stage (Path B only)</td>
+        <td>Path B requires TG handoff before Calendly. Own nudge cadence: Day 2, 5, 10. Day 14 no booking &rarr; Orbit.</td>
+        <td>Audit #1, #6: Two-path + TG nudge</td>
       </tr>
       <tr>
-        <td>Split "Proposal" into <strong>Sent</strong> + <strong>Call</strong></td>
-        <td>Track proposal-to-call conversion and follow-up cadence</td>
-        <td>Section 6: Fast Track Day 4-5</td>
+        <td>Add <strong>Booked</strong> stage (via Calendly)</td>
+        <td>Calendly link sent (DM or TG) &rarr; Lead books via Calendly &rarr; auto-move to Booked. Tracks Calendly sent-vs-booked gap.</td>
+        <td>Audit #4: Calendly tracking</td>
       </tr>
       <tr>
-        <td>Add side-tracks: <strong>Nurture</strong> and <strong>Monthly</strong></td>
-        <td>Bucket B enters 21-day nurture. Bucket C enters monthly touches.</td>
-        <td>Sections 7, 10: Nurture Track, Monthly Nurture</td>
+        <td>Add <strong>Orbit</strong> exit lane (with reason)</td>
+        <td>5 reasons: No Response, Not Now, Ghost, Has Team, Hard No. Two cadences: 45d or 60d. Resurrection flow back to pipeline.</td>
+        <td>Audit #5: Full Orbit system</td>
+      </tr>
+      <tr>
+        <td>Add <strong>Closed Lost</strong> exit lane (with reason)</td>
+        <td>Terminal exit. Reason tracked for pattern analysis (budget, timing, competitor, went in-house, etc.)</td>
+        <td>Audit #2: Exit lanes</td>
+      </tr>
+      <tr>
+        <td>Split Proposal into <strong>Sent</strong> + <strong>Call</strong></td>
+        <td>Track proposal-to-call conversion. Post-proposal silence sequence fires at Sent stage.</td>
+        <td>Playbook Section 6: Fast Track</td>
       </tr>
     </tbody>
   </table>
 
   <div class="callout callout-warning">
     <strong>Migration Note</strong>
-    Existing opportunities in old stages will be auto-mapped to the nearest new stage. No data loss. Stage history will preserve the original stage names.
+    Existing opportunities in old stages will be auto-mapped to the nearest new stage. No data loss. Stage history will preserve the original stage names. <code>dm_account</code> defaults to "sdr" for existing leads (can be bulk-updated).
   </div>
 </div>
 
@@ -1094,6 +1232,48 @@
   </div>
 
   <p>The playbook defines specific timing for every follow-up. Today, the team tracks this manually (or forgets). The CRM should queue these actions automatically and surface them as tasks.</p>
+
+  <h3>Sequence 0: Cold Outreach &mdash; 5-Bump Sequence</h3>
+  <div class="callout callout-warning">
+    <strong>Audit Finding: This was completely missing.</strong> The 5-bump cold outreach is the highest-volume automation in the system. It runs before discovery and is where the majority of leads spend their time.
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Bump</th>
+        <th>Timing</th>
+        <th>Message Type</th>
+        <th>Auto-Triggered?</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>0</td><td>Day 0</td><td>Opener &mdash; personalized cold DM</td><td><span class="badge badge-green">Yes</span> On lead creation</td></tr>
+      <tr><td>1</td><td>Day 3-4</td><td>Value &mdash; insight or market data</td><td><span class="badge badge-green">Yes</span></td></tr>
+      <tr><td>2</td><td>Day 7-8</td><td>Credibility &mdash; case study or social proof</td><td><span class="badge badge-green">Yes</span></td></tr>
+      <tr><td>3</td><td>Day 12-13</td><td>Direct Ask &mdash; explicit call-to-action</td><td><span class="badge badge-green">Yes</span></td></tr>
+      <tr><td>4</td><td>Day 18-19</td><td>Breakup &mdash; "going to pause for now"</td><td><span class="badge badge-green">Yes</span></td></tr>
+      <tr><td>&mdash;</td><td>Day 26</td><td>No response after Bump 4 &rarr; auto-move to <strong>Orbit</strong> (reason: no_response)</td><td><span class="badge badge-green">Yes</span></td></tr>
+    </tbody>
+  </table>
+  <p style="font-size: 13px; color: var(--gray-500);"><strong>Fields needed:</strong> <code>bump_number</code> (0-4), <code>last_bump_date</code> on each opportunity. If lead replies at any bump &rarr; auto-move to <strong>Warm</strong> and stop the bump sequence.</p>
+
+  <h3>Sequence 0b: TG Booking Nudge (Path B Only)</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Day</th>
+        <th>Action</th>
+        <th>Auto-Triggered?</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>0</td><td>Lead enters TG stage. Calendly sent in TG.</td><td><span class="badge badge-green">Yes</span></td></tr>
+      <tr><td>2</td><td>Nudge: "Did you get a chance to check the calendar link?"</td><td><span class="badge badge-green">Yes</span></td></tr>
+      <tr><td>5</td><td>Nudge: Value add + reminder</td><td><span class="badge badge-green">Yes</span></td></tr>
+      <tr><td>10</td><td>Nudge: Direct re-ask</td><td><span class="badge badge-green">Yes</span></td></tr>
+      <tr><td>14</td><td>No booking &rarr; auto-move to Orbit (reason: ghost)</td><td><span class="badge badge-green">Yes</span></td></tr>
+    </tbody>
+  </table>
 
   <h3>Sequence 1: Bucket A &mdash; Fast Track</h3>
   <div class="mockup">
@@ -1214,9 +1394,29 @@
     </tbody>
   </table>
 
+  <h3>Sequence 5: Orbit (Bucket B/C &mdash; Long-Term)</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Orbit Reason</th>
+        <th>Cadence</th>
+        <th>Touch Type</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>No Response</td><td>Every 60 days</td><td>Value touch (market data, competitor move)</td></tr>
+      <tr><td>Not Now</td><td>Every 45 days</td><td>Value touch + soft re-engagement</td></tr>
+      <tr><td>Ghost (booked but no-showed or went silent)</td><td>Every 60 days</td><td>Light touch, breakup after 3 attempts</td></tr>
+      <tr><td>Has Team (doing it in-house)</td><td>Every 60 days</td><td>Case study results, "how's it going?"</td></tr>
+      <tr><td>Hard No</td><td>None</td><td>No further outreach. Monitor for trigger events only.</td></tr>
+    </tbody>
+  </table>
+  <p style="font-size: 13px; color: var(--gray-500);"><strong>Fields:</strong> <code>orbit_reason</code>, <code>orbit_cadence_days</code>, <code>orbit_touch_number</code>, <code>resurrect_count</code>. When a trigger event matches, lead can be resurrected back into the pipeline.</p>
+
   <div class="callout callout-primary">
     <strong>How Sequences Work Technically</strong>
-    A new <code>crm_sequences</code> table stores queued actions per opportunity. A cron job (Supabase Edge Function) runs daily, checks for due actions, and creates tasks in the Tasks system with the appropriate template pre-loaded. Phil/Jdot see these as action items on their dashboard.
+    A new <code>crm_sequences</code> table stores queued actions per opportunity. A cron job (Supabase Edge Function) runs daily, checks for due actions, and creates tasks in the Tasks system with the appropriate template pre-loaded. Phil/Jdot see these as action items on their dashboard.<br><br>
+    <strong>7 sequence types:</strong> <code>cold_outreach</code> (5 bumps), <code>tg_booking</code> (Path B nudges), <code>fast_track</code>, <code>nurture_21</code>, <code>post_proposal</code>, <code>monthly</code>, <code>orbit</code>.
   </div>
 </div>
 
@@ -1326,12 +1526,40 @@
     </div>
   </div>
 
+  <div class="callout callout-info">
+    <strong>Audit Fix: Split by Account</strong>
+    "DMs Sent = 73" &mdash; from which account? The dashboard adds <code>dm_account</code> as a filter dimension so the team can compare Path A vs Path B performance separately. Each metric card can be toggled to show totals or per-account breakdown.
+  </div>
+
+  <h3>No-Show &amp; Contract Alerts</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Alert</th>
+        <th>Trigger</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>No-Show</strong></td>
+        <td>Booked lead doesn't show up for discovery call</td>
+        <td>3-day reschedule window (auto-task). Day 3 no response &rarr; Orbit (reason: ghost). Field: <code>no_show</code> flag.</td>
+      </tr>
+      <tr>
+        <td><strong>Contract Unsigned</strong></td>
+        <td>Contract sent but not signed after 3 days</td>
+        <td>Alert Closer + Founder. Auto-task to follow up. Fields: <code>contract_sent_date</code>, <code>contract_signed_date</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
   <h3>Weekly Rhythm Report (Auto-generated every Monday)</h3>
   <p>The playbook defines a weekly rhythm (Section 16). Every Monday morning, the CRM auto-generates a report sent to the team TG channel:</p>
   <ul>
-    <li><strong>Last week:</strong> Deals closed, revenue, conversion rates, DMs sent, meetings run</li>
+    <li><strong>Last week:</strong> Deals closed, revenue, conversion rates, DMs sent (by account), meetings run</li>
     <li><strong>This week:</strong> Scheduled calls, proposals due, nurture touches queued, follow-ups overdue</li>
-    <li><strong>Alerts:</strong> Stale leads (no contact in 7+ days), BAMFAM violations, Bucket B leads ready for re-assessment</li>
+    <li><strong>Alerts:</strong> Stale leads (no contact in 7+ days), BAMFAM violations, no-shows pending reschedule, unsigned contracts, Bucket B leads ready for re-assessment</li>
   </ul>
 </div>
 
@@ -1425,8 +1653,11 @@
     <tbody>
       <tr>
         <td><code>crm_opportunities</code></td>
-        <td>Add: <code>bucket</code> (A/B/C), <code>temperature_score</code> (0-100), <code>next_meeting_at</code>, <code>next_meeting_type</code>, <code>bucket_changed_at</code>, <code>proposal_sent_at</code>, <code>discovery_call_at</code></td>
-        <td>Bucket system, BAMFAM tracking, sequence triggers</td>
+        <td>
+          <strong>Phase 1a:</strong> <code>bucket</code> (A/B/C), <code>temperature_score</code> (0-100), <code>dm_account</code> (enum: closer/sdr/other), <code>tg_handle</code>, <code>calendly_sent_via</code> (dm/tg/not_yet), <code>calendly_sent_date</code>, <code>calendly_booked_date</code>, <code>gc_opened</code> (na/not_yet/opened), <code>bump_number</code> (0-4), <code>last_bump_date</code>, <code>warm_sub_state</code> (interested/silent), <code>orbit_reason</code>, <code>closed_lost_reason</code>, <code>dedup_key</code>, <code>next_meeting_at</code>, <code>next_meeting_type</code>, <code>bucket_changed_at</code>, <code>discovery_call_at</code>, <code>proposal_sent_at</code><br>
+          <strong>Phase 1b:</strong> <code>orbit_cadence_days</code>, <code>orbit_touch_number</code>, <code>resurrect_count</code>, <code>gc_opened_date</code>, <code>no_show</code> (boolean), <code>contract_sent_date</code>, <code>contract_signed_date</code>, <code>kickoff_date</code>
+        </td>
+        <td>Two-path routing, bump tracking, Calendly tracking, Orbit system, BAMFAM, dedup</td>
       </tr>
       <tr>
         <td><code>crm_contacts</code></td>
@@ -1435,8 +1666,8 @@
       </tr>
       <tr>
         <td><code>message_templates</code></td>
-        <td>Add: <code>pipeline_stage</code>, <code>bucket</code>, <code>sequence_day</code>, <code>playbook_section</code></td>
-        <td>Context-aware template surfacing</td>
+        <td>Add: <code>pipeline_stage</code>, <code>bucket</code>, <code>dm_account</code> (for path-specific templates), <code>sequence_day</code>, <code>playbook_section</code></td>
+        <td>Context-aware template surfacing. Templates branch on <code>dm_account</code> at Warm stage.</td>
       </tr>
     </tbody>
   </table>
@@ -1458,8 +1689,8 @@
       </tr>
       <tr>
         <td><code>crm_sequences</code></td>
-        <td><code>opportunity_id</code>, <code>sequence_type</code> (fast_track/nurture_21/post_proposal/monthly), <code>started_at</code>, <code>status</code> (active/paused/completed), <code>current_step</code></td>
-        <td>Track which automated sequence an opportunity is on.</td>
+        <td><code>opportunity_id</code>, <code>sequence_type</code> (cold_outreach/tg_booking/fast_track/nurture_21/post_proposal/monthly/orbit), <code>started_at</code>, <code>status</code> (active/paused/completed), <code>current_step</code></td>
+        <td>Track which automated sequence an opportunity is on. 7 sequence types.</td>
       </tr>
       <tr>
         <td><code>crm_sequence_steps</code></td>
@@ -1496,43 +1727,64 @@
     <div class="section-num">10</div>
     <div>
       <div class="section-title">Implementation Roadmap</div>
-      <div class="section-subtitle">Three phases, incremental value at each step</div>
+      <div class="section-subtitle">Four phases (1a, 1b, 2, 3), incremental value at each step</div>
     </div>
   </div>
 
   <div class="timeline">
     <div class="timeline-item">
       <div class="timeline-dot"></div>
-      <div class="timeline-label">Phase 1 &mdash; Foundation</div>
-      <div class="timeline-title">Pipeline Alignment + Activity Tracking</div>
+      <div class="timeline-label">Phase 1a &mdash; Correct Pipeline + Core Fields</div>
+      <div class="timeline-title">Two-Path Routing + Stages + Cold Sequence</div>
       <div class="timeline-desc">
         <ul style="margin-top: 8px; font-size: 13px; color: var(--gray-500);">
+          <li>Add <code>dm_account</code>, <code>bump_number</code>, <code>last_bump_date</code>, <code>warm_sub_state</code>, <code>tg_handle</code>, <code>calendly_sent_via/date</code>, <code>gc_opened</code>, <code>dedup_key</code> to opportunities</li>
+          <li>Implement correct pipeline stages: Cold DM &rarr; Warm (Interested/Silent) &rarr; TG (Path B) &rarr; Booked &rarr; Discovery Done &rarr; Proposal Sent/Call &rarr; Contract &rarr; Closed Won</li>
+          <li>Add Orbit exit lane with <code>orbit_reason</code> and Closed Lost with <code>closed_lost_reason</code></li>
           <li>Add bucket field + temperature score to opportunities</li>
-          <li>Add new pipeline stages (DM Sent, Response, Discovery Booked/Done, Proposal Sent/Call)</li>
-          <li>Build <code>crm_activities</code> table and activity timeline UI on opportunity detail</li>
+          <li>Build cold outreach 5-bump sequence (highest-volume automation)</li>
+          <li>Build <code>crm_activities</code> table and activity timeline UI</li>
           <li>Add BAMFAM next_meeting tracking with warning badges</li>
           <li>Add decision-maker flag to contacts</li>
-          <li>Link message templates to stages + buckets</li>
-          <li>Build pre-call prep checklist form</li>
+          <li>Dedup check on lead creation (project name + handle)</li>
         </ul>
-        <p style="margin-top: 8px;"><strong>Value delivered:</strong> Every opportunity has a clear bucket, activity history, and BAMFAM compliance. Templates surface at the right stage. Pre-call prep is structured.</p>
+        <p style="margin-top: 8px;"><strong>Value delivered:</strong> Pipeline accurately reflects the two-path reality. Cold outreach is tracked and automated. Duplicates are prevented. Every opportunity has a bucket, activity history, and BAMFAM compliance.</p>
+      </div>
+    </div>
+
+    <div class="timeline-item">
+      <div class="timeline-dot" style="background: #6366F1; box-shadow: 0 0 0 2px #6366F1;"></div>
+      <div class="timeline-label" style="color: #6366F1;">Phase 1b &mdash; Calendly + Orbit + Templates</div>
+      <div class="timeline-title">Complete the Foundation</div>
+      <div class="timeline-desc">
+        <ul style="margin-top: 8px; font-size: 13px; color: var(--gray-500);">
+          <li>Calendly webhook integration (<code>invitee.created</code> &rarr; auto-move to Booked)</li>
+          <li>TG booking nudge sequence (Path B: Day 2, 5, 10, 14 &rarr; Orbit)</li>
+          <li>Full Orbit system: 5 reasons, two cadences (45d/60d), resurrection flow</li>
+          <li>No-show tracking (<code>no_show</code> flag, 3-day reschedule window)</li>
+          <li>Contract alerts (<code>contract_sent_date</code>, <code>contract_signed_date</code>, 3-day unsigned alert)</li>
+          <li>Link message templates to stages + buckets + <code>dm_account</code> for path-specific surfacing</li>
+          <li>Build pre-call prep checklist form</li>
+          <li>Dashboard: split metrics by <code>dm_account</code> dimension</li>
+        </ul>
+        <p style="margin-top: 8px;"><strong>Value delivered:</strong> Calendly auto-updates pipeline. Orbit nurtures cold leads long-term. Templates surface at the right stage for the right path. No-shows and stale contracts are flagged automatically.</p>
       </div>
     </div>
 
     <div class="timeline-item">
       <div class="timeline-dot" style="background: var(--accent); box-shadow: 0 0 0 2px var(--accent);"></div>
       <div class="timeline-label" style="color: var(--accent);">Phase 2 &mdash; Automation</div>
-      <div class="timeline-title">Sequences + Dashboard + Weekly Reports</div>
+      <div class="timeline-title">Post-Discovery Sequences + Dashboard + Weekly Reports</div>
       <div class="timeline-desc">
         <ul style="margin-top: 8px; font-size: 13px; color: var(--gray-500);">
-          <li>Build sequence engine (<code>crm_sequences</code> + <code>crm_sequence_steps</code>)</li>
-          <li>Implement all 4 sequences: Fast Track, 21-Day Nurture, Post-Proposal, Monthly Nurture</li>
-          <li>Build Sales Dashboard page with Phil/Jdot metrics and pipeline summary</li>
+          <li>Build sequence engine (<code>crm_sequences</code> + <code>crm_sequence_steps</code>) for post-discovery flows</li>
+          <li>Implement remaining sequences: Fast Track, 21-Day Nurture, Post-Proposal Silence, Monthly Nurture, Orbit touches</li>
+          <li>Build Sales Dashboard page with Phil/Jdot metrics, pipeline summary, and Path A vs B comparison</li>
           <li>Build <code>sales_metrics_daily</code> table with auto-snapshot Edge Function</li>
-          <li>Auto-generate weekly Monday report to TG channel</li>
+          <li>Auto-generate weekly Monday report to TG channel (including account breakdown)</li>
           <li>Build proposal tracker (<code>crm_proposals</code> table + UI)</li>
         </ul>
-        <p style="margin-top: 8px;"><strong>Value delivered:</strong> Follow-ups happen automatically. No lead falls through the cracks. Metrics are real-time. Monday standups have data.</p>
+        <p style="margin-top: 8px;"><strong>Value delivered:</strong> Follow-ups happen automatically. No lead falls through the cracks. Metrics are real-time with Path A/B comparison. Monday standups have data.</p>
       </div>
     </div>
 
@@ -1577,12 +1829,14 @@
       <div class="compare-header proposed">After (Playbook in CRM)</div>
       <div class="compare-body">
         <ul>
-          <li>Playbook actions are the CRM workflow &mdash; no memorization needed</li>
+          <li>Two-path routing (Path A / Path B) baked into every stage</li>
+          <li>5-bump cold outreach runs automatically per lead</li>
+          <li>Calendly integration auto-moves leads to Booked</li>
           <li>Every follow-up is queued, templated, and tracked</li>
-          <li>Real-time dashboard with all playbook KPIs</li>
-          <li>AI generates proposal drafts from opportunity data</li>
-          <li>Auto-scoring classifies buckets from call data</li>
-          <li>Trigger events auto-scanned and matched to leads</li>
+          <li>Orbit system nurtures cold leads with the right cadence</li>
+          <li>Real-time dashboard with Path A vs B comparison</li>
+          <li>Dedup prevents double-contacting from multiple accounts</li>
+          <li>No-shows get 3-day reschedule window, then Orbit</li>
           <li>BAMFAM enforced with warnings on every opportunity</li>
           <li>Monday report auto-generated and sent to TG</li>
           <li>Full audit trail of playbook execution per deal</li>

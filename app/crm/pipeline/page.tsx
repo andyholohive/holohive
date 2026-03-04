@@ -294,7 +294,19 @@ export default function PipelinePage() {
     closed_lost: 'Lost',
     account_active: 'Active',
     account_at_risk: 'At Risk',
-    account_churned: 'Inactive'
+    account_churned: 'Inactive',
+    // Sales Pipeline v2 stages (not rendered on this page)
+    cold_dm: 'Cold DM',
+    warm: 'Warm',
+    tg_intro: 'TG Intro',
+    booked: 'Booked',
+    discovery_done: 'Discovery Done',
+    proposal_sent: 'Proposal Sent',
+    proposal_call: 'Proposal Call',
+    v2_contract: 'Contract',
+    v2_closed_won: 'Closed Won',
+    orbit: 'Orbit',
+    v2_closed_lost: 'Closed Lost',
   };
 
   const stageColors: Record<OpportunityStage, { bg: string; text: string; border: string; solid: string }> = {
@@ -312,7 +324,19 @@ export default function PipelinePage() {
     closed_lost: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', solid: 'bg-red-500' },
     account_active: { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', solid: 'bg-teal-500' },
     account_at_risk: { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', solid: 'bg-yellow-500' },
-    account_churned: { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200', solid: 'bg-slate-500' }
+    account_churned: { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200', solid: 'bg-slate-500' },
+    // Sales Pipeline v2 stages (not rendered on this page)
+    cold_dm: { bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', solid: 'bg-sky-500' },
+    warm: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', solid: 'bg-amber-500' },
+    tg_intro: { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200', solid: 'bg-violet-500' },
+    booked: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', solid: 'bg-blue-500' },
+    discovery_done: { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', solid: 'bg-indigo-500' },
+    proposal_sent: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', solid: 'bg-purple-500' },
+    proposal_call: { bg: 'bg-fuchsia-50', text: 'text-fuchsia-700', border: 'border-fuchsia-200', solid: 'bg-fuchsia-500' },
+    v2_contract: { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', solid: 'bg-cyan-500' },
+    v2_closed_won: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', solid: 'bg-emerald-500' },
+    orbit: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', solid: 'bg-orange-500' },
+    v2_closed_lost: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', solid: 'bg-red-500' },
   };
 
   useEffect(() => {

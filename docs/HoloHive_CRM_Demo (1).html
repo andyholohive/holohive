@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Holo Hive CRM - Interactive Demo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes slideInFromRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes zoomIn { from { transform: scale(0.95) translateY(10px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+    .animate-slide-in { animation: slideInFromRight 0.3s ease-out; }
+    .animate-fade-in { animation: fadeIn 0.2s ease-out; }
+    .animate-zoom-in { animation: zoomIn 0.2s ease-out; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useMemo, useCallback } = React;
+
+    // ============ CONFIG ============
+    const STAGES = [
+      { id: 'cold', label: 'Cold', color: '#3B82F6' },
+      { id: 'warm', label: 'Warm', color: '#F59E0B' },
+      { id: 'tg', label: 'TG', color: '#10B981' },
+      { id: 'booked', label: 'Booked', color: '#8B5CF6' },
+      { id: 'orbit', label: 'Orbit', color: '#14B8A6' },
+    ];
+
+    const DEAL_STAGES = [
+      { id: 'discovery', label: 'Discovery', probability: 20, staleDays: 14 },
+      { id: 'proposal', label: 'Proposal', probability: 50, staleDays: 10 },
+      { id: 'negotiation', label: 'Negotiation', probability: 75, staleDays: 7 },
+      { id: 'verbal', label: 'Verbal', probability: 90, staleDays: 5 },
+    ];
+
+    const SERVICES = [
+      { id: 'vhp', name: 'Verified Holder Program', shortName: 'VHP', price: 25000 },
+      { id: 'kol', name: 'KOL Rounds', shortName: 'KOL', price: 35000 },
+      { id: 'full', name: 'Full Korea Campaign', shortName: 'Full', price: 75000 },
+      { id: 'community', name: 'Community Distribution', shortName: 'Comm', price: 15000 },
+      { id: 'consulting', name: 'Market Consulting', shortName: 'Consult', price: 10000 },
+    ];
+
+    const SOURCES = [
+      { id: 'cold_outreach', label: 'Cold Outreach', icon: '❄️' },
+      { id: 'referral', label: 'Referral', icon: '🤝' },
+      { id: 'inbound', label: 'Inbound', icon: '📥' },
+      { id: 'event', label: 'Event', icon: '🎤' },
+    ];
+
+    const ORBIT_REASONS = [
+      { id: 'no_response', label: 'No Response', days: 180 },
+      { id: 'has_team', label: 'Has Team', days: 90 },
+      { id: 'not_now', label: 'Not Now', days: 90 },
+      { id: 'hard_no', label: 'Hard No', days: 365 },
+      { id: 'ghost', label: 'Ghost After Call', days: 45 },
+    ];
+
+    const VIEWS = [
+      { id: 'all_items', label: 'All Items', icon: '📋', filter: {} },
+      { id: 'my_actions', label: 'My Actions', icon: '⚡', filter: { actionNeeded: true } },
+      { id: 'jdot_calls', label: 'Jdot Calls', icon: '📞', filter: { owner: 'Jdot' } },
+      { id: 'stale_deals', label: 'Stale Deals', icon: '⚠️', filter: { type: 'deal', stale: true } },
+      { id: 'cold_pipeline', label: 'Cold Pipeline', icon: '❄️', filter: { stage: 'cold' } },
+      { id: 'all_prospects', label: 'All Prospects', icon: '👥', filter: { type: 'prospect' } },
+      { id: 'all_deals', label: 'All Deals', icon: '💰', filter: { type: 'deal' } },
+    ];
+
+    // ============ DATA ============
+    const ACCOUNTS = ['Avalanche Gaming', 'Treasure DAO', 'Ronin Network', 'Immutable X', 'Berachain', 'Monad Labs', 'Arbitrum', 'zkSync', 'Polygon', 'Optimism', 'Base Protocol', 'Scroll'].map((name, i) => ({ id: i + 1, name }));
+    const CONTACTS = ACCOUNTS.map((a, i) => ({ id: i + 1, accountId: a.id, firstName: ['Mike', 'Sarah', 'Alex', 'James', 'David', 'Chris', 'Nina', 'Tom', 'Lisa', 'Kevin', 'Emma', 'Ryan'][i], lastName: ['Chen', 'Kim', 'Wong', 'Liu', 'Park', 'Lee', 'Zhang', 'Wang', 'Cho', 'Yun', 'Han', 'Seo'][i], role: ['Head of Growth', 'BD Lead', 'CEO', 'COO', 'CMO', 'Partnerships'][i % 6], twitter: `@${['Mike', 'Sarah', 'Alex', 'James', 'David', 'Chris', 'Nina', 'Tom', 'Lisa', 'Kevin', 'Emma', 'Ryan'][i].toLowerCase()}_crypto` }));
+
+    const initProspects = () => {
+      const data = [];
+      let id = 1;
+      // Cold
+      for (let i = 0; i < 8; i++) {
+        const bump = Math.floor(Math.random() * 5);
+        const days = Math.floor(Math.random() * 10) + 1;
+        data.push({ id: id++, accountId: i + 1, contactId: i + 1, stage: 'cold', owner: 'Yano', bumpNumber: bump, daysSince: days, source: i < 5 ? 'cold_outreach' : 'referral', interestIn: [], whatTheySaid: '', isAutoOrbit: bump >= 4 && days >= 7 });
+      }
+      // Warm
+      for (let i = 0; i < 3; i++) {
+        data.push({ id: id++, accountId: i + 4, contactId: i + 4, stage: 'warm', owner: 'Yano', daysSince: i + 1, lastResponseDate: new Date(Date.now() - i * 86400000).toISOString().split('T')[0], source: 'cold_outreach', interestIn: [['vhp'], ['kol'], ['full']][i], whatTheySaid: ['Interested!', 'Tell me more', 'Korea sounds good'][i] });
+      }
+      // TG
+      for (let i = 0; i < 2; i++) {
+        data.push({ id: id++, accountId: i + 7, contactId: i + 7, stage: 'tg', owner: 'Yano', daysSince: i + 2, lastResponseDate: new Date(Date.now() - (i + 1) * 86400000).toISOString().split('T')[0], tgHandle: `@tg_user_${i}`, source: 'cold_outreach', interestIn: ['vhp'], whatTheySaid: 'Gave TG' });
+      }
+      // Booked
+      for (let i = 0; i < 2; i++) {
+        data.push({ id: id++, accountId: i + 9, contactId: i + 9, stage: 'booked', owner: 'Jdot', daysSince: i, lastResponseDate: new Date(Date.now() - i * 86400000).toISOString().split('T')[0], source: i === 0 ? 'referral' : 'cold_outreach', interestIn: [['full'], ['vhp', 'kol']][i], whatTheySaid: ['Excited to discuss', 'Ready for Q1'][i] });
+      }
+      // Orbit
+      for (let i = 0; i < 3; i++) {
+        const reason = ORBIT_REASONS[i % 5];
+        const daysUntil = Math.floor(Math.random() * 40) - 20;
+        data.push({ id: id++, accountId: i + 11, contactId: i + 11, stage: 'orbit', owner: 'System', daysSince: 60, orbitReason: reason.id, resurrectDate: new Date(Date.now() + daysUntil * 86400000).toISOString().split('T')[0], isResurrectDue: daysUntil <= 0, source: 'cold_outreach' });
+      }
+      return data;
+    };
+
+    const initDeals = () => [
+      { id: 1, accountId: 1, contactId: 1, stage: 'discovery', services: ['vhp'], value: 25000, owner: 'Jdot', closeDate: '2025-02-15', source: 'referral', call1Done: false, call2Done: false, daysSince: 18, isStale: true },
+      { id: 2, accountId: 2, contactId: 2, stage: 'proposal', services: ['vhp', 'kol'], value: 60000, owner: 'Jdot', closeDate: '2025-02-10', source: 'cold_outreach', call1Done: true, call2Done: false, call1Notes: 'Good call. Budget ~$50-100K.', daysSince: 12, isStale: true },
+      { id: 3, accountId: 3, contactId: 3, stage: 'negotiation', services: ['full'], value: 75000, owner: 'Jdot', closeDate: '2025-02-01', source: 'cold_outreach', call1Done: true, call2Done: true, call1Notes: 'Great discovery.', call2Notes: 'Sent proposal.', daysSince: 5, isStale: false },
+      { id: 4, accountId: 4, contactId: 4, stage: 'verbal', services: ['full', 'kol'], value: 110000, owner: 'Jdot', closeDate: '2025-01-30', source: 'referral', call1Done: true, call2Done: true, daysSince: 3, isStale: false },
+    ];
+
+    // ============ UTILS ============
+    const getNextAction = (item, type) => {
+      if (type === 'deal') {
+        if (!item.call1Done) return { action: 'Run Discovery', type: 'call1' };
+        if (!item.call2Done) return { action: 'Run Proposal', type: 'call2' };
+        if (item.stage === 'discovery') return { action: 'Send Proposal', type: 'advance' };
+        if (item.stage === 'proposal') return { action: 'Follow Up', type: 'followup' };
+        if (item.stage === 'negotiation') return { action: 'Close Deal', type: 'close' };
+        if (item.stage === 'verbal') return { action: 'Get Signed', type: 'close' };
+        return { action: 'Done', type: 'none' };
+      }
+      if (item.stage === 'cold') {
+        if (item.isAutoOrbit) return { action: 'Review → Orbit', type: 'auto_orbit' };
+        if (item.daysSince >= 3 || item.bumpNumber === 0) return { action: `Bump #${item.bumpNumber}`, type: 'bump' };
+        return { action: `Wait ${3 - item.daysSince}d`, type: 'waiting' };
+      }
+      if (item.stage === 'warm') return { action: 'Get TG', type: 'tg' };
+      if (item.stage === 'tg') return { action: 'Book Call', type: 'book' };
+      if (item.stage === 'booked') return { action: 'Create Deal', type: 'convert' };
+      if (item.stage === 'orbit') {
+        if (item.isResurrectDue) return { action: 'Resurrect', type: 'resurrect' };
+        return { action: item.resurrectDate, type: 'waiting' };
+      }
+      return { action: 'Done', type: 'none' };
+    };
+
+    const isActionNeeded = (item, type) => {
+      const a = getNextAction(item, type);
+      return a.type !== 'waiting' && a.type !== 'none';
+    };
+
+    const getDaysSinceResponse = (d) => d ? Math.floor((Date.now() - new Date(d).getTime()) / 86400000) : null;
+
+    // ============ COMPONENTS ============
+    const Button = ({ children, variant = 'primary', size = 'md', className = '', ...props }) => {
+      const base = 'inline-flex items-center justify-center font-medium rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50';
+      const variants = { primary: 'bg-blue-600 text-white hover:bg-blue-700', secondary: 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50', ghost: 'text-gray-600 hover:bg-gray-100', success: 'bg-emerald-600 text-white hover:bg-emerald-700', danger: 'bg-red-500 text-white hover:bg-red-600', teal: 'bg-teal-600 text-white hover:bg-teal-700' };
+      const sizes = { sm: 'px-2.5 py-1.5 text-xs', md: 'px-4 py-2 text-sm' };
+      return <button className={`${base} ${variants[variant]} ${sizes[size]} ${className}`} {...props}>{children}</button>;
+    };
+
+    const Badge = ({ children, color = 'gray', dot = false }) => {
+      const colors = { blue: 'bg-blue-50 text-blue-700', amber: 'bg-amber-50 text-amber-700', green: 'bg-emerald-50 text-emerald-700', purple: 'bg-violet-50 text-violet-700', teal: 'bg-teal-50 text-teal-700', red: 'bg-red-50 text-red-700', gray: 'bg-gray-50 text-gray-600' };
+      return <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-medium ${colors[color]}`}>{dot && <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />}{children}</span>;
+    };
+
+    const Modal = ({ children, onClose, width = 'max-w-md' }) => (
+      <>
+        <div onClick={onClose} className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 animate-fade-in" />
+        <div className={`fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl z-50 w-full ${width} p-6 animate-zoom-in`}>{children}</div>
+      </>
+    );
+
+    const MetricsBar = ({ prospects, deals }) => {
+      const m = useMemo(() => {
+        const byStage = {}; STAGES.forEach(s => byStage[s.id] = prospects.filter(p => p.stage === s.id).length);
+        const actions = prospects.filter(p => isActionNeeded(p, 'prospect')).length + deals.filter(d => isActionNeeded(d, 'deal')).length;
+        const hot = prospects.filter(p => { const d = getDaysSinceResponse(p.lastResponseDate); return d !== null && d <= 3; }).length;
+        const stale = deals.filter(d => d.isStale).length;
+        const pipeline = deals.reduce((s, d) => s + d.value, 0);
+        const weighted = deals.reduce((s, d) => { const st = DEAL_STAGES.find(x => x.id === d.stage); return s + (d.value * (st?.probability || 0) / 100); }, 0);
+        return { byStage, actions, hot, stale, pipeline, weighted };
+      }, [prospects, deals]);
+
+      return (
+        <div className="bg-white/80 border-b border-gray-100 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="px-4 py-2 rounded-xl border border-gray-100"><div className="text-xl font-semibold">{m.actions}</div><div className="text-xs text-gray-500">Actions</div></div>
+            {m.hot > 0 && <div className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200"><div className="text-xl font-semibold text-emerald-700">{m.hot}</div><div className="text-xs text-emerald-600">Hot</div></div>}
+            {m.stale > 0 && <div className="px-4 py-2 rounded-xl bg-amber-50 border border-amber-200"><div className="text-xl font-semibold text-amber-700">{m.stale}</div><div className="text-xs text-amber-600">Stale</div></div>}
+            <div className="w-px h-10 bg-gray-200 mx-2" />
+            <div className="flex items-center gap-1">
+              {STAGES.map((s, i) => (
+                <div key={s.id} className="flex items-center">
+                  <div className="text-center px-3 py-1"><div className="text-sm font-semibold" style={{ color: s.color }}>{m.byStage[s.id]}</div><div className="text-[10px] text-gray-400 uppercase">{s.label}</div></div>
+                  {i < 4 && <span className="text-gray-300 text-xs">→</span>}
+                </div>
+              ))}
+            </div>
+            <div className="w-px h-10 bg-gray-200 mx-2" />
+            <div className="flex items-center gap-3 ml-auto">
+              <div className="text-right"><div className="text-xs text-gray-400 uppercase">Pipeline</div><div className="text-lg font-semibold">${(m.pipeline / 1000).toFixed(0)}K</div></div>
+              <div className="text-right px-4 py-2 bg-emerald-50 rounded-xl border border-emerald-100"><div className="text-[10px] text-emerald-600 uppercase">Weighted</div><div className="text-lg font-bold text-emerald-700">${(m.weighted / 1000).toFixed(0)}K</div></div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const ActionRow = ({ item, isProspect, onSelect, onAction, onGotReply }) => {
+      const account = ACCOUNTS.find(a => a.id === item.accountId);
+      const contact = CONTACTS.find(c => c.id === item.contactId);
+      const stage = isProspect ? STAGES.find(s => s.id === item.stage) : DEAL_STAGES.find(s => s.id === item.stage);
+      const nextAction = getNextAction(item, isProspect ? 'prospect' : 'deal');
+      const daysSinceResponse = getDaysSinceResponse(item.lastResponseDate);
+      const isHot = daysSinceResponse !== null && daysSinceResponse <= 3;
+      const source = SOURCES.find(s => s.id === item.source);
+
+      const getBg = () => {
+        if (isHot) return 'bg-emerald-50/50 border-emerald-100';
+        if (item.isStale) return 'bg-amber-50/50 border-amber-100';
+        if (item.isAutoOrbit) return 'bg-teal-50/50 border-teal-100';
+        return 'bg-white border-gray-100 hover:border-gray-200 hover:shadow-sm';
+      };
+
+      return (
+        <div className={`rounded-xl border p-4 mb-2 cursor-pointer transition-all ${getBg()}`} onClick={() => onSelect(item, isProspect ? 'prospect' : 'deal')}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="font-semibold text-gray-900">{account?.name}</span>
+                {source && <span className="text-sm opacity-60">{source.icon}</span>}
+                {isHot && <span>🔥</span>}
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <span>{contact?.firstName} {contact?.lastName}</span>
+                <span className="text-gray-300">·</span>
+                <span className="text-gray-400">{contact?.twitter}</span>
+                <span className="text-gray-300">·</span>
+                <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${item.owner === 'Yano' ? 'bg-blue-100 text-blue-700' : item.owner === 'Jdot' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>@{item.owner}</span>
+              </div>
+              {item.interestIn?.length > 0 && (
+                <div className="flex gap-1 mt-2">
+                  {item.interestIn.map(sId => <Badge key={sId} color="purple">{SERVICES.find(s => s.id === sId)?.shortName}</Badge>)}
+                </div>
+              )}
+              {item.whatTheySaid && item.stage === 'booked' && <div className="text-xs text-gray-500 italic mt-2">"{item.whatTheySaid}"</div>}
+            </div>
+            
+            <div className="flex items-center gap-4 flex-shrink-0">
+              <div className="flex flex-col items-end gap-1">
+                <Badge color={isProspect ? (item.stage === 'cold' ? 'blue' : item.stage === 'warm' ? 'amber' : item.stage === 'tg' ? 'green' : item.stage === 'booked' ? 'purple' : 'teal') : (item.stage === 'discovery' ? 'blue' : item.stage === 'proposal' ? 'amber' : item.stage === 'negotiation' ? 'purple' : 'green')} dot>{stage?.label}</Badge>
+                {item.isStale && <span className="text-xs text-amber-600 font-medium">Stale</span>}
+              </div>
+              
+              <div className="text-right w-14">
+                <div className={`text-sm font-semibold ${item.daysSince > 7 ? 'text-red-600' : item.daysSince > 3 ? 'text-amber-600' : 'text-gray-700'}`}>{item.daysSince}d</div>
+                {daysSinceResponse !== null && <div className={`text-xs ${daysSinceResponse <= 3 ? 'text-emerald-600 font-medium' : 'text-gray-400'}`}>↩ {daysSinceResponse}d</div>}
+              </div>
+              
+              {item.value && <div className="text-sm font-semibold text-emerald-600 w-16 text-right">${(item.value/1000).toFixed(0)}K</div>}
+              
+              <div className="w-24 text-right">
+                <div className={`text-sm font-medium ${nextAction.type === 'waiting' ? 'text-gray-400' : 'text-gray-700'}`}>{nextAction.action}</div>
+              </div>
+              
+              <div className="flex gap-1.5" onClick={e => e.stopPropagation()}>
+                {isProspect && item.stage === 'cold' && <Button variant="ghost" size="sm" onClick={() => onGotReply(item)}>↩</Button>}
+                {nextAction.type !== 'waiting' && nextAction.type !== 'none' && <Button variant="primary" size="sm" onClick={() => onAction(item, 'primary', isProspect ? 'prospect' : 'deal')}>✓</Button>}
+                {isProspect && item.stage !== 'orbit' && <Button variant="ghost" size="sm" onClick={() => onAction(item, 'orbit', 'prospect')}>⏸</Button>}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const Sidebar = ({ activeView, onSelectView, prospects, deals }) => {
+      const getCounts = (filter) => {
+        const items = [...prospects, ...deals.map(d => ({ ...d, _type: 'deal' }))];
+        return items.filter(item => {
+          if (filter.actionNeeded && !isActionNeeded(item, item._type === 'deal' ? 'deal' : 'prospect')) return false;
+          if (filter.owner && item.owner !== filter.owner) return false;
+          if (filter.stage && item.stage !== filter.stage) return false;
+          if (filter.type === 'deal' && !item.value) return false;
+          if (filter.stale && !item.isStale) return false;
+          return true;
+        }).length;
+      };
+      
+      return (
+        <div className="w-60 bg-white border-r border-gray-100 p-4 min-h-[calc(100vh-140px)]">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-3 px-3">Views</div>
+          {VIEWS.map(view => {
+            const count = getCounts(view.filter);
+            const isActive = activeView?.id === view.id;
+            return (
+              <button key={view.id} onClick={() => onSelectView(view)}
+                className={`w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center justify-between mb-1 ${isActive ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}
+              >
+                <div className="flex items-center gap-2.5"><span className="text-base opacity-70">{view.icon}</span><span>{view.label}</span></div>
+                {count > 0 && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>{count}</span>}
+              </button>
+            );
+          })}
+        </div>
+      );
+    };
+
+    const GotReplyModal = ({ item, onClose, onConfirm }) => {
+      const account = ACCOUNTS.find(a => a.id === item.accountId);
+      const [whatTheySaid, setWhatTheySaid] = useState('');
+      const [interestIn, setInterestIn] = useState([]);
+      
+      return (
+        <Modal onClose={onClose} width="max-w-lg">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-xl">🎉</div>
+            <div><h3 className="text-lg font-bold">Got a Reply!</h3><p className="text-sm text-gray-500">{account?.name} → Moving to Warm</p></div>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">What did they say?</label>
+              <input type="text" value={whatTheySaid} onChange={e => setWhatTheySaid(e.target.value)} placeholder="e.g. Interested, want to learn more" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm" autoFocus />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Interested in?</label>
+              <div className="flex flex-wrap gap-2">
+                {SERVICES.map(s => (
+                  <button key={s.id} onClick={() => setInterestIn(prev => prev.includes(s.id) ? prev.filter(x => x !== s.id) : [...prev, s.id])}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${interestIn.includes(s.id) ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                  >{s.shortName}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-6">
+            <Button variant="secondary" onClick={onClose} className="flex-1">Cancel</Button>
+            <Button variant="success" onClick={() => onConfirm(whatTheySaid, interestIn)} className="flex-1">Move to Warm →</Button>
+          </div>
+        </Modal>
+      );
+    };
+
+    const OrbitModal = ({ item, onClose, onConfirm }) => {
+      const account = ACCOUNTS.find(a => a.id === item.accountId);
+      const [reason, setReason] = useState('');
+      
+      return (
+        <Modal onClose={onClose}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center text-xl">⏸</div>
+            <div><h3 className="text-lg font-bold">Move to Orbit</h3><p className="text-sm text-gray-500">{account?.name}</p></div>
+          </div>
+          <div className="space-y-2">
+            {ORBIT_REASONS.map(r => (
+              <label key={r.id} className={`flex items-start p-4 rounded-xl border-2 cursor-pointer transition-all ${reason === r.id ? 'border-teal-500 bg-teal-50' : 'border-gray-100 hover:border-gray-200'}`}>
+                <input type="radio" checked={reason === r.id} onChange={() => setReason(r.id)} className="mt-0.5 mr-3" />
+                <div><div className="font-medium">{r.label}</div><div className="text-xs text-gray-500">Resurrect in {r.days}d</div></div>
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-3 mt-6">
+            <Button variant="secondary" onClick={onClose} className="flex-1">Cancel</Button>
+            <Button variant="teal" onClick={() => reason && onConfirm(reason)} disabled={!reason} className="flex-1">Move to Orbit</Button>
+          </div>
+        </Modal>
+      );
+    };
+
+    const AddProspectModal = ({ onClose, onConfirm, existingAccounts }) => {
+      const [accountName, setAccountName] = useState('');
+      const [firstName, setFirstName] = useState('');
+      const [lastName, setLastName] = useState('');
+      const [twitter, setTwitter] = useState('');
+      const [role, setRole] = useState('Head of Growth');
+      const [source, setSource] = useState('cold_outreach');
+      
+      const canSubmit = accountName.trim() && firstName.trim() && twitter.trim();
+      
+      const handleSubmit = () => {
+        if (!canSubmit) return;
+        onConfirm({
+          accountName: accountName.trim(),
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          twitter: twitter.trim().startsWith('@') ? twitter.trim() : `@${twitter.trim()}`,
+          role,
+          source
+        });
+      };
+      
+      return (
+        <Modal onClose={onClose} width="max-w-lg">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-xl">➕</div>
+            <div><h3 className="text-lg font-bold">Add New Prospect</h3><p className="text-sm text-gray-500">Start a new outreach sequence</p></div>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Company/Project Name *</label>
+              <input type="text" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="e.g. Avalanche Gaming" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500" autoFocus />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
+                <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Mike" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Chen" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500" />
+              </div>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Twitter Handle *</label>
+              <input type="text" value={twitter} onChange={e => setTwitter(e.target.value)} placeholder="@mike_crypto" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500" />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+              <select value={role} onChange={e => setRole(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 bg-white">
+                <option value="Head of Growth">Head of Growth</option>
+                <option value="BD Lead">BD Lead</option>
+                <option value="CEO">CEO</option>
+                <option value="COO">COO</option>
+                <option value="CMO">CMO</option>
+                <option value="Partnerships">Partnerships</option>
+                <option value="Founder">Founder</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Source</label>
+              <div className="flex flex-wrap gap-2">
+                {SOURCES.map(s => (
+                  <button key={s.id} onClick={() => setSource(s.id)} className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${source === s.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                    {s.icon} {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex gap-3 mt-6">
+            <Button variant="secondary" onClick={onClose} className="flex-1">Cancel</Button>
+            <Button variant="primary" onClick={handleSubmit} disabled={!canSubmit} className="flex-1">Add Prospect</Button>
+          </div>
+        </Modal>
+      );
+    };
+
+    const ProspectPanel = ({ prospect, onClose, onUpdate }) => {
+      const account = ACCOUNTS.find(a => a.id === prospect.accountId);
+      const contact = CONTACTS.find(c => c.id === prospect.contactId);
+      const stage = STAGES.find(s => s.id === prospect.stage);
+      const source = SOURCES.find(s => s.id === prospect.source);
+      const [edited, setEdited] = useState({ source: prospect.source || 'cold_outreach', interestIn: prospect.interestIn || [], whatTheySaid: prospect.whatTheySaid || '', notes: prospect.notes || '', tgHandle: prospect.tgHandle || '' });
+      const [hasChanges, setHasChanges] = useState(false);
+      
+      const handleChange = (field, value) => { setEdited(prev => ({ ...prev, [field]: value })); setHasChanges(true); };
+      const toggleInterest = (sId) => handleChange('interestIn', edited.interestIn.includes(sId) ? edited.interestIn.filter(x => x !== sId) : [...edited.interestIn, sId]);
+      
+      return (
+        <>
+          <div onClick={onClose} className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 animate-fade-in" />
+          <div className="fixed top-0 right-0 w-[480px] h-full bg-white shadow-2xl z-50 flex flex-col overflow-hidden animate-slide-in">
+            <div className="p-6 border-b border-gray-100 bg-gradient-to-br from-blue-50 to-white">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2"><Badge color="blue">Prospect</Badge>{source && <span className="text-xs text-gray-400">{source.icon} {source.label}</span>}</div>
+                  <h2 className="text-xl font-bold text-gray-900">{account?.name}</h2>
+                  <div className="text-sm text-gray-500 mt-1">{contact?.firstName} {contact?.lastName} · {contact?.role}</div>
+                  <div className="text-xs text-gray-400 mt-1">{contact?.twitter}</div>
+                </div>
+                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg text-xl">×</button>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Badge color={prospect.stage === 'cold' ? 'blue' : prospect.stage === 'warm' ? 'amber' : prospect.stage === 'tg' ? 'green' : prospect.stage === 'booked' ? 'purple' : 'teal'} dot>{stage?.label}</Badge>
+                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">{prospect.daysSince}d ago</span>
+                {prospect.bumpNumber !== null && prospect.bumpNumber !== undefined && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-lg">Bump #{prospect.bumpNumber}</span>}
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div>
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Source</div>
+                <div className="flex flex-wrap gap-2">
+                  {SOURCES.map(s => (<button key={s.id} onClick={() => handleChange('source', s.id)} className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${edited.source === s.id ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{s.icon} {s.label}</button>))}
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Interested In</div>
+                <div className="flex flex-wrap gap-2">
+                  {SERVICES.map(s => (<button key={s.id} onClick={() => toggleInterest(s.id)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${edited.interestIn.includes(s.id) ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{s.shortName}</button>))}
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">What They Said</div>
+                <input type="text" value={edited.whatTheySaid} onChange={e => handleChange('whatTheySaid', e.target.value)} placeholder="e.g. Interested in Korea" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm" />
+              </div>
+              
+              {['warm', 'tg', 'booked'].includes(prospect.stage) && (
+                <div>
+                  <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Telegram Handle</div>
+                  <input type="text" value={edited.tgHandle} onChange={e => handleChange('tgHandle', e.target.value)} placeholder="@telegram_handle" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm" />
+                </div>
+              )}
+              
+              <div>
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Notes</div>
+                <textarea value={edited.notes} onChange={e => handleChange('notes', e.target.value)} placeholder="Add notes..." rows={3} className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none" />
+              </div>
+            </div>
+            
+            {hasChanges && (
+              <div className="p-6 border-t border-gray-100 bg-gray-50">
+                <Button variant="success" onClick={() => { onUpdate(prospect.id, edited); setHasChanges(false); }} className="w-full">Save Changes</Button>
+              </div>
+            )}
+          </div>
+        </>
+      );
+    };
+
+    const DealPanel = ({ deal, onClose, onAction, onUpdateValue }) => {
+      const account = ACCOUNTS.find(a => a.id === deal.accountId);
+      const contact = CONTACTS.find(c => c.id === deal.contactId);
+      const stage = DEAL_STAGES.find(s => s.id === deal.stage);
+      const dealServices = deal.services?.map(sId => SERVICES.find(s => s.id === sId)).filter(Boolean) || [];
+      const [editingValue, setEditingValue] = useState(false);
+      const [tempValue, setTempValue] = useState(deal.value);
+      const source = SOURCES.find(s => s.id === deal.source);
+      
+      return (
+        <>
+          <div onClick={onClose} className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 animate-fade-in" />
+          <div className="fixed top-0 right-0 w-[480px] h-full bg-white shadow-2xl z-50 flex flex-col overflow-hidden animate-slide-in">
+            <div className="p-6 border-b border-gray-100 bg-gradient-to-br from-violet-50 to-white">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2"><Badge color="purple">Deal</Badge>{source && <span className="text-xs text-gray-400">{source.icon} {source.label}</span>}</div>
+                  <h2 className="text-xl font-bold text-gray-900">{account?.name}</h2>
+                  <div className="text-sm text-gray-500 mt-1">{contact?.firstName} {contact?.lastName} · {contact?.role}</div>
+                </div>
+                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg text-xl">×</button>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Badge color={stage?.id === 'discovery' ? 'blue' : stage?.id === 'proposal' ? 'amber' : stage?.id === 'negotiation' ? 'purple' : 'green'} dot>{stage?.label}</Badge>
+                {editingValue ? (
+                  <div className="flex items-center gap-1">
+                    <span className="text-emerald-600 text-sm">$</span>
+                    <input type="number" value={tempValue} onChange={e => setTempValue(Number(e.target.value))} className="w-24 px-2 py-1 border border-emerald-300 rounded-lg text-sm font-bold text-emerald-700" autoFocus />
+                    <Button variant="success" size="sm" onClick={() => { onUpdateValue(deal.id, tempValue); setEditingValue(false); }}>✓</Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setEditingValue(false); setTempValue(deal.value); }}>×</Button>
+                  </div>
+                ) : (
+                  <button onClick={() => setEditingValue(true)} className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-lg text-sm font-bold hover:bg-emerald-200">${deal.value?.toLocaleString()} ✏️</button>
+                )}
+                {deal.isStale && <Badge color="amber">⚠️ Stale</Badge>}
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div>
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Services</div>
+                <div className="space-y-2">
+                  {dealServices.map(service => (
+                    <div key={service.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                      <span className="font-medium text-gray-800">{service.name}</span>
+                      <span className="text-emerald-600 font-semibold">${service.price.toLocaleString()}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between items-center p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                    <span className="font-bold text-gray-900">Deal Value</span>
+                    <span className="text-emerald-700 font-bold text-lg">${deal.value?.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Details</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-50 p-4 rounded-xl"><div className="text-xs text-gray-400 mb-1">Close Date</div><div className="font-semibold">{deal.closeDate}</div></div>
+                  <div className="bg-gray-50 p-4 rounded-xl"><div className="text-xs text-gray-400 mb-1">Probability</div><div className="font-semibold">{stage?.probability}%</div></div>
+                  <div className="bg-gray-50 p-4 rounded-xl"><div className="text-xs text-gray-400 mb-1">Weighted</div><div className="font-semibold text-emerald-600">${((deal.value * stage?.probability / 100) / 1000).toFixed(0)}K</div></div>
+                  <div className="bg-gray-50 p-4 rounded-xl"><div className="text-xs text-gray-400 mb-1">Days in Stage</div><div className={`font-semibold ${deal.isStale ? 'text-amber-600' : ''}`}>{deal.daysSince}d</div></div>
+                </div>
+              </div>
+              
+              <div>
+                <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Calls</div>
+                <div className="space-y-3">
+                  <div className={`p-4 rounded-xl border-2 ${deal.call1Done ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50 border-gray-100'}`}>
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold">Discovery Call</span>
+                      <Badge color={deal.call1Done ? 'green' : 'gray'}>{deal.call1Done ? '✓ Done' : 'Pending'}</Badge>
+                    </div>
+                    {deal.call1Done && deal.call1Notes && <div className="text-sm text-gray-600 mt-3 p-3 bg-white rounded-lg">{deal.call1Notes}</div>}
+                  </div>
+                  <div className={`p-4 rounded-xl border-2 ${deal.call2Done ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50 border-gray-100'}`}>
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold">Proposal Call</span>
+                      <Badge color={deal.call2Done ? 'green' : 'gray'}>{deal.call2Done ? '✓ Done' : 'Pending'}</Badge>
+                    </div>
+                    {deal.call2Done && deal.call2Notes && <div className="text-sm text-gray-600 mt-3 p-3 bg-white rounded-lg">{deal.call2Notes}</div>}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-gray-100 bg-gray-50">
+              <div className="flex gap-2">
+                {!deal.call1Done && <Button variant="primary" onClick={() => onAction(deal, 'call1_done', 'deal')} className="flex-1">✓ Discovery Done</Button>}
+                {deal.call1Done && !deal.call2Done && <Button variant="primary" onClick={() => onAction(deal, 'call2_done', 'deal')} className="flex-1">✓ Proposal Done</Button>}
+                {deal.call1Done && deal.call2Done && (
+                  <>
+                    <Button variant="secondary" onClick={() => onAction(deal, 'advance', 'deal')} className="flex-1">Advance</Button>
+                    <Button variant="success" onClick={() => onAction(deal, 'won', 'deal')}>🎉 Won</Button>
+                    <Button variant="danger" onClick={() => onAction(deal, 'lost', 'deal')}>Lost</Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      );
+    };
+
+    // ============ MAIN ============
+    function App() {
+      const [prospects, setProspects] = useState(initProspects);
+      const [deals, setDeals] = useState(initDeals);
+      const [activeView, setActiveView] = useState(VIEWS[0]);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [selectedItem, setSelectedItem] = useState(null);
+      const [selectedType, setSelectedType] = useState(null);
+      const [showOrbitModal, setShowOrbitModal] = useState(null);
+      const [showGotReplyModal, setShowGotReplyModal] = useState(null);
+      const [showAddProspectModal, setShowAddProspectModal] = useState(false);
+
+      const filteredItems = useMemo(() => {
+        let items = [...prospects.map(p => ({ ...p, _isProspect: true })), ...deals.map(d => ({ ...d, _isProspect: false }))];
+        
+        if (activeView?.filter && Object.keys(activeView.filter).length > 0) {
+          items = items.filter(item => {
+            if (activeView.filter.actionNeeded && !isActionNeeded(item, item._isProspect ? 'prospect' : 'deal')) return false;
+            if (activeView.filter.owner && item.owner !== activeView.filter.owner) return false;
+            if (activeView.filter.stage && item.stage !== activeView.filter.stage) return false;
+            if (activeView.filter.type === 'deal' && item._isProspect) return false;
+            if (activeView.filter.type === 'prospect' && !item._isProspect) return false;
+            if (activeView.filter.stale && !item.isStale) return false;
+            return true;
+          });
+        }
+        
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          items = items.filter(item => {
+            const acc = ACCOUNTS.find(a => a.id === item.accountId);
+            const con = CONTACTS.find(c => c.id === item.contactId);
+            return acc?.name.toLowerCase().includes(q) || con?.firstName?.toLowerCase().includes(q);
+          });
+        }
+        
+        return items.sort((a, b) => {
+          const aHot = getDaysSinceResponse(a.lastResponseDate) !== null && getDaysSinceResponse(a.lastResponseDate) <= 3;
+          const bHot = getDaysSinceResponse(b.lastResponseDate) !== null && getDaysSinceResponse(b.lastResponseDate) <= 3;
+          if (aHot && !bHot) return -1;
+          if (!aHot && bHot) return 1;
+          return b.daysSince - a.daysSince;
+        });
+      }, [prospects, deals, activeView, searchQuery]);
+
+      const handleAction = useCallback((item, action, type) => {
+        if (action === 'orbit') { setShowOrbitModal(item); return; }
+        
+        if (type === 'prospect') {
+          setProspects(prev => prev.map(p => {
+            if (p.id !== item.id) return p;
+            if (action === 'primary') {
+              if (p.stage === 'cold') return { ...p, bumpNumber: Math.min(p.bumpNumber + 1, 4), daysSince: 0, isAutoOrbit: false };
+              if (p.stage === 'warm') return { ...p, stage: 'tg', daysSince: 0 };
+              if (p.stage === 'tg') return { ...p, stage: 'booked', owner: 'Jdot', daysSince: 0 };
+            }
+            return p;
+          }));
+        }
+        
+        if (type === 'deal') {
+          setDeals(prev => prev.map(d => {
+            if (d.id !== item.id) return d;
+            if (action === 'call1_done') return { ...d, call1Done: true, daysSince: 0 };
+            if (action === 'call2_done') return { ...d, call2Done: true, daysSince: 0 };
+            if (action === 'advance') {
+              const idx = DEAL_STAGES.findIndex(s => s.id === d.stage);
+              if (idx < DEAL_STAGES.length - 1) return { ...d, stage: DEAL_STAGES[idx + 1].id, daysSince: 0, isStale: false };
+            }
+            return d;
+          }));
+        }
+        setSelectedItem(null);
+      }, []);
+
+      const handleGotReplyConfirm = (whatTheySaid, interestIn) => {
+        setProspects(prev => prev.map(p => p.id !== showGotReplyModal.id ? p : { ...p, stage: 'warm', daysSince: 0, lastResponseDate: new Date().toISOString().split('T')[0], whatTheySaid, interestIn, isAutoOrbit: false }));
+        setShowGotReplyModal(null);
+      };
+
+      const handleOrbitConfirm = (reason) => {
+        const r = ORBIT_REASONS.find(x => x.id === reason);
+        setProspects(prev => prev.map(p => p.id !== showOrbitModal.id ? p : { ...p, stage: 'orbit', owner: 'System', orbitReason: reason, resurrectDate: new Date(Date.now() + r.days * 86400000).toISOString().split('T')[0], daysSince: 0, isAutoOrbit: false, isResurrectDue: false }));
+        setShowOrbitModal(null);
+      };
+
+      const handleUpdateProspect = (id, updates) => {
+        setProspects(prev => prev.map(p => p.id !== id ? p : { ...p, ...updates }));
+        if (selectedItem?.id === id && selectedType === 'prospect') setSelectedItem(prev => ({ ...prev, ...updates }));
+      };
+
+      const handleUpdateDealValue = (id, value) => {
+        setDeals(prev => prev.map(d => d.id !== id ? d : { ...d, value }));
+        if (selectedItem?.id === id) setSelectedItem(prev => ({ ...prev, value }));
+      };
+
+      const handleAddProspect = (data) => {
+        // Create new account
+        const newAccountId = Math.max(...ACCOUNTS.map(a => a.id)) + prospects.length + 1;
+        ACCOUNTS.push({ id: newAccountId, name: data.accountName });
+        
+        // Create new contact
+        const newContactId = Math.max(...CONTACTS.map(c => c.id)) + prospects.length + 1;
+        CONTACTS.push({ 
+          id: newContactId, 
+          accountId: newAccountId, 
+          firstName: data.firstName, 
+          lastName: data.lastName, 
+          role: data.role, 
+          twitter: data.twitter 
+        });
+        
+        // Create new prospect
+        const newProspect = {
+          id: Math.max(...prospects.map(p => p.id)) + 1,
+          accountId: newAccountId,
+          contactId: newContactId,
+          stage: 'cold',
+          owner: 'Yano',
+          bumpNumber: 0,
+          daysSince: 0,
+          source: data.source,
+          interestIn: [],
+          whatTheySaid: '',
+          isAutoOrbit: false
+        };
+        
+        setProspects(prev => [newProspect, ...prev]);
+        setShowAddProspectModal(false);
+        
+        // Switch to Cold Pipeline view to see the new prospect
+        setActiveView(VIEWS.find(v => v.id === 'cold_pipeline'));
+      };
+
+      return (
+        <div className="font-sans bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+          <div className="bg-white/90 backdrop-blur-md border-b border-gray-100 px-6 py-4 sticky top-0 z-30">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm">H</div>
+                  <span className="font-bold text-gray-900 text-lg">Holo Hive CRM</span>
+                </div>
+                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-md">Interactive Demo</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <input type="text" placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 pr-4 py-2.5 bg-gray-50 border-0 rounded-xl text-sm w-72 focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all" />
+                  <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                </div>
+                <Button variant="primary" onClick={() => setShowAddProspectModal(true)}>+ Add Prospect</Button>
+              </div>
+            </div>
+          </div>
+          
+          <MetricsBar prospects={prospects} deals={deals} />
+          
+          <div className="flex">
+            <Sidebar activeView={activeView} onSelectView={setActiveView} prospects={prospects} deals={deals} />
+            
+            <div className="flex-1 p-6">
+              <div className="flex justify-between items-center mb-5">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">{activeView?.label}</h2>
+                  <p className="text-sm text-gray-500 mt-0.5">{filteredItems.length} items</p>
+                </div>
+              </div>
+              
+              {filteredItems.map(item => (
+                <ActionRow key={`${item._isProspect ? 'p' : 'd'}-${item.id}`} item={item} isProspect={item._isProspect}
+                  onSelect={(i, t) => { setSelectedItem(i); setSelectedType(t); }}
+                  onAction={handleAction}
+                  onGotReply={setShowGotReplyModal}
+                />
+              ))}
+              
+              {filteredItems.length === 0 && <div className="text-center py-16"><div className="text-4xl mb-3">✨</div><div className="text-gray-500">All caught up!</div></div>}
+            </div>
+          </div>
+          
+          {selectedItem && selectedType === 'deal' && <DealPanel deal={selectedItem} onClose={() => setSelectedItem(null)} onAction={handleAction} onUpdateValue={handleUpdateDealValue} />}
+          {selectedItem && selectedType === 'prospect' && <ProspectPanel prospect={selectedItem} onClose={() => setSelectedItem(null)} onUpdate={handleUpdateProspect} />}
+          {showGotReplyModal && <GotReplyModal item={showGotReplyModal} onClose={() => setShowGotReplyModal(null)} onConfirm={handleGotReplyConfirm} />}
+          {showOrbitModal && <OrbitModal item={showOrbitModal} onClose={() => setShowOrbitModal(null)} onConfirm={handleOrbitConfirm} />}
+          {showAddProspectModal && <AddProspectModal onClose={() => setShowAddProspectModal(false)} onConfirm={handleAddProspect} existingAccounts={ACCOUNTS} />}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>

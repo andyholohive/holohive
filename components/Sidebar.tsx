@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChangelog } from '@/contexts/ChangelogContext';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -279,18 +279,18 @@ export default function Sidebar({ children }: SidebarProps) {
                 </div>
               )}
               <div className="space-y-2">
-                {/* Pipeline tab */}
-                <Link href="/crm/pipeline" legacyBehavior>
+                {/* Sales Pipeline tab */}
+                <Link href="/crm/sales-pipeline" legacyBehavior>
                   <Button
                     asChild
-                    variant={pathname.startsWith('/crm/pipeline') ? 'default' : 'ghost'}
+                    variant={pathname.startsWith('/crm/sales-pipeline') ? 'default' : 'ghost'}
                     className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/crm/pipeline') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Pipeline' : undefined}
+                    style={pathname.startsWith('/crm/sales-pipeline') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Sales' : undefined}
                   >
                     <span>
-                      <TrendingUp className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Pipeline'}
+                      <Target className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Sales'}
                     </span>
                   </Button>
                 </Link>
@@ -321,6 +321,21 @@ export default function Sidebar({ children }: SidebarProps) {
                     <span>
                       <UserPlus className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
                       {!isSidebarCollapsed && 'Contacts'}
+                    </span>
+                  </Button>
+                </Link>
+                {/* Submissions tab */}
+                <Link href="/crm/submissions" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/crm/submissions') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/crm/submissions') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Submissions' : undefined}
+                  >
+                    <span>
+                      <Inbox className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Submissions'}
                     </span>
                   </Button>
                 </Link>

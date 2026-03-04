@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sales Pipeline — Onboarding Guide | Holo Hive</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+    :root {
+      --teal: #3e8692;
+      --teal-light: #e8f4f6;
+      --teal-dark: #2d6470;
+      --amber: #d97706;
+      --amber-light: #fef3c7;
+      --red: #dc2626;
+      --red-light: #fef2f2;
+      --green: #16a34a;
+      --green-light: #f0fdf4;
+      --blue: #2563eb;
+      --blue-light: #eff6ff;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-500: #6b7280;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--gray-800);
+      line-height: 1.7;
+      background: #fff;
+      font-size: 14px;
+    }
+
+    /* Cover Page */
+    .cover {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--teal) 0%, var(--teal-dark) 100%);
+      color: white;
+      text-align: center;
+      padding: 60px 40px;
+      page-break-after: always;
+    }
+
+    .cover-logo {
+      width: 80px;
+      height: 80px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      font-weight: 800;
+      margin-bottom: 40px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .cover h1 {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 12px;
+    }
+
+    .cover .subtitle {
+      font-size: 20px;
+      font-weight: 300;
+      opacity: 0.9;
+      margin-bottom: 48px;
+    }
+
+    .cover .meta {
+      font-size: 13px;
+      opacity: 0.7;
+      border-top: 1px solid rgba(255,255,255,0.2);
+      padding-top: 24px;
+      margin-top: auto;
+    }
+
+    /* Main Content */
+    .content {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 60px 40px;
+    }
+
+    /* Table of Contents */
+    .toc {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 12px;
+      padding: 32px 36px;
+      margin-bottom: 48px;
+      page-break-after: always;
+    }
+
+    .toc h2 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--teal);
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--teal-light);
+    }
+
+    .toc ol {
+      list-style: none;
+      counter-reset: toc-counter;
+    }
+
+    .toc ol li {
+      counter-increment: toc-counter;
+      margin-bottom: 8px;
+    }
+
+    .toc ol li a {
+      text-decoration: none;
+      color: var(--gray-700);
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--gray-100);
+      transition: color 0.2s;
+    }
+
+    .toc ol li a:hover {
+      color: var(--teal);
+    }
+
+    .toc ol li a::before {
+      content: counter(toc-counter, decimal-leading-zero);
+      font-weight: 700;
+      color: var(--teal);
+      margin-right: 16px;
+      font-size: 13px;
+      min-width: 24px;
+    }
+
+    /* Section Headers */
+    .section {
+      margin-bottom: 48px;
+      page-break-inside: avoid;
+    }
+
+    .section-number {
+      display: inline-block;
+      background: var(--teal);
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin-bottom: 16px;
+      letter-spacing: -0.5px;
+    }
+
+    h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--teal-dark);
+      margin-top: 28px;
+      margin-bottom: 12px;
+    }
+
+    p {
+      margin-bottom: 14px;
+      color: var(--gray-700);
+    }
+
+    strong {
+      color: var(--gray-900);
+      font-weight: 600;
+    }
+
+    /* Flow Diagram */
+    .flow-diagram {
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+      overflow-x: auto;
+    }
+
+    .flow-stages {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 16px;
+    }
+
+    .flow-stage {
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .flow-arrow {
+      color: var(--gray-300);
+      font-size: 18px;
+      font-weight: 300;
+    }
+
+    .fs-cold { background: #dbeafe; color: #1e40af; }
+    .fs-warm { background: #fef3c7; color: #92400e; }
+    .fs-tg { background: #e0e7ff; color: #3730a3; }
+    .fs-booked { background: #fce7f3; color: #9d174d; }
+    .fs-discovery { background: #d1fae5; color: #065f46; }
+    .fs-proposal { background: #ede9fe; color: #5b21b6; }
+    .fs-contract { background: #ffedd5; color: #9a3412; }
+    .fs-won { background: #dcfce7; color: #166534; border: 2px solid #16a34a; }
+
+    .flow-secondary {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 8px;
+    }
+
+    .flow-secondary .flow-stage {
+      opacity: 0.7;
+    }
+
+    .fs-orbit { background: #fef3c7; color: #92400e; }
+    .fs-lost { background: #fee2e2; color: #991b1b; }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 24px;
+      font-size: 13px;
+    }
+
+    thead th {
+      background: var(--teal);
+      color: white;
+      padding: 10px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    thead th:first-child {
+      border-radius: 8px 0 0 0;
+    }
+
+    thead th:last-child {
+      border-radius: 0 8px 0 0;
+    }
+
+    tbody td {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--gray-100);
+      color: var(--gray-700);
+    }
+
+    tbody tr:hover {
+      background: var(--gray-50);
+    }
+
+    tbody tr:last-child td:first-child {
+      border-radius: 0 0 0 8px;
+    }
+
+    tbody tr:last-child td:last-child {
+      border-radius: 0 0 8px 0;
+    }
+
+    /* Alert Cards */
+    .alert-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .alert-card {
+      padding: 14px 18px;
+      border-radius: 10px;
+      border-left: 4px solid;
+    }
+
+    .alert-card.red { background: var(--red-light); border-color: var(--red); }
+    .alert-card.amber { background: var(--amber-light); border-color: var(--amber); }
+    .alert-card.blue { background: var(--blue-light); border-color: var(--blue); }
+    .alert-card.green { background: var(--green-light); border-color: var(--green); }
+
+    .alert-card .alert-title {
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    .alert-card .alert-desc {
+      font-size: 12px;
+      color: var(--gray-500);
+    }
+
+    .alert-card.red .alert-title { color: var(--red); }
+    .alert-card.amber .alert-title { color: var(--amber); }
+    .alert-card.blue .alert-title { color: var(--blue); }
+    .alert-card.green .alert-title { color: var(--green); }
+
+    /* Priority Icons */
+    .priority-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .priority-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 10px;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-100);
+    }
+
+    .priority-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .pi-urgent { background: #fee2e2; }
+    .pi-high { background: #fef3c7; }
+    .pi-medium { background: #dbeafe; }
+    .pi-low { background: var(--gray-100); }
+
+    .priority-label {
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+
+    .priority-desc {
+      font-size: 12px;
+      color: var(--gray-500);
+    }
+
+    /* Lists */
+    ul, ol {
+      margin: 10px 0 16px 24px;
+      color: var(--gray-700);
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    li em {
+      color: var(--gray-500);
+    }
+
+    /* Callout / Info boxes */
+    .callout {
+      padding: 16px 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+      font-size: 13px;
+    }
+
+    .callout-info {
+      background: var(--blue-light);
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+    }
+
+    .callout-tip {
+      background: var(--green-light);
+      border: 1px solid #bbf7d0;
+      color: #166534;
+    }
+
+    .callout-warning {
+      background: var(--amber-light);
+      border: 1px solid #fde68a;
+      color: #92400e;
+    }
+
+    .callout-label {
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+
+    /* Steps */
+    .steps {
+      counter-reset: step-counter;
+      list-style: none;
+      margin-left: 0;
+      padding-left: 0;
+    }
+
+    .steps li {
+      counter-increment: step-counter;
+      position: relative;
+      padding-left: 48px;
+      margin-bottom: 16px;
+      min-height: 32px;
+      display: flex;
+      align-items: flex-start;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .steps li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 32px;
+      height: 32px;
+      background: var(--teal);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    /* Bump lifecycle */
+    .bump-timeline {
+      position: relative;
+      padding-left: 28px;
+      margin: 20px 0;
+    }
+
+    .bump-timeline::before {
+      content: '';
+      position: absolute;
+      left: 10px;
+      top: 8px;
+      bottom: 8px;
+      width: 2px;
+      background: var(--gray-200);
+    }
+
+    .bump-step {
+      position: relative;
+      margin-bottom: 16px;
+      padding: 10px 16px;
+      background: var(--gray-50);
+      border-radius: 8px;
+      border: 1px solid var(--gray-100);
+    }
+
+    .bump-step::before {
+      content: '';
+      position: absolute;
+      left: -22px;
+      top: 14px;
+      width: 10px;
+      height: 10px;
+      background: var(--teal);
+      border-radius: 50%;
+      border: 2px solid white;
+    }
+
+    .bump-step .bump-label {
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--teal-dark);
+    }
+
+    .bump-step .bump-desc {
+      font-size: 12px;
+      color: var(--gray-500);
+      margin-top: 2px;
+    }
+
+    /* Bucket cards */
+    .bucket-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .bucket-card {
+      padding: 16px;
+      border-radius: 10px;
+      text-align: center;
+      border: 2px solid;
+    }
+
+    .bucket-a { background: #fef2f2; border-color: #fca5a5; }
+    .bucket-b { background: #fef3c7; border-color: #fcd34d; }
+    .bucket-c { background: #f3f4f6; border-color: #d1d5db; }
+
+    .bucket-letter {
+      font-size: 28px;
+      font-weight: 800;
+    }
+
+    .bucket-a .bucket-letter { color: var(--red); }
+    .bucket-b .bucket-letter { color: var(--amber); }
+    .bucket-c .bucket-letter { color: var(--gray-500); }
+
+    .bucket-label {
+      font-weight: 600;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .bucket-desc {
+      font-size: 11px;
+      color: var(--gray-500);
+      margin-top: 4px;
+    }
+
+    /* Metric cards */
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .metric-card {
+      padding: 16px;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      text-align: center;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: var(--gray-500);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .metric-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--teal);
+      margin-top: 4px;
+    }
+
+    .metric-desc {
+      font-size: 11px;
+      color: var(--gray-500);
+      margin-top: 4px;
+    }
+
+    /* Keyboard shortcut style for actions */
+    .action-tag {
+      display: inline-block;
+      background: var(--teal-light);
+      color: var(--teal-dark);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Inter', monospace;
+    }
+
+    /* HR */
+    hr {
+      border: none;
+      border-top: 1px solid var(--gray-200);
+      margin: 40px 0;
+    }
+
+    /* Divider with text */
+    .divider {
+      display: flex;
+      align-items: center;
+      margin: 48px 0 24px;
+    }
+
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .divider span {
+      padding: 0 16px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--gray-300);
+      font-weight: 600;
+    }
+
+    /* Best practices checklist */
+    .checklist {
+      list-style: none;
+      margin-left: 0;
+      padding-left: 0;
+    }
+
+    .checklist li {
+      padding: 10px 16px 10px 40px;
+      position: relative;
+      background: var(--gray-50);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border: 1px solid var(--gray-100);
+    }
+
+    .checklist li::before {
+      content: '✓';
+      position: absolute;
+      left: 14px;
+      top: 10px;
+      color: var(--teal);
+      font-weight: 700;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 40px;
+      color: var(--gray-500);
+      font-size: 12px;
+      border-top: 1px solid var(--gray-200);
+      margin-top: 60px;
+    }
+
+    /* Print styles */
+    @media print {
+      body { font-size: 12px; }
+      .cover { min-height: auto; padding: 100px 40px; }
+      .content { padding: 40px 20px; }
+      .section { page-break-inside: avoid; }
+      .alert-cards, .priority-grid, .bucket-grid, .metric-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    /* Code / monospace */
+    code {
+      background: var(--gray-100);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--teal-dark);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Cover Page -->
+  <div class="cover">
+    <div class="cover-logo">HH</div>
+    <h1>Sales Pipeline</h1>
+    <p class="subtitle">Onboarding Guide</p>
+    <p style="font-size: 15px; opacity: 0.85; max-width: 500px; line-height: 1.8;">
+      Everything you need to know to manage your outreach, close deals, and keep your pipeline healthy.
+    </p>
+    <p class="meta">Holo Hive &middot; Internal Documentation &middot; 2025</p>
+  </div>
+
+  <div class="content">
+
+    <!-- Table of Contents -->
+    <div class="toc">
+      <h2>Table of Contents</h2>
+      <ol>
+        <li><a href="#s1">Overview — How the Pipeline Works</a></li>
+        <li><a href="#s2">Getting Started — Adding Opportunities</a></li>
+        <li><a href="#s3">Understanding Stages</a></li>
+        <li><a href="#s4">The Actions Tab — Your Daily To-Do List</a></li>
+        <li><a href="#s5">Cold DM Outreach & The Bump System</a></li>
+        <li><a href="#s6">Moving Through the Pipeline</a></li>
+        <li><a href="#s7">The Opportunity Detail Panel</a></li>
+        <li><a href="#s8">Pipeline View — Table & Kanban</a></li>
+        <li><a href="#s9">Overall Tab — Your Big Picture View</a></li>
+        <li><a href="#s10">Orbit — Managing Shelved Deals</a></li>
+        <li><a href="#s11">Templates — Quick Message Copy</a></li>
+        <li><a href="#s12">Dashboard & Metrics</a></li>
+        <li><a href="#s13">Tips & Best Practices</a></li>
+      </ol>
+    </div>
+
+    <!-- Section 1 -->
+    <div class="section" id="s1">
+      <span class="section-number">01</span>
+      <h2>Overview — How the Pipeline Works</h2>
+      <p>The Sales Pipeline tracks every potential deal from first contact to closed-won. Each opportunity flows through <strong>stages</strong>, and the system tells you exactly what to do next via <strong>actions</strong>.</p>
+
+      <h3>The Stage Flow</h3>
+      <div class="flow-diagram">
+        <div class="flow-stages">
+          <span class="flow-stage fs-cold">Cold DM</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-stage fs-warm">Warm</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-stage fs-tg">TG Intro</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-stage fs-booked">Booked</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-stage fs-discovery">Discovery Done</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-stage fs-proposal">Proposal Call</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-stage fs-contract">Contract</span>
+          <span class="flow-arrow">→</span>
+          <span class="flow-stage fs-won">Closed Won ✓</span>
+        </div>
+        <div class="flow-secondary">
+          <span class="flow-stage fs-orbit">↳ Orbit (shelved)</span>
+          <span class="flow-stage fs-lost">↳ Closed Lost</span>
+        </div>
+      </div>
+
+      <h3>Alert Cards</h3>
+      <p>At the top of the page, you'll see alert cards that highlight anything needing immediate attention:</p>
+
+      <div class="alert-cards">
+        <div class="alert-card red">
+          <div class="alert-title">Booking Needed</div>
+          <div class="alert-desc">Deals past discovery with no future meeting set (BAMFAM violation)</div>
+        </div>
+        <div class="alert-card amber">
+          <div class="alert-title">Overdue</div>
+          <div class="alert-desc">A meeting happened but you haven't logged the outcome</div>
+        </div>
+        <div class="alert-card blue">
+          <div class="alert-title">Stale (7d+)</div>
+          <div class="alert-desc">Deals with no contact in 7+ days</div>
+        </div>
+        <div class="alert-card amber">
+          <div class="alert-title">At Risk</div>
+          <div class="alert-desc">Closing-stage deals with a low temperature score</div>
+        </div>
+        <div class="alert-card green">
+          <div class="alert-title">Meetings</div>
+          <div class="alert-desc">How many meetings you have today / this week</div>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Section 2 -->
+    <div class="section" id="s2">
+      <span class="section-number">02</span>
+      <h2>Getting Started — Adding Opportunities</h2>
+      <p>Click the <strong>"+ New"</strong> button at the top right to create an opportunity.</p>
+
+      <h3>Required Fields</h3>
+      <ul>
+        <li><strong>Name</strong> — The company or contact name</li>
+      </ul>
+
+      <h3>Recommended Fields</h3>
+      <ul>
+        <li><strong>POC Platform & Handle</strong> — Where you first reached out (Twitter, Instagram, Telegram, etc.) and their handle</li>
+        <li><strong>Owner</strong> — Who on the team owns this deal</li>
+        <li><strong>Source</strong> — How you found them:
+          <ul>
+            <li><em>Cold Outreach</em> — You reached out first (affiliate field is hidden for this source)</li>
+            <li><em>Referral</em> — Someone introduced you (a "Referrer" field appears)</li>
+            <li><em>Inbound, Event, Twitter, LinkedIn, Telegram, Website</em></li>
+          </ul>
+        </li>
+      </ul>
+
+      <h3>Affiliate (for non-cold-outreach sources)</h3>
+      <p>If the deal came through an affiliate or partner, use the searchable dropdown to select one. If the affiliate doesn't exist yet, just type their name and click <strong>"Add [name] as new affiliate"</strong> — it's created instantly.</p>
+
+      <h3>Notes</h3>
+      <p>Add any context that will help you or your team understand the deal.</p>
+    </div>
+
+    <hr>
+
+    <!-- Section 3 -->
+    <div class="section" id="s3">
+      <span class="section-number">03</span>
+      <h2>Understanding Stages</h2>
+      <p>Each stage represents where the deal currently sits in your sales process:</p>
+
+      <table>
+        <thead>
+          <tr><th>Stage</th><th>What's Happening</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Cold DM</strong></td><td>You've identified a lead and are reaching out via DM</td></tr>
+          <tr><td><strong>Warm</strong></td><td>They've responded to your outreach</td></tr>
+          <tr><td><strong>TG Intro</strong></td><td>You've connected on Telegram</td></tr>
+          <tr><td><strong>Booked</strong></td><td>A discovery call is scheduled</td></tr>
+          <tr><td><strong>Discovery Done</strong></td><td>The discovery call happened, you understand their needs</td></tr>
+          <tr><td><strong>Proposal Call</strong></td><td>Time to present your proposal on a call</td></tr>
+          <tr><td><strong>Contract</strong></td><td>Proposal accepted, chasing the signature</td></tr>
+          <tr><td><strong>Closed Won</strong></td><td>Deal signed!</td></tr>
+          <tr><td><strong>Orbit</strong></td><td>Deal shelved — not the right time, but may revisit</td></tr>
+          <tr><td><strong>Closed Lost</strong></td><td>Deal didn't work out</td></tr>
+          <tr><td><strong>Nurture</strong></td><td>Long-term relationship, periodic check-ins</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-label">Color Coding</div>
+        Each stage has its own color throughout the app — in badges, kanban columns, and table headers — so you can quickly identify where deals are at a glance.
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Section 4 -->
+    <div class="section" id="s4">
+      <span class="section-number">04</span>
+      <h2>The Actions Tab — Your Daily To-Do List</h2>
+      <p>The <strong>Actions tab</strong> is the heart of the pipeline. It scans all your opportunities and tells you exactly what needs to happen next, ranked by priority.</p>
+
+      <h3>Priority Levels</h3>
+      <div class="priority-grid">
+        <div class="priority-item">
+          <div class="priority-icon pi-urgent">🔺</div>
+          <div>
+            <div class="priority-label">Urgent</div>
+            <div class="priority-desc">Do this now — overdue meetings, BAMFAM violations</div>
+          </div>
+        </div>
+        <div class="priority-item">
+          <div class="priority-icon pi-high">⚡</div>
+          <div>
+            <div class="priority-label">High</div>
+            <div class="priority-desc">Should do today — bumps due, follow-ups needed</div>
+          </div>
+        </div>
+        <div class="priority-item">
+          <div class="priority-icon pi-medium">🕐</div>
+          <div>
+            <div class="priority-label">Medium</div>
+            <div class="priority-desc">Can wait a bit — periodic check-ins</div>
+          </div>
+        </div>
+        <div class="priority-item">
+          <div class="priority-icon pi-low">⏳</div>
+          <div>
+            <div class="priority-label">Low / Wait</div>
+            <div class="priority-desc">No action needed yet — meeting upcoming, cooling period</div>
+          </div>
+        </div>
+      </div>
+
+      <h3>How Actions Work</h3>
+      <p>Each opportunity gets <strong>one primary action</strong> based on its stage and status. For example:</p>
+      <ul>
+        <li>A cold DM with no bumps → <span class="action-tag">Send First DM</span></li>
+        <li>A cold DM bumped 4 days ago → <span class="action-tag">Bump #2</span></li>
+        <li>A warm/interested deal → <span class="action-tag">Get TG Handle</span></li>
+        <li>A booked deal with a past meeting → <span class="action-tag">Discovery Done</span></li>
+        <li>A proposal_call deal → <span class="action-tag">Send Proposal</span></li>
+      </ul>
+
+      <h3>Quick Actions & Alternatives</h3>
+      <p>Next to the primary action button, you'll often see:</p>
+      <ul>
+        <li><strong>Quick action</strong> (green button) — A common shortcut. For example, "Replied!" instantly moves a cold DM to warm.</li>
+        <li><strong>Dropdown arrow</strong> — More options like "Orbit", "Lost", or stage-specific alternatives.</li>
+      </ul>
+
+      <h3>Filtering Actions</h3>
+      <p>Use the tabs at the top to focus:</p>
+      <ul>
+        <li><strong>All</strong> — Everything actionable</li>
+        <li><strong>Outreach</strong> — Cold DM, Warm, TG Intro, Booked stages</li>
+        <li><strong>Closing</strong> — Discovery Done, Proposal Call, Contract stages</li>
+        <li><strong>Orbit</strong> — Deals in orbit that may need attention</li>
+        <li><strong>Waiting</strong> — Deals in a cooling period (bump cooldowns, nurturing)</li>
+      </ul>
+
+      <p>You can also filter by <strong>My Actions</strong> (only your deals) or <strong>All Actions</strong> (everyone's deals).</p>
+
+      <h3>Sorting</h3>
+      <p>Sort your actions by Priority (default), Stage, Temperature, Deal Value, Name, Newest, or Oldest. Your sort preference is saved automatically.</p>
+    </div>
+
+    <hr>
+
+    <!-- Section 5 -->
+    <div class="section" id="s5">
+      <span class="section-number">05</span>
+      <h2>Cold DM Outreach & The Bump System</h2>
+      <p>The <strong>Outreach tab</strong> is dedicated to your cold DM pipeline with advanced filtering, pagination, and bulk operations.</p>
+
+      <h3>The Bump Lifecycle</h3>
+      <p>Bumps track how many times you've reached out to a lead:</p>
+
+      <div class="bump-timeline">
+        <div class="bump-step">
+          <div class="bump-label">Bump #0</div>
+          <div class="bump-desc">Action: "Send First DM"</div>
+        </div>
+        <div class="bump-step">
+          <div class="bump-label">After Sending</div>
+          <div class="bump-desc">bump_number becomes 1, 3-day cooldown starts</div>
+        </div>
+        <div class="bump-step">
+          <div class="bump-label">During Cooldown</div>
+          <div class="bump-desc">Action: "Wait Xd" (shows days remaining)</div>
+        </div>
+        <div class="bump-step">
+          <div class="bump-label">After 3 Days</div>
+          <div class="bump-desc">Action: "Bump #2"</div>
+        </div>
+        <div class="bump-step">
+          <div class="bump-label">Repeat</div>
+          <div class="bump-desc">Up to 4 bumps total</div>
+        </div>
+        <div class="bump-step">
+          <div class="bump-label">After 4 Bumps (No Reply)</div>
+          <div class="bump-desc">Action: "Review → Orbit"</div>
+        </div>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-label">Tip</div>
+        During the "Wait" period, you can still mark a lead as "Replied!" if they respond — the action stays visible with a quick "Replied!" button.
+      </div>
+
+      <h3>If They Reply</h3>
+      <p>At any point, if a lead replies, click <strong>"Replied!"</strong> to move them to the <strong>Warm</strong> stage.</p>
+
+      <h3>Outreach Filters</h3>
+      <ul>
+        <li><strong>Owner tabs</strong> — Filter by team member or view all</li>
+        <li><strong>Search</strong> — Find opportunities by name</li>
+        <li><strong>Path</strong> — Closer (Path A) or SDR (Path B)</li>
+        <li><strong>Bucket</strong> — A, B, or C priority</li>
+        <li><strong>Bump Status</strong> — No bumps, 1-2 bumps, 3+ bumps</li>
+      </ul>
+
+      <h3>Bulk Operations</h3>
+      <p>Select multiple opportunities using the checkboxes, then:</p>
+      <ul>
+        <li><strong>Bump All</strong> — Record a bump for all selected</li>
+        <li><strong>Move to Warm</strong> — Advance all to warm (they replied!)</li>
+        <li><strong>Delete</strong> — Remove selected opportunities</li>
+      </ul>
+    </div>
+
+    <hr>
+
+    <!-- Section 6 -->
+    <div class="section" id="s6">
+      <span class="section-number">06</span>
+      <h2>Moving Through the Pipeline</h2>
+      <p>As deals progress, different prompts and actions guide you:</p>
+
+      <h3>Warm → TG Intro: "Got TG!"</h3>
+      <p>When you click "Got TG!" (either as a quick action or from the dropdown), a dialog asks you to <strong>enter their Telegram handle</strong>. This saves the handle and moves the deal forward.</p>
+
+      <h3>Booked → Discovery Done: Bucket Assignment</h3>
+      <p>After marking a deal as "Discovery Done" (the discovery call happened), you're prompted to <strong>assign a bucket</strong>:</p>
+
+      <div class="bucket-grid">
+        <div class="bucket-card bucket-a">
+          <div class="bucket-letter">A</div>
+          <div class="bucket-label">Hot</div>
+          <div class="bucket-desc">High intent, likely to close</div>
+        </div>
+        <div class="bucket-card bucket-b">
+          <div class="bucket-letter">B</div>
+          <div class="bucket-label">Warm</div>
+          <div class="bucket-desc">Interested but needs nurturing</div>
+        </div>
+        <div class="bucket-card bucket-c">
+          <div class="bucket-letter">C</div>
+          <div class="bucket-label">Low</div>
+          <div class="bucket-desc">Lower priority, longer timeline</div>
+        </div>
+      </div>
+
+      <p>This helps prioritize your pipeline and shows up in the temperature score calculation.</p>
+
+      <h3>Proposal Call → Send Proposal → Contract</h3>
+      <p>The proposal call stage has a two-step flow:</p>
+      <ol class="steps">
+        <li><strong>"Send Proposal"</strong> — Click this after the call to mark the proposal as sent. An activity log popup lets you record details.</li>
+        <li><strong>"To Contract"</strong> — After the proposal is sent, this becomes the next action to move the deal into the contract stage.</li>
+      </ol>
+
+      <h3>Contract → Closed Won: "Chase Signature"</h3>
+      <p>In the contract stage, <span class="action-tag">Chase Signature</span> is your primary action (records a follow-up activity). Use the <span class="action-tag">Signed!</span> quick action when the deal closes.</p>
+      <p>Need to schedule another call? Use <strong>"Schedule Call"</strong> from the dropdown.</p>
+
+      <h3>Moving to Orbit</h3>
+      <p>When a deal stalls, you can move it to <strong>Orbit</strong> from any stage. You'll be asked to select a reason:</p>
+      <ul>
+        <li>No Response</li>
+        <li>Bad Timing</li>
+        <li>No Budget</li>
+        <li>Went with Competitor</li>
+        <li>Other</li>
+      </ul>
+      <p>Deals in orbit for 90+ days will surface a "Resurrect" action to re-engage them.</p>
+
+      <h3>Closing a Deal as Lost</h3>
+      <p>Moving to "Closed Lost" prompts you for an optional reason. This helps track why deals don't close.</p>
+    </div>
+
+    <hr>
+
+    <!-- Section 7 -->
+    <div class="section" id="s7">
+      <span class="section-number">07</span>
+      <h2>The Opportunity Detail Panel</h2>
+      <p>Click any opportunity name to open the <strong>slide-over panel</strong> on the right side. This is your command center for a single deal.</p>
+
+      <h3>What You'll See</h3>
+      <ul>
+        <li><strong>Header</strong> — Name, stage badge, bucket, path, deal value</li>
+        <li><strong>Details card</strong> — Temperature score, owner, POC info, TG handle, source, next meeting, last contacted</li>
+        <li><strong>Notes</strong> — Any context about the deal</li>
+      </ul>
+
+      <h3>Editing</h3>
+      <p>Click the <strong>pencil icon</strong> to enter edit mode. You can update:</p>
+      <ul>
+        <li>Name, POC, owner, source, stage</li>
+        <li>Deal value, currency</li>
+        <li>TG handle, meeting date/time</li>
+        <li>Notes and all other fields</li>
+      </ul>
+
+      <h3>Bump Controls (Cold DM only)</h3>
+      <p>A visual progress tracker shows bumps 1-4 as dots. Use the <strong>+</strong> and <strong>-</strong> buttons to manually adjust the bump count.</p>
+
+      <h3>Quick Actions</h3>
+      <ul>
+        <li><strong>Move to Orbit</strong> — Orange button at the bottom</li>
+        <li><strong>Delete</strong> — Red button (use carefully!)</li>
+        <li><strong>Move to Stage</strong> — Dropdown to manually move to any stage</li>
+      </ul>
+
+      <h3>Activity Timeline</h3>
+      <p>The bottom of the panel shows a chronological timeline of all activities:</p>
+      <ul>
+        <li>Notes, calls, messages, meetings, proposals, bumps</li>
+        <li>Each has a type icon, title, description, outcome, and next steps</li>
+      </ul>
+
+      <p><strong>To add an activity</strong>, fill in the form at the top of the timeline section:</p>
+      <ol class="steps">
+        <li>Select the type (Note, Call, Message, Meeting, Proposal)</li>
+        <li>Add a title and optional details</li>
+        <li>Set outcome, next step, and dates as needed</li>
+        <li>Click "Add"</li>
+      </ol>
+    </div>
+
+    <hr>
+
+    <!-- Section 8 -->
+    <div class="section" id="s8">
+      <span class="section-number">08</span>
+      <h2>Pipeline View — Table & Kanban</h2>
+      <p>The <strong>Pipeline tab</strong> shows all active opportunities (non-orbit, non-closed) in two views:</p>
+
+      <h3>Table View (Default)</h3>
+      <ul>
+        <li>Opportunities grouped by stage with collapsible headers</li>
+        <li>Each header shows the stage name, count, and total deal value</li>
+        <li><strong>Drag and drop</strong> rows to reorder within a stage (use the grip handle on the left)</li>
+        <li><strong>Click a name or deal value</strong> to edit it inline</li>
+        <li><strong>Click a row</strong> to open the detail panel</li>
+      </ul>
+
+      <h3>Kanban View</h3>
+      <ul>
+        <li>Vertical columns for each stage</li>
+        <li><strong>Drag cards</strong> between columns to change stages</li>
+        <li>Cards show key info: name, value, bucket, temperature, bump progress</li>
+        <li>Collapsible columns with chevrons</li>
+        <li>Drop zones for "Orbit" and "Lost" on the sides</li>
+      </ul>
+
+      <h3>Path Filter</h3>
+      <p>Use the dropdown to filter by:</p>
+      <ul>
+        <li><strong>All Paths</strong> — See everything</li>
+        <li><strong>Path A (Closer)</strong> — Direct closer pipeline</li>
+        <li><strong>Path B (SDR)</strong> — SDR-led pipeline</li>
+      </ul>
+    </div>
+
+    <hr>
+
+    <!-- Section 9 -->
+    <div class="section" id="s9">
+      <span class="section-number">09</span>
+      <h2>Overall Tab — Your Big Picture View</h2>
+      <p>The <strong>Overall tab</strong> gives you a consolidated view with three collapsible sections:</p>
+
+      <ol>
+        <li><strong>Outreach</strong> (blue) — Your full cold DM pipeline</li>
+        <li><strong>Pipeline</strong> (green) — All active deals in table view</li>
+        <li><strong>Orbit</strong> (amber) — Shelved deals</li>
+      </ol>
+
+      <p>The tab badge shows the <strong>total count of active opportunities</strong> (excluding closed won and closed lost).</p>
+
+      <div class="callout callout-tip">
+        <div class="callout-label">Tip</div>
+        Click any section header to expand/collapse it. This is great for a quick daily review without switching between tabs.
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Section 10 -->
+    <div class="section" id="s10">
+      <span class="section-number">10</span>
+      <h2>Orbit — Managing Shelved Deals</h2>
+      <p>The <strong>Orbit tab</strong> groups shelved deals by their orbit reason (No Response, Bad Timing, No Budget, etc.).</p>
+
+      <p>Each group shows:</p>
+      <ul>
+        <li>The reason label and count</li>
+        <li>A table with deal details, time in orbit, and last contacted date</li>
+      </ul>
+
+      <h3>What Happens Over Time</h3>
+      <ul>
+        <li>Deals in orbit for <strong>90+ days</strong> get a "Resurrect" action in the Actions tab</li>
+        <li>You can manually resurrect a deal from the orbit tab's menu → moves it back to Cold DM</li>
+        <li>Or mark it as Lost if it's truly dead</li>
+      </ul>
+    </div>
+
+    <hr>
+
+    <!-- Section 11 -->
+    <div class="section" id="s11">
+      <span class="section-number">11</span>
+      <h2>Templates — Quick Message Copy</h2>
+      <p>The <strong>Templates tab</strong> stores reusable DM and message templates for each pipeline stage.</p>
+
+      <h3>Browsing Templates</h3>
+      <p>Use the <strong>stage filter pills</strong> at the top to filter:</p>
+      <ul>
+        <li>All, Cold DM, Warm, TG Intro, Booked, Discovery Done, Proposal Call, Contract, Bumps</li>
+      </ul>
+
+      <p>Each template card shows:</p>
+      <ul>
+        <li>Name and stage/sub-type badges</li>
+        <li>Content preview</li>
+        <li>Variable placeholders (e.g., <code>[KOL_NAME]</code>, <code>[PROJECT_NAME]</code>)</li>
+      </ul>
+
+      <h3>Using a Template</h3>
+      <p>Click the <strong>copy icon</strong> on any template card to copy the content to your clipboard. Then paste it into your DM and replace the placeholders.</p>
+
+      <h3>Creating a Template</h3>
+      <ol class="steps">
+        <li>Click <strong>"+ New Template"</strong></li>
+        <li>Fill in: <strong>Name</strong>, <strong>Stage</strong>, <strong>Sub-type</strong>, and <strong>Content</strong> (use <code>[KOL_NAME]</code>, <code>[PROJECT_NAME]</code>, etc. as placeholders)</li>
+        <li>Click <strong>"Create Template"</strong></li>
+      </ol>
+
+      <h3>Editing & Deleting</h3>
+      <ul>
+        <li><strong>Edit</strong> — Click the pencil icon on a template card</li>
+        <li><strong>Delete</strong> — Click the trash icon (immediate, no confirmation)</li>
+      </ul>
+
+      <h3>Pre-loaded Templates</h3>
+      <p>The system comes with default templates:</p>
+      <ul>
+        <li>Cold DM — Initial Outreach</li>
+        <li>Bump 1, 2, 3 — Escalating follow-ups</li>
+        <li>Warm — Reply follow-up</li>
+        <li>TG Intro — First Telegram message</li>
+      </ul>
+    </div>
+
+    <hr>
+
+    <!-- Section 12 -->
+    <div class="section" id="s12">
+      <span class="section-number">12</span>
+      <h2>Dashboard & Metrics</h2>
+      <p>Click the <strong>"Sales Dashboard"</strong> header at the top of the page to expand detailed analytics.</p>
+
+      <h3>Pipeline Health</h3>
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="metric-label">Pipeline Value</div>
+          <div class="metric-value">$—</div>
+          <div class="metric-desc">Total value of active opportunities</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Weighted Pipeline</div>
+          <div class="metric-value">$—</div>
+          <div class="metric-desc">Values weighted by stage probability</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Active Deals</div>
+          <div class="metric-value">—</div>
+          <div class="metric-desc">Non-closed / non-orbit deals</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Revenue</div>
+          <div class="metric-value">$—</div>
+          <div class="metric-desc">Total closed-won value</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Deals Won</div>
+          <div class="metric-value">—</div>
+          <div class="metric-desc">Number of closed-won deals</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">In Orbit</div>
+          <div class="metric-value">—</div>
+          <div class="metric-desc">Number of shelved deals</div>
+        </div>
+      </div>
+
+      <h3>Conversion Funnel</h3>
+      <p>A visual bar chart showing how many deals pass through each stage — from DMs sent all the way to closed won. Helps identify where deals drop off.</p>
+
+      <h3>Key Rates</h3>
+      <table>
+        <thead>
+          <tr><th>Metric</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Response Rate</strong></td><td>% of cold DMs that got a reply</td></tr>
+          <tr><td><strong>Close Rate</strong></td><td>Won / (Won + Lost)</td></tr>
+          <tr><td><strong>Avg Deal Size</strong></td><td>Mean value of closed-won deals</td></tr>
+          <tr><td><strong>Avg Close Time</strong></td><td>Days from created to closed</td></tr>
+          <tr><td><strong>Qualified %</strong></td><td>Bucket A + B as % of total</td></tr>
+          <tr><td><strong>Bucket A %</strong></td><td>Top-tier deals as % of total</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Bottleneck Analysis</h3>
+      <p>Shows you:</p>
+      <ul>
+        <li><strong>Biggest Drop-off</strong> — The stage where you lose the most deals</li>
+        <li><strong>Slowest Stage</strong> — Where deals sit the longest</li>
+        <li>A full conversion table with stage-by-stage breakdown</li>
+      </ul>
+
+      <h3>Temperature Score</h3>
+      <p>Each opportunity has an auto-calculated temperature (0-100) based on:</p>
+      <ul>
+        <li>Bucket assignment (A = 40 base, B = 25, C = 10)</li>
+        <li>How recently you've been in contact</li>
+        <li>Number of logged activities</li>
+        <li>Whether a meeting is booked</li>
+        <li>Stage progression bonuses</li>
+        <li>Penalties for stale deals, bump exhaustion, or silent warm leads</li>
+      </ul>
+
+      <div class="callout callout-info">
+        <div class="callout-label">Refresh</div>
+        Use the <strong>"Recalc Scores"</strong> button to refresh all temperature scores.
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Section 13 -->
+    <div class="section" id="s13">
+      <span class="section-number">13</span>
+      <h2>Tips & Best Practices</h2>
+
+      <h3>Daily Workflow</h3>
+      <ol class="steps">
+        <li>Open the <strong>Actions tab</strong> — this is your to-do list</li>
+        <li>Work through urgent items first (red), then high (amber)</li>
+        <li>Check the <strong>alert cards</strong> at the top for anything critical</li>
+        <li>Log activities as you go — the system tracks everything</li>
+      </ol>
+
+      <h3>BAMFAM Rule</h3>
+      <div class="callout callout-warning">
+        <div class="callout-label">BAMFAM</div>
+        <strong>B</strong>ook <strong>A</strong> <strong>M</strong>eeting <strong>F</strong>rom <strong>A</strong> <strong>M</strong>eeting. After any call past discovery, always schedule the next meeting before hanging up. The system enforces this — deals without a future meeting get flagged.
+      </div>
+
+      <h3>Key Reminders</h3>
+      <ul class="checklist">
+        <li>Don't let deals sit in a stage for too long without action — the "Stale 7d+" alert catches forgotten deals</li>
+        <li>Temperature scores drop when deals go cold — use them as a health check</li>
+        <li>Don't write every DM from scratch — copy a template, personalize the placeholders, and send</li>
+        <li>Every time you interact with a lead (DM, call, meeting, proposal), log it — this builds a timeline for your whole team</li>
+        <li>If a lead goes silent after 3-4 bumps, move them to Orbit rather than clogging your pipeline — they'll resurface in 90 days</li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <strong>Holo Hive</strong> &middot; Sales Pipeline Onboarding Guide<br>
+      <span style="opacity: 0.7;">Internal documentation &middot; Questions? Reach out to your team lead.</span>
+    </div>
+
+  </div>
+
+</body>
+</html>

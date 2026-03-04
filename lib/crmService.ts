@@ -8,7 +8,8 @@ import { supabase } from './supabase';
 export type OpportunityStage =
   | 'new' | 'contacted' | 'qualified' | 'unqualified' | 'nurture' | 'dead'  // Lead stages
   | 'deal_qualified' | 'proposal' | 'negotiation' | 'contract' | 'closed_won' | 'closed_lost'  // Deal stages
-  | 'account_active' | 'account_at_risk' | 'account_churned';  // Account stages
+  | 'account_active' | 'account_at_risk' | 'account_churned'  // Account stages
+  | 'cold_dm' | 'warm' | 'tg_intro' | 'booked' | 'discovery_done' | 'proposal_sent' | 'proposal_call' | 'v2_contract' | 'v2_closed_won' | 'orbit' | 'v2_closed_lost';  // Sales Pipeline v2 stages
 
 export type AccountType = 'general' | 'channel' | 'campaign' | 'lite' | 'ad_hoc';
 export type OpportunitySource = 'referral' | 'inbound' | 'event' | 'cold_outreach';
