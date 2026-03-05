@@ -4779,7 +4779,7 @@ export default function SalesPipelinePage() {
                   <Target className="h-4 w-4 text-emerald-700" />
                   <h4 className="font-semibold text-emerald-700">Pipeline</h4>
                   <Badge variant="secondary" className="text-xs font-medium">
-                    {filteredOpportunities.filter(o => !['orbit', 'v2_closed_won', 'v2_closed_lost'].includes(o.stage)).length}
+                    {filteredOpportunities.filter(o => PIPELINE_STAGES.includes(o.stage as SalesPipelineStage) && o.stage !== 'cold_dm').length}
                   </Badge>
                 </div>
                 {overviewSections.pipeline ? <ChevronUp className="h-4 w-4 text-emerald-500" /> : <ChevronDown className="h-4 w-4 text-emerald-500" />}
