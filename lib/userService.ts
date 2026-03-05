@@ -35,8 +35,7 @@ export class UserService {
   static async getOrCreateUserProfile(
     userId: string,
     email: string,
-    name?: string,
-    role: 'super_admin' | 'admin' | 'member' | 'guest' = 'member'
+    name?: string
   ): Promise<UserProfile | null> {
     // First try to get existing profile
     const existingProfile = await this.getUserProfile(userId)
@@ -44,13 +43,13 @@ export class UserService {
       return existingProfile
     }
 
-    // Create new profile for OAuth user
+    // Create new profile for OAuth user — inactive until admin approves
     return this.createUserProfile({
       id: userId,
       email,
       name: name || email.split('@')[0],
-      role,
-      is_active: true,
+      role: 'member',
+      is_active: false,
     })
   }
 
@@ -156,6 +155,28 @@ export class UserService {
    */
   static async activateUser(userId: string): Promise<boolean> {
     return this.updateUserProfile(userId, { is_active: true })
+  }
+
+  /**
+   * Delete user record (admin only, for rejecting pending sign-ups)
+   */
+  static async deleteUser(userId: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', userId)
+
+      if (error) {
+        console.error('Error deleting user:', error)
+        return false
+      }
+
+      return true
+    } catch (error) {
+      console.error('Error deleting user:', error)
+      return false
+    }
   }
 
   /**

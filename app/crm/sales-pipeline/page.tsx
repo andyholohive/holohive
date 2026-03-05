@@ -517,10 +517,10 @@ export default function SalesPipelinePage() {
   }, [outreachPage, outreachFilters, user?.id]);
 
   useEffect(() => {
-    if (activeTab === 'outreach') {
+    if (activeTab === 'outreach' || (activeTab === 'overview' && overviewSections.outreach)) {
       fetchOutreach();
     }
-  }, [activeTab, fetchOutreach]);
+  }, [activeTab, fetchOutreach, overviewSections.outreach]);
 
   // ============================================
   // Filtered Opportunities
@@ -4674,6 +4674,12 @@ export default function SalesPipelinePage() {
             <TabsTrigger value="pipeline" className="flex items-center gap-2">
               <Target className="h-4 w-4" />
               Pipeline
+              {(() => {
+                const pipelineCount = opportunities.filter(o =>
+                  PIPELINE_STAGES.includes(o.stage as SalesPipelineStage) && o.stage !== 'cold_dm'
+                ).length;
+                return pipelineCount > 0 ? <Badge variant="secondary" className="ml-1">{pipelineCount}</Badge> : null;
+              })()}
             </TabsTrigger>
             <TabsTrigger value="orbit" className="flex items-center gap-2">
               <RotateCcw className="h-4 w-4" />

@@ -45,8 +45,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const profile = await UserService.getOrCreateUserProfile(
       authUser.id,
       authUser.email || '',
-      name,
-      'member' // Default role for OAuth users
+      name
     )
     setUserProfile(profile)
   }

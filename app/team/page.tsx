@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Shield, Loader2 } from 'lucide-react';
+import { Search, Shield, Loader2, UserCheck, UserX, Clock, Ban, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,18 +30,27 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [pendingRoles, setPendingRoles] = useState<Record<string, string>>({});
+  const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const { toast } = useToast();
   const { userProfile } = useAuth();
 
   useEffect(() => {
     fetchTeamMembers();
-    checkSuperAdminStatus();
+    checkAdminStatus();
   }, []);
 
-  const checkSuperAdminStatus = async () => {
+  const checkAdminStatus = async () => {
     const isSuper = await UserService.isCurrentUserSuperAdmin();
+    const isAdm = await UserService.isCurrentUserAdmin();
     setIsSuperAdmin(isSuper);
+    setIsAdmin(isAdm);
   };
 
   const handleRoleChange = async (userId: string, newRole: string) => {
@@ -83,11 +92,143 @@ export default function TeamPage() {
     }
   };
 
+  const handleApprove = async (member: TeamMember) => {
+    setApprovingId(member.id);
+    try {
+      const selectedRole = pendingRoles[member.id] || member.role;
+      // Update role if changed, then activate
+      if (selectedRole !== member.role) {
+        await UserService.updateUserRole(
+          member.id,
+          selectedRole as 'super_admin' | 'admin' | 'member' | 'guest'
+        );
+      }
+      const success = await UserService.activateUser(member.id);
+      if (success) {
+        setTeamMembers(prev =>
+          prev.map(m =>
+            m.id === member.id ? { ...m, is_active: true, role: selectedRole } : m
+          )
+        );
+        toast({
+          title: 'User approved',
+          description: `${member.name} has been approved and can now access the app.`,
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to approve user.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error approving user:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to approve user.',
+        variant: 'destructive',
+      });
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const handleReject = async (member: TeamMember) => {
+    setRejectingId(member.id);
+    try {
+      const success = await UserService.deleteUser(member.id);
+      if (success) {
+        setTeamMembers(prev => prev.filter(m => m.id !== member.id));
+        toast({
+          title: 'User rejected',
+          description: `${member.name}'s sign-up request has been rejected.`,
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to reject user.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error rejecting user:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to reject user.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRejectingId(null);
+    }
+  };
+
+  const handleDeactivate = async (member: TeamMember) => {
+    setDeactivatingId(member.id);
+    try {
+      const success = await UserService.deactivateUser(member.id);
+      if (success) {
+        setTeamMembers(prev =>
+          prev.map(m =>
+            m.id === member.id ? { ...m, is_active: false } : m
+          )
+        );
+        toast({
+          title: 'User deactivated',
+          description: `${member.name} has been deactivated and can no longer access the app.`,
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to deactivate user.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error deactivating user:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to deactivate user.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeactivatingId(null);
+    }
+  };
+
+  const handleDeleteMember = async (member: TeamMember) => {
+    setDeletingId(member.id);
+    try {
+      const success = await UserService.deleteUser(member.id);
+      if (success) {
+        setTeamMembers(prev => prev.filter(m => m.id !== member.id));
+        setConfirmDeleteId(null);
+        toast({
+          title: 'User removed',
+          description: `${member.name} has been removed from the team.`,
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to remove user.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to remove user.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const fetchTeamMembers = async () => {
     try {
       setLoading(true);
-      
-      // Fetch all users except those with guest role
+
       const { data: users, error } = await supabase
         .from('users')
         .select('*')
@@ -117,7 +258,15 @@ export default function TeamPage() {
     }
   };
 
-  const filteredTeamMembers = teamMembers.filter(member =>
+  const pendingMembers = teamMembers.filter(m => !m.is_active);
+  const activeMembers = teamMembers.filter(m => m.is_active);
+
+  const filteredActiveMembers = activeMembers.filter(member =>
+    member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    member.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredPendingMembers = pendingMembers.filter(member =>
     member.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     member.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -206,7 +355,7 @@ export default function TeamPage() {
               <p className="text-gray-600">Manage your team members</p>
             </div>
           </div>
-          
+
           <div className="flex items-center justify-between">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -219,155 +368,338 @@ export default function TeamPage() {
             </div>
           </div>
 
-          {filteredTeamMembers.length === 0 ? (
+          {/* Pending Approval Section */}
+          {isAdmin && filteredPendingMembers.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-amber-600" />
+                <h3 className="text-lg font-semibold text-amber-800">
+                  Pending Approval ({filteredPendingMembers.length})
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredPendingMembers.map((member) => (
+                  <Card key={member.id} className="border-amber-200 bg-amber-50/50">
+                    <CardHeader className="pb-3">
+                      <div className="flex flex-col items-center text-center">
+                        {member.profile_photo_url ? (
+                          <div className="w-14 h-14 rounded-full overflow-hidden mb-2 relative">
+                            <img
+                              src={member.profile_photo_url}
+                              alt={`${member.name || 'User'} profile`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                            <div className="w-14 h-14 bg-amber-200 rounded-full flex items-center justify-center absolute top-0 left-0 hidden">
+                              <span className="text-amber-800 font-bold text-lg">
+                                {getUserInitials(member.name || member.email)}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-14 h-14 bg-amber-200 rounded-full flex items-center justify-center mb-2">
+                            <span className="text-amber-800 font-bold text-lg">
+                              {getUserInitials(member.name || member.email)}
+                            </span>
+                          </div>
+                        )}
+                        <h3 className="font-semibold text-gray-900">
+                          {member.name || 'Unnamed User'}
+                        </h3>
+                        <p className="text-sm text-gray-500">{member.email}</p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Signed up {formatDate(member.created_at)}
+                        </p>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3 pt-0">
+                      <div>
+                        <label className="text-xs text-gray-500 mb-1 block">Assign Role</label>
+                        <Select
+                          value={pendingRoles[member.id] || member.role}
+                          onValueChange={(value) =>
+                            setPendingRoles(prev => ({ ...prev, [member.id]: value }))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="member">Member</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            {isSuperAdmin && (
+                              <SelectItem value="super_admin">Super Admin</SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => handleApprove(member)}
+                          disabled={approvingId === member.id || rejectingId === member.id}
+                          className="flex-1 text-white hover:opacity-90"
+                          style={{ backgroundColor: '#3e8692' }}
+                          size="sm"
+                        >
+                          {approvingId === member.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <UserCheck className="h-4 w-4 mr-1" />
+                              Approve
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          onClick={() => handleReject(member)}
+                          disabled={approvingId === member.id || rejectingId === member.id}
+                          variant="outline"
+                          className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                          size="sm"
+                        >
+                          {rejectingId === member.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <UserX className="h-4 w-4 mr-1" />
+                              Reject
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Active Members Section */}
+          {filteredActiveMembers.length === 0 && filteredPendingMembers.length === 0 ? (
             <div className="text-center py-12">
               <Shield className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">
                 {searchTerm ? 'No team members found' : 'No team members yet'}
               </h3>
               <p className="text-gray-600">
-                {searchTerm 
-                  ? 'Try adjusting your search terms.' 
+                {searchTerm
+                  ? 'Try adjusting your search terms.'
                   : 'Team members will appear here.'
                 }
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredTeamMembers.map((member) => (
-                <Card key={member.id}>
-                  <CardHeader className="pb-4">
-                    <div className="flex flex-col items-center text-center">
-                      {member.profile_photo_url ? (
-                        <div className="w-16 h-16 rounded-full overflow-hidden mb-3 relative">
-                          <img 
-                            src={member.profile_photo_url} 
-                            alt={`${member.name || 'User'} profile`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              // Fallback to initials if image fails to load
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
-                              target.nextElementSibling?.classList.remove('hidden');
-                            }}
-                          />
-                          <div className="w-16 h-16 bg-gradient-to-br from-[#3e8692] to-[#2d6470] rounded-full flex items-center justify-center absolute top-0 left-0 hidden">
+            <>
+              {isAdmin && filteredPendingMembers.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-semibold text-gray-700">
+                    Active Members ({filteredActiveMembers.length})
+                  </h3>
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredActiveMembers.map((member) => (
+                  <Card key={member.id}>
+                    <CardHeader className="pb-4">
+                      <div className="flex flex-col items-center text-center">
+                        {member.profile_photo_url ? (
+                          <div className="w-16 h-16 rounded-full overflow-hidden mb-3 relative">
+                            <img
+                              src={member.profile_photo_url}
+                              alt={`${member.name || 'User'} profile`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                target.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                            <div className="w-16 h-16 bg-gradient-to-br from-[#3e8692] to-[#2d6470] rounded-full flex items-center justify-center absolute top-0 left-0 hidden">
+                              <span className="text-white font-bold text-xl">
+                                {getUserInitials(member.name || member.email)}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-16 h-16 bg-gradient-to-br from-[#3e8692] to-[#2d6470] rounded-full flex items-center justify-center mb-3">
                             <span className="text-white font-bold text-xl">
                               {getUserInitials(member.name || member.email)}
                             </span>
                           </div>
+                        )}
+                        <div className="mb-2">
+                          <h3 className="font-semibold text-gray-900 text-lg">
+                            {member.name || 'Unnamed User'}
+                          </h3>
+                          <p className="text-sm text-gray-500">{member.email}</p>
                         </div>
-                      ) : (
-                        <div className="w-16 h-16 bg-gradient-to-br from-[#3e8692] to-[#2d6470] rounded-full flex items-center justify-center mb-3">
-                          <span className="text-white font-bold text-xl">
-                            {getUserInitials(member.name || member.email)}
+                        <div className="flex items-center space-x-2">
+                          {isSuperAdmin && member.id !== userProfile?.id ? (
+                            <div className="relative">
+                              {updatingRoleId === member.id && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded z-10">
+                                  <Loader2 className="h-4 w-4 animate-spin text-[#3e8692]" />
+                                </div>
+                              )}
+                              <Select
+                                value={member.role}
+                                onValueChange={(value) => handleRoleChange(member.id, value)}
+                                disabled={updatingRoleId === member.id}
+                              >
+                                <SelectTrigger className="h-7 text-xs w-[120px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="super_admin">Super Admin</SelectItem>
+                                  <SelectItem value="admin">Admin</SelectItem>
+                                  <SelectItem value="member">Member</SelectItem>
+                                  <SelectItem value="guest">Guest</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : (
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              member.role === 'super_admin'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {member.role === 'super_admin'
+                                ? 'Super Admin'
+                                : member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {/* Join Date */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Join Date</span>
+                        <span className="font-medium text-gray-900">
+                          {formatDate(member.created_at)}
+                        </span>
+                      </div>
+
+                      {/* Status */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Status</span>
+                        <span className="font-medium text-gray-900">
+                          {member.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+
+                      {/* Telegram Status */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Telegram</span>
+                        <span className={`font-medium ${member.telegram_id ? 'text-green-600' : 'text-red-600'}`}>
+                          {member.telegram_id ? 'Connected' : 'Disconnected'}
+                        </span>
+                      </div>
+
+                      {/* X ID */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">X</span>
+                        <span className={`font-medium ${member.x_id ? 'text-gray-900' : 'text-red-600'}`}>
+                          {member.x_id ? (
+                            <a
+                              href={`https://x.com/${member.x_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:underline"
+                            >
+                              @{member.x_id}
+                            </a>
+                          ) : (
+                            'Not set'
+                          )}
+                        </span>
+                      </div>
+
+                      {/* Last Updated */}
+                      {member.updated_at && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600">Last Updated</span>
+                          <span className="font-medium text-gray-900">
+                            {formatDate(member.updated_at)}
                           </span>
                         </div>
                       )}
-                      <div className="mb-2">
-                        <h3 className="font-semibold text-gray-900 text-lg">
-                          {member.name || 'Unnamed User'}
-                        </h3>
-                        <p className="text-sm text-gray-500">{member.email}</p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        {isSuperAdmin && member.id !== userProfile?.id ? (
-                          <div className="relative">
-                            {updatingRoleId === member.id && (
-                              <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded z-10">
-                                <Loader2 className="h-4 w-4 animate-spin text-[#3e8692]" />
+
+                      {/* Admin actions: Deactivate / Remove */}
+                      {isAdmin && member.id !== userProfile?.id && (
+                        <div className="pt-2 border-t border-gray-100 space-y-2">
+                          {confirmDeleteId === member.id ? (
+                            <div className="space-y-2">
+                              <p className="text-xs text-red-600 text-center font-medium">
+                                Are you sure? This cannot be undone.
+                              </p>
+                              <div className="flex gap-2">
+                                <Button
+                                  onClick={() => handleDeleteMember(member)}
+                                  disabled={deletingId === member.id}
+                                  variant="outline"
+                                  className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                                  size="sm"
+                                >
+                                  {deletingId === member.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    'Confirm Remove'
+                                  )}
+                                </Button>
+                                <Button
+                                  onClick={() => setConfirmDeleteId(null)}
+                                  variant="outline"
+                                  className="flex-1"
+                                  size="sm"
+                                >
+                                  Cancel
+                                </Button>
                               </div>
-                            )}
-                            <Select
-                              value={member.role}
-                              onValueChange={(value) => handleRoleChange(member.id, value)}
-                              disabled={updatingRoleId === member.id}
-                            >
-                              <SelectTrigger className="h-7 text-xs w-[120px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="super_admin">Super Admin</SelectItem>
-                                <SelectItem value="admin">Admin</SelectItem>
-                                <SelectItem value="member">Member</SelectItem>
-                                <SelectItem value="guest">Guest</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        ) : (
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            member.role === 'super_admin'
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {member.role === 'super_admin'
-                              ? 'Super Admin'
-                              : member.role.charAt(0).toUpperCase() + member.role.slice(1)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {/* Join Date */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Join Date</span>
-                      <span className="font-medium text-gray-900">
-                        {formatDate(member.created_at)}
-                      </span>
-                    </div>
-
-                    {/* Status */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Status</span>
-                      <span className="font-medium text-gray-900">
-                        {member.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </div>
-
-                    {/* Telegram Status */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Telegram</span>
-                      <span className={`font-medium ${member.telegram_id ? 'text-green-600' : 'text-red-600'}`}>
-                        {member.telegram_id ? 'Connected' : 'Disconnected'}
-                      </span>
-                    </div>
-
-                    {/* X ID */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">X</span>
-                      <span className={`font-medium ${member.x_id ? 'text-gray-900' : 'text-red-600'}`}>
-                        {member.x_id ? (
-                          <a 
-                            href={`https://x.com/${member.x_id}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="hover:underline"
-                          >
-                            @{member.x_id}
-                          </a>
-                        ) : (
-                          'Not set'
-                        )}
-                      </span>
-                    </div>
-
-                    {/* Last Updated */}
-                    {member.updated_at && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Last Updated</span>
-                        <span className="font-medium text-gray-900">
-                          {formatDate(member.updated_at)}
-                        </span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={() => handleDeactivate(member)}
+                                disabled={deactivatingId === member.id}
+                                variant="outline"
+                                className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50"
+                                size="sm"
+                              >
+                                {deactivatingId === member.id ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Ban className="h-3 w-3 mr-1" />
+                                    Deactivate
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                onClick={() => setConfirmDeleteId(member.id)}
+                                variant="outline"
+                                className="flex-1 border-red-300 text-red-600 hover:bg-red-50"
+                                size="sm"
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Remove
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>
     </div>
   );
-} 
+}

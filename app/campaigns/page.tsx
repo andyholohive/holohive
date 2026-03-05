@@ -54,6 +54,7 @@ export default function CampaignsPage() {
   const [selectedKolIds, setSelectedKolIds] = useState<Set<string>>(new Set());
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [contentCounts, setContentCounts] = useState<{ [campaignId: string]: { total: number; posted: number } }>({});
+  const [paidContentCounts, setPaidContentCounts] = useState<{ [campaignId: string]: number }>({});
   // In newCampaign state, add region, clientChoosingKols, multiActivation, intro_call, intro_call_date, budgetAllocations
   const [newCampaign, setNewCampaign] = useState({
     client_id: "",
@@ -243,31 +244,49 @@ export default function CampaignsPage() {
       );
       setCampaigns(fetchedCampaigns);
 
-      // Fetch content counts for each campaign
+      // Fetch content counts and paid content counts for each campaign
       const counts: { [campaignId: string]: { total: number; posted: number } } = {};
+      const paidCounts: { [campaignId: string]: number } = {};
       await Promise.all(
         fetchedCampaigns.map(async (campaign) => {
           try {
-            const { data, error } = await supabase
-              .from('contents')
-              .select('status')
-              .eq('campaign_id', campaign.id);
+            const [contentsRes, paymentsRes] = await Promise.all([
+              supabase.from('contents').select('id, status').eq('campaign_id', campaign.id),
+              supabase.from('payments').select('content_id').eq('campaign_id', campaign.id),
+            ]);
 
-            if (!error && data) {
-              const total = data.length;
-              const posted = data.filter(content =>
+            if (!contentsRes.error && contentsRes.data) {
+              const total = contentsRes.data.length;
+              const posted = contentsRes.data.filter(content =>
                 content.status?.toLowerCase() === 'posted' ||
                 content.status?.toLowerCase() === 'published' ||
                 content.status?.toLowerCase() === 'live'
               ).length;
               counts[campaign.id] = { total, posted };
+
+              // Count paid contents, only counting IDs that exist in this campaign's contents
+              const contentIds = new Set(contentsRes.data.map(c => c.id));
+              const paidContentIds = new Set<string>();
+              if (!paymentsRes.error && paymentsRes.data) {
+                paymentsRes.data.forEach(payment => {
+                  if (Array.isArray(payment.content_id)) {
+                    payment.content_id.forEach((id: string) => {
+                      if (contentIds.has(id)) {
+                        paidContentIds.add(id);
+                      }
+                    });
+                  }
+                });
+              }
+              paidCounts[campaign.id] = paidContentIds.size;
             }
           } catch (err) {
-            console.error(`Error fetching content counts for campaign ${campaign.id}:`, err);
+            console.error(`Error fetching counts for campaign ${campaign.id}:`, err);
           }
         })
       );
       setContentCounts(counts);
+      setPaidContentCounts(paidCounts);
     } catch (err) {
       console.error("Error fetching campaigns:", err);
       setError("Failed to load campaigns");
@@ -1111,6 +1130,14 @@ export default function CampaignsPage() {
                       const counts = contentCounts[campaign.id];
                       if (!counts || counts.total === 0) return 'No content yet';
                       return `${counts.posted} of ${counts.total} content posted`;
+                    })()}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {(() => {
+                      const counts = contentCounts[campaign.id];
+                      if (!counts || counts.total === 0) return '';
+                      const paid = paidContentCounts[campaign.id] || 0;
+                      return `${paid} of ${counts.total} content paid`;
                     })()}
                   </p>
                 </div>

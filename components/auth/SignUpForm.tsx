@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { supabase } from '@/lib/supabase'
 import { Loader2 } from 'lucide-react'
 import { GoogleSignInButton } from './GoogleSignInButton'
@@ -20,7 +19,6 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [name, setName] = useState('')
-  const [role, setRole] = useState<'super_admin' | 'admin' | 'member' | 'client'>('member')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -49,7 +47,6 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
         options: {
           data: {
             name: name.trim(),
-            role: role,
           },
         },
       })
@@ -72,7 +69,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl text-center">Check your email</CardTitle>
           <CardDescription className="text-center">
-            We've sent you a confirmation link to verify your account
+            We've sent you a confirmation link. After verifying your email, an admin will review and approve your account.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -153,20 +150,6 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
               required
               className="focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input"
             />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
-            <Select value={role} onValueChange={(value) => setRole(value as 'super_admin' | 'admin' | 'member' | 'client')}>
-              <SelectTrigger className="focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
-                <SelectValue placeholder="Select your role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="member">Member</SelectItem>
-                <SelectItem value="client">Client</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
           
           <Button

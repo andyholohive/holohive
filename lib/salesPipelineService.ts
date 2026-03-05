@@ -198,22 +198,36 @@ export class SalesPipelineService {
   // ----------------------------------------
 
   static async getAll(): Promise<SalesPipelineOpportunity[]> {
-    const { data, error } = await supabase
-      .from('crm_opportunities')
-      .select(`
-        *,
-        affiliate:crm_affiliates(*),
-        client:clients!crm_opportunities_client_id_fkey(id, name)
-      `)
-      .in('stage', ALL_V2_STAGES)
-      .order('position', { ascending: true })
-      .order('created_at', { ascending: false });
+    // Supabase defaults to 1000 rows — paginate to fetch all
+    const pageSize = 1000;
+    let allData: SalesPipelineOpportunity[] = [];
+    let from = 0;
+    let hasMore = true;
 
-    if (error) {
-      console.error('Error fetching sales pipeline opportunities:', error);
-      throw error;
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('crm_opportunities')
+        .select(`
+          *,
+          affiliate:crm_affiliates(*),
+          client:clients!crm_opportunities_client_id_fkey(id, name)
+        `)
+        .in('stage', ALL_V2_STAGES)
+        .order('position', { ascending: true })
+        .order('created_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+
+      if (error) {
+        console.error('Error fetching sales pipeline opportunities:', error);
+        throw error;
+      }
+
+      allData = allData.concat((data || []) as SalesPipelineOpportunity[]);
+      hasMore = (data?.length || 0) === pageSize;
+      from += pageSize;
     }
-    return (data || []) as SalesPipelineOpportunity[];
+
+    return allData;
   }
 
   static async create(data: CreateSalesPipelineOpportunityData): Promise<SalesPipelineOpportunity> {
