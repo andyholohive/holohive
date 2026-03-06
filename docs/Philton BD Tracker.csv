@@ -1,0 +1,2578 @@
+KOREA OUTREACH TRACKER,,Pipeline: 986,,⚠ Errors: 0,,📅 Resurrect Due: 11,,,,,,,
+FLOW:  ① COLD  →  ② WARM  →  ③ TG  →  ④ BOOKED  →  [ORBIT nurture]  →  [CLOSED dead],,,,,,,,,,,,,
+WHO,,STATUS,,TIMING,,STEP 1 /2,STEP 3 /4,ORBIT,,,,,
+,,,,,,,,,,,,,
+Entered,Project,POC Social,Stage,⚠️ Status,Last Action,Days Since,Bump #,TG Handle,Orbit Reason,Resurrect #,Resurrect,Notes,Opener
+,Decibel,https://x.com/AvgNomad,Orbit,✓ Waiting,2026-02-17,16,2,,Has Team,0,2026-05-18,,A
+,Decibel,https://x.com/borntobry,Orbit,✓ Waiting,2026-02-17,16,0,,Has Team,0,2026-05-18,,A
+,Nomina,https://x.com/AustinKing,Warm - Interested,OVERDUE: Get TG or move to Silent,2026-02-17,16,0,,,,,,A
+,Boundless,https://x.com/BoundlessBrett,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Boundless,https://x.com/reka_eth,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Boundless,https://x.com/jacobeverly,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Boundless,https://x.com/zksanti,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Melee,https://x.com/kaitrias,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Melee,https://x.com/NickPreszler,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Melee,https://x.com/itsmaximilian,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Melee,https://x.com/zen_llama,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Melee,https://x.com/kermit5329,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Mavryk,https://x.com/mv1_Davis,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Mavryk,https://x.com/theSamMorrow,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Stable,https://x.com/mehler,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Stable,https://x.com/dollardrifter,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Titan,https://x.com/realRockyChung,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Titan,https://x.com/defythepancake,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Titan,https://x.com/niightwing_,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Titan,https://x.com/Ratanabhinaww,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Titan,https://x.com/timahhl,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,OpenAssets,https://x.com/alexandre_lores,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,OpenAssets,https://x.com/bryansbodner,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Wildcat Labs,https://x.com/kethcode,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Wildcat Labs,https://x.com/andfletcher1,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Wildcat Labs,https://x.com/functi0nZer0,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Wildcat Labs,https://x.com/d1ll0nk,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Wildcat Labs,https://x.com/dotnet_enjoyer,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Multipli,https://x.com/Shaaran5,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Multipli,https://x.com/RitumbharaB,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Multipli,https://x.com/nakul___gupta,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,strykrai,https://x.com/vascomds1,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Breakout,https://x.com/Tradermayne,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Breakout,https://x.com/abetrade,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Breakout,https://x.com/unclesendit,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Breakout,https://x.com/mk_breakout,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Anti Fund,https://x.com/geoffreywoo,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,MeckaAI,https://x.com/jasontheutopian,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,MeckaAI,https://x.com/datorxrc,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,MeckaAI,https://x.com/NotDeu,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Doppler,https://x.com/rox_r0x,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,BlindPay,https://x.com/joaocsb,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,BlindPay,https://x.com/bebedaselva,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,TACEO_IO,https://x.com/aisconnolly,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,TACEO_IO,https://x.com/gm_usi,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,TACEO_IO,https://x.com/aisconolIy,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Ebisu,https://x.com/EbisuEthan,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Rialo,https://x.com/firearrowmage,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Rialo,https://x.com/JanCamenisch,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Rialo,https://x.com/0xyoungin,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Rialo,https://x.com/itachee_x,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Rialo,https://x.com/soumeya,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Bloom,https://x.com/cheerful_nicole,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Bloom,https://x.com/heymanavv,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Bloom,https://x.com/jeeanribeiro,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Courtyard,https://x.com/chef_spin,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Courtyard,https://x.com/zrschneider,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Courtyard,https://x.com/jpetrich,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Courtyard,https://x.com/LeJ3une,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Billy Bets,https://x.com/BunchuBets,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Billy Bets,https://x.com/jaredaugustine,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Pear Protocol,https://x.com/literallymarvel,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Pear Protocol,https://x.com/dinosaurteef,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Pear Protocol,https://x.com/hufhaus9,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Pear Protocol,https://x.com/Hashrosin_Eth,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Manifold,https://x.com/0xcarro,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Manifold,https://x.com/the_mattyk,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Manifold,https://x.com/jameswoodmanv,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Captur,https://x.com/sai__kc,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,DSRV,https://x.com/hyungkyu_hqueue,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,DSRV,https://x.com/KyusukJ,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Gaia,https://x.com/mateo_ventures,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Gaia,https://x.com/sydneylai,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Gaia,https://x.com/shankuverymuchx,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Gaia,https://x.com/narayananratish,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,OpacityNetwork,https://x.com/thepablob,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,OpacityNetwork,https://x.com/RonTuretzky,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,OpacityNetwork,https://x.com/EulerLagrange,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,OpacityNetwork,https://x.com/SealedVoid,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,T1,https://x.com/OrestTa,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,T1,https://x.com/kisaguncan,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Balance,https://x.com/RealBalanceFun,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Nesa,https://x.com/nesaorg,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Nesa,https://x.com/stefanluke_,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,AminoChain,https://x.com/Amino_Chain,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,AminoChain,https://x.com/JelaniC3,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,MeshMap,https://x.com/meshmapxyz,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,MeshMap,https://x.com/Ryanrz,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,MeshMap,https://x.com/pedrocruztech,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,MeshMap,https://x.com/matt_kudo,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Dynamic,https://x.com/mpearl_19,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Dynamic,https://x.com/elliefarrisi,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Dynamic,https://x.com/turbahn,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Dynamic,https://x.com/dynamic_xyz,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Dynamic,https://x.com/trynathaniel,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Dynamic,https://x.com/Dilkash,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Dynamic,https://x.com/joannatran_,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Dynamic,https://x.com/FR3NCHL0AF,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Neynar,https://x.com/neynarxyz,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Neynar,https://x.com/manan19,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Neynar,https://x.com/grin_io,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Rails,https://x.com/rails_xyz,Orbit,✓ Waiting,2026-02-26,7,2,,Has Team,0,2026-05-27,,A
+,Rails,https://x.com/0xnosh,Orbit,✓ Waiting,2026-02-26,7,2,,Has Team,0,2026-05-27,,A
+,tapestry,https://x.com/nemoblackburn,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,tapestry,https://x.com/dgabeau,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,tapestry,https://x.com/mackaydavidd,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,tapestry,https://x.com/usetapestry,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,HyENA,https://x.com/CJCJCJCJ_,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,HyENA,https://x.com/Mojojojoppg,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,HyENA,https://x.com/0xSisyphus,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,strykrai,https://x.com/Tytaninc,Closed,—,2026-02-17,16,0,,,,,Account Suspended,A
+,Doppler,https://x.com/soltah2013aabb,Closed,—,2026-02-17,16,0,,,,,Account Suspended,A
+,AminoChain,https://x.com/maxfullstack,Closed,—,2026-02-17,16,0,,,,,Dead account,A
+,Honeypot Finance,https://x.com/emilie4rio,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Turtle,https://x.com/OKDunc,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Turtle,https://x.com/luis_turtle,Closed,—,2026-02-18,15,1,,,,,Dead account,A
+,Sign,https://x.com/realyanxin,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,BOS,https://x.com/EdanYago,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,ZAR,https://x.com/tmnsky,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,peaq,https://x.com/dorloechter,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Bron Wallet,https://x.com/tokarev_d,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Shodai Network,https://x.com/Bmulligan56,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Shodai Network,https://x.com/mikednorman,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,USDAI,https://x.com/0xZergs,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,USDAI,https://x.com/ssmccul,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Mira Network,https://x.com/stone_gettings,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Mira Network,https://x.com/Shonik,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Mira Network,https://x.com/karansirdesai,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Doppel,https://x.com/TamirMSamman,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Doppel,https://x.com/rahul_madduluri,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Mu Digital,https://x.com/hizonpm,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,ZenGo,https://x.com/TalBeerySec,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,ZenGo,https://x.com/ArielMGore,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Plasma,https://x.com/pauliepunt,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Plasma,https://x.com/rongplace,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Plasma,https://x.com/xkonjin,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Plasma,https://x.com/lucidxpl,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Plasma,https://x.com/proofofnathan,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Sahara AI,https://x.com/ThisIsJoules,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Daylight,https://x.com/jasonbadeaux,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Acurast,https://x.com/OlenaAcurast,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Fuse Energy,https://x.com/alanchanguk,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,xmaquina,https://x.com/ZolKilla,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,OpenEden,https://x.com/jeremyng777,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,RISCZero,https://x.com/BoundlessBrett,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,OpenGradient,https://x.com/advait_jayant,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Miden,https://x.com/midenmonk,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Openmind,https://x.com/SidechainGavin,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Openmind,https://x.com/boyuan,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Inference Labs,https://x.com/sudo_ron,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,ORO AI,https://x.com/ckxyz_,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,HeyElsa,https://x.com/TheDhawalS,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Gondor,https://x.com/iatskar,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Surf AI,https://x.com/kevinlilili98,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Valora,https://x.com/jackie_bona,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Rainfi,https://x.com/solwhitey,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,LoopCrypto,https://x.com/EleniThinks,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Ethgas,https://x.com/lepsoe,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,brevis,https://x.com/no89thkey,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,jpeg,https://x.com/dannyvayne,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Ranger,https://x.com/0xFA2,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Ranger,https://x.com/Nevergreen911,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Sound,https://x.com/dgreenstein1,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Squad Protocol,https://x.com/deni_ersht,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Squad Protocol,https://x.com/SimkinStepan,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Noble,https://x.com/johnletey,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Noble,https://x.com/JulianKocher,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Veda,https://x.com/sunandr_,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Veda,https://x.com/joshkessler_,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Gravity,https://x.com/itsmenotyou,Closed,—,2026-02-18,15,0,,Has Team,,,,A
+,Mezo,https://x.com/mhluongo,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,gensyn,https://x.com/benfielding,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,gensyn,https://x.com/_jamico,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Perena,https://x.com/boopable,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,OP_NET,https://x.com/bc1plainview,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,OP_NET,https://x.com/chadmasterxbt,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,OneBalance,https://x.com/furter_samuel,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,OneBalance,https://x.com/euclid_ob,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,OneBalance,https://x.com/EdwardCWilson,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,re ,https://x.com/benaneesh,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,re ,https://x.com/natalieevagray,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,re ,https://x.com/st3phdoteth,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,re ,https://x.com/thecliffwhite,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Makina,https://x.com/HugoApps,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Makina,https://x.com/FarmerAlbus,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Recall,https://x.com/andrewxhill,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Recall,https://x.com/carsonfarmer,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Reya,https://x.com/0xSimonJones,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Reya,https://x.com/ggBrokoli,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Linera,https://x.com/ma2bd,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Linera,https://x.com/wiltongorske,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Ethereal,https://x.com/0xAfif,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Human Passport,https://x.com/lebraat,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,teaprotocol,https://x.com/mxcl,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Hylo,https://x.com/sape_sol,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Hylo,https://x.com/Shoomsol,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,XO Market,https://x.com/delzlon,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,PrismaX,https://x.com/shayebackus,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,ZenChain,https://x.com/0xPadgett_,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,ZenChain,https://x.com/MetaMattz,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Pi Squared,https://x.com/JeetRaut,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Pi Squared,https://x.com/RosuGrigore,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Pi Squared,https://x.com/Ovcd27,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,XMTP,https://x.com/petermdenton,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,XMTP,https://x.com/ShaneMac,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Roam,https://x.com/RohanJT,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Marina,https://x.com/0xAnthonny,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,Pionex,https://x.com/YasserXbt,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,bitsCrunch,https://x.com/VijayPravinM,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,bitsCrunch,https://x.com/ajayprashanth36,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,kinetiq,https://x.com/0xmagnus,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,kinetiq,https://x.com/0xOmnia,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,kinetiq,https://x.com/encryptjustice,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,kinetiq,https://x.com/mektigboy,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,infinex,https://x.com/ben_kurrek,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,infinex,https://x.com/kaiynne,Cold,✓ Waiting,2026-03-03,2,3,,,,,,A
+,infinex,https://x.com/egorsidelska,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,infinex,https://x.com/Minqian_lu,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Paystream,https://x.com/alok8bb,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Paystream,https://x.com/MaushishYadav,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Loyal,https://x.com/Assumed_Lost,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Limitless,https://x.com/JacquesWhales,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Limitless,https://x.com/0xClemm,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Limitless,https://x.com/cjhtech,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,irys,https://x.com/lew_xyz,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,irys,https://x.com/josh_benaron,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,irys,https://x.com/misterwestwolf,Cold,✓ Waiting,2026-03-03,2,2,,,,,,A
+,Omnipair,https://x.com/0xmoaz,Cold,✓ Waiting,2026-03-03,1,3,,,,,,A
+,Omnipair,https://x.com/tr4ce4,Cold,✓ Waiting,2026-03-03,1,3,,,,,,A
+,Omnipair,https://x.com/rakka_sol,Cold,✓ Waiting,2026-03-03,1,3,,,,,,A
+,Gondi,https://x.com/ape6743,Cold,✓ Waiting,2026-03-03,1,3,,,,,,A
+,Gondi,https://x.com/0xend,Cold,✓ Waiting,2026-03-03,1,3,,,,,,A
+,Gondi,https://x.com/0xburga,Cold,✓ Waiting,2026-03-03,1,3,,,,,,A
+,Gondi,https://x.com/VonMaketh,Cold,✓ Waiting,2026-03-03,1,3,,,,,,A
+,SynFutures,https://x.com/Syntern_,Cold,✓ Waiting,2026-03-03,1,3,,,,,,A
+,SynFutures,https://x.com/WennyCai,Closed,—,2026-02-17,1,0,,,,,account no longer exist,A
+,SynFutures,https://x.com/lilykuma_S2_,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,SynFutures,https://x.com/markjoonlee,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Pontem Labs,https://x.com/BorisPovod,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Pontem Labs,https://x.com/dmytro1sorokin,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,GEODNET,https://x.com/mvrender,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,GEODNET,https://x.com/RouvenKeller,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Morpho,https://x.com/Julien_devatom,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Morpho,https://x.com/PaulFrambot,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Morpho,https://x.com/MerlinEgalite,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Altius,https://x.com/_annabellehuang,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Altius,https://x.com/paskal_navi,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Altius,https://x.com/ihorbielov,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,matcha,https://x.com/willwarren,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,matcha,https://x.com/clacladev,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,matcha,https://x.com/carolyumi6,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,matcha,https://x.com/0xCalderon,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,matcha,https://x.com/timebeing,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,matcha,https://x.com/johnqtalent,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,matcha,https://x.com/i/chat/2551271796-702957747227095040,Cold,✓ Waiting,2026-02-26,1,2,,,,,,A
+,Datai Network,https://x.com/ElieDatai,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Datai Network,https://x.com/AIFlow_ML,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Nomina,https://x.com/ttarsi,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Nomina,https://x.com/AustinKing,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Nomina,https://x.com/withgrace,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,iExec RLC,https://x.com/fotshudi,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,iExec RLC,https://x.com/tomm7y,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,iExec RLC,https://x.com/RickK9_Algo,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Planck,https://x.com/AapsiK,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Planck,https://x.com/RohanTalwadia,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Neutron,https://x.com/CitrusMimosa,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Neutron,https://x.com/luisqagt,Closed,✓ Waiting,2026-02-17,1,1,,,,,account no longer exist,A
+,Neutron,https://x.com/clydedevv,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,DFlow,https://x.com/niteshnath,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,DFlow,https://x.com/boidushya,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,DFlow,https://x.com/eekeyguyy,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,DFlow,https://x.com/spaceagente,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,DFlow,https://x.com/DanJablonski,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ferra,https://x.com/ferra_protocol,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ferra,https://x.com/0xMetaChan,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Moonwell,https://x.com/chrizy,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Moonwell,https://x.com/LukeYoungblood,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Moonwell,https://x.com/danimimm,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Euler Labs,https://x.com/gmmiguelcruz,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Euler Labs,https://x.com/gupta_kanv,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,SIXR,https://x.com/Ahad4293,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,SIXR,https://x.com/Umar_Kht,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,zerobase,https://x.com/Gink5814,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,zerobase,https://x.com/mirrorzk,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Janction,https://x.com/HARA_JasmyCFO,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Walrus,https://x.com/RJ_Simmonds,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Silencio,https://x.com/messerer_theo,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Project Eleven,https://x.com/apruden08,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Project Eleven,https://x.com/FinnMurphy12,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Project Eleven,https://x.com/ConorDeegan4,Closed,—,,,0,,,,,account no longer exist,A
+,Project Eleven,https://x.com/lmushin,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Cosmos Labs,https://x.com/RoboMcGobo,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Cosmos Labs,https://x.com/qxnico,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Cosmos Labs,https://x.com/0xMagmar,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Cosmos Labs,https://x.com/merkle_1,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Rhuna,https://x.com/Sveatoslav,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Fanable,https://x.com/Alexnaaman,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,beemaps,https://x.com/aseidman,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,crunchDAO,https://x.com/__scalar__,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,crunchDAO,https://x.com/herelle_jean,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,meanwhile,https://x.com/LeboBTC,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,meanwhile,https://x.com/ztownsend,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,coinflow,https://x.com/SirDigitalDan,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,coinflow,https://x.com/solcostcomember,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,coinflow,https://x.com/johnthomaslang,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,bulktrade,https://x.com/kdotcrypto,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,bulktrade,https://x.com/hotlneblng_,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,bulktrade,https://x.com/junbug_sol,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Bastion,https://x.com/nassyweazy,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Bastion,https://x.com/0xDaedalus,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Rocksolid,https://x.com/paladin_eth,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Rocksolid,https://x.com/wardy_ben,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Kintsu,https://x.com/KintsuShiitake,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Kintsu,https://x.com/Alexi0s,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Divine,https://x.com/cairoeth,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Divine,https://x.com/0xfuturistic,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Hela Labs,https://x.com/Shivams_twt,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Hela Labs,https://x.com/atbigthumb,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Falcon,https://x.com/beanginax,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Falcon,https://x.com/tallgraffe,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Bio,https://x.com/NateHindman,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Bio,https://x.com/paulkhls,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Bio,https://x.com/jamessinka,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Bio,https://x.com/AakaashMeduri,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Bitlight Labs,https://x.com/ValestinYoung,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Shield,https://x.com/EmanFT_,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Shield,https://x.com/admcJD,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Shield,https://x.com/LuissCarchi,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Shield,https://x.com/isaiahudotong,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Raiku,https://x.com/degenroot,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Raiku,https://x.com/_offmylawn,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Coop Records,https://x.com/Cooopahtroopa,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Coop Records,https://x.com/JakeOnchain,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Coop Records,https://x.com/ramiechaarani,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,zerohash,https://x.com/katieeperry,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,zerohash,https://x.com/rorytait,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,zerohash,https://x.com/e_woodford,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,zerohash,https://x.com/lensofleo,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Cloudburst,https://x.com/IntelTweet,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Belfort,https://x.com/laurensdp,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Research,https://x.com/joycesticks,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Research,https://x.com/arshiamalek_,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Oasis,https://x.com/robertbrienza,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Oasis,https://x.com/markkalin121,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Oasis,https://x.com/markowifk,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,DIAM,https://x.com/chiragjetani,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,DIAM,https://x.com/OldMonnk,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Owlto,https://x.com/leowlto,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Owlto,https://x.com/krystalhkowlto,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Wallet tg,https://x.com/just_crypto_fan,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Wallet tg,https://x.com/avk767,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Wallet tg,https://x.com/pkhr,Closed,—,2026-02-23,10,1,,Not Now,0,,,A
+,Wallet tg,https://x.com/mirakhmed,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Avici,https://x.com/RamXBT,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Avici,https://x.com/zoom_crypto,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Cysic,https://x.com/i/chat/2551271796-1004598609143218177,,✓ Waiting,,,0,,,,,,A
+,Cysic,https://x.com/i/chat/2551271796-1225063722118332416,,✓ Waiting,,,0,,,,,,A
+,Cysic,https://x.com/i/chat/2551271796-1486422146305908738,,✓ Waiting,,,0,,,,,,A
+,Midnight,https://x.com/IamIanKane,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Humidifi,https://x.com/GurkGurkie,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Humidifi,https://x.com/0xIrohsol,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Novastro,https://x.com/shreedharshetty,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Zona,https://x.com/DataLust_xyz,Warm - Silent,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Greenchain,https://x.com/LuisGrainChain,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Meld,https://x.com/ansh_bizdev,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Variational,https://x.com/mr_plumpkin,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Variational,https://x.com/0xMGB,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,edgeX_exchange,https://x.com/EdgeXShun,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,edgeX_exchange,https://x.com/ruixyz,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,edgeX_exchange,https://x.com/edgeX_KF,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Paradex,https://x.com/rjun_eth,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Paradex,https://x.com/noncesensicalll,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Paradex,https://x.com/nicolas4vx,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Paradex,https://x.com/PioGerard,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,trade.xyz,https://x.com/0xmev,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,trade.xyz,https://x.com/hyperliquidbull,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ostium,https://x.com/cointradernik,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Drift,https://x.com/tracybbd,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Drift,https://x.com/namanc19,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Drift,https://x.com/cindyleowtt,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Drift,https://x.com/davijlu,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Spiko,https://x.com/pierlmn,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Spiko,https://x.com/AntMichon,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Figure,https://x.com/blockchainphyn,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Midas,https://x.com/JonasKonstandin,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Midas,https://x.com/DDinkelmeyer,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Street,https://x.com/MiyaHedge,Orbit,✓ Waiting,2026-02-26,7,1,,Not Now,0,2026-04-12,,A
+,Street,https://x.com/hhpStreet,Orbit,✓ Waiting,2026-02-26,7,1,,Not Now,0,2026-04-12,,A
+,Street,https://x.com/Simbo_01,Orbit,✓ Waiting,2026-02-26,7,1,,Not Now,0,2026-04-12,,A
+,Street,https://x.com/andyfolio,Orbit,✓ Waiting,2026-02-26,7,1,,Not Now,0,2026-04-12,,A
+,Rabby,https://x.com/galenyuan,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Rabby,https://x.com/ellenwarreninfo,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Phantom,https://x.com/DPazdan,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Phantom,https://x.com/donnie,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Phantom,https://x.com/joewadcan,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Phantom,https://x.com/owlsquid,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Phantom,https://x.com/_willthompson,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Phantom,https://x.com/etekis,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Phantom,https://x.com/FemiAw,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Phantom,https://x.com/BChillman,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Phantom,https://x.com/samnovick,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Phantom,https://x.com/itsdavidwu,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Phantom,https://x.com/litexo,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Pendle,https://x.com/tn_pendle,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Pendle,https://x.com/DDangleDan,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,UR,https://x.com/dao_lbrian,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,UR,https://x.com/ngyingzhong,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,UR,https://x.com/every1lovesneo,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,UR,https://x.com/Donmario,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Tuyo,https://x.com/izqui9,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Tuyo,https://x.com/aperezpaya,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ready,https://x.com/zk4dam,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ready,https://x.com/ChadWestTweets,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ready,https://x.com/graemeblackwood,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ready,https://x.com/olliegarch,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ready,https://x.com/jniset,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ready,https://x.com/itamarl,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Kast,https://x.com/raagulanpathy,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Kast,https://x.com/eddyvnyc,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Kast,https://x.com/peppercrunch_,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Kast,https://x.com/ItsJoshieP,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Kast,https://x.com/fabiokastcard,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Alinged,https://x.com/mauro_aligned,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Sova Labs,https://x.com/rkmasiello,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Arcium,https://x.com/manzgoeggel,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Arcium,https://x.com/cryptopapi997,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Arcium,https://x.com/milianstx,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Arcium,https://x.com/yrschrade,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Arcium,https://x.com/julian_arcium,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,OpenGradient,https://x.com/josephweb3,Orbit,✓ Waiting,2026-02-27,6,2,JosephWeb3,No Response,0,2026-08-26,,A
+,Veera,https://x.com/imawickedlemon,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Veera,https://x.com/imAJaju,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Epoch Protocol,https://x.com/sokkkkaaa,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Epoch Protocol,https://x.com/manankpatni,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Epoch Protocol,https://x.com/OstwalAk,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Senpi Ai,https://x.com/betashop,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Based,https://x.com/edison0xyz,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Based,https://x.com/shu_bit_,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Based,https://x.com/BasedPalsNFT,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Reflect,https://x.com/0xNIC0,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Reflect,https://x.com/stablecoinjesus,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Reflect,https://x.com/alexandroff_h,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Reflect,https://x.com/vinikloppel,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Aspecta,https://x.com/jackhe24,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,PreStocks,https://x.com/XavierEkkel,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Credora,https://x.com/MarcinRedStone,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Credora,https://x.com/Asian0xV,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Plural,https://x.com/AdamTSilver,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Plural,https://x.com/oofong_,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Suzaku,https://x.com/ToNio87fr,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Trepa,https://x.com/anamansari062,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Trepa,https://x.com/reubence,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Panora,https://x.com/0xAditya1,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Panora,https://x.com/Keshav_Saraogi,Closed,—,,,0,,,,,Account no longer exist,A
+,Swarm,https://x.com/YannickMyson,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Avail,https://x.com/prabalbanerjee,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Avail,https://x.com/mayurrelekar,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Avail,https://x.com/ri5hitripathi,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Humanoid Network,https://x.com/imogenmaygreen,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,DigiFTTech,https://x.com/ciz233,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,DigiFTTech,https://x.com/DigiFT_Henry,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Vanish,https://x.com/FrozenWhale_,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Vanish,https://x.com/SpikeShhh,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Vanish,https://x.com/LoganNfts,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Vanish,https://x.com/jpegxbt,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Bitway,https://x.com/shaneqiu,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Checksig,https://x.com/Ferdinando1970,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Caesar,https://x.com/mrkmcknz,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Caesar,https://x.com/tfrost,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Caesar,https://x.com/_JHoff,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Caesar,https://x.com/0xjck,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Bullish,https://x.com/ThomasFarley,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Hyperbeat,https://x.com/spectreign,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Hyperbeat,https://x.com/0xMokokoo,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Hyperbeat,https://x.com/HatashiYamatomo,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Nunchi,https://x.com/cremedupepe,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Nunchi,https://x.com/basitWeb3,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Nunchi,https://x.com/dwunkdwunk,Closed,—,2026-03-04,1,3,,,,,no longer in the team,A
+,Nunchi,https://x.com/milkmybunny,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Almanac,https://x.com/xzistance,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Almanac,https://x.com/lcnxyz,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Quai Network,https://x.com/mechanikalk,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Quai Network,https://x.com/VeronikaPolar,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Quai Network,https://x.com/mattman,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Quai Network,https://x.com/RileyStephens28,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Rarible (Flipp),https://x.com/timofeevone,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Rarible (Flipp),https://x.com/insider0x,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Rarible (Flipp),https://x.com/dappdesigner,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Rarible (Flipp),https://x.com/patrikduksin,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Rarible (Flipp),https://x.com/alxfal,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Rarible (Flipp),https://x.com/JonathanColon,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,KAIO,https://x.com/JiroNFT,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,KAIO,https://x.com/odang75,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,KAIO,https://x.com/ericmartihaynes,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Midl,https://x.com/Midltoshi,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Midl,https://x.com/fx16pxl,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Midl,https://x.com/midladyyy,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,GAIB  | RWAiFi,https://x.com/0xRamonM,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,GAIB  | RWAiFi,https://x.com/Joeynftc,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Freename,https://x.com/0xVarano,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Freename,https://x.com/theliondave,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Freename,https://x.com/Nameably,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Data Guardians,https://x.com/Matthia28630182,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Poseidon,https://x.com/sasicodes,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Questflow,https://x.com/carney_eth,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Quack AI,https://x.com/RiiixEth,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,w3.io,https://x.com/audieleon,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Mask Network,https://x.com/suji_yan,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Mask Network,https://x.com/yuan_brad,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Orb,https://x.com/bselwesiuk,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Orb,https://x.com/KimmoOrb,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,SOCLLY,https://x.com/Vaibhav_SOCLLY,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Magicblock,https://x.com/thlorenz,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Magicblock,https://x.com/PiccoGabriele,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Magicblock,https://x.com/jonasXchen,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Magicblock,https://x.com/supermarioblock,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,OFFGRID,https://x.com/juliusonchain,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,SilentSwap,https://x.com/AnewbiZ007,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,SilentSwap,https://x.com/mayhemSlayhem,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Atlasswallet,https://x.com/SamCKx,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,ORBT,https://x.com/nabylc,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Concrete,https://x.com/dill_sl,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Concrete,https://x.com/blueprintluke,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Concrete,https://x.com/crypttoji,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ellipsis Labs,https://x.com/ethtwit,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ellipsis Labs,https://x.com/0xShitTrader,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ellipsis Labs,https://x.com/rahuuuuuljain,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ondo (Strangelove),https://x.com/armandkhatri,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ondo (Strangelove),https://x.com/iandebode,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ondo (Strangelove),https://x.com/iamkaterpillar,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ondo (Strangelove),https://x.com/susscrypto,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ondo (Strangelove),https://x.com/ben_grossman,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ondo (Strangelove),https://x.com/nathanlallman,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ondo (Strangelove),https://x.com/Recently_Rugged,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Ondo (Strangelove),https://x.com/KatieAWheeler,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Cetus,https://x.com/waylicechang,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Cetus,https://x.com/amywph,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Euphoria,https://x.com/NathanWorsley_,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Euphoria,https://x.com/gmcaseycraig,Closed,—,,,0,,,,,Account no longer exist,A
+,Euphoria,https://x.com/DefiDougi,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Agora,https://x.com/drakeevans,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Agora,https://x.com/Br1ghid,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Agora,https://x.com/Nick_van_Eck,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,XerpaAI,https://x.com/0xhaoxyz,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,XerpaAI,https://x.com/kongkou_,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Velvet,https://x.com/defivas,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Kuru,https://x.com/kryptobaby777,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Kuru,https://x.com/i/chat/2551271796-2858028572,,✓ Waiting,,,0,,,,,,A
+,Kuru,https://x.com/i/chat/2551271796-1475612593830178820,,✓ Waiting,,,0,,,,,,A
+,Perceptron,https://x.com/i/chat/2551271796-1903384295001010176,,✓ Waiting,,,0,,,,,,A
+,Perceptron,https://x.com/i/chat/271178212-2551271796,,✓ Waiting,,,0,,,,,,A
+,tauntAI,https://x.com/DJSabatage,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Cork Protocol,https://x.com/Philfog,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Cork Protocol,https://x.com/TheRealStone,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Cork Protocol,https://x.com/leopoldbiget,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Cork Protocol,https://x.com/robdogeth,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Cork Protocol,https://x.com/Pybast,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,FOLD BITCOIN,https://x.com/mhluongo,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,FOLD BITCOIN,https://x.com/willreeves,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,FOLD BITCOIN,https://x.com/mattmcman_s,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,zypher,https://x.com/Amber0v01,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,zypher,https://x.com/0x_maggie,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,zenrock,https://x.com/Jack_Krevitt1,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,zenrock,https://x.com/randytlittle,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Plume,https://x.com/chriseyin,Cold,✓ Waiting,2026-03-04,1,3,,,,,,A
+,Plume,https://x.com/teddyP_xyz,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Plume,https://x.com/dikshaxboo,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Plume,https://x.com/TripleVodkaSoda,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Plume,https://x.com/CryptoDan2025,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Plume,https://x.com/klarens_malluta,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Plume,https://x.com/kerfffc,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Plume,https://x.com/kalebjake,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Plume,https://x.com/James__Friel,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Plume,https://x.com/eyqshen,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,FLock.io,https://x.com/0x7SUN,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,FLock.io,https://x.com/vatsalshah01,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,FLock.io,https://x.com/sameeha_rehman,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Edgen,https://x.com/evasweb3,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Hyperbolic,https://x.com/KaiHuang,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Hyperbolic,https://x.com/Yuchenj_UW,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Hyperbolic,https://x.com/zjasper,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Ritual,https://x.com/niraj,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Ritual,https://x.com/akileshpotti,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Ritual,https://x.com/evayzh,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,deepsnitch,https://x.com/MarkGrasso_,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Nous Research,https://x.com/rogershijin,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Nous Research,https://x.com/dillonrolnick,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Nous Research,https://x.com/yaboilyrical,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Nous Research,https://x.com/dmayhem93,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Surf Liquid,https://x.com/Muhammad_Ali87,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Surf Liquid,https://x.com/shivamtas,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Warden,https://x.com/WorldWideWarden,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Salad,https://x.com/SommerChase,Closed,—,2026-02-26,7,1,,,,,no longer part of the team,A
+,Olas,https://x.com/david_enim,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Olas,https://x.com/contentwillvary,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,taska,https://x.com/theblockinator,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Ionix,https://x.com/IonixChain,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Dfinity,https://x.com/dominic_w,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Dfinity,https://x.com/JoshHQ,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Dfinity,https://x.com/rickcoli,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Dfinity,https://x.com/PierreSamaties,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Dfinity,https://x.com/bjoerntm,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Kindred,https://x.com/metamaxxmoon,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Kindred,https://x.com/callmeyurina,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,AstraOS,https://x.com/AdelineAstraOS,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,AstraOS,https://x.com/ElzigAstraOS,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Akash,https://x.com/gregosuri,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Akash,https://x.com/ArturTroian,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Akash,https://x.com/thereisnomax,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Akash,https://x.com/vakaytion,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Akash,https://x.com/remitramel,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Glider,https://x.com/BrianInCrypto,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Glider,https://x.com/wynters0ul,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Glider,https://x.com/marcos_0x,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Glider,https://x.com/JockinVC,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Glider,https://x.com/mads,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Glider,https://x.com/johnjohnson,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,FairScale,https://x.com/Rishee_A,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,FairScale,https://x.com/elsandro,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Kinetic,https://x.com/GrantStenger,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ElevenLabs,https://x.com/alecwilcock,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ElevenLabs,https://x.com/dulzzz,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ElevenLabs,https://x.com/matiii,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ElevenLabs,https://x.com/lukeharries,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ElevenLabs,https://x.com/Carles_Reina,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ElevenLabs,https://x.com/giaccoangelo,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ElevenLabs,https://x.com/_samsklar,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ElevenLabs,https://x.com/maxilevi__,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ElevenLabs,https://x.com/LukaMarr,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ElevenLabs,https://x.com/matt_elevenlabs,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ElevenLabs,https://x.com/HugoRayne,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ElevenLabs,https://x.com/louisjoejordan,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Pythia,https://x.com/Eremeyen3,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Degen,https://x.com/ts_tomek,Closed,—,,,0,,,,,Account can't message,A
+,Degen,https://x.com/jacek0x,Closed,—,,,0,,,,,Account can't message,A
+,ampersend,https://x.com/rodventures,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ampersend,https://x.com/1stNoL,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Privasea,https://x.com/DavidJiaoEth,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Privasea,https://x.com/ARG78,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Openserv,https://x.com/open_founder,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Openserv,https://x.com/defidennis,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Openserv,https://x.com/iamfakeguru,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Openserv,https://x.com/crypto_st0rm,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Dex,https://x.com/reggitales,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Dex,https://x.com/almas_sapar,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Dex,https://x.com/gukevinr,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,vlayer,https://x.com/nam1ta,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,vlayer,https://x.com/Mojtek,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Mo,https://x.com/g_dip,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Mo,https://x.com/reginatto,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Mo,https://x.com/jordanhall,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Defx,https://x.com/darshanbathija,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Avantis,https://x.com/yugkapoor92,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Avantis,https://x.com/TheRadhaMathur,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Avantis,https://x.com/314yush,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Avantis,https://x.com/0xSehaj,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Avantis,https://x.com/Fractal_Monk,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Avantis,https://x.com/trader_koala,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Avantis,https://x.com/yangit69,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Arch Network,https://x.com/brianchoffman,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Arch Network,https://x.com/nick4iezos,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Arch Network,https://x.com/treeonchain,Closed,—,2026-02-28,5,2,,,,,,A
+,Arch Network,https://x.com/proofofmud,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ArchDAO,https://x.com/i/chat/2551271796-1986213942071570432,,✓ Waiting,,,0,,,,,,A
+,Futarchy,https://x.com/_futarchy,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Omnipair,https://x.com/0xmoaz,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Omnipair,https://x.com/tr4ce4,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Omnipair,https://x.com/rakka_sol,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Gondi,https://x.com/ape6743,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Gondi,https://x.com/0xend,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Gondi,https://x.com/0xburga,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Gondi,https://x.com/VonMaketh,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,SynFutures,https://x.com/Syntern_,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,SynFutures,https://x.com/WennyCai,Closed,—,2026-02-17,16,0,,,,,account no longer exist,A
+,SynFutures,https://x.com/lilykuma_S2_,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,SynFutures,https://x.com/markjoonlee,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Pontem Labs,https://x.com/BorisPovod,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Pontem Labs,https://x.com/dmytro1sorokin,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,GEODNET,https://x.com/mvrender,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,GEODNET,https://x.com/RouvenKeller,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Morpho,https://x.com/Julien_devatom,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Morpho,https://x.com/PaulFrambot,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Morpho,https://x.com/MerlinEgalite,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Altius,https://x.com/_annabellehuang,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Altius,https://x.com/paskal_navi,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Altius,https://x.com/ihorbielov,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,matcha,https://x.com/willwarren,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,matcha,https://x.com/clacladev,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,matcha,https://x.com/carolyumi6,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,matcha,https://x.com/0xCalderon,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,matcha,https://x.com/timebeing,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,matcha,https://x.com/johnqtalent,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,matcha,https://x.com/i/chat/2551271796-702957747227095040,,✓ Waiting,,,0,,,,,,A
+,Datai Network,https://x.com/ElieDatai,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Datai Network,https://x.com/AIFlow_ML,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Nomina,https://x.com/ttarsi,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Octane Security,https://x.com/giovignone,Warm - Interested,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Nomina,https://x.com/withgrace,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,iExec RLC,https://x.com/fotshudi,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,iExec RLC,https://x.com/tomm7y,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,iExec RLC,https://x.com/RickK9_Algo,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Planck,https://x.com/AapsiK,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Planck,https://x.com/RohanTalwadia,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Neutron,https://x.com/CitrusMimosa,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Neutron,https://x.com/luisqagt,Closed,—,2026-02-17,16,0,,,,,account no longer exist,A
+,Neutron,https://x.com/clydedevv,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,DFlow,https://x.com/niteshnath,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,DFlow,https://x.com/boidushya,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,DFlow,https://x.com/eekeyguyy,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,DFlow,https://x.com/spaceagente,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,DFlow,https://x.com/DanJablonski,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Ferra,https://x.com/ferra_protocol,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Ferra,https://x.com/0xMetaChan,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Fraction AI,https://x.com/FractionAI_xyz,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Byzantine Finance,https://x.com/benoitded,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Byzantine Finance,https://x.com/gaia_ferrero,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Lightcone,https://x.com/lightconexyz,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Lightcone,https://x.com/aradtski,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Fluton,https://x.com/0xCulha,Orbit,✓ Waiting,2026-02-28,5,2,,Not Now,0,2026-04-14,,A
+,Fluton,https://x.com/FlutonIO,Orbit,✓ Waiting,2026-02-28,5,2,,Not Now,0,2026-04-14,,A
+,Inference,https://x.com/KhraminaDianka,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Inference,https://x.com/mchlhess,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Inference,https://x.com/samhogan,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Inference,https://x.com/atbeme,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Inference,https://x.com/TheHarryET,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Inference,https://x.com/AmarSVS,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,kyd,https://x.com/KYDLabs,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,kyd,https://x.com/KYDNimale,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,kyd,https://x.com/davbarrick,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Inco,https://x.com/remi_gai,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Inco,https://x.com/furkanakal,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Inco,https://x.com/vwakesahu,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Inco,https://x.com/NPasquier,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Hedra,https://x.com/johnathanchewy,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Hedra,https://x.com/mjlbach,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Yupp,https://x.com/gilad,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Blackbird,https://x.com/dcwj,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Blackbird,https://x.com/blackbird,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Ambient,https://x.com/kwdila,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Universal,https://x.com/rai_sur11,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Universal,https://x.com/0xgaut,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Universal,https://x.com/universaldotxyz,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,YO,https://x.com/0scaronchain,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,YO,https://x.com/Elmidou,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,YO,https://x.com/drissology,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,YO,https://x.com/raykov_krasimir,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Enso | ⌘,https://x.com/connor_enso,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Enso | ⌘,https://x.com/0xjavierd,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Enso | ⌘,https://x.com/lindyhan,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Enso | ⌘,https://x.com/yazidu7_ajay,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Enso | ⌘,https://x.com/BKWeb3,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Enso | ⌘,https://x.com/EnsoBuild,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Reservoir,https://x.com/ef_24_,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Reservoir,https://x.com/derek_russo,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Reservoir,https://x.com/reservoir_xyz,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,pod network,https://x.com/KBUZ,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,pod network,https://x.com/shresth3103,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Merit Systems,https://x.com/merit_systems,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Merit Systems,https://x.com/samrags_,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Merit Systems,https://x.com/0xMasonH,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Merit Systems,https://x.com/rsproule,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Merit Systems,https://x.com/jsonhedman,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,P2P.me,https://x.com/MehtabAnsari_,Warm - Interested,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Merit Systems,https://x.com/alvaroecuesta,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Spire,https://x.com/tonydenyer,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Spire,https://x.com/__leahy,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Spire,https://x.com/CoffeeTimesTW,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Spire,https://x.com/mteamisloading,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Spire,https://x.com/0xExcalibor,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Sixpence,https://x.com/SixpenceAI,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Sixpence,https://x.com/0xPianoHands,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,❜embed,https://x.com/YassineLanda,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,❜embed,https://x.com/albiverse,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Axal,https://x.com/getaxal,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Synthetix,https://x.com/synthetix,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Synthetix,https://x.com/BurtRock69,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Synthetix,https://x.com/ideacasino,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Sling Money,https://x.com/SlingMoney,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Sling Money,https://x.com/elibelly,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Sling Money,https://x.com/waltfy,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Sling Money,https://x.com/notgwera,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Sling Money,https://x.com/SimonRAmor,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Sling Money,https://x.com/mhudack,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Sling Money,https://x.com/alan_donatiello,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ZBD,https://x.com/zbdpay,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ZBD,https://x.com/andreneves,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ZBD,https://x.com/NodeHello,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,PAN,https://x.com/0xMcDonald,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,PAN,https://x.com/Pan_Ecosystem,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,LazAI,https://x.com/iamblockchaindr,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,LazAI,https://x.com/LazAINetwork,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Fere AI,https://x.com/xpranavprakash,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Fere AI,https://x.com/0xAron,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Fere AI,https://x.com/fere_ai,Warm - Interested,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Codex,https://x.com/AVKhatibi,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Codex,https://x.com/victor_yaw_,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Codex,https://x.com/haonan,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Codex,https://x.com/momoeureka,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Codex,https://x.com/codex_pbc,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Satflow,https://x.com/Satflow,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Satflow,https://x.com/robertjfclarke,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Satflow,https://x.com/anatolie,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Satflow,https://x.com/kiwi_dream,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Satflow,https://x.com/thedanhepworth,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Zona,https://x.com/zona_io,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Velvet,https://x.com/Velvet_Capital,Warm - Interested,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Zona,https://x.com/0xdefiwizard,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,BitGo,https://x.com/chenfang,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Beatcoin,https://x.com/BrcToTheMoon,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Dawn,https://x.com/neilc_dawn,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Dawn,https://x.com/james_smits,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Dawn,https://x.com/onchainbanksy,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Dawn,https://x.com/lylllah,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Obex,https://x.com/parkeraedwards,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Solflare,https://x.com/tommysol_,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Solflare,https://x.com/bibatheking,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Solflare,https://x.com/mirogrk,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Solflare,https://x.com/TheRealEmko_,Warm - Silent,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Solflare,https://x.com/callahan_dks,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Solflare,https://x.com/vidor_solflare,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Solflare,https://x.com/filip_solflare,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Solflare,https://x.com/Qester,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Solflare,https://x.com/__Lorso,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Solflare,https://x.com/gmiko88,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Solflare,https://x.com/solquicks,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Celo,https://x.com/marek_,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Celo,https://x.com/KateEldaly,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Celo,https://x.com/RegenRene,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Celo,https://x.com/Celo,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Gateway FM,https://x.com/KyryliukVasyl,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Conduit,https://x.com/KAndrewHuang,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Conduit,https://x.com/AndyDotETH,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Conduit,https://x.com/conduitxyz,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Octane Security,https://x.com/mullaneym6,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Tangem,https://x.com/Tangem,Warm - Interested,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Octane Security,https://x.com/xsshash,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Octane Security,https://x.com/0xGojoArc,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Octane Security,https://x.com/octane_security,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Neverland,https://x.com/catalyst_nvr,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Neverland,https://x.com/omo_oshodi_,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Neverland,https://x.com/alice_nvr,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Neverland,https://x.com/Alex_nvrl,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Neverland,https://x.com/hypermassiv,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Neverland,https://x.com/pince_croco,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Neverland,https://x.com/Neverland_Money,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Level,https://x.com/levelusd,,✓ Waiting,,,0,,,,,,A
+,Prodia Labs,https://x.com/AvadyMikhail,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Prodia Labs,https://x.com/_PedroPizarro_,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,LI.FI,https://x.com/PhilippZentner,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,LI.FI,https://x.com/0xJim,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,LI.FI,https://x.com/0xJord4n,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,LI.FI,https://x.com/_sarthakarora,Warm - Silent,✓ Waiting,2026-03-05,0,3,,,,,,A
+,LI.FI,https://x.com/DominikHell6,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,LI.FI,https://x.com/lifiprotocol,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Bitpanda,https://x.com/Bitpanda/affiliates,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Bitpanda,https://x.com/christiant5r,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Bitpanda,https://x.com/schoisistar,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Nashpoint,https://x.com/nashpointfi,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,SOCKET,https://x.com/DheerajShah,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,SOCKET,https://x.com/litocoen,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,SOCKET,https://x.com/ShreyKeny,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,SOCKET,https://x.com/vaibhavchellani,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,SOCKET,https://x.com/sid_onchain,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,SOCKET,https://x.com/dimsomedim,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,SOCKET,https://x.com/0xrishabhai,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,SOCKET,https://x.com/SOCKETProtocol/affiliates,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,infiniFi,https://x.com/RobAnon,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,infiniFi,https://x.com/DeFiToast,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,infiniFi,https://x.com/0xKmack,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,infiniFi,https://x.com/infiniFi/affiliates,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Brewit.eth,https://x.com/sivramshastri,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Steakhouse,https://x.com/SebVentures,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Steakhouse,https://x.com/AesPoker,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Steakhouse,https://x.com/BillOkello_,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Steakhouse,https://x.com/dzidzoh,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Steakhouse,https://x.com/JamesCliffyz,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Steakhouse,https://x.com/0xMiracle_,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Steakhouse,https://x.com/0x_roo,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Gradient,https://x.com/yuangao,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Gradient,https://x.com/adamy_gn,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Gradient,https://x.com/0xhaylie,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Gradient,https://x.com/alex_mirran,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Gradient,https://x.com/davidz9,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Gradient,https://x.com/Gradient_HQ/affiliates,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Mevvy,https://x.com/mevvynetwork,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,FanTV AI,https://x.com/FanTV_official,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,FanTV AI,https://x.com/OzairAkhtar5,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,P2P.me,https://x.com/slayervault,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Inflectiv AI,https://x.com/inflectivAI,Warm - Silent,✓ Waiting,2026-03-05,0,3,,,,,,A
+,P2P.me,https://x.com/P2Pdotme,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Yield,https://x.com/0xYoki,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Yield,https://x.com/yield_xyz,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Mesh ,https://x.com/meshpay,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Mesh ,https://x.com/bamazizimesh,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,AetheriumX,https://x.com/aetheriumX_fun,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ULTILAND,https://x.com/ULTILAND,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Figure,https://x.com/mcagney,Warm - Interested,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Sentora,https://x.com/SentoraHQ,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Sentora,https://x.com/LucasOutumuro,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Sentora,https://x.com/MaryTiganas,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Firelight,https://x.com/Firelightfi,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Flare,https://x.com/cielbiru,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Flare,https://x.com/jun_julyaugust,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Flare,https://x.com/_WaterAmi,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Flare,https://x.com/dineshkpinto,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Flare,https://x.com/rohitdayanii,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Flare,https://x.com/maxluck95,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Flare,https://x.com/0xQuantic,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Flare,https://x.com/j00sko,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Spectra,https://x.com/justz_eth,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Spectra,https://x.com/GaspardPeduzzi,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Spectra,https://x.com/AbsoluteUknit,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Spectra,https://x.com/Ulydev,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Spectra,https://x.com/spectra_finance,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Bifrost Wallet,https://x.com/BifrostWallet,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Bifrost Wallet,https://x.com/zeroXserdar,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Bifrost Wallet,https://x.com/MarcoStevenW,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Bifrost Wallet,https://x.com/AlphaKnocks,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ALLO,https://x.com/kadvani,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,ALLO,https://x.com/dwivedinitin,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Goldfinch,https://x.com/goldfinch_fi,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Goldfinch,https://x.com/_blakewest,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,Goldfinch,https://x.com/sall,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,RAAC,https://x.com/kkrusherr,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,RAAC,https://x.com/CryptoChris91,Cold,✓ Waiting,2026-03-05,0,3,,,,,,A
+,RAAC,https://x.com/Raacfi,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Creek Finance,https://x.com/kaikaiguanguany,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Creek Finance,https://x.com/creekfinance,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,CratD2C,https://x.com/CratD2C,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,STBL,https://x.com/stbl_official/affiliates,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,STBL,https://x.com/Reeve_Collins,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,STBL,https://x.com/subtleDesi,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Block Street,https://x.com/BlockSt_HQ,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Block Street,https://x.com/IsHedyW,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Block Street,https://x.com/dthanh2501,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,TopNod,https://x.com/Top_nod,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Ember Protocol,https://x.com/EmberProtocol/affiliates,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Bluefin,https://x.com/bluefinapp/affiliates,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Bluefin,https://x.com/zabimx,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,MSX,https://x.com/msxcom,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Meta Earth,https://x.com/_MetaEarth_,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Meta Earth,https://x.com/Web3Penny_,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,City Protocol,https://x.com/jerome_wong99,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,City Protocol,https://x.com/cityprotocolHQ,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Higgsfield AI,https://x.com/higgsfield_ai/affiliates,,✓ Waiting,,,0,,,,,Account Suspended,A
+,Higgsfield AI,https://x.com/codentropy,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Usual,https://x.com/usualmoney/affiliates,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Usual,https://x.com/Red_Souk,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Usual,https://x.com/Pierr_Person,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Usual,https://x.com/AdliTB,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Maple,https://x.com/maplefinance,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Maple,https://x.com/syrupsid,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Maple,https://x.com/MartindRijke,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Maple,https://x.com/joe_defi,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Maple,https://x.com/NayatCheikh,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Maple,https://x.com/michaelbcn,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Oro,https://x.com/orogoldapp,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Propy,https://x.com/PropyInc,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Propy,https://x.com/DenitzaPropy,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Zoth,https://x.com/zothdotio,TG,ACTION: Send Nudge #2,2026-02-28,5,2,@zoctopus7,,,,,A
+,Zoth,https://x.com/pritrules,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Tessera Lab,https://x.com/Tessera_PE/affiliates,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Tessera Lab,https://x.com/CryptoSteven88,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Tessera Lab,https://x.com/Web3Maxx,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Tessera Lab,https://x.com/hey_woody1989,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Mento,https://x.com/boqdan_,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Mento,https://x.com/denney808,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Multiliquid,https://x.com/will_beeson,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Parcl,https://x.com/Parcl/affiliates,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Parcl,https://x.com/EZcrypt0,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Parcl,https://x.com/kellangrenier,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,EstateX,https://x.com/estatexeu,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,EstateX,https://x.com/BartEstateX,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,BYDFi,https://x.com/BYDFi,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,BYDFi,https://x.com/BYDFiCMO,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Fairmint,https://x.com/fairmint,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Fairmint,https://x.com/thibauld,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Fairmint,https://x.com/Joris_DLN,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Realio,https://x.com/romeiroE,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Realio,https://x.com/derekboirun,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Backed,https://x.com/leviadam1,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,PinLink,https://x.com/PinLinkAi,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Incentiv,https://x.com/CynicalCTB,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Incentiv,https://x.com/shineDUDES,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Incentiv,https://x.com/Incentiv_net/affiliates,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Cygnus,https://x.com/CygnusFi,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Mina Protocol,https://x.com/MinaProtocol,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Mina Protocol,https://x.com/deepthiskumar8,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Mina Protocol,https://x.com/evanashapiro,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Axelar Network,https://x.com/sergey_nog,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Axelar Network,https://x.com/yorgosv_,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Axelar Network,https://x.com/axelar/affiliates,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Hurupay,https://x.com/HurupayApp,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Hurupay,https://x.com/philip_hurupay,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Hurupay,https://x.com/JamesHurupay,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Remora Markets,https://x.com/aaron0v,Cold,ACTION: Send Bump 3,2026-02-28,5,2,,,,,,A
+,Remora Markets,https://x.com/cryptowazza,Cold,✓ Waiting,2026-03-01,4,2,,,,,,A
+,Arc,https://x.com/Soghoian,Cold,✓ Waiting,2026-03-01,4,2,,,,,,A
+,Arc,https://x.com/dollarsterlingX,Closed,—,,,0,,,,,Account doesn't exist,A
+,Arc,https://x.com/DrakeBreeding,Cold,✓ Waiting,2026-03-01,4,2,,,,,,A
+,Arc,https://x.com/AdiSeredinschi,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Arc,https://x.com/blockjain,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Arc,https://x.com/elk_xyz,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Nado,https://x.com/nadoHQ,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Nado,https://x.com/Jackisnotinabox,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Stakin,https://x.com/tyootiago,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Bleap,https://x.com/JoaoAlvesDotETH,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Bleap,https://x.com/gabeweb3_,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Bleap,https://x.com/BleapApp,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Startale,https://x.com/WatanabeSota,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Startale,https://x.com/henskensm,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Startale,https://x.com/samyukta_n,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Startale,https://x.com/w3_shunp,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Startale,https://x.com/SotaOnchain,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Startale,https://x.com/shunp_w3,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Startale,https://x.com/chrischoitweets,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Aleo,https://x.com/AleoHQ,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Aleo,https://x.com/apruden08,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Aleo,https://x.com/1HowardWu,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Aleo,https://x.com/SignCurve,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Aleo,https://x.com/snarkworld,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,DeCharge,https://x.com/DoctorPrk,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,DeCharge,https://x.com/DeCharge,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,aZen,https://x.com/azen_protocol,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,aZen,https://x.com/Jasmine_aZen,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,ROVR,https://x.com/danveral11,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,UBI Network,https://x.com/ALfromUA,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Moonchain,https://x.com/Moonchain_com,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,SODAX,https://x.com/gosodax,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,SODAX,https://x.com/real_digidavid,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Hivello,https://x.com/hivelloofficial,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Silencio,https://x.com/silencioNetwork,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Nodepay,https://x.com/nodepay,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Utila,https://x.com/utila_io,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Ryder,https://x.com/RyderWallet,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Ryder,https://x.com/louiseivan,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Panoptic,https://x.com/guil_lambert,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Panoptic,https://x.com/Panoptic_xyz,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Panoptic,https://x.com/IzzyBagi,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Panoptic,https://x.com/_crypt0queen,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Panoptic,https://x.com/brandonly1000,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,octra,https://x.com/octra,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,octra,https://x.com/mwilcox,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,octra,https://x.com/octrabunch,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,octra,https://x.com/lambda0xE,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,octra,https://x.com/chiefofautism,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Rarimo,https://x.com/Rarimo_protocol,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Rarimo,https://x.com/Arvolear,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Ligero Inc,https://x.com/ligero_inc,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Ligero Inc,https://x.com/mvenkita,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Ligero Inc,https://x.com/Saloniverma_,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Asymmetry,https://x.com/asymmetryfin,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Asymmetry,https://x.com/hannahjojo_,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,ShapeShift,https://x.com/ShapeShift,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,ShapeShift,https://x.com/hpayne_writer,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Hourglass,https://x.com/Charlie_Pyle,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Hourglass,https://x.com/hourglasshq,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Tapio,https://x.com/TapioFinance,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Merit Systems,https://x.com/x402m,Warm - Interested,ACTION: Follow up - get TG handle,2026-03-01,4,2,,,,,,B
+,Silo Labs,https://x.com/SiloIntern,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Silo Labs,https://x.com/ayham_eth,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Stryke,https://x.com/stryke_xyz,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Dolomite,https://x.com/bdiaz95,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Umbra,https://x.com/Abbasshaikh,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Umbra,https://x.com/kru_tweets,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Umbra,https://x.com/pranay_design,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Umbra,https://x.com/UmbraPrivacy,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,human.tech,https://x.com/humntech,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,human.tech,https://x.com/angelicagvidal,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Electron,https://x.com/vinny_web3,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Electron,https://x.com/garvitgoel03,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,sophon,https://x.com/EdC,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,sophon,https://x.com/ramonIsTweeting,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,sophon,https://x.com/0xsseb,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,sophon,https://x.com/oskaritem,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Whetstone Research,https://x.com/aadams,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Whetstone Research,https://x.com/cooper_kunz,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Whetstone Research,https://x.com/whetstonedotcc,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Beyond,https://x.com/magnus_beyond,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Beyond,https://x.com/beyond__tech,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Real,https://x.com/RealFinOfficial,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Inversion,https://x.com/lindsgazi,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Imua,https://x.com/finleyistan,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Hybrid,https://x.com/BuildOnHybrid,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Hybrid,https://x.com/0xJayHYB,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Quantum,https://x.com/QuantumFDN,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Quantum,https://x.com/ledgersaur,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Psy Protocol,https://x.com/PsyProtocol,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Psy Protocol,https://x.com/cmpeq,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Psy Protocol,https://x.com/cyberqualia,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,ODX,https://x.com/ODXLabs,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,ODX,https://x.com/sethiODX,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,ODX,https://x.com/PakSamb0,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Datalayer,https://x.com/datalayerxyz,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,Block Sec Arena,https://x.com/BlockSec_Arena,Cold,✓ Waiting,2026-03-01,4,2,,,,,,B
+,RAX Finance,https://x.com/RaxFinance,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Drama3,https://x.com/Drama3Social,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Voyage,https://x.com/onvoyage_ai,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Voyage,https://x.com/sama_jun7,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Alph AI,https://x.com/alphai_snipe,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Alph AI,https://x.com/HameerCrypto_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Impossible Cloud Network,https://x.com/ICN_Protocol/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Impossible Cloud Network,https://x.com/KaiWawrzinek,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Giza,https://x.com/OzturanIrem,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Giza,https://x.com/franalgaba_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Giza,https://x.com/raphael_dkhn,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Giza,https://x.com/renckorzay,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Giza,https://x.com/Gonmeso,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Plastic Labs,https://x.com/plasticlabs,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Metafyed,https://x.com/metafyed,Warm - Silent,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Plastic Labs,https://x.com/TheMarshmalon,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Plastic Labs,https://x.com/vintrotweets,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Plastic Labs,https://x.com/raju____,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Cambrian Network,https://x.com/CambrianNetwork/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Cambrian Network,https://x.com/i/chat/48080858-2551271796,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Cambrian Network,https://x.com/0xpili_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Cambrian Network,https://x.com/bermchain,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Mahojin,https://x.com/k_mahojin,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Capx AI,https://x.com/0xCapx/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Capx AI,https://x.com/0xHBx,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Capx AI,https://x.com/tyagicapx,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Capx AI,https://x.com/0xSharvil,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Fortytwo,https://x.com/fortytwo/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Fortytwo,https://x.com/inikitin,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Fortytwo,https://x.com/vlarin,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Sogni.ai,https://x.com/Sogni_Protocol,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Sogni.ai,https://x.com/kaiznjosh,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Sogni.ai,https://x.com/krunkosaurus,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Sogni.ai,https://x.com/natxwang,,✓ Waiting,,,0,,,,,,B
+,Sogni.ai,https://x.com/lost0nchain,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Overlay Protocol,https://x.com/OverlayProtocol,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Overlay Protocol,https://x.com/OmarTheQuant,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Overlay Protocol,https://x.com/tomascimach,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,NinjaTrader,https://x.com/NinjaTrader,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,NinjaTrader,https://x.com/AnthonyCrudele,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Vest,https://x.com/VestExchange/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Vest,https://x.com/hushky6,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Vest,https://x.com/capital_jn,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Vest,https://x.com/ape_sage,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Silo Labs,https://x.com/SiloFinance,Warm - Silent,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Plastic Labs,https://x.com/courtlandleer,Warm - Silent,✓ Waiting,2026-03-02,3,2,,,,,,B
+,RISE,https://x.com/risechain/affiliates,TG,ACTION: Send Nudge #2,2026-02-26,7,1,@drdent18,,,,,B
+,RISE,https://x.com/sam_battenally,TG,ACTION: Send Nudge #2,2026-02-26,7,1,@drdent18,,,,,B
+,RISE,https://x.com/sashaaa,TG,ACTION: Send Nudge #2,2026-02-26,7,1,@drdent18,,,,,B
+,RISE,https://x.com/Junger0x,TG,ACTION: Send Nudge #2,2026-02-26,7,1,@drdent18,,,,,B
+,RISE,https://x.com/hai_rise,TG,ACTION: Send Nudge #2,2026-02-26,7,1,@drdent18,,,,,B
+,Haven,https://x.com/haven_rwa,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Myriad,https://x.com/Evknows,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Myriad,https://x.com/ilanhz,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Myriad,https://x.com/farokh,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Noon,https://x.com/i/chat/2551271796-1841168462179151881,,✓ Waiting,,,0,,,,,,B
+,Noon,https://x.com/i/chat/2551271796-1268032197870727168,,✓ Waiting,,,0,,,,,,B
+,Rango,https://x.com/RangoCommander,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,TULPEA,https://x.com/Tulpea_org,Warm - Interested,✓ Waiting,2026-03-04,1,2,,,,,,B
+,3Jane,https://x.com/3janexyz,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,3Jane,https://x.com/_yakovsky,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,RISE,https://x.com/nvthnh,TG,ACTION: Send Nudge #1,2026-03-02,3,2,@drdent18,,,,,B
+,3Jane,https://x.com/VasilhsTaff,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,3Jane,https://x.com/wumpycrypto,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Glow Finance,https://x.com/GlowFinanceXYZ,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Credit Coop,https://x.com/creditcoop_xyz,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Credit Coop,https://x.com/CWALK_19,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Credit Coop,https://x.com/mostarz93,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Rootstock,https://x.com/rootstock_io/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Rootstock,https://x.com/aeidelman,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Rootstock,https://x.com/GoldenGatsby,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Lightspark,https://x.com/lightspark/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Lightspark,https://x.com/kphur,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Lightspark,https://x.com/davistrazza,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Fern,https://x.com/cjmg2006,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Fern,https://x.com/pooja_eth,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Oobit,https://x.com/oobit/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Oobit,https://x.com/SadotBarak,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Pocket,https://x.com/PocketWallet/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Pocket,https://x.com/iirfan,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Pocket,https://x.com/sxohom,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Pocket,https://x.com/xpranay_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,CUBE,https://x.com/cubexch/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,CUBE,https://x.com/baalazamon,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,CUBE,https://x.com/nickyfny,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,CUBE,https://x.com/0xlwu,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,CUBE,https://x.com/Sea_Eoh,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Sphere,https://x.com/sphere_labs/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Sphere,https://x.com/0xdirichlet,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Sphere,https://x.com/sphere,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Stormrae,https://x.com/stormrae_ai,Cold,ERROR: Has TG - change Stage to TG,2026-03-02,3,2,HH Team,,,,,B
+,Stormrae,https://x.com/marc0x4F,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Ubyx,https://x.com/ubyx_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Concordium,https://x.com/Concordium/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Concordium,https://x.com/KabraVarunkabra,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Concordium,https://x.com/BBilowitzki,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Share,https://x.com/sharedotxyz/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Share,https://x.com/Scott_eth,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Slice,https://x.com/add_slice,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Goblin Finance,https://x.com/the_goblin_fi,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Fermi Labs,https://x.com/FermiLabs,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Fermi Labs,https://x.com/dktrpo,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,GTE,https://x.com/GTE_XYZ/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,GTE,https://x.com/moses_gte,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,GTE,https://x.com/mlunghi2000,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,GTE,https://x.com/enzo_gte,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,GTE,https://x.com/foobiusV,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,GTE,https://x.com/PaikCapital,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,GTE,https://x.com/paik_michael,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Quantra,https://x.com/quantra_rwa,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Babylon,https://x.com/babylonlabs_io/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Babylon,https://x.com/_erikio,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Silhouette,https://x.com/silhouette_ex/affiliates,TG,ACTION: Send Nudge #1,2026-03-02,3,2,@rizzlesims,,,,,B
+,Silhouette,https://x.com/WaynesWorldza,TG,ACTION: Send Nudge #1,2026-03-02,3,2,@rizzlesims,,,,,B
+,Silhouette,https://x.com/chandlerdkk,TG,ACTION: Send Nudge #1,2026-03-02,3,2,@rizzlesims,,,,,B
+,Silhouette,https://x.com/RizzleSimms,TG,ACTION: Send Nudge #1,2026-03-02,3,2,@rizzlesims,,,,,B
+,Bulk,https://x.com/bulktrade/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Perpl,https://x.com/perpltrade,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Perpl,https://x.com/_gvan,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Fly,https://x.com/flytrade_/affiliates,Orbit,✓ Waiting,2026-02-24,9,0,,Not Now,0,2026-04-10,,B
+,Fly,https://x.com/Ikz101,Orbit,✓ Waiting,2026-02-24,9,0,,Not Now,0,2026-04-10,,B
+,Fly,https://x.com/franciskthomas,Orbit,✓ Waiting,2026-02-24,9,0,,Not Now,0,2026-04-10,,B
+,Fly,https://x.com/dr_rahemanAli,Orbit,✓ Waiting,2026-02-24,9,0,,Not Now,0,2026-04-10,,B
+,Fly,https://x.com/Adixbt,Orbit,✓ Waiting,2026-02-24,9,0,,Not Now,0,2026-04-10,,B
+,Canopy,https://x.com/canopyxyz,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Canopy,https://x.com/BennettDavisV1,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Move Industries,https://x.com/moveindustries/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Move Industries,https://x.com/analyticalali,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Move Industries,https://x.com/HYC2484,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Move Industries,https://x.com/torabyou,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Move Industries,https://x.com/hautism,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Move Industries,https://x.com/0xdaik,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Petra,https://x.com/PetraWallet,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Petra,https://x.com/rynduffy,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Petra,https://x.com/Paul40693926,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Rhea Finance,https://x.com/rhea_finance,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Rhea Finance,https://x.com/aescobarindo,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Omnity Network,https://x.com/OmnityNetwork,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Omnity Network,https://x.com/louisliubj,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Omnity Network,https://x.com/cesar_w3,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Solstice,https://x.com/solsticefi/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Solstice,https://x.com/RyanDay,,✓ Waiting,,,0,,,,,,B
+,Solstice,https://x.com/defidavo,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Solstice,https://x.com/ben_solstice,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,U,https://x.com/UTechStables,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Orbofi,https://x.com/Orbofi,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Vanar,https://x.com/Vanarchain,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Vanar,https://x.com/AshVanar,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Venus Protocol,https://x.com/VenusProtocol,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Hibachi,https://x.com/hibachi_xyz,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Flashnet,https://x.com/flashnet/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Flashnet,https://x.com/ethannmarcus,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Flashnet,https://x.com/juliankc,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Flashnet,https://x.com/matija_sobocan,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Flashnet,https://x.com/quantumly,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Flashnet,https://x.com/summraznboi,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Meridian,https://x.com/Sqruw,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Meridian,https://x.com/meridian_money,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Azura,https://x.com/azuratrade,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Azura,https://x.com/lech77eth,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Azura,https://x.com/TheSonOfMosiah,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,ODOS,https://x.com/odosprotocol,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Polynomial,https://x.com/PolynomialFi,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Derive,https://x.com/DeriveXYZ,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Derive,https://x.com/itseneff,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Derive,https://x.com/0x_Atreyu,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Derive,https://x.com/earthtojake_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Euclid Protocol,https://x.com/chouchani9,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Kairos,https://x.com/KairosTradeX,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Kairos,https://x.com/thejay,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Osmosis,https://x.com/osmosis,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Bluff.com,https://x.com/official_bluff,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,MyShell.AI,https://x.com/myshell_ai,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,MyShell.AI,https://x.com/0xAikoDai,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,MyShell.AI,https://x.com/hance_zhang7,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,MyShell.AI,https://x.com/x64Rick,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Naptha AI,https://x.com/NapthaAI,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Naptha AI,https://x.com/richardblythman,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,EIDON AI,https://x.com/eidon_ai,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,EIDON AI,https://x.com/theSamPadilla,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,EIDON AI,https://x.com/RobertDaleSmith,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Prime Intellect,https://x.com/PrimeIntellect/affiliates,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Prime Intellect,https://x.com/qvale,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Prime Intellect,https://x.com/vincentweisser,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Prime Intellect,https://x.com/creet_z,Closed,—,,,0,,,,,,B
+,Prime Intellect,https://x.com/johannes_hage,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Prime Intellect,https://x.com/dominik_scherm,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Prime Intellect,https://x.com/samsja19,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Prime Intellect,https://x.com/rasdani_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Chainbase,https://x.com/ChainbaseHQ,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Chainbase,https://x.com/moguxyz,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Chainbase,https://x.com/Renee7eth,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Chainbase,https://x.com/MagiccatMila,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Chainbase,https://x.com/yizc77,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Payman,https://x.com/0xTyllen,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Payman,https://x.com/jonmtaylor24,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,DAPPOS,https://x.com/0xJulieC,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,DAPPOS,https://x.com/Opiwixzy1,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,RISE,https://x.com/i/chat/2551271796-1861200914201116672,TG,ACTION: Send Nudge #2,2026-02-26,7,1,@drdent18,,,,,B
+,Renegade,https://x.com/renegade_fi,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Renegade,https://x.com/chrisliambender,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Renegade,https://x.com/sehyunchung,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Renegade,https://x.com/jkraut_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,D8X,https://x.com/d8x_exchange,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,D8X,https://x.com/0xcaspar_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,PredictEX,https://x.com/PredictEX,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,PredictEX,https://x.com/sorryplato,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Privy,https://x.com/privy_io,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Privy,https://x.com/jayhinz,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Privy,https://x.com/skerskerrr,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Privy,https://x.com/segall_max,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Privy,https://x.com/jdp273,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Privy,https://x.com/debsoon,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Privy,https://x.com/tednotlasso,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,stabble,https://x.com/_danielpavel,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,stabble,https://x.com/captainkong_eth,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,3Jane,https://x.com/uhr3al,Warm - Silent,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Sunrise,https://x.com/tonyjin,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Sunrise,https://x.com/shadddowfax,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,TradeFox,https://x.com/tradefoxai,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,TradeFox,https://x.com/tradefoxintern,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,TradeFox,https://x.com/Prithvir12,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,WIDI,https://x.com/WIDITDOTFUN,Closed,—,,,0,,,,,,B
+,WIDI,https://x.com/cryptomattk,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Chance,https://x.com/Chance_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Codatta,https://x.com/codatta_io,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,ONINO,https://x.com/onino_io,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Roxom,https://x.com/roxom,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Roxom,https://x.com/borjamartels,Warm - Interested,✓ Waiting,2026-03-04,1,2,,,,,,B
+,Euphoria,https://x.com/Euphoria_fi,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Insilico Terminal,https://x.com/InsilicoTrading,Warm - Interested,ACTION: Follow up - get TG handle,2026-03-02,3,2,,,,,,B
+,Velvet,https://x.com/degen_mike14,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Velvet,https://x.com/TheDeFiPlug,Warm - Silent,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Arrow Markets,https://x.com/ArrowMarkets,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Arrow Markets,https://x.com/EdwardMehrez,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,OpenDelta,https://x.com/schteringard,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Bliss,https://x.com/getbliss_io,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Bitte,https://x.com/BitteProtocol,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Bitte,https://x.com/PKuveke,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Bitte,https://x.com/nategeier,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Bitte,https://x.com/carolinwend,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Amadeus Protocol,https://x.com/amadeusprotocol,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,tea Protocol,https://x.com/teaprotocol,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Anchorage Digital,https://x.com/Anchorage,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Anchorage Digital,https://x.com/nathanmccauley,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Anchorage Digital,https://x.com/KevWysocki,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Anchorage Digital,https://x.com/bx,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Anchorage Digital,https://x.com/dlawant,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Vyper,https://x.com/TradeonVyper,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Vyper,https://x.com/Feed_SOL,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Vyper,https://x.com/scardi,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,TOKI,https://x.com/tokifinance,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,TOKI,https://x.com/motokiyoshida,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,TOKI,https://x.com/daikinesia0,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Towns App,https://x.com/townsapp,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Towns App,https://x.com/patfives,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Towns App,https://x.com/coinbilly,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Ridima,https://x.com/i/chat/2551271796-1372933793896656901,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Deriverse,https://x.com/deriverse_io,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Deriverse,https://x.com/highfreqfencer,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Byreal,https://x.com/byreal_io,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,SWAPPA,https://x.com/swappadex,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Raycast,https://x.com/danielpsequeira,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Raycast,https://x.com/thomaspaulmann,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Warp,https://x.com/warpdotdev,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Warp,https://x.com/zachlloydtweets,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Warp,https://x.com/BHolmesDev,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,The Clearing Company,https://x.com/theclearingco,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,The Clearing Company,https://x.com/tonigemayel,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,The Clearing Company,https://x.com/niraek,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Subzero Labs,https://x.com/soumeya,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Subzero Labs,https://x.com/firearrowmage,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Subzero Labs,https://x.com/JanCamenisch,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Subzero Labs,https://x.com/0xyoungin,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Turnkey,https://x.com/turnkeyhq,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Turnkey,https://x.com/mariiajuanaaaa,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Turnkey,https://x.com/joe_r0,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Turnkey,https://x.com/CryptoClayman,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Turnkey,https://x.com/sadbryce,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Turnkey,https://x.com/amanonthechain,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Turnkey,https://x.com/crypteriq,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Turnkey,https://x.com/whojackjones,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Turnkey,https://x.com/hm_arnold,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Turnkey,https://x.com/ReallyNotMoe,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Wellspring,https://x.com/WellspringApp,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Wellspring,https://x.com/chabalpha,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,OPSIN,https://x.com/opsinfinance,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Pluralis Research,https://x.com/AlexanderLong,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Cryptoys,https://x.com/Cryptoys,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Cryptoys,https://x.com/willweinraub,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Blockaid,https://x.com/blockaid_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Blockaid,https://x.com/ggbotnyc,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Blockaid,https://x.com/idobn,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Blockaid,https://x.com/NickSanschagrin,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Spicenet,https://x.com/spicenet,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Spicenet,https://x.com/Peprika_Inferno,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Spicenet,https://x.com/MrPkar,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Spicenet,https://x.com/0xsahil,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Glow Foundation,https://x.com/chrisdenaro,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Glow Foundation,https://x.com/DavidVorick,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Glow Foundation,https://x.com/vik_kalghatgi,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Glow Foundation,https://x.com/Lironie13,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Glow Foundation,https://x.com/CallumMelly,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Cortex Agent,https://x.com/cortexagentsc,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Keplr,https://x.com/dogemos,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Prism,https://x.com/PrismFi_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Krak,https://x.com/Krak,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Krak,https://x.com/ellatjonas,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,MWX,https://x.com/yoseazka,Closed,—,2026-02-25,8,1,,,,,bootstrapped / Sketchy,B
+,MWX,https://x.com/mwx_ai,Closed,—,2026-02-25,8,1,,,,,bootstrapped / Sketchy,B
+,Selanet,https://x.com/SelaNetwork,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,AltLayer,https://x.com/alt_layer,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Exponent,https://x.com/ExponentFinance,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Exponent,https://x.com/valentinmadrid_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Exponent,https://x.com/ttrofel,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Nym,https://x.com/nym,Closed,—,2026-02-25,8,1,,,,,not our ICP,B
+,Nym,https://x.com/jayapapaya,Closed,—,2026-02-25,8,1,,,,,not our ICP,B
+,SideShift.ai,https://x.com/abrkn,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,SideShift.ai,https://x.com/sideshiftai,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Seer,https://x.com/seer_pm,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Seer,https://x.com/clesaege,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Teneo Protocol,https://x.com/teneo_protocol,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Miracle,https://x.com/miracletrade,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Miracle,https://x.com/Jordanmiracl,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,fiamma,https://x.com/cyimonio,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,fiamma,https://x.com/fiamma_labs,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Payy,https://x.com/calummoore,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Payy,https://x.com/sidgandhi_xyz,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,stabble,https://x.com/stabbleorg,Warm - Interested,ACTION: Follow up - get TG handle,2026-03-02,3,2,,,,,,B
+,ForU AI,https://x.com/corycongUwU,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,ForU AI,https://x.com/pangxuekai,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,ForU AI,https://x.com/foruai,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Neutrl,https://x.com/Neutrl,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Neutrl,https://x.com/behrin,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Neutrl,https://x.com/omc_sh,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Neutrl,https://x.com/0xmjt,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Neutrl,https://x.com/0xTAY_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Cyber,https://x.com/BuildOnCyber,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Cyber,https://x.com/WilsonWei777,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Cyber,https://x.com/pisofa,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Cyber,https://x.com/zhimao_liu,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Huma,https://x.com/humafinance,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Huma,https://x.com/avniguven_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,BAGS,https://x.com/BagsApp,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,BAGS,https://x.com/Sambags12,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,BAGS,https://x.com/ramyobags,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,BAGS,https://x.com/finnbags,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Fluid,https://x.com/smykjain,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Fluid,https://x.com/thrilok_kumar,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Arowana-Official,https://x.com/Arowana_Main,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,RWA.xyz,https://x.com/RWA_xyz,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,RWA.xyz,https://x.com/CharlieYouAI,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,RWA.xyz,https://x.com/adamlawrencium,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,RWA.xyz,https://x.com/DeanKD_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,RWA.xyz,https://x.com/minerva_crypto,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,METAWIN,https://x.com/MetaWin,Closed,—,2026-03-02,3,2,,,,,,B
+,METAWIN,https://x.com/Skelhorn,Closed,—,2026-03-02,3,2,,,,,,B
+,Flash.Trade,https://x.com/FlashTrade,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Flash.Trade,https://x.com/allinbitcoin_,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Flash.Trade,https://x.com/Crypt0Panda,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Ika,https://x.com/ikadotxyz,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Ika,https://x.com/omersadika,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,StarkWare,https://x.com/odin_free,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,StarkWare,https://x.com/avihu28,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,StarkWare,https://x.com/EliBenSasson,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,StarkWare,https://x.com/akashneelesh,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,StarkWare,https://x.com/itamardvir,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Payy,https://x.com/payy_link,Warm - Silent,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Cash City,https://x.com/cashcitydotfun,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Tenor,https://x.com/TenorFinance,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Tenor,https://x.com/PYGendron,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Tenor,https://x.com/0xphilgood,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Tenor,https://x.com/ddallaire25,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Initia,https://x.com/ItsAlwaysZonny,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Initia,https://x.com/tansawit,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Initia,https://x.com/Sukriti2108,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Initia,https://x.com/sinitias,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Initia,https://x.com/cedosalah,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Across,https://x.com/AcrossProtocol,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Across,https://x.com/mrice32,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Across,https://x.com/Al3jandroRM,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Across,https://x.com/racarac,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Across,https://x.com/BenniDaytime,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Across,https://x.com/kiraonchain,Cold,✓ Waiting,2026-03-02,3,2,,,,,,B
+,Across,https://x.com/ydanwashere,Closed,—,,,0,,,,,,B
+,Across,https://x.com/kanishkkhurana,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Ambire,https://x.com/ambire,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Ambire,https://x.com/0xwhyduck,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Ambire,https://x.com/cinesiusss,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Ambire,https://x.com/Ivshti,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Etherlink,https://x.com/ma11eta,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Etherlink,https://x.com/0yield,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Etherlink,https://x.com/mojojo_eth,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Etherlink,https://x.com/etherlink,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Hemi,https://x.com/hemi_xyz,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Hemi,https://x.com/MatthewRoszak,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Cake Wallet,https://x.com/cakewallet,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Cake Wallet,https://x.com/vikrantnyc,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Cake Wallet,https://x.com/sethforprivacy,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Bullshot,https://x.com/Bullshot911,TG,ACTION: Send Nudge #1,2026-03-02,3,1,@ortamir90,,,,,B
+,Tangem,https://x.com/anaonchain,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Tangem,https://x.com/Crypto_Familie,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Botanix,https://x.com/WillemSchroe,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Botanix,https://x.com/0xkeksgiven,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Botanix,https://x.com/oranjegoose,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Botanix,https://x.com/spiderchainnews,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Botanix,https://x.com/alipaints,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Malda,https://x.com/malda_xyz,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Malda,https://x.com/axel_ventures,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Malda,https://x.com/0xFleck,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Malda,https://x.com/scsongi,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Malda,https://x.com/realbarnakiss,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Malda,https://x.com/0xLevente_v,Closed,—,,,0,,,,,,B
+,The Movement,https://x.com/movement_xyz,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Puffer,https://x.com/art3chris,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Puffer,https://x.com/AmirOnchain,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Symbiotic,https://x.com/symbioticfi,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Symbiotic,https://x.com/FelixLts,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Symbiotic,https://x.com/roth_edgar,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Symbiotic,https://x.com/pseudotheos,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Reown,https://x.com/reown_,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Reown,https://x.com/Houlgrave,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Reown,https://x.com/iamMEANiX,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Reown,https://x.com/Dolcemaschio,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Reown,https://x.com/Rohit7101,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Reown,https://x.com/skibitsky,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Decibel,https://x.com/AlyssaPonzo,Orbit,✓ Waiting,2026-02-25,8,1,,Not Now,0,2026-04-11,,B
+,Backpack,https://x.com/Backpack,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Backpack,https://x.com/armaniferrante,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Backpack,https://x.com/tristan,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,CipherOwl,https://x.com/leozc,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Kiyotaka,https://x.com/minara,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Kiyotaka,https://x.com/lowesyang,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Hubble AI,https://x.com/MeetHubble,Closed,—,,,0,,,,,,B
+,Hubble AI,https://x.com/Leoninweb3,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Hubble AI,https://x.com/amyincrypto,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Hubble AI,https://x.com/0xShainey_,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Range,https://x.com/range_org,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Range,https://x.com/aesmonty,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Range,https://x.com/syedchoudhury,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Bullet,https://x.com/Bulletxyz,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Bullet,https://x.com/Tristan0x,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Bullet,https://x.com/aditya_sharma,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Bullet,https://x.com/PDAnimol,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,VeryAI,https://x.com/itszach,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,VeryAI,https://x.com/oyyblin,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,VeryAI,https://x.com/thisisjared,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,VeryAI,https://x.com/abrilzucchi,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Brava Finance,https://x.com/Gccooke,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Deks,https://x.com/lautaroweb3,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Inflectiv AI,https://x.com/Humman30,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Perceptron Network,https://x.com/PerceptronNTWK,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Perceptron Network,https://x.com/geoffreymccabe,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Perceptron Network,https://x.com/Peter_thoc,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,GoatX,https://x.com/GoatX_trade,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Orbit,https://x.com/orbitai,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Orbit,https://x.com/venivci,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Orbit,https://x.com/hunterrice,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Levl,https://x.com/LevlFi,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Union,https://x.com/union_build,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,IO Trader IO,https://x.com/IOTradersIO,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,BaseVol,https://x.com/BaseVolApp,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,BaseVol,https://x.com/still_otm,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,BaseVol,https://x.com/KDragon_vol,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Prodigy,https://x.com/ProdigyFi,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Prodigy,https://x.com/0xindaquil,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Grix,https://x.com/GrixFinance,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Grix,https://x.com/0xOrM,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Sonic,https://x.com/SonicLabs,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Sonic,https://x.com/MitchellDemeter,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Sonic,https://x.com/YJN58,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Sonic,https://x.com/0xseg,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Sonic,https://x.com/Mr__Metalx,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Sonic,https://x.com/CryptoTin_,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Sonic,https://x.com/_lfausto,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Sonic,https://x.com/Lorem_Ipsum95,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Sonic,https://x.com/SjHarcourt,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Sonic,https://x.com/michaelfkong,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,DogeOS,https://x.com/MyDogeCEO,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Thru,https://x.com/thru_xyz,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Thru,https://x.com/CantelopePeel,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Thru,https://x.com/bubbleboi,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Thru,https://x.com/yoowon,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Thru,https://x.com/chang_defi,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Thru,https://x.com/CantelopePeel,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Rujira,https://x.com/RujiraNetwork,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Rujira,https://x.com/PragmaticMonkey,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Rujira,https://x.com/markfromdenmar_,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Rujira,https://x.com/codehans1,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,lava,https://x.com/lava_xyz,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Tempo,https://x.com/tempo,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,M0,https://x.com/reginatto,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,M0,https://x.com/g_dip,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,M0,https://x.com/jordanhall,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,M0,https://x.com/denalimarsh,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,M0,https://x.com/LucaProsperi,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,M0,https://x.com/conradocanas,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,M0,https://x.com/Khrafts,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,M0,https://x.com/PierrickGT,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Record,https://x.com/record_protocol,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,blinq,https://x.com/blinqfi,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,PiP World / Mavericks,https://x.com/neoworldlife,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,PiP World / Mavericks,https://x.com/pip_world,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,PiP World / Mavericks,https://x.com/MavAgents,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,PiP World / Mavericks,https://x.com/Quantum0,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,PiP World / Mavericks,https://x.com/SaadNaja,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,surfcash,https://x.com/akshatwts,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,surfcash,https://x.com/surfcashx,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,surfcash,https://x.com/cesarsuarezpab,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,surfcash,https://x.com/0xChesterKing,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+,Kresus Wallet,https://x.com/KresusOfficial,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-02-26,Magna,https://x.com/julibachi,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-02-26,Magna,https://x.com/larrybekchyan,Closed,—,2026-02-26,7,0,,,,,DMs no longer Open,B
+2026-02-26,Magna,https://x.com/erkantecm,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-02-26,Magna,https://x.com/wesley_xyz,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-02-26,Magna,https://x.com/magna_digital,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-02-26,PRED,https://x.com/predofficial,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-02-26,BitRing,https://x.com/bitring2025,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-02-26,t54.ai,https://x.com/t54ai,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-02-26,t54.ai,https://x.com/maniusmaximus,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-02-26,t54.ai,https://x.com/Sergio2Chan,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-02-27,trytbd,https://x.com/coreyj_miller,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-03-02,kash,https://x.com/kash_bot,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-03-02,Bluprynt,https://x.com/RobTG4,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-03-02,Bluprynt,https://x.com/blupryntco,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-03-02,Trufin,https://x.com/0xdev8,Cold,✓ Waiting,2026-03-03,2,2,,,,,,B
+2026-03-04,Akave,https://x.com/abusyhippie,Cold,✓ Waiting,2026-03-04,1,0,,,,,,B
+2026-03-04,Akave,https://x.com/stefaanweb3,Cold,✓ Waiting,2026-03-04,1,0,,,,,,B
+2026-03-04,ARQ,https://x.com/arq_finance,Cold,✓ Waiting,2026-03-04,1,0,,,,,,B
+2026-03-04,Sats Terminal,https://x.com/SatsTerminal,Cold,✓ Waiting,2026-03-04,1,0,,,,,,B
+2026-03-04,Sats Terminal,https://x.com/stan_havryliuk,Cold,✓ Waiting,2026-03-04,1,0,,,,,,B
+2026-03-04,Sats Terminal,https://x.com/ameeetgaikwad,Cold,✓ Waiting,2026-03-04,1,0,,,,,,B
+2026-03-04,Sats Terminal,https://x.com/rishabhjava,Cold,✓ Waiting,2026-03-04,1,0,,,,,,B
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,
+,,,,,,,0,,,,,,

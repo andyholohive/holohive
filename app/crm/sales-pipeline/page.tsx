@@ -73,6 +73,8 @@ import {
   CreateSalesDmTemplateData,
 } from '@/lib/salesPipelineService';
 import { UserService } from '@/lib/userService';
+import { BookingService } from '@/lib/bookingService';
+import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow, format } from 'date-fns';
 
 // ============================================
@@ -134,6 +136,7 @@ function SortableTableRow({ id, children, className, onClick }: { id: string; ch
 
 export default function SalesPipelinePage() {
   const { user } = useAuth();
+  const { toast } = useToast();
 
   // Data state
   const [loading, setLoading] = useState(true);
@@ -169,6 +172,9 @@ export default function SalesPipelinePage() {
 
   // Bump loading
   const [isBumping, setIsBumping] = useState(false);
+
+  // Booking link team member selection (keyed by context)
+  const [bookingUserId, setBookingUserId] = useState<Record<string, string>>({});
 
   // Orbit/Closed Lost reason prompts
   const [orbitPrompt, setOrbitPrompt] = useState<{ oppId: string; oppName: string; fromStage: string } | null>(null);
@@ -248,6 +254,7 @@ export default function SalesPipelinePage() {
     type: ActivityType;
     title: string;
     showMeetingPicker?: boolean;
+    ownerId?: string;
   } | null>(null);
   const [activityLogForm, setActivityLogForm] = useState<{
     title: string;
@@ -576,6 +583,21 @@ export default function SalesPipelinePage() {
       alert(err.message || 'Error updating opportunity');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const copyBookingLink = async (userId: string, oppId: string) => {
+    try {
+      const bp = await BookingService.getBookingPageByUserId(userId);
+      if (bp?.slug) {
+        const url = `https://app.holohive.io/public/book/${bp.slug}?opp=${oppId}`;
+        navigator.clipboard.writeText(url);
+        toast({ title: 'Booking link copied', description: url });
+      } else {
+        toast({ title: 'No booking page', description: 'This team member does not have a booking page set up.', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to get booking link.', variant: 'destructive' });
     }
   };
 
@@ -1275,8 +1297,8 @@ export default function SalesPipelinePage() {
     'Check In': { label: 'Nurture Check-In', hint: 'It\'s been 30+ days. Send a light touch — share content, ask how things are going, or see if timing is better now.' },
   };
 
-  const openActivityLogPrompt = (oppId: string, oppName: string, type: ActivityType, title: string, showMeetingPicker?: boolean) => {
-    setActivityLogPrompt({ oppId, oppName, type, title, showMeetingPicker });
+  const openActivityLogPrompt = (oppId: string, oppName: string, type: ActivityType, title: string, showMeetingPicker?: boolean, ownerId?: string) => {
+    setActivityLogPrompt({ oppId, oppName, type, title, showMeetingPicker, ownerId });
     setActivityLogForm({ title, description: '', outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined });
   };
 
@@ -1302,13 +1324,13 @@ export default function SalesPipelinePage() {
           };
           const mapping = stageActivityMap[action.targetStage];
           if (mapping) {
-            openActivityLogPrompt(oppId, opp.name, mapping.type, mapping.title, mapping.showMeetingPicker);
+            openActivityLogPrompt(oppId, opp.name, mapping.type, mapping.title, mapping.showMeetingPicker, opp.owner_id || undefined);
           }
         }
       } else {
         // open_detail actions
         if (action.label === 'Book Next Meeting!' || action.label === 'Schedule Meeting') {
-          openActivityLogPrompt(oppId, opp.name, 'meeting', 'Meeting scheduled', true);
+          openActivityLogPrompt(oppId, opp.name, 'meeting', 'Meeting scheduled', true, opp.owner_id || undefined);
         } else if (action.label === 'Log Meeting Outcome') {
           openActivityLogPrompt(oppId, opp.name, 'meeting', 'Meeting outcome', false);
         } else if (action.label === 'Send Proposal') {
@@ -3295,6 +3317,27 @@ export default function SalesPipelinePage() {
 
             {/* Quick Actions */}
             <div className="flex gap-2 flex-wrap">
+              <div className="flex items-center gap-1">
+                <Select
+                  value={bookingUserId[`slide-${opp.id}`] || opp.owner_id || ''}
+                  onValueChange={v => setBookingUserId(prev => ({ ...prev, [`slide-${opp.id}`]: v }))}
+                >
+                  <SelectTrigger className="h-8 text-xs w-[120px] border-[#3e8692]/30">
+                    <SelectValue placeholder="Team member" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map(u => (
+                      <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline" size="sm" className="text-xs text-[#3e8692] border-[#3e8692]/30 hover:bg-[#3e8692]/5"
+                  onClick={() => copyBookingLink(bookingUserId[`slide-${opp.id}`] || opp.owner_id || '', opp.id)}
+                >
+                  <Calendar className="h-3.5 w-3.5 mr-1" /> Copy Booking Link
+                </Button>
+              </div>
               <Button
                 variant="outline" size="sm" className="text-xs text-orange-600 border-orange-300 hover:bg-orange-50"
                 onClick={() => handleStageChange(opp.id, 'orbit', opp.stage)}
@@ -3850,6 +3893,37 @@ export default function SalesPipelinePage() {
               </details>}
           </div>
 
+            {/* Copy Booking Link - only in edit mode */}
+            {isEdit && editingOpp && (
+              <div className="border-t pt-3 mb-1">
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={bookingUserId[`edit-${editingOpp.id}`] || editingOpp.owner_id || ''}
+                    onValueChange={v => setBookingUserId(prev => ({ ...prev, [`edit-${editingOpp.id}`]: v }))}
+                  >
+                    <SelectTrigger className="h-8 text-sm flex-1">
+                      <SelectValue placeholder="Team member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map(u => (
+                        <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-sm whitespace-nowrap"
+                    onClick={() => copyBookingLink(bookingUserId[`edit-${editingOpp.id}`] || editingOpp.owner_id || '', editingOpp.id)}
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Copy Booking Link
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => { setIsCreateOpen(false); setEditingOpp(null); setForm({ name: '' }); }}>
                 Cancel
@@ -3926,11 +4000,43 @@ export default function SalesPipelinePage() {
               />
             </div>
 
+            {/* Copy Booking Link — send to prospect so they self-book */}
+            {activityLogPrompt?.showMeetingPicker && (
+              <div className="p-3 bg-[#3e8692]/5 border border-[#3e8692]/20 rounded-lg">
+                <p className="text-xs text-gray-600 mb-2">Send a booking link so they can pick a time themselves:</p>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={bookingUserId[`activity-${activityLogPrompt.oppId}`] || activityLogPrompt.ownerId || ''}
+                    onValueChange={v => setBookingUserId(prev => ({ ...prev, [`activity-${activityLogPrompt.oppId}`]: v }))}
+                  >
+                    <SelectTrigger className="h-8 text-sm flex-1 border-[#3e8692]/30">
+                      <SelectValue placeholder="Team member" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map(u => (
+                        <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-sm whitespace-nowrap border-[#3e8692]/30 text-[#3e8692] hover:bg-[#3e8692]/10"
+                    onClick={() => copyBookingLink(bookingUserId[`activity-${activityLogPrompt.oppId}`] || activityLogPrompt.ownerId || '', activityLogPrompt.oppId)}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Booking Link
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Meeting Date/Time pickers */}
             {activityLogPrompt?.showMeetingPicker && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-1.5">
-                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Meeting Date</Label>
+                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Meeting Date <span className="font-normal normal-case text-gray-400">(optional)</span></Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -3957,7 +4063,7 @@ export default function SalesPipelinePage() {
                   </Popover>
                 </div>
                 <div className="grid gap-1.5">
-                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Meeting Time</Label>
+                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Meeting Time <span className="font-normal normal-case text-gray-400">(optional)</span></Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button

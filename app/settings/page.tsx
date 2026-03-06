@@ -6,12 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { User, Mail, AtSign, Camera, Loader2, Save, ArrowLeft, MessageSquare, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { User, Mail, AtSign, Camera, Loader2, Save, ArrowLeft, MessageSquare, CheckCircle, XCircle, RefreshCw, Calendar, Link2, Copy, ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useRouter } from 'next/navigation';
+import { BookingService, BookingPage, AvailableSlot } from '@/lib/bookingService';
 
 export default function SettingsPage() {
   return (
@@ -50,6 +53,21 @@ function SettingsContent() {
     profile_photo_url: '',
   });
 
+  // Booking page state
+  const [bookingPage, setBookingPage] = useState<BookingPage | null>(null);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingSaving, setBookingSaving] = useState(false);
+  const [bookingForm, setBookingForm] = useState({
+    title: '',
+    description: '',
+    slug: '',
+    is_active: true,
+    slot_duration_minutes: 30,
+    available_slots: [] as AvailableSlot[],
+  });
+
+  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
   useEffect(() => {
     if (userProfile) {
       setFormData({
@@ -65,8 +83,86 @@ function SettingsContent() {
       if (userProfile.role === 'admin' || userProfile.role === 'super_admin') {
         fetchWebhookStatus();
       }
+
+      // Fetch booking page
+      fetchBookingPage();
     }
   }, [userProfile]);
+
+  const fetchBookingPage = async () => {
+    setBookingLoading(true);
+    try {
+      const page = await BookingService.getMyBookingPage();
+      if (page) {
+        setBookingPage(page);
+        setBookingForm({
+          title: page.title || '',
+          description: page.description || '',
+          slug: page.slug,
+          is_active: page.is_active,
+          slot_duration_minutes: page.slot_duration_minutes,
+          available_slots: page.available_slots || [],
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching booking page:', err);
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  const handleSaveBooking = async () => {
+    if (!bookingPage) return;
+    setBookingSaving(true);
+    try {
+      const updated = await BookingService.updateBookingPage(bookingPage.id, {
+        title: bookingForm.title.trim() || null,
+        description: bookingForm.description.trim() || null,
+        slug: bookingForm.slug.trim(),
+        is_active: bookingForm.is_active,
+        slot_duration_minutes: bookingForm.slot_duration_minutes,
+        available_slots: bookingForm.available_slots,
+      });
+      setBookingPage(updated);
+      toast({ title: 'Booking page updated', description: 'Your booking page settings have been saved.' });
+    } catch (err: any) {
+      console.error('Error saving booking page:', err);
+      toast({ title: 'Save failed', description: err?.message || 'Failed to save booking page settings.', variant: 'destructive' });
+    } finally {
+      setBookingSaving(false);
+    }
+  };
+
+  const toggleDay = (day: number) => {
+    const existing = bookingForm.available_slots.find(s => s.day === day);
+    if (existing) {
+      setBookingForm(prev => ({
+        ...prev,
+        available_slots: prev.available_slots.filter(s => s.day !== day),
+      }));
+    } else {
+      setBookingForm(prev => ({
+        ...prev,
+        available_slots: [...prev.available_slots, { day, start: '09:00', end: '17:00' }],
+      }));
+    }
+  };
+
+  const updateSlotTime = (day: number, field: 'start' | 'end', value: string) => {
+    setBookingForm(prev => ({
+      ...prev,
+      available_slots: prev.available_slots.map(s =>
+        s.day === day ? { ...s, [field]: value } : s
+      ),
+    }));
+  };
+
+  const copyBookingUrl = () => {
+    if (!bookingPage) return;
+    const url = `https://app.holohive.io/public/book/${bookingForm.slug}`;
+    navigator.clipboard.writeText(url);
+    toast({ title: 'Link copied', description: url });
+  };
 
   const fetchWebhookStatus = async () => {
     setWebhookLoading(true);
@@ -557,6 +653,182 @@ function SettingsContent() {
                     : 'Unknown'}
                 </span>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Booking Page Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Booking Page
+              </CardTitle>
+              <CardDescription>
+                Manage your public booking page where prospects can schedule meetings with you
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {bookingLoading ? (
+                <div className="flex items-center gap-2 text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Loading booking settings...</span>
+                </div>
+              ) : bookingPage ? (
+                <>
+                  {/* Active toggle */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-sm font-medium text-gray-700">Page Active</span>
+                      <p className="text-xs text-gray-500">When disabled, your booking page won&apos;t be accessible</p>
+                    </div>
+                    <button
+                      onClick={() => setBookingForm(prev => ({ ...prev, is_active: !prev.is_active }))}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        bookingForm.is_active ? 'bg-[#3e8692]' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        bookingForm.is_active ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+
+                  {/* Public URL */}
+                  <div className="space-y-2">
+                    <Label className="text-sm">Public Booking URL</Label>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 flex items-center gap-2 bg-gray-50 rounded-md px-3 py-2 text-sm text-gray-600 border">
+                        <Link2 className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <span className="truncate">app.holohive.io/public/book/{bookingForm.slug}</span>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={copyBookingUrl}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`/public/book/${bookingForm.slug}`, '_blank')}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Title & Description */}
+                  <div className="space-y-2">
+                    <Label htmlFor="booking-title">Title</Label>
+                    <Input
+                      id="booking-title"
+                      value={bookingForm.title}
+                      onChange={e => setBookingForm(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder={`Book a call with ${formData.name}`}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="booking-desc">Description</Label>
+                    <Input
+                      id="booking-desc"
+                      value={bookingForm.description}
+                      onChange={e => setBookingForm(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Optional subtitle"
+                    />
+                  </div>
+
+                  {/* Slug */}
+                  <div className="space-y-2">
+                    <Label htmlFor="booking-slug">URL Slug</Label>
+                    <Input
+                      id="booking-slug"
+                      value={bookingForm.slug}
+                      onChange={e => setBookingForm(prev => ({ ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
+                      placeholder="your-slug"
+                    />
+                  </div>
+
+                  {/* Slot Duration */}
+                  <div className="space-y-2">
+                    <Label>Meeting Duration</Label>
+                    <Select
+                      value={String(bookingForm.slot_duration_minutes)}
+                      onValueChange={v => setBookingForm(prev => ({ ...prev, slot_duration_minutes: Number(v) }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="15">15 minutes</SelectItem>
+                        <SelectItem value="30">30 minutes</SelectItem>
+                        <SelectItem value="45">45 minutes</SelectItem>
+                        <SelectItem value="60">60 minutes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Available Slots */}
+                  <div className="space-y-3">
+                    <Label>Available Days & Hours (UTC)</Label>
+                    <div className="space-y-2">
+                      {DAY_NAMES.map((name, dayIndex) => {
+                        const slot = bookingForm.available_slots.find(s => s.day === dayIndex);
+                        const isEnabled = !!slot;
+                        return (
+                          <div key={dayIndex} className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 w-28">
+                              <Checkbox
+                                checked={isEnabled}
+                                onCheckedChange={() => toggleDay(dayIndex)}
+                              />
+                              <span className="text-sm text-gray-700">{name}</span>
+                            </div>
+                            {isEnabled && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <Input
+                                  type="time"
+                                  value={slot!.start}
+                                  onChange={e => updateSlotTime(dayIndex, 'start', e.target.value)}
+                                  className="w-28 h-8 text-sm"
+                                />
+                                <span className="text-gray-400">to</span>
+                                <Input
+                                  type="time"
+                                  value={slot!.end}
+                                  onChange={e => updateSlotTime(dayIndex, 'end', e.target.value)}
+                                  className="w-28 h-8 text-sm"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Save Button */}
+                  <div className="flex justify-end pt-4 border-t">
+                    <Button
+                      onClick={handleSaveBooking}
+                      disabled={bookingSaving}
+                      className="hover:opacity-90"
+                      style={{ backgroundColor: '#3e8692', color: 'white' }}
+                    >
+                      {bookingSaving ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-2" />
+                          Save Booking Settings
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-gray-500">No booking page found for your account.</p>
+              )}
             </CardContent>
           </Card>
 
