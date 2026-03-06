@@ -171,7 +171,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
 
     setSubmitting(true);
     try {
-      await BookingService.createBooking({
+      const booking = await BookingService.createBooking({
         booking_page_id: bookingPage.id,
         opportunity_id: oppId || undefined,
         booker_name: bookerName.trim(),
@@ -181,6 +181,24 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
         end_time: selectedSlot.end,
         notes: notes.trim() || undefined,
       });
+
+      // Trigger edge function to create Google Calendar event + send confirmation emails
+      try {
+        await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/booking-confirmation`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({ booking_id: booking.id }),
+          }
+        );
+      } catch (fnErr) {
+        console.error('Error calling booking-confirmation function:', fnErr);
+      }
+
       setStep('success');
     } catch (err) {
       console.error('Error creating booking:', err);
