@@ -130,7 +130,7 @@ export class ClientService {
   /**
    * Update client
    */
-  static async updateClient(id: string, updates: Partial<Pick<Client, 'name' | 'email' | 'location' | 'is_active' | 'is_whitelisted' | 'whitelist_partner_id' | 'logo_url'>>): Promise<Client> {
+  static async updateClient(id: string, updates: Partial<Pick<Client, 'name' | 'email' | 'location' | 'is_active' | 'is_whitelisted' | 'whitelist_partner_id' | 'logo_url' | 'approved_domains'>>): Promise<Client> {
     try {
       const { data, error } = await supabase
         .from('clients')

@@ -42,6 +42,8 @@ export interface FormResponse {
   response_data: Record<string, any>; // { field_id: value }
   submitted_by_email: string | null;
   submitted_by_name: string | null;
+  client_id: string | null;
+  client_name?: string | null;
   submitted_at: string;
 }
 
@@ -107,6 +109,7 @@ export interface SubmitResponseData {
   response_data: Record<string, any>;
   submitted_by_email?: string;
   submitted_by_name?: string;
+  client_id?: string;
 }
 
 export class FormService {
@@ -462,7 +465,8 @@ export class FormService {
           form_id: responseData.form_id,
           response_data: responseData.response_data,
           submitted_by_email: responseData.submitted_by_email || null,
-          submitted_by_name: responseData.submitted_by_name || null
+          submitted_by_name: responseData.submitted_by_name || null,
+          client_id: responseData.client_id || null
         }),
       });
 
@@ -486,14 +490,34 @@ export class FormService {
     try {
       const { data: responses, error } = await (supabase as any)
         .from('form_responses')
-        .select('*')
+        .select('*, client:clients!form_responses_client_id_fkey(name)')
         .eq('form_id', formId)
         .order('submitted_at', { ascending: false });
 
       if (error) throw error;
-      return responses || [];
+      return (responses || []).map((r: any) => ({
+        ...r,
+        client_name: r.client?.name || null,
+      }));
     } catch (error) {
       console.error('Error fetching responses:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Link a form response to a client
+   */
+  static async linkResponseToClient(responseId: string, clientId: string | null): Promise<void> {
+    try {
+      const { error } = await (supabase as any)
+        .from('form_responses')
+        .update({ client_id: clientId })
+        .eq('id', responseId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error linking response to client:', error);
       throw error;
     }
   }

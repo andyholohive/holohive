@@ -156,6 +156,8 @@ export interface CRMActivity {
   next_step: string | null;
   next_step_date: string | null;
   owner_id: string | null;
+  attachment_url: string | null;
+  attachment_name: string | null;
   created_at: string;
 }
 
@@ -186,6 +188,8 @@ export interface CreateActivityData {
   outcome?: string;
   next_step?: string;
   next_step_date?: string;
+  attachment_url?: string;
+  attachment_name?: string;
 }
 
 // ============================================
@@ -284,6 +288,7 @@ export class SalesPipelineService {
       calendly_sent_date?: string | null;
       calendly_booked_date?: string | null;
       gc_opened?: string;
+      client_id?: string | null;
     }
   ): Promise<SalesPipelineOpportunity> {
     // Get current state for stage history

@@ -23,7 +23,7 @@ import {
   Plus, Minus, Search, Trash2, X, LayoutGrid, TableIcon, GripVertical, Loader2,
   Target, AlertTriangle, ArrowRight, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronUp,
   Phone, MessageSquare, Calendar, FileText, StickyNote, Zap, RotateCcw, Clock, Edit, Copy, Check, ChevronsUpDown,
-  Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown
+  Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown, Paperclip
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -47,6 +47,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { CRMService, CRMAffiliate, OpportunityStage } from '@/lib/crmService';
+import { ClientService } from '@/lib/clientService';
 import {
   SalesPipelineService,
   SalesPipelineOpportunity,
@@ -169,6 +170,8 @@ export default function SalesPipelinePage() {
   const [activityMeetingDate, setActivityMeetingDate] = useState<string | undefined>(undefined);
   const [activityMeetingTime, setActivityMeetingTime] = useState<string | undefined>(undefined);
   const [isActivitySubmitting, setIsActivitySubmitting] = useState(false);
+  const [activityFile, setActivityFile] = useState<File | null>(null);
+  const activityFileRef = useRef<HTMLInputElement>(null);
 
   // Bump loading
   const [isBumping, setIsBumping] = useState(false);
@@ -181,6 +184,16 @@ export default function SalesPipelinePage() {
   const [orbitReasonValue, setOrbitReasonValue] = useState<OrbitReason>('no_response');
   const [closedLostPrompt, setClosedLostPrompt] = useState<{ oppId: string; oppName: string; fromStage: string } | null>(null);
   const [closedLostReasonValue, setClosedLostReasonValue] = useState('');
+
+  // Closed Won prompt
+  const [closedWonPrompt, setClosedWonPrompt] = useState<{ oppId: string; oppName: string; dealValue: number; source: string } | null>(null);
+  const [closedWonMode, setClosedWonMode] = useState<'new' | 'existing'>('new');
+  const [closedWonEmail, setClosedWonEmail] = useState('');
+  const [closedWonName, setClosedWonName] = useState('');
+  const [closedWonClientId, setClosedWonClientId] = useState('');
+  const [closedWonClients, setClosedWonClients] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [closedWonClientSearch, setClosedWonClientSearch] = useState('');
+  const [closedWonClientPopoverOpen, setClosedWonClientPopoverOpen] = useState(false);
 
   // TG handle prompt
   const [tgHandlePrompt, setTgHandlePrompt] = useState<{ oppId: string; oppName: string } | null>(null);
@@ -534,7 +547,12 @@ export default function SalesPipelinePage() {
   // ============================================
 
   const filteredOpportunities = opportunities.filter(opp => {
-    if (searchTerm && !opp.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      const matchesName = opp.name.toLowerCase().includes(term);
+      const matchesPoc = opp.poc_handle?.toLowerCase().includes(term);
+      if (!matchesName && !matchesPoc) return false;
+    }
     if (pathFilter === 'closer' && opp.dm_account !== 'closer') return false;
     if (pathFilter === 'sdr' && opp.dm_account !== 'sdr') return false;
     return true;
@@ -621,6 +639,28 @@ export default function SalesPipelinePage() {
     }
     if (newStage === 'v2_closed_lost') {
       setClosedLostPrompt({ oppId, oppName, fromStage: currentStage });
+      return;
+    }
+    if (newStage === 'v2_closed_won') {
+      const opp = opportunities.find(o => o.id === oppId);
+      try {
+        const clients = await ClientService.getAllClients();
+        setClosedWonClients(clients.map(c => ({ id: c.id, name: c.name, email: c.email || '' })));
+      } catch (err) {
+        console.error('Error fetching clients:', err);
+        setClosedWonClients([]);
+      }
+      setClosedWonName(oppName);
+      setClosedWonEmail('');
+      setClosedWonClientId('');
+      setClosedWonClientSearch('');
+      setClosedWonMode('new');
+      setClosedWonPrompt({
+        oppId,
+        oppName,
+        dealValue: (opp as any)?.deal_value || 0,
+        source: (opp as any)?.source || '',
+      });
       return;
     }
     if (newStage === 'tg_intro') {
@@ -718,6 +758,46 @@ export default function SalesPipelinePage() {
     }
   };
 
+  const confirmClosedWon = async () => {
+    if (!closedWonPrompt) return;
+    const { oppId, oppName } = closedWonPrompt;
+    try {
+      let clientId: string;
+      if (closedWonMode === 'new') {
+        if (!closedWonName.trim()) return;
+        const client = await ClientService.createClient(closedWonName.trim(), closedWonEmail.trim() || '');
+        clientId = client.id;
+      } else {
+        if (!closedWonClientId) return;
+        clientId = closedWonClientId;
+      }
+      await SalesPipelineService.update(oppId, {
+        stage: 'v2_closed_won' as OpportunityStage,
+        client_id: clientId,
+      });
+      setClosedWonPrompt(null);
+      await fetchData();
+      openActivityLogPrompt(oppId, oppName, 'note', 'Deal closed won');
+    } catch (err) {
+      console.error('Error closing won:', err);
+    }
+  };
+
+  const skipClosedWon = async () => {
+    if (!closedWonPrompt) return;
+    const { oppId, oppName } = closedWonPrompt;
+    try {
+      await SalesPipelineService.update(oppId, {
+        stage: 'v2_closed_won' as OpportunityStage,
+      });
+      setClosedWonPrompt(null);
+      await fetchData();
+      openActivityLogPrompt(oppId, oppName, 'note', 'Deal closed won');
+    } catch (err) {
+      console.error('Error closing won:', err);
+    }
+  };
+
   const handleResurrect = async (opp: SalesPipelineOpportunity) => {
     try {
       await SalesPipelineService.update(opp.id, {
@@ -774,9 +854,24 @@ export default function SalesPipelinePage() {
     if (!activityForm.title.trim() || !slideOverOpp) return;
     setIsActivitySubmitting(true);
     try {
+      let attachmentUrl: string | undefined;
+      let attachmentName: string | undefined;
+      if (activityFile) {
+        const fileExt = activityFile.name.split('.').pop();
+        const filePath = `${slideOverOpp.id}/${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('crm-attachments')
+          .upload(filePath, activityFile, { cacheControl: '3600', upsert: false });
+        if (uploadError) throw uploadError;
+        const { data: { publicUrl } } = supabase.storage.from('crm-attachments').getPublicUrl(filePath);
+        attachmentUrl = publicUrl;
+        attachmentName = activityFile.name;
+      }
       await SalesPipelineService.createActivity({
         ...activityForm,
         opportunity_id: slideOverOpp.id,
+        attachment_url: attachmentUrl,
+        attachment_name: attachmentName,
       });
       // If meeting type with a date set, update next_meeting_at
       if (activityForm.type === 'meeting' && activityMeetingDate) {
@@ -789,6 +884,8 @@ export default function SalesPipelinePage() {
         await fetchData();
       }
       setActivityForm({ opportunity_id: '', type: 'note', title: '' });
+      setActivityFile(null);
+      if (activityFileRef.current) activityFileRef.current.value = '';
       setActivityMeetingDate(undefined);
       setActivityMeetingTime(undefined);
       await fetchActivities(slideOverOpp.id);
@@ -1299,7 +1396,18 @@ export default function SalesPipelinePage() {
 
   const openActivityLogPrompt = (oppId: string, oppName: string, type: ActivityType, title: string, showMeetingPicker?: boolean, ownerId?: string) => {
     setActivityLogPrompt({ oppId, oppName, type, title, showMeetingPicker, ownerId });
-    setActivityLogForm({ title, description: '', outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined });
+    // For message type, pre-fill description from matching template
+    let defaultDescription = '';
+    if (type === 'message') {
+      const opp = opportunities.find(o => o.id === oppId);
+      if (opp) {
+        const stageTemplates = templates.filter(t => t.is_active && t.stage === opp.stage);
+        if (stageTemplates.length > 0) {
+          defaultDescription = stageTemplates[0].content;
+        }
+      }
+    }
+    setActivityLogForm({ title, description: defaultDescription, outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined });
   };
 
   const handleActionExecute = async (oppId: string, action: ReturnType<typeof getNextAction>, opp: SalesPipelineOpportunity) => {
@@ -1393,6 +1501,25 @@ export default function SalesPipelinePage() {
     if (!userId) return '—';
     const u = users.find(u => u.id === userId);
     return u?.name || u?.email || '—';
+  };
+
+  const cleanPocHandle = (handle: string): string => {
+    // Strip common URL prefixes to show just the handle
+    return handle
+      .replace(/^https?:\/\/(www\.)?(x\.com|twitter\.com|instagram\.com|linkedin\.com\/in|t\.me|discord\.gg|discord\.com\/users)\/?/i, '@')
+      .replace(/^https?:\/\/(www\.)?[^/]+\/?/i, '')
+      .replace(/\/+$/, '');
+  };
+
+  const linkifyText = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    if (parts.length === 1) return text;
+    return parts.map((part, i) =>
+      urlRegex.test(part) ? (
+        <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-[#3e8692] hover:underline break-all" onClick={e => e.stopPropagation()}>{part}</a>
+      ) : part
+    );
   };
 
   const activityIcon = (type: ActivityType) => {
@@ -2175,7 +2302,7 @@ export default function SalesPipelinePage() {
                       {opp.poc_handle ? (
                         <div className="flex items-center gap-1.5">
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">{opp.poc_platform || 'other'}</Badge>
-                          <span className="text-xs text-gray-600">{opp.poc_handle}</span>
+                          <span className="text-xs text-gray-600">{cleanPocHandle(opp.poc_handle)}</span>
                         </div>
                       ) : (
                         <span className="text-gray-400">—</span>
@@ -2550,6 +2677,7 @@ export default function SalesPipelinePage() {
             <TableHeader>
               <TableRow className="bg-gray-50/50">
                 <TableHead>Name</TableHead>
+                <TableHead className="w-[160px]">POC</TableHead>
                 <TableHead className="w-[140px]">Stage</TableHead>
                 <TableHead className="w-[70px]">Bucket</TableHead>
                 <TableHead className="w-[260px]">Next Action</TableHead>
@@ -2562,7 +2690,7 @@ export default function SalesPipelinePage() {
             <TableBody>
               {currentItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12">
+                  <TableCell colSpan={9} className="text-center py-12">
                     <div className="flex flex-col items-center gap-2 text-gray-400">
                       <Zap className="h-8 w-8" />
                       <p className="text-sm font-medium">{emptyLabel}</p>
@@ -2584,6 +2712,16 @@ export default function SalesPipelinePage() {
                         <Building2 className="h-4 w-4 text-gray-400" />
                         <span className="font-medium">{opp.name}</span>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {opp.poc_handle ? (
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize flex-shrink-0">{opp.poc_platform || 'other'}</Badge>
+                          <span className="text-xs text-gray-600 truncate max-w-[90px]">{cleanPocHandle(opp.poc_handle)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold ${stageColors.bg} ${stageColors.text} ${stageColors.border}`}>
@@ -2866,7 +3004,7 @@ export default function SalesPipelinePage() {
           setActionGuidance(null);
         }} />
       )}
-      <div className="fixed inset-y-0 right-0 w-[480px] bg-white border-l shadow-xl z-[70] flex flex-col">
+      <div className="fixed inset-y-0 right-0 w-[480px] max-w-[calc(100vw-2rem)] bg-white border-l shadow-xl z-[70] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b bg-gradient-to-r from-gray-50 to-white">
           <div className="flex items-start justify-between gap-3">
@@ -3200,8 +3338,8 @@ export default function SalesPipelinePage() {
             {/* Details Card */}
             <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
               <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Details</h4>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                <div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm min-w-0">
+                <div className="min-w-0">
                   <span className="text-xs text-gray-500">Temperature</span>
                   <div className="flex items-center gap-2 mt-1">
                     <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -3220,17 +3358,17 @@ export default function SalesPipelinePage() {
                 <div>
                   <span className="text-xs text-gray-500">POC</span>
                   {opp.poc_handle ? (
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">{opp.poc_platform || 'other'}</Badge>
-                      <span className="font-medium">{opp.poc_handle}</span>
+                    <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize flex-shrink-0">{opp.poc_platform || 'other'}</Badge>
+                      <span className="font-medium truncate">{cleanPocHandle(opp.poc_handle)}</span>
                     </div>
                   ) : (
                     <p className="font-medium mt-0.5 text-gray-400">—</p>
                   )}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <span className="text-xs text-gray-500">TG Handle</span>
-                  <p className="font-medium mt-0.5">{opp.tg_handle || '—'}</p>
+                  <p className="font-medium mt-0.5 truncate">{opp.tg_handle || '—'}</p>
                 </div>
                 <div>
                   <span className="text-xs text-gray-500">Source</span>
@@ -3271,7 +3409,7 @@ export default function SalesPipelinePage() {
             {opp.notes && (
               <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Notes</h4>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{opp.notes}</p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap break-words" style={{ overflowWrap: 'anywhere' }}>{opp.notes}</p>
               </div>
             )}
 
@@ -3316,8 +3454,8 @@ export default function SalesPipelinePage() {
             )}
 
             {/* Quick Actions */}
-            <div className="flex gap-2 flex-wrap">
-              <div className="flex items-center gap-1">
+            <div className="flex gap-2 flex-wrap min-w-0">
+              <div className="flex items-center gap-1 flex-wrap">
                 <Select
                   value={bookingUserId[`slide-${opp.id}`] || opp.owner_id || ''}
                   onValueChange={v => setBookingUserId(prev => ({ ...prev, [`slide-${opp.id}`]: v }))}
@@ -3386,7 +3524,6 @@ export default function SalesPipelinePage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="note">Note</SelectItem>
-                      <SelectItem value="call">Call</SelectItem>
                       <SelectItem value="message">Message</SelectItem>
                       <SelectItem value="meeting">Meeting</SelectItem>
                       <SelectItem value="proposal">Proposal</SelectItem>
@@ -3551,6 +3688,33 @@ export default function SalesPipelinePage() {
                     {isActivitySubmitting ? '...' : 'Add'}
                   </Button>
                 </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    ref={activityFileRef}
+                    className="hidden"
+                    onChange={e => setActivityFile(e.target.files?.[0] || null)}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs text-gray-500"
+                    onClick={() => activityFileRef.current?.click()}
+                  >
+                    <Paperclip className="h-3.5 w-3.5 mr-1" />
+                    {activityFile ? 'Change file' : 'Attach file'}
+                  </Button>
+                  {activityFile && (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-600 bg-white border rounded-md px-2 py-1">
+                      <Paperclip className="h-3 w-3 text-gray-400" />
+                      <span className="truncate max-w-[180px]">{activityFile.name}</span>
+                      <button type="button" onClick={() => { setActivityFile(null); if (activityFileRef.current) activityFileRef.current.value = ''; }} className="text-gray-400 hover:text-gray-600">
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Activity list */}
@@ -3565,27 +3729,39 @@ export default function SalesPipelinePage() {
                       </div>
                       <div className="w-px flex-1 bg-gray-200 mt-2" />
                     </div>
-                    <div className="flex-1 min-w-0 pb-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-900">{act.title}</span>
-                        <Badge variant="outline" className="text-[10px] px-1.5 capitalize">{act.type}</Badge>
+                    <div className="flex-1 min-w-0 pb-4 overflow-hidden">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-gray-900 break-words">{linkifyText(act.title)}</span>
+                        <Badge variant="outline" className="text-[10px] px-1.5 capitalize flex-shrink-0">{act.type}</Badge>
                       </div>
-                      {act.description && <p className="text-sm text-gray-600 mt-1">{act.description}</p>}
+                      {act.description && <p className="text-sm text-gray-600 mt-1 break-words overflow-wrap-anywhere" style={{ overflowWrap: 'anywhere' }}>{linkifyText(act.description)}</p>}
                       {act.outcome && (
-                        <p className="text-sm text-gray-500 mt-1">
-                          <span className="font-medium text-gray-700">Outcome:</span> {act.outcome}
+                        <p className="text-sm text-gray-500 mt-1 break-words" style={{ overflowWrap: 'anywhere' }}>
+                          <span className="font-medium text-gray-700">Outcome:</span> {linkifyText(act.outcome)}
                         </p>
                       )}
                       {act.next_step && (
-                        <div className="flex items-center gap-1 mt-1 text-sm text-blue-600">
-                          <ArrowRight className="h-3 w-3 flex-shrink-0" />
-                          <span>{act.next_step}</span>
+                        <div className="flex items-start gap-1 mt-1 text-sm text-blue-600">
+                          <ArrowRight className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                          <span className="break-words" style={{ overflowWrap: 'anywhere' }}>{linkifyText(act.next_step)}</span>
                           {act.next_step_date && (
                             <span className="text-gray-400 ml-1">
                               ({format(new Date(act.next_step_date), 'MMM d')})
                             </span>
                           )}
                         </div>
+                      )}
+                      {act.attachment_url && (
+                        <a
+                          href={act.attachment_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 mt-1.5 text-xs text-[#3e8692] hover:underline"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          <Paperclip className="h-3 w-3" />
+                          {act.attachment_name || 'Attachment'}
+                        </a>
                       )}
                       <span className="text-xs text-gray-400 mt-1.5 block">
                         {formatDistanceToNow(new Date(act.created_at), { addSuffix: true })}
@@ -3636,6 +3812,20 @@ export default function SalesPipelinePage() {
                   className="auth-input"
                 />
               </div>
+
+              {!isEdit && (
+                <div className="grid gap-2">
+                  <Label>Stage</Label>
+                  <Select value={form.stage || 'cold_dm'} onValueChange={v => setForm(f => ({ ...f, stage: v as SalesPipelineStage }))}>
+                    <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ALL_V2_STAGES.filter(s => s !== 'proposal_sent').map(s => (
+                        <SelectItem key={s} value={s}>{STAGE_LABELS[s]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
@@ -3989,6 +4179,58 @@ export default function SalesPipelinePage() {
               </div>
             )}
 
+            {/* Template picker for message type */}
+            {activityLogPrompt?.type === 'message' && (() => {
+              const opp = opportunities.find(o => o.id === activityLogPrompt.oppId);
+              const oppStage = opp?.stage || '';
+              const stageTemplates = templates.filter(t => t.is_active && t.stage === oppStage);
+              const allActiveTemplates = templates.filter(t => t.is_active);
+              const hasStageTemplates = stageTemplates.length > 0;
+              return (
+                <div className="grid gap-1.5">
+                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">DM Template <span className="font-normal normal-case text-gray-400">(optional)</span></Label>
+                  <Select
+                    value="placeholder"
+                    onValueChange={templateId => {
+                      if (templateId === 'none') {
+                        setActivityLogForm(f => ({ ...f, description: '' }));
+                        return;
+                      }
+                      const tmpl = templates.find(t => t.id === templateId);
+                      if (tmpl) setActivityLogForm(f => ({ ...f, description: tmpl.content }));
+                    }}
+                  >
+                    <SelectTrigger className="auth-input">
+                      <SelectValue placeholder="Pick a template..." />
+                    </SelectTrigger>
+                    <SelectContent className="z-[90]">
+                      <SelectItem value="none">No template</SelectItem>
+                      {hasStageTemplates && (
+                        <>
+                          <SelectItem value="__stage_header" disabled className="text-xs font-semibold text-gray-400 uppercase">
+                            Current Stage — {oppStage.replace(/_/g, ' ')}
+                          </SelectItem>
+                          {stageTemplates.map(t => (
+                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                          ))}
+                        </>
+                      )}
+                      {allActiveTemplates.filter(t => t.stage !== oppStage).length > 0 && (
+                        <>
+                          <SelectItem value="__other_header" disabled className="text-xs font-semibold text-gray-400 uppercase">
+                            Other Stages
+                          </SelectItem>
+                          {allActiveTemplates.filter(t => t.stage !== oppStage).map(t => (
+                            <SelectItem key={t.id} value={t.id}>{t.name} ({t.stage.replace(/_/g, ' ')})</SelectItem>
+                          ))}
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              );
+            })()}
+
             {/* Title (editable) */}
             <div className="grid gap-1.5">
               <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Title</Label>
@@ -4131,13 +4373,30 @@ export default function SalesPipelinePage() {
 
             {/* Description */}
             <div className="grid gap-1.5">
-              <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Description <span className="font-normal normal-case text-gray-400">(optional)</span></Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{activityLogPrompt?.type === 'message' ? 'Message' : 'Description'} <span className="font-normal normal-case text-gray-400">(optional)</span></Label>
+                {activityLogPrompt?.type === 'message' && activityLogForm.description && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-gray-500 hover:text-[#3e8692]"
+                    onClick={() => {
+                      navigator.clipboard.writeText(activityLogForm.description);
+                      toast({ title: 'Copied to clipboard' });
+                    }}
+                  >
+                    <Copy className="h-3 w-3 mr-1" />
+                    Copy
+                  </Button>
+                )}
+              </div>
               <Textarea
                 value={activityLogForm.description}
                 onChange={e => setActivityLogForm(f => ({ ...f, description: e.target.value }))}
                 className="auth-input min-h-[60px]"
-                placeholder="Add context..."
-                rows={2}
+                placeholder={activityLogPrompt?.type === 'message' ? 'DM content...' : 'Add context...'}
+                rows={activityLogPrompt?.type === 'message' ? 4 : 2}
               />
             </div>
 
@@ -4255,6 +4514,100 @@ export default function SalesPipelinePage() {
       </DialogContent>
     </Dialog>
   );
+
+  const renderClosedWonPrompt = () => {
+    const filteredClients = closedWonClients.filter(c =>
+      c.name.toLowerCase().includes(closedWonClientSearch.toLowerCase()) ||
+      c.email.toLowerCase().includes(closedWonClientSearch.toLowerCase())
+    );
+    const selectedClient = closedWonClients.find(c => c.id === closedWonClientId);
+    const canConfirm = closedWonMode === 'new' ? closedWonName.trim() !== '' : closedWonClientId !== '';
+
+    return (
+      <Dialog open={!!closedWonPrompt} onOpenChange={open => { if (!open) setClosedWonPrompt(null); }}>
+        <DialogContent className="sm:max-w-sm z-[80]">
+          <DialogHeader>
+            <DialogTitle>Deal Won!</DialogTitle>
+            <DialogDescription>Link {closedWonPrompt?.oppName} to a client, or skip.</DialogDescription>
+          </DialogHeader>
+          <Select value={closedWonMode} onValueChange={v => setClosedWonMode(v as 'new' | 'existing')}>
+            <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="new">Create New Client</SelectItem>
+              <SelectItem value="existing">Link Existing Client</SelectItem>
+            </SelectContent>
+          </Select>
+          {closedWonMode === 'new' ? (
+            <div className="space-y-2">
+              <div>
+                <Label className="text-sm font-medium">Client Name</Label>
+                <Input
+                  value={closedWonName}
+                  onChange={e => setClosedWonName(e.target.value)}
+                  placeholder="Company or contact name"
+                  autoFocus
+                  className="auth-input"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium">Email</Label>
+                <Input
+                  value={closedWonEmail}
+                  onChange={e => setClosedWonEmail(e.target.value)}
+                  placeholder="client@example.com (optional)"
+                  type="email"
+                  className="auth-input"
+                />
+              </div>
+            </div>
+          ) : (
+            <Popover open={closedWonClientPopoverOpen} onOpenChange={setClosedWonClientPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between auth-input">
+                  {selectedClient ? selectedClient.name : 'Select a client...'}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0 z-[90]" align="start">
+                <Command>
+                  <CommandInput
+                    placeholder="Search clients..."
+                    value={closedWonClientSearch}
+                    onValueChange={setClosedWonClientSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>No clients found.</CommandEmpty>
+                    <CommandGroup>
+                      {filteredClients.map(client => (
+                        <CommandItem
+                          key={client.id}
+                          value={client.name}
+                          onSelect={() => {
+                            setClosedWonClientId(client.id);
+                            setClosedWonClientPopoverOpen(false);
+                          }}
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${closedWonClientId === client.id ? 'opacity-100' : 'opacity-0'}`} />
+                          <div>
+                            <div className="font-medium">{client.name}</div>
+                            {client.email && <div className="text-xs text-gray-500">{client.email}</div>}
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={skipClosedWon}>Skip</Button>
+            <Button onClick={confirmClosedWon} disabled={!canConfirm} style={{ backgroundColor: '#3e8692' }}>Confirm</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
 
   const renderTgHandlePrompt = () => (
     <Dialog open={!!tgHandlePrompt} onOpenChange={open => { if (!open) setTgHandlePrompt(null); }}>
@@ -5211,6 +5564,7 @@ export default function SalesPipelinePage() {
       {renderFormDialog()}
       {renderOrbitPrompt()}
       {renderClosedLostPrompt()}
+      {renderClosedWonPrompt()}
       {renderTgHandlePrompt()}
       {renderBucketPrompt()}
       {renderActivityLogPrompt()}

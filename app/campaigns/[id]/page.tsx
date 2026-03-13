@@ -214,6 +214,8 @@ const CampaignDetailsPage = () => {
     date: Date;
   } | null>(null);
   const [sendingPaymentNotification, setSendingPaymentNotification] = useState(false);
+  const [paymentNotificationMessage, setPaymentNotificationMessage] = useState('');
+  const [isEditingPaymentMessage, setIsEditingPaymentMessage] = useState(false);
 
   // Latest pricing suggestion state
   const [latestCostMap, setLatestCostMap] = useState<Map<string, number>>(new Map());
@@ -1365,6 +1367,7 @@ const CampaignDetailsPage = () => {
         budget_type: form.budget_type,
         outline: form.outline,
         approved_emails: (form as any).approved_emails?.length > 0 ? (form as any).approved_emails : null,
+        approved_domains: (form as any).approved_domains?.length > 0 ? (form as any).approved_domains : null,
       });
       // Handle allocations
       // Delete marked allocations
@@ -1650,6 +1653,8 @@ const CampaignDetailsPage = () => {
       chatTitle: telegramChat.title,
       date
     });
+    setPaymentNotificationMessage(`$${amount.toLocaleString()} has been deposited to ${wallet}!\n\nThanks for being part of the Holo Hive network 🙌`);
+    setIsEditingPaymentMessage(false);
     setPaymentNotifyDialogOpen(true);
   };
 
@@ -1657,12 +1662,12 @@ const CampaignDetailsPage = () => {
   const sendPaymentNotification = async () => {
     if (!pendingPaymentNotification) return;
 
-    const { amount, wallet, chatId } = pendingPaymentNotification;
+    const { chatId } = pendingPaymentNotification;
 
     // Send the notification
     setSendingPaymentNotification(true);
     try {
-      const message = `$${amount.toLocaleString()} has been deposited to ${wallet}!\n\nThanks for being part of the Holo Hive network 🙌`;
+      const message = paymentNotificationMessage;
 
       const response = await fetch('/api/telegram/send', {
         method: 'POST',
@@ -2097,6 +2102,8 @@ const CampaignDetailsPage = () => {
             chatTitle: telegramChat.title,
             date: new Date(newValue)
           });
+          setPaymentNotificationMessage(`$${amount.toLocaleString()} has been deposited to ${wallet}!\n\nThanks for being part of the Holo Hive network 🙌`);
+          setIsEditingPaymentMessage(false);
           setPaymentNotifyDialogOpen(true);
           return; // Don't show success toast yet
         }
@@ -3335,7 +3342,11 @@ const CampaignDetailsPage = () => {
               <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
               <CardHeader className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="bg-gray-100 p-2 rounded-lg"><Megaphone className="h-6 w-6 text-gray-600" /></div>
+                  {campaign.client_logo_url ? (
+                    <img src={campaign.client_logo_url} alt={campaign.client_name || 'Client'} className="h-10 w-10 rounded-lg object-cover" />
+                  ) : (
+                    <div className="bg-gray-100 p-2 rounded-lg"><Megaphone className="h-6 w-6 text-gray-600" /></div>
+                  )}
                   {editMode ? (
                       <Input
                         className="text-2xl font-bold text-gray-900 auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
@@ -4051,39 +4062,56 @@ const CampaignDetailsPage = () => {
                     </div>
                   </div>
 
-                  {/* Approved Emails Section */}
+                  {/* Approved Access Section */}
                   <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="bg-[#3e8692] p-2.5 rounded-lg">
                         <Users className="h-5 w-5 text-white" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900">Approved Emails</h3>
+                      <h3 className="text-lg font-semibold text-gray-900">Approved Access</h3>
                     </div>
                     <div className="bg-white p-4 rounded-lg border border-gray-200">
                       <p className="text-sm text-gray-600 mb-3">
                         {editMode
-                          ? 'Add email addresses that are allowed to access the public campaign view (in addition to the client email and same-domain emails).'
-                          : 'Email addresses allowed to access the public campaign view (in addition to the client email and same-domain emails).'}
+                          ? 'Add email addresses or domains that are allowed to access the public campaign view (in addition to the client email and same-domain emails).'
+                          : 'Email addresses and domains allowed to access the public campaign view (in addition to the client email and same-domain emails).'}
                       </p>
                       {editMode && (
                         <div className="flex flex-col gap-2">
                           <Textarea
                             value={emailInput}
                             onChange={(e) => setEmailInput(e.target.value)}
-                            placeholder="Enter email addresses (comma or newline separated)&#10;e.g. email1@example.com, email2@example.com"
+                            placeholder={"Enter emails or domains (comma or newline separated)\ne.g. user@example.com, partner.com"}
                             className="auth-input min-h-[80px]"
                           />
                           <Button
                             type="button"
                             onClick={() => {
-                              const emails = emailInput
+                              const entries = emailInput
                                 .split(/[\n,]+/)
-                                .map(email => email.trim().toLowerCase())
-                                .filter(email => email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+                                .map(entry => entry.trim().toLowerCase())
+                                .filter(entry => entry.length > 0);
                               const currentEmails = (form as any)?.approved_emails || [];
-                              const newEmails = emails.filter(email => !currentEmails.includes(email));
+                              const currentDomains = (form as any)?.approved_domains || [];
+                              let newEmails: string[] = [];
+                              let newDomains: string[] = [];
+                              entries.forEach(entry => {
+                                if (entry.includes('@') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry)) {
+                                  if (!currentEmails.includes(entry)) newEmails.push(entry);
+                                } else {
+                                  const domain = entry.replace(/^@/, '');
+                                  if (/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domain)) {
+                                    if (!currentDomains.includes(domain)) newDomains.push(domain);
+                                  }
+                                }
+                              });
                               if (newEmails.length > 0) {
                                 handleChange('approved_emails' as any, [...currentEmails, ...newEmails]);
+                              }
+                              if (newDomains.length > 0) {
+                                handleChange('approved_domains' as any, [...currentDomains, ...newDomains]);
+                              }
+                              if (newEmails.length > 0 || newDomains.length > 0) {
                                 setEmailInput('');
                               }
                             }}
@@ -4091,38 +4119,63 @@ const CampaignDetailsPage = () => {
                             className="hover:opacity-90 w-fit"
                             style={{ backgroundColor: '#3e8692', color: 'white' }}
                           >
-                            Add Emails
+                            Add
                           </Button>
                         </div>
                       )}
-                      {((editMode ? (form as any)?.approved_emails : campaign?.approved_emails) || []).length > 0 ? (
-                        <div className={`flex flex-wrap gap-2 ${editMode ? 'mt-3' : ''}`}>
-                          {((editMode ? (form as any)?.approved_emails : campaign?.approved_emails) || []).map((email: string, index: number) => (
-                            <div
-                              key={index}
-                              className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm"
-                            >
-                              {email}
-                              {editMode && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const currentEmails = (form as any)?.approved_emails || [];
-                                    handleChange('approved_emails' as any, currentEmails.filter((_: string, i: number) => i !== index));
-                                  }}
-                                  className="ml-1 text-gray-500 hover:text-gray-700"
-                                >
-                                  ×
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        !editMode && (
-                          <p className="text-sm text-gray-400 italic">No approved emails added yet.</p>
-                        )
-                      )}
+                      {(() => {
+                        const emails = (editMode ? (form as any)?.approved_emails : campaign?.approved_emails) || [];
+                        const domains = (editMode ? (form as any)?.approved_domains : (campaign as any)?.approved_domains) || [];
+                        return emails.length > 0 || domains.length > 0 ? (
+                          <div className={`flex flex-wrap gap-2 ${editMode ? 'mt-3' : ''}`}>
+                            {emails.map((email: string, index: number) => (
+                              <div
+                                key={`email-${index}`}
+                                className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm"
+                              >
+                                {email}
+                                {editMode && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const currentEmails = (form as any)?.approved_emails || [];
+                                      handleChange('approved_emails' as any, currentEmails.filter((_: string, i: number) => i !== index));
+                                    }}
+                                    className="ml-1 text-gray-500 hover:text-gray-700"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                            {domains.map((domain: string, index: number) => (
+                              <div
+                                key={`domain-${index}`}
+                                className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-800 rounded-full text-sm"
+                              >
+                                <Globe className="h-3.5 w-3.5" />
+                                @{domain}
+                                {editMode && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const currentDomains = (form as any)?.approved_domains || [];
+                                      handleChange('approved_domains' as any, currentDomains.filter((_: string, i: number) => i !== index));
+                                    }}
+                                    className="ml-1 text-blue-500 hover:text-blue-700"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          !editMode && (
+                            <p className="text-sm text-gray-400 italic">No approved emails or domains added yet.</p>
+                          )
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -10014,25 +10067,59 @@ const CampaignDetailsPage = () => {
           <DialogHeader>
             <DialogTitle>Confirm Delete</DialogTitle>
           </DialogHeader>
-          <div className="text-sm text-gray-600 mt-2 mb-2">Are you sure you want to delete this content?</div>
+          {(() => {
+            const linkedPayments = contentToDelete ? payments.filter(p => {
+              const ids = Array.isArray(p.content_id) ? p.content_id : (p.content_id ? [p.content_id] : []);
+              return ids.includes(contentToDelete.id);
+            }) : [];
+            return (
+              <>
+                <div className="text-sm text-gray-600 mt-2 mb-2">Are you sure you want to delete this content?</div>
+                {linkedPayments.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                    <p className="font-medium text-amber-800 flex items-center gap-1.5">
+                      <AlertTriangle className="h-4 w-4" />
+                      {linkedPayments.length} linked payment{linkedPayments.length !== 1 ? 's' : ''} will also be deleted
+                    </p>
+                    <p className="text-amber-700 mt-1">
+                      Total: ${linkedPayments.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </>
+            );
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
             <Button variant="destructive" onClick={async () => {
               setShowDeleteDialog(false);
               if (!contentToDelete) return;
               const contentId = contentToDelete.id;
+              const linkedPaymentIds = payments
+                .filter(p => {
+                  const ids = Array.isArray(p.content_id) ? p.content_id : (p.content_id ? [p.content_id] : []);
+                  return ids.includes(contentId);
+                })
+                .map(p => p.id);
               const prevContents = [...contents];
               setContents(prev => prev.filter(c => c.id !== contentId));
+              setPayments(prev => prev.filter(p => !linkedPaymentIds.includes(p.id)));
               try {
+                if (linkedPaymentIds.length > 0) {
+                  await Promise.all(linkedPaymentIds.map(id => supabase.from('payments').delete().eq('id', id)));
+                }
                 await supabase.from('contents').delete().eq('id', contentId);
                 toast({
                   title: 'Content deleted',
-                  description: 'Content deleted successfully.',
+                  description: linkedPaymentIds.length > 0
+                    ? `Content and ${linkedPaymentIds.length} linked payment${linkedPaymentIds.length !== 1 ? 's' : ''} deleted.`
+                    : 'Content deleted successfully.',
                   variant: 'destructive',
                   duration: 3000,
                 });
               } catch (error) {
-                setContents(prev => prev);
+                setContents(prevContents);
+                fetchPayments();
                 toast({
                   title: 'Error',
                   description: 'Failed to delete content.',
@@ -10126,24 +10213,58 @@ const CampaignDetailsPage = () => {
           <DialogHeader>
             <DialogTitle>Confirm Bulk Delete</DialogTitle>
           </DialogHeader>
-          <div className="text-sm text-gray-600 mt-2 mb-2">Are you sure you want to delete {selectedContents.length} content item{selectedContents.length !== 1 ? 's' : ''}?</div>
+          {(() => {
+            const linkedPayments = payments.filter(p => {
+              const ids = Array.isArray(p.content_id) ? p.content_id : (p.content_id ? [p.content_id] : []);
+              return ids.some((id: string) => selectedContents.includes(id));
+            });
+            return (
+              <>
+                <div className="text-sm text-gray-600 mt-2 mb-2">Are you sure you want to delete {selectedContents.length} content item{selectedContents.length !== 1 ? 's' : ''}?</div>
+                {linkedPayments.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                    <p className="font-medium text-amber-800 flex items-center gap-1.5">
+                      <AlertTriangle className="h-4 w-4" />
+                      {linkedPayments.length} linked payment{linkedPayments.length !== 1 ? 's' : ''} will also be deleted
+                    </p>
+                    <p className="text-amber-700 mt-1">
+                      Total: ${linkedPayments.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </>
+            );
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)}>Cancel</Button>
             <Button variant="destructive" onClick={async () => {
               setShowBulkDeleteDialog(false);
               const toDelete = selectedContents;
+              const linkedPaymentIds = payments
+                .filter(p => {
+                  const ids = Array.isArray(p.content_id) ? p.content_id : (p.content_id ? [p.content_id] : []);
+                  return ids.some((id: string) => toDelete.includes(id));
+                })
+                .map(p => p.id);
               const prevContents = [...contents];
               setContents(prev => prev.filter(c => !toDelete.includes(c.id)));
+              setPayments(prev => prev.filter(p => !linkedPaymentIds.includes(p.id)));
               try {
+                if (linkedPaymentIds.length > 0) {
+                  await Promise.all(linkedPaymentIds.map(id => supabase.from('payments').delete().eq('id', id)));
+                }
                 await Promise.all(toDelete.map(contentId => supabase.from('contents').delete().eq('id', contentId)));
                 toast({
                   title: 'Contents deleted',
-                  description: `${toDelete.length} content item${toDelete.length !== 1 ? 's' : ''} deleted successfully.`,
+                  description: linkedPaymentIds.length > 0
+                    ? `${toDelete.length} content item${toDelete.length !== 1 ? 's' : ''} and ${linkedPaymentIds.length} linked payment${linkedPaymentIds.length !== 1 ? 's' : ''} deleted.`
+                    : `${toDelete.length} content item${toDelete.length !== 1 ? 's' : ''} deleted successfully.`,
                   variant: 'destructive',
                   duration: 3000,
                 });
               } catch (error) {
-                setContents(prev => prev);
+                setContents(prevContents);
+                fetchPayments();
                 toast({
                   title: 'Error',
                   description: 'Failed to delete some content items.',
@@ -10562,12 +10683,31 @@ const CampaignDetailsPage = () => {
           </DialogHeader>
           <div className="py-4">
             <div className="bg-gray-50 rounded-lg p-4 space-y-2 overflow-hidden">
-              <p className="text-sm text-gray-600">Message preview:</p>
-              <p className="font-medium text-gray-900 break-words">
-                ${pendingPaymentNotification?.amount.toLocaleString()} has been deposited to {pendingPaymentNotification?.wallet}!
-                <br />
-                Thanks for being part of the Holo Hive network 🙌
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-600">{isEditingPaymentMessage ? 'Edit message:' : 'Message preview:'}</p>
+                {!isEditingPaymentMessage && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingPaymentMessage(true)}
+                    className="text-sm text-[#3e8692] hover:underline flex items-center gap-1"
+                  >
+                    <Edit className="h-3.5 w-3.5" />
+                    Edit
+                  </button>
+                )}
+              </div>
+              {isEditingPaymentMessage ? (
+                <Textarea
+                  value={paymentNotificationMessage}
+                  onChange={(e) => setPaymentNotificationMessage(e.target.value)}
+                  className="auth-input min-h-[100px] text-sm"
+                  autoFocus
+                />
+              ) : (
+                <p className="font-medium text-gray-900 break-words whitespace-pre-line">
+                  {paymentNotificationMessage}
+                </p>
+              )}
             </div>
             {pendingPaymentNotification?.chatTitle && (
               <p className="text-xs text-gray-500 mt-2 break-words">
@@ -10583,9 +10723,18 @@ const CampaignDetailsPage = () => {
             >
               Skip
             </Button>
+            {isEditingPaymentMessage && (
+              <Button
+                variant="outline"
+                onClick={() => setIsEditingPaymentMessage(false)}
+                disabled={sendingPaymentNotification}
+              >
+                Done Editing
+              </Button>
+            )}
             <Button
               onClick={sendPaymentNotification}
-              disabled={sendingPaymentNotification}
+              disabled={sendingPaymentNotification || !paymentNotificationMessage.trim()}
               style={{ backgroundColor: '#3e8692', color: 'white' }}
               className="hover:opacity-90"
             >

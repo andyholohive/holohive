@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { form_id, response_data, submitted_by_email, submitted_by_name } = body;
+    const { form_id, response_data, submitted_by_email, submitted_by_name, client_id } = body;
 
     // Validate required fields
     if (!form_id || !response_data) {
@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
         form_id,
         response_data,
         submitted_by_email: submitted_by_email || null,
-        submitted_by_name: submitted_by_name || null
+        submitted_by_name: submitted_by_name || null,
+        client_id: client_id || null
       }])
       .select()
       .single();

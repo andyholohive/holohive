@@ -21,13 +21,28 @@ import {
   FileText,
   TrendingUp,
   Eye,
+  EyeOff,
   Megaphone,
   StickyNote,
   Briefcase,
   Activity,
   ChevronDown,
   ChevronUp,
-  MessageSquare
+  MessageSquare,
+  Link as LinkIcon,
+  FolderOpen,
+  Globe,
+  Send,
+  UserCheck,
+  Hash,
+  ClipboardList,
+  Download,
+  File,
+  Image as ImageIcon,
+  CheckCircle2,
+  Circle,
+  Lock,
+  ArrowRight
 } from 'lucide-react';
 import 'react-quill/dist/quill.snow.css';
 
@@ -61,12 +76,46 @@ type ClientContext = {
   milestones: string | null;
   client_contacts: string | null;
   holohive_contacts: string | null;
+  telegram_url: string | null;
+  shared_drive_url: string | null;
+  gtm_sync_url: string | null;
+  onboarding_phase: string | null;
+};
+
+type CampaignDNAField = {
+  label: string;
+  answer: string;
+  page_number: number;
+};
+
+type KolRosterEntry = {
+  id: string;
+  name: string;
+  link: string | null;
+  platform: string | null;
+  tier: string | null;
+  status: string;
+  displayStatus: string;
+  statusColor: string;
+  contentLinks: string[];
+  impressions: number;
+  engagement: number;
+  campaignName: string;
+  campaignId: string;
 };
 
 type DecisionLogEntry = {
   id: string;
   decision_date: string;
   summary: string;
+};
+
+type FormSubmission = {
+  id: string;
+  formName: string;
+  submittedAt: string;
+  fields: { label: string; answer: string }[];
+  attachments: { label: string; url: string; fileName: string }[];
 };
 
 type WeeklyUpdate = {
@@ -129,6 +178,18 @@ const getStatusBadge = (status: string) => {
   }
 };
 
+const stripHtml = (html: string) => {
+  return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+};
+
+const kolStatusMap: Record<string, { label: string; color: string }> = {
+  'Curated': { label: 'Shortlisted', color: 'bg-gray-100 text-gray-700' },
+  'Contacted': { label: 'Pitching', color: 'bg-blue-100 text-blue-700' },
+  'Interested': { label: 'Negotiating', color: 'bg-yellow-100 text-yellow-700' },
+  'Onboarded': { label: 'Content Creation', color: 'bg-purple-100 text-purple-700' },
+  'Concluded': { label: 'Completed', color: 'bg-green-100 text-green-700' },
+};
+
 export default function ClientPortalPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const idOrSlug = params.id;
@@ -153,6 +214,19 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   const [decisionLog, setDecisionLog] = useState<DecisionLogEntry[]>([]);
   const [weeklyUpdates, setWeeklyUpdates] = useState<WeeklyUpdate[]>([]);
   const [showPreviousUpdates, setShowPreviousUpdates] = useState(false);
+  const [hasOnboardingResponse, setHasOnboardingResponse] = useState<boolean | null>(null);
+  const [onboardingFormSlug, setOnboardingFormSlug] = useState<string | null>(null);
+  const [onboardingFormId, setOnboardingFormId] = useState<string | null>(null);
+  const [campaignDNA, setCampaignDNA] = useState<CampaignDNAField[]>([]);
+  const [kolRoster, setKolRoster] = useState<KolRosterEntry[]>([]);
+  const [formSubmissions, setFormSubmissions] = useState<FormSubmission[]>([]);
+  const [viewingSubmission, setViewingSubmission] = useState<FormSubmission | null>(null);
+  const [earliestSubmissionDate, setEarliestSubmissionDate] = useState<string | null>(null);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [welcomePhase, setWelcomePhase] = useState<'enter' | 'ready' | 'opening' | 'done'>('enter');
+  const [portalFadeIn, setPortalFadeIn] = useState(false);
+  const [actionItems, setActionItems] = useState<{ id: string; text: string; court: string; phase: string; is_done: boolean; display_order: number; attachment_url: string | null; attachment_label: string | null }[]>([]);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   // UI states
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed'>('all');
@@ -226,6 +300,10 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       fetchClientContext();
       fetchDecisionLog();
       fetchWeeklyUpdates();
+      fetchActionItems();
+      checkOnboardingStatus();
+      fetchKolRoster();
+      fetchFormSubmissions();
     }
   }, [clientId, isAuthenticated]);
 
@@ -242,7 +320,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         if (now - timestamp < CACHE_DURATION) {
           if (cachedEmail && cachedEmail.toLowerCase() === clientEmail.toLowerCase()) {
             setEmail(cachedEmail);
-            setIsAuthenticated(true);
+            setIsAuthenticated(true); // Start loading data immediately
+            setWelcomePhase('enter');
+            setShowWelcome(true);
+            requestAnimationFrame(() => {
+              setTimeout(() => setWelcomePhase('ready'), 50);
+            });
             return;
           }
         }
@@ -297,8 +380,74 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     }
 
     saveAuthToCache(email);
-    setIsAuthenticated(true);
+    setIsAuthenticated(true); // Start loading data immediately
+    setWelcomePhase('enter');
+    setShowWelcome(true);
+    // Animate in after a brief frame
+    requestAnimationFrame(() => {
+      setTimeout(() => setWelcomePhase('ready'), 50);
+    });
   };
+
+  const handleWelcomeContinue = () => {
+    setWelcomePhase('opening');
+    // After doors fully open, switch to portal with teal overlay fade
+    setTimeout(() => {
+      setPortalFadeIn(true);
+      setIsAuthenticated(true);
+      setShowWelcome(false);
+      // Remove overlay after fade completes
+      setTimeout(() => setPortalFadeIn(false), 1000);
+    }, 1200);
+  };
+
+  async function checkOnboardingStatus() {
+    if (!clientId) return;
+    try {
+      // Find the onboarding form
+      const { data: form } = await supabasePublic
+        .from('forms')
+        .select('id, slug')
+        .eq('slug', 'holo-hive-onboarding')
+        .eq('status', 'published')
+        .single();
+
+      if (!form) {
+        setHasOnboardingResponse(true); // no form exists, hide banner
+        return;
+      }
+
+      setOnboardingFormSlug(form.slug);
+      setOnboardingFormId(form.id);
+
+      // Check if this client has already submitted a response
+      const { count } = await supabasePublic
+        .from('form_responses')
+        .select('id', { count: 'exact', head: true })
+        .eq('form_id', form.id)
+        .eq('client_id', clientId);
+
+      const hasResponse = (count || 0) > 0;
+      setHasOnboardingResponse(hasResponse);
+      if (hasResponse) {
+        fetchCampaignDNA(form.id);
+        // Fetch earliest submission date for phase computation
+        const { data: earliestResp } = await supabasePublic
+          .from('form_responses')
+          .select('submitted_at')
+          .eq('form_id', form.id)
+          .eq('client_id', clientId)
+          .order('submitted_at', { ascending: true })
+          .limit(1);
+        if (earliestResp && earliestResp.length > 0) {
+          setEarliestSubmissionDate(earliestResp[0].submitted_at);
+        }
+      }
+    } catch (err) {
+      console.error('Error checking onboarding status:', err);
+      setHasOnboardingResponse(true); // hide banner on error
+    }
+  }
 
   async function fetchCampaigns() {
     if (!clientId) return;
@@ -379,7 +528,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     try {
       const { data } = await supabasePublic
         .from('client_context')
-        .select('id, engagement_type, scope, start_date, milestones, client_contacts, holohive_contacts')
+        .select('id, engagement_type, scope, start_date, milestones, client_contacts, holohive_contacts, telegram_url, shared_drive_url, gtm_sync_url, onboarding_phase')
         .eq('client_id', clientId)
         .single();
       setClientContext(data || null);
@@ -430,6 +579,212 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     }
   }
 
+  async function fetchActionItems() {
+    if (!clientId) return;
+    try {
+      const { data } = await supabasePublic
+        .from('client_action_items')
+        .select('id, text, court, phase, is_done, display_order, attachment_url, attachment_label')
+        .eq('client_id', clientId)
+        .eq('is_hidden', false)
+        .order('display_order', { ascending: true });
+      setActionItems(data || []);
+    } catch (err) {
+      console.error('Error fetching action items:', err);
+    }
+  }
+
+  async function fetchCampaignDNA(formId: string) {
+    if (!clientId) return;
+    try {
+      // Fetch form fields (exclude section/description types)
+      const { data: fields } = await supabasePublic
+        .from('form_fields')
+        .select('id, label, field_type, page_number, display_order')
+        .eq('form_id', formId)
+        .not('field_type', 'in', '("section","description")')
+        .order('page_number', { ascending: true })
+        .order('display_order', { ascending: true });
+
+      if (!fields || fields.length === 0) return;
+
+      // Fetch the latest response for this client
+      const { data: responses } = await supabasePublic
+        .from('form_responses')
+        .select('id, response_data')
+        .eq('form_id', formId)
+        .eq('client_id', clientId)
+        .order('submitted_at', { ascending: false })
+        .limit(1);
+
+      if (!responses || responses.length === 0) return;
+
+      const responseData = responses[0].response_data as Record<string, any>;
+      const dnaFields: CampaignDNAField[] = [];
+
+      for (const field of fields) {
+        const answer = responseData[field.id];
+        if (answer === undefined || answer === null || answer === '') continue;
+        const answerStr = Array.isArray(answer) ? answer.join(', ') : String(answer);
+        if (!answerStr.trim()) continue;
+        dnaFields.push({
+          label: stripHtml(field.label),
+          answer: answerStr,
+          page_number: field.page_number || 1,
+        });
+      }
+
+      setCampaignDNA(dnaFields);
+    } catch (err) {
+      console.error('Error fetching campaign DNA:', err);
+    }
+  }
+
+  async function fetchKolRoster() {
+    if (!clientId) return;
+    try {
+      // Get campaign IDs for this client
+      const { data: campaignsData } = await supabasePublic
+        .from('campaigns')
+        .select('id, name')
+        .eq('client_id', clientId)
+        .is('archived_at', null);
+
+      if (!campaignsData || campaignsData.length === 0) return;
+
+      const campaignMap = new Map(campaignsData.map(c => [c.id, c.name]));
+      const campaignIds = campaignsData.map(c => c.id);
+
+      // Fetch campaign_kols with nested data
+      const { data: kolsData } = await supabasePublic
+        .from('campaign_kols')
+        .select(`
+          id,
+          campaign_id,
+          status,
+          hidden,
+          master_kols(name, link, platform, tier),
+          contents(content_link, impressions, likes, comments, retweets, bookmarks)
+        `)
+        .in('campaign_id', campaignIds)
+        .or('hidden.is.null,hidden.eq.false');
+
+      if (!kolsData) return;
+
+      const roster: KolRosterEntry[] = kolsData.map((kol: any) => {
+        const mk = kol.master_kols || {};
+        const contents = kol.contents || [];
+        const statusInfo = kolStatusMap[kol.status] || { label: kol.status, color: 'bg-gray-100 text-gray-700' };
+        const impressions = contents.reduce((sum: number, c: any) => sum + (c.impressions || 0), 0);
+        const engagement = contents.reduce((sum: number, c: any) =>
+          sum + (c.likes || 0) + (c.comments || 0) + (c.retweets || 0) + (c.bookmarks || 0), 0);
+        const contentLinks = contents.filter((c: any) => c.content_link).map((c: any) => c.content_link);
+
+        return {
+          id: kol.id,
+          name: mk.name || 'Unknown',
+          link: mk.link || null,
+          platform: mk.platform || null,
+          tier: mk.tier || null,
+          status: kol.status,
+          displayStatus: statusInfo.label,
+          statusColor: statusInfo.color,
+          contentLinks,
+          impressions,
+          engagement,
+          campaignName: campaignMap.get(kol.campaign_id) || 'Unknown',
+          campaignId: kol.campaign_id,
+        };
+      });
+
+      setKolRoster(roster);
+    } catch (err) {
+      console.error('Error fetching KOL roster:', err);
+    }
+  }
+
+  async function fetchFormSubmissions() {
+    if (!clientId) return;
+    try {
+      const { data: responsesData } = await supabasePublic
+        .from('form_responses')
+        .select('id, form_id, response_data, submitted_at')
+        .eq('client_id', clientId)
+        .order('submitted_at', { ascending: false });
+
+      if (!responsesData || responsesData.length === 0) return;
+
+      const formIds = [...new Set(responsesData.map(r => r.form_id))];
+
+      const [{ data: formsData }, { data: fieldsData }] = await Promise.all([
+        supabasePublic
+          .from('forms')
+          .select('id, name')
+          .in('id', formIds),
+        supabasePublic
+          .from('form_fields')
+          .select('id, form_id, label, field_type, page_number, display_order')
+          .in('form_id', formIds)
+          .not('field_type', 'in', '("section","description")')
+          .order('page_number', { ascending: true })
+          .order('display_order', { ascending: true }),
+      ]);
+
+      const formNameMap = new Map((formsData || []).map(f => [f.id, f.name]));
+      const fieldsByForm = new Map<string, typeof fieldsData>();
+      for (const field of fieldsData || []) {
+        const arr = fieldsByForm.get(field.form_id) || [];
+        arr.push(field);
+        fieldsByForm.set(field.form_id, arr);
+      }
+
+      const submissions: FormSubmission[] = responsesData.map(resp => {
+        const rd = (resp.response_data || {}) as Record<string, any>;
+        const fields = fieldsByForm.get(resp.form_id) || [];
+        const qaPairs: { label: string; answer: string }[] = [];
+        const attachments: { label: string; url: string; fileName: string }[] = [];
+
+        for (const field of fields) {
+          const answer = rd[field.id];
+          if (answer === undefined || answer === null || answer === '') continue;
+          const answerStr = Array.isArray(answer) ? answer.join(', ') : String(answer);
+          if (!answerStr.trim()) continue;
+          qaPairs.push({ label: stripHtml(field.label), answer: answerStr });
+        }
+
+        // Extract attachments
+        for (const key of Object.keys(rd)) {
+          if (key.endsWith('_attachments') && Array.isArray(rd[key])) {
+            const fieldId = key.replace('_attachments', '');
+            const field = fields.find(f => f.id === fieldId);
+            const label = field ? stripHtml(field.label) : 'Attachment';
+            for (const url of rd[key]) {
+              if (typeof url === 'string' && url.trim()) {
+                const fileName = decodeURIComponent(url.split('/').pop() || 'file');
+                attachments.push({ label, url, fileName });
+              }
+            }
+          }
+        }
+
+        return {
+          id: resp.id,
+          formName: formNameMap.get(resp.form_id) || 'Form',
+          submittedAt: resp.submitted_at,
+          fields: qaPairs,
+          attachments,
+        };
+      });
+
+      setFormSubmissions(submissions);
+    } catch (err) {
+      console.error('Error fetching form submissions:', err);
+    }
+  }
+
+  // Collect all form attachments for resource vault
+  const formAttachments = formSubmissions.flatMap(s => s.attachments);
+
   // Filter campaigns based on active tab and search term
   const filteredCampaigns = campaigns.filter(campaign => {
     const matchesTab = activeTab === 'all' ||
@@ -451,13 +806,135 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     totalBudget: campaigns.reduce((sum, c) => sum + (c.total_budget || 0), 0),
   };
 
+  // Compute portal phase
+  const portalPhase: 'kickoff' | 'discovery' | 'tracker' = (() => {
+    if (clientContext?.onboarding_phase) {
+      return clientContext.onboarding_phase as 'kickoff' | 'discovery' | 'tracker';
+    }
+    if (hasOnboardingResponse === false || hasOnboardingResponse === null) {
+      return 'kickoff';
+    }
+    if (earliestSubmissionDate) {
+      const daysSince = Math.floor((Date.now() - new Date(earliestSubmissionDate).getTime()) / (1000 * 60 * 60 * 24));
+      return daysSince < 5 ? 'discovery' : 'tracker';
+    }
+    return 'kickoff';
+  })();
+
+  // Compute days since submission for timeline
+  const daysSinceSubmission = earliestSubmissionDate
+    ? Math.floor((Date.now() - new Date(earliestSubmissionDate).getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
+
+  // Timeline milestone states
+  const timelineNodes = [
+    {
+      label: 'Kickoff & Briefing',
+      days: 'Day 1',
+      completed: hasOnboardingResponse === true,
+      active: portalPhase === 'kickoff',
+    },
+    {
+      label: 'Deep-Dive Audit & DD',
+      days: 'Day 2-3',
+      completed: portalPhase === 'discovery' || portalPhase === 'tracker',
+      active: portalPhase === 'discovery' && daysSinceSubmission < 4,
+    },
+    {
+      label: 'Strategy & GTM Sync',
+      days: 'Day 4',
+      completed: (portalPhase === 'discovery' && daysSinceSubmission >= 4) || portalPhase === 'tracker',
+      active: portalPhase === 'discovery' && daysSinceSubmission >= 4,
+    },
+    {
+      label: 'KOL Shortlist & Deployment',
+      days: 'Day 5-7',
+      completed: portalPhase === 'tracker',
+      active: portalPhase === 'tracker',
+    },
+  ];
+
+  // Action board items per phase
+  // Hardcoded fallback for un-seeded clients
+  const fallbackActionBoardItems = {
+    kickoff: {
+      yours: [
+        { text: 'Complete onboarding form', done: hasOnboardingResponse === true },
+        { text: 'Upload assets & documentation (branding, decks, product links)', done: false },
+        { text: 'Confirm workspace access', done: false },
+      ],
+      ours: [
+        { text: 'Workspace setup & onboarding overview', done: false },
+        { text: 'Project, product & resource review', done: false },
+        { text: 'Ecosystem & market positioning analysis', done: false },
+      ],
+    },
+    discovery: {
+      yours: [
+        { text: 'Submit graphic materials vault', done: formSubmissions.some(s => s.attachments.length > 0) },
+        { text: 'Review campaign brief', done: false },
+        { text: 'Confirm weekly sync schedule', done: false },
+      ],
+      ours: [
+        { text: 'Internal strategy & narrative positioning review', done: false },
+        { text: 'KOL outreach brief preparation & translation', done: false },
+        { text: 'KOL selection & shortlist preparation', done: false },
+        { text: 'Initial content brief preparation', done: false },
+        { text: 'Regional GTM plan development', done: false },
+      ],
+    },
+    tracker: {
+      yours: [
+        { text: 'Review & approve KOL shortlist', done: false },
+        { text: 'Review & approve content brief', done: false },
+        { text: 'Approve content drafts', done: false },
+      ],
+      ours: [
+        { text: 'Campaign tracker deployment', done: false },
+        { text: 'Creator outreach with translated content brief', done: kolRoster.length > 0 },
+        { text: 'Content schedule planning & finalization', done: kolRoster.some(k => k.contentLinks.length > 0) },
+        { text: 'First activations scheduled', done: false },
+        { text: 'Performance tracking & reporting', done: false },
+      ],
+    },
+  };
+
+  const hasDbActionItems = actionItems.length > 0;
+  const phaseActionItems = hasDbActionItems
+    ? actionItems.filter(i => i.phase === portalPhase)
+    : [];
+  const dbYoursItems = phaseActionItems.filter(i => i.court === 'yours').sort((a, b) => a.display_order - b.display_order);
+  const dbOursItems = phaseActionItems.filter(i => i.court === 'ours').sort((a, b) => a.display_order - b.display_order);
+  const doneYoursCount = dbYoursItems.filter(i => i.is_done).length;
+  const doneOursCount = dbOursItems.filter(i => i.is_done).length;
+  const hasDoneItems = hasDbActionItems && (doneYoursCount > 0 || doneOursCount > 0);
+
+  const actionBoardItems = hasDbActionItems
+    ? {
+        [portalPhase]: {
+          yours: (showCompleted ? dbYoursItems : dbYoursItems.filter(i => !i.is_done)).map(i => ({ text: i.text, done: i.is_done, attachment_url: i.attachment_url, attachment_label: i.attachment_label })),
+          ours: (showCompleted ? dbOursItems : dbOursItems.filter(i => !i.is_done)).map(i => ({ text: i.text, done: i.is_done, attachment_url: i.attachment_url, attachment_label: i.attachment_label })),
+        },
+      }
+    : fallbackActionBoardItems;
+
+  // KOL live status metrics
+  const kolsSecured = kolRoster.filter(k => k.status === 'Onboarded' || k.status === 'Concluded').length;
+  const contentLive = kolRoster.filter(k => k.contentLinks.length > 0).length;
+
+  // Welcome subtitle per phase
+  const welcomeSubtitle = portalPhase === 'kickoff'
+    ? "Let's get started — complete the steps below to kick off your campaign."
+    : portalPhase === 'discovery'
+    ? "We're building your campaign strategy. Here's where things stand."
+    : "Your campaign is live. Track everything in one place.";
+
   // Loading state
   if (loadingClientEmail) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(160deg, #0c2d33 0%, #1a4a52 35%, #3e8692 70%, #5ba3ad 100%)' }}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e8692] mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-white/20 border-t-white/80 mx-auto mb-4"></div>
         </div>
       </div>
     );
@@ -466,14 +943,232 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   // Error state
   if (error && !clientEmail) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Card className="max-w-md w-full mx-4">
-          <CardContent className="pt-6 text-center">
-            <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Portal Not Found</h2>
-            <p className="text-gray-600">{error}</p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(160deg, #0c2d33 0%, #1a4a52 35%, #3e8692 70%, #5ba3ad 100%)' }}>
+        <div className="max-w-md w-full mx-4 text-center p-10 rounded-2xl" style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+          <Building2 className="h-12 w-12 mx-auto mb-4" style={{ color: 'rgba(255,255,255,0.4)' }} />
+          <h2 className="text-xl font-semibold text-white mb-2">Portal Not Found</h2>
+          <p style={{ color: 'rgba(255,255,255,0.5)' }}>{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Welcome transition screen
+  if (showWelcome) {
+    const isVisible = welcomePhase === 'ready';
+    const isLeaving = welcomePhase === 'opening' || welcomePhase === 'done';
+
+    return (
+      <div className="min-h-screen flex items-center justify-center overflow-hidden relative" style={{ background: 'linear-gradient(160deg, #0c2d33 0%, #1a4a52 35%, #3e8692 70%, #5ba3ad 100%)' }}>
+        {/* Animated glow orbs */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div
+            className="absolute rounded-full"
+            style={{
+              width: '800px', height: '800px',
+              background: 'radial-gradient(circle, rgba(91,163,173,0.3) 0%, transparent 60%)',
+              top: '-200px', right: '-200px',
+              animation: 'pulse 4s ease-in-out infinite',
+            }}
+          />
+          <div
+            className="absolute rounded-full"
+            style={{
+              width: '600px', height: '600px',
+              background: 'radial-gradient(circle, rgba(62,134,146,0.25) 0%, transparent 60%)',
+              bottom: '-150px', left: '-150px',
+              animation: 'pulse 5s ease-in-out infinite 1s',
+            }}
+          />
+          <div
+            className="absolute rounded-full"
+            style={{
+              width: '300px', height: '300px',
+              background: 'radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 60%)',
+              top: '40%', left: '50%',
+              transform: 'translate(-50%, -50%)',
+              animation: 'pulse 3s ease-in-out infinite 0.5s',
+            }}
+          />
+          {/* Subtle grid pattern overlay */}
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)',
+            backgroundSize: '40px 40px',
+          }} />
+        </div>
+
+        {/* Door panels */}
+        <div className="absolute inset-0 flex z-10 pointer-events-none">
+          <div
+            className="h-full"
+            style={{
+              width: '50%',
+              background: 'linear-gradient(160deg, #0c2d33 0%, #1a4a52 35%, #3e8692 70%, #5ba3ad 100%)',
+              transform: isLeaving ? 'translateX(-105%)' : 'translateX(0)',
+              transition: 'transform 1.2s cubic-bezier(0.77, 0, 0.175, 1)',
+              boxShadow: isLeaving ? '4px 0 30px rgba(0,0,0,0.2)' : 'none',
+            }}
+          />
+          <div
+            className="h-full"
+            style={{
+              width: '50%',
+              background: 'linear-gradient(200deg, #0c2d33 0%, #1a4a52 35%, #3e8692 70%, #5ba3ad 100%)',
+              transform: isLeaving ? 'translateX(105%)' : 'translateX(0)',
+              transition: 'transform 1.2s cubic-bezier(0.77, 0, 0.175, 1)',
+              boxShadow: isLeaving ? '-4px 0 30px rgba(0,0,0,0.2)' : 'none',
+            }}
+          />
+        </div>
+
+        {/* Subtle horizontal shimmer line */}
+        <div
+          className="absolute z-10"
+          style={{
+            top: '50%',
+            left: 0,
+            right: 0,
+            height: '1px',
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.06) 20%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.06) 80%, transparent 100%)',
+            opacity: isVisible ? 1 : 0,
+            transition: 'opacity 1.5s ease-out 0.3s',
+          }}
+        />
+
+        {/* Welcome content */}
+        <div
+          className="relative z-20 text-center px-6"
+          style={{
+            opacity: isLeaving ? 0 : isVisible ? 1 : 0,
+            transform: isLeaving ? 'scale(0.9)' : isVisible ? 'scale(1) translateY(0)' : 'scale(0.95) translateY(20px)',
+            transition: 'all 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        >
+          {/* Frosted glass card */}
+          <div
+            className="rounded-3xl px-16 py-14 mx-auto max-w-md"
+            style={{
+              background: 'rgba(255,255,255,0.04)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+            }}
+          >
+            {/* Greeting text */}
+            <div
+              style={{
+                opacity: isVisible ? 1 : 0,
+                transform: isVisible ? 'translateY(0)' : 'translateY(15px)',
+                transition: 'all 0.7s ease-out 0.15s',
+              }}
+            >
+              <p className="text-xs font-medium uppercase tracking-[0.35em] mb-8" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                Welcome back
+              </p>
+            </div>
+
+            {/* Client logo or Holo Hive logo */}
+            <div
+              className="mb-5 flex justify-center"
+              style={{
+                opacity: isVisible ? 1 : 0,
+                transform: isVisible ? 'translateY(0) scale(1)' : 'translateY(15px) scale(0.9)',
+                transition: 'all 0.7s ease-out 0.25s',
+              }}
+            >
+              {client?.logo_url ? (
+                <div className="relative">
+                  <div
+                    className="absolute -inset-1 rounded-2xl"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05))',
+                      filter: 'blur(1px)',
+                    }}
+                  />
+                  <img
+                    src={client.logo_url}
+                    alt={client.name}
+                    className="relative h-20 w-20 object-cover rounded-2xl"
+                    style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}
+                  />
+                </div>
+              ) : (
+                <Image
+                  src="/images/logo.png"
+                  alt="Holo Hive"
+                  width={180}
+                  height={60}
+                  className="h-14 w-auto"
+                  style={{ filter: 'brightness(0) invert(1)', opacity: 0.9 }}
+                />
+              )}
+            </div>
+
+            {/* Client name */}
+            <div
+              style={{
+                opacity: isVisible ? 1 : 0,
+                transform: isVisible ? 'translateY(0)' : 'translateY(15px)',
+                transition: 'all 0.7s ease-out 0.35s',
+              }}
+            >
+              <h1 className="text-4xl sm:text-5xl font-bold text-white mb-10" style={{ textShadow: '0 2px 20px rgba(0,0,0,0.15)', letterSpacing: '-0.02em' }}>
+                {client?.name}
+              </h1>
+            </div>
+
+            {/* Divider */}
+            <div
+              className="mx-auto mb-10"
+              style={{
+                width: '40px',
+                height: '1px',
+                background: 'rgba(255,255,255,0.2)',
+                opacity: isVisible ? 1 : 0,
+                transition: 'opacity 0.7s ease-out 0.4s',
+              }}
+            />
+
+            {/* Enter button */}
+            <div
+              style={{
+                opacity: isVisible ? 1 : 0,
+                transform: isVisible ? 'translateY(0)' : 'translateY(15px)',
+                transition: 'all 0.7s ease-out 0.5s',
+              }}
+            >
+              <button
+                onClick={handleWelcomeContinue}
+                className="group inline-flex items-center gap-3 text-lg font-medium text-white/80 transition-all duration-300 hover:text-white active:scale-95"
+              >
+                Enter Portal
+                <svg className="w-5 h-5 transition-transform duration-300 group-hover:translate-x-1.5 opacity-60 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 8.25L21 12m0 0l-3.75 3.75M21 12H3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Powered by */}
+          <div
+            className="mt-8"
+            style={{
+              opacity: isVisible ? 1 : 0,
+              transition: 'opacity 1s ease-out 0.8s',
+            }}
+          >
+            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>
+              Powered by Holo Hive
+            </p>
+          </div>
+        </div>
+
+        <style jsx>{`
+          @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.05); }
+          }
+        `}</style>
       </div>
     );
   }
@@ -481,56 +1176,82 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   // Email authentication gate
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <Card className="max-w-md w-full">
-          <CardHeader className="text-center pb-2">
-            <div className="flex justify-center mb-4">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(160deg, #0c2d33 0%, #1a4a52 35%, #3e8692 70%, #5ba3ad 100%)' }}>
+        {/* Background orbs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute rounded-full" style={{ width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(91,163,173,0.2) 0%, transparent 60%)', top: '-100px', right: '-100px' }} />
+          <div className="absolute rounded-full" style={{ width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(62,134,146,0.15) 0%, transparent 60%)', bottom: '-80px', left: '-80px' }} />
+        </div>
+
+        <div className="relative z-10 max-w-md w-full">
+          {/* Logo area */}
+          <div className="text-center mb-8">
+            {client?.logo_url ? (
+              <img
+                src={client.logo_url}
+                alt={client.name}
+                className="h-16 w-16 object-cover rounded-2xl shadow-lg mx-auto mb-4"
+              />
+            ) : (
               <Image
                 src="/images/logo.png"
                 alt="Holo Hive"
-                width={120}
-                height={40}
-                className="h-10 w-auto"
+                width={140}
+                height={46}
+                className="h-12 w-auto mx-auto mb-4"
+                style={{ filter: 'brightness(0) invert(1)', opacity: 0.9 }}
               />
-            </div>
-            {client?.logo_url && (
-              <div className="flex justify-center mb-2">
-                <img
-                  src={client.logo_url}
-                  alt={client.name}
-                  className="h-10 w-auto max-w-[120px] object-contain rounded-lg"
-                />
-              </div>
             )}
-            <CardTitle className="text-xl">Client Portal</CardTitle>
-            {client && (
-              <p className="text-gray-600 mt-2">Welcome, {client.name}</p>
-            )}
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600 mb-4 text-center">
-              Please enter your email address to access your campaigns and reports.
+            <h1 className="text-2xl font-bold text-white mb-1">
+              {client?.name ? `${client.name} Portal` : 'Client Portal'}
+            </h1>
+            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              Enter your email to access your dashboard
             </p>
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
+          </div>
+
+          {/* Login card */}
+          <div className="rounded-2xl p-8" style={{ background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <form onSubmit={handleEmailSubmit} className="space-y-5">
               <div>
-                <Input
+                <input
                   type="email"
                   placeholder="your.email@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="auth-input"
                   required
+                  className="w-full px-4 py-3 rounded-xl text-white placeholder-white/30 outline-none transition-all duration-200 focus:ring-2 focus:ring-white/30"
+                  style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
                 />
                 {emailError && (
-                  <p className="text-sm text-red-600 mt-2">{emailError}</p>
+                  <p className="text-sm mt-2" style={{ color: '#f87171' }}>{emailError}</p>
                 )}
               </div>
-              <Button type="submit" className="w-full bg-[#3e8692] hover:bg-[#2d6570]">
+              <button
+                type="submit"
+                className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
+                style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%)', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 2px 20px rgba(0,0,0,0.1)' }}
+              >
                 Access Portal
-              </Button>
+              </button>
             </form>
-          </CardContent>
-        </Card>
+          </div>
+
+          {/* Powered by */}
+          <div className="text-center mt-6">
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>Powered by</span>
+              <Image
+                src="/images/logo.png"
+                alt="Holo Hive"
+                width={60}
+                height={20}
+                className="h-4 w-auto"
+                style={{ filter: 'brightness(0) invert(1)', opacity: 0.3 }}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -538,6 +1259,26 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   // Main portal content
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-50 to-gray-100">
+      {/* Teal-to-portal transition overlay */}
+      {portalFadeIn && (
+        <div
+          className="fixed inset-0 z-[100] pointer-events-none"
+          style={{
+            background: 'linear-gradient(160deg, #0c2d33 0%, #1a4a52 35%, #3e8692 70%, #5ba3ad 100%)',
+            animation: 'portalOverlayFade 1s ease-out forwards',
+          }}
+        />
+      )}
+      <style>{`
+        @keyframes portalOverlayFade {
+          0% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        @keyframes pulse {
+          0%, 100% { box-shadow: 0 0 0 4px rgba(62,134,146,0.2); }
+          50% { box-shadow: 0 0 0 8px rgba(62,134,146,0.1); }
+        }
+      `}</style>
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -576,9 +1317,277 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             Welcome back, <span className="text-[#3e8692]">{client?.name}</span>
           </h1>
           <p className="text-gray-500 text-lg">
-            View and track all your campaigns in one place.
+            {welcomeSubtitle}
           </p>
         </div>
+
+        {/* 7-Day Timeline */}
+        <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10">
+          <CardContent className="p-6 sm:p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                <Activity className="h-5 w-5 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Onboarding Progress</h3>
+            </div>
+            <div className="relative flex items-start justify-between">
+              {/* Background connector lines */}
+              {timelineNodes.map((_, i) => {
+                if (i === 0) return null;
+                const segmentWidth = 100 / timelineNodes.length;
+                return (
+                  <div
+                    key={`line-${i}`}
+                    className="absolute top-4 h-0.5 -translate-y-1/2"
+                    style={{
+                      left: `${segmentWidth * (i - 0.5)}%`,
+                      width: `${segmentWidth}%`,
+                      borderTop: timelineNodes[i - 1].completed
+                        ? '2px solid #3e8692'
+                        : '2px dashed #d1d5db',
+                    }}
+                  />
+                );
+              })}
+              {timelineNodes.map((node, i) => {
+                const isCompleted = node.completed;
+                const isActive = node.active && !node.completed;
+                const isLocked = !isCompleted && !isActive;
+                return (
+                  <div key={i} className="flex flex-col items-center text-center relative z-10" style={{ width: `${100 / timelineNodes.length}%` }}>
+                    {/* Node circle */}
+                    <div className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full mb-2 ${
+                      isCompleted
+                        ? 'bg-[#3e8692] text-white'
+                        : isActive
+                        ? 'bg-white border-2 border-[#3e8692]'
+                        : 'bg-gray-200 text-gray-400'
+                    }`}
+                    style={isActive ? { animation: 'pulse 2s ease-in-out infinite', boxShadow: '0 0 0 4px rgba(62,134,146,0.2)' } : {}}
+                    >
+                      {isCompleted ? (
+                        <CheckCircle2 className="h-5 w-5" />
+                      ) : isActive ? (
+                        <Circle className="h-4 w-4 text-[#3e8692]" />
+                      ) : (
+                        <Lock className="h-3.5 w-3.5" />
+                      )}
+                    </div>
+                    {/* Label */}
+                    <p className={`text-xs sm:text-sm font-medium leading-tight px-1 ${
+                      isCompleted ? 'text-[#3e8692]' : isActive ? 'text-gray-900 font-bold' : 'text-gray-400'
+                    }`}>
+                      {node.label}
+                    </p>
+                    <p className={`text-[10px] sm:text-xs mt-0.5 ${isLocked ? 'text-gray-300' : 'text-gray-500'}`}>
+                      {node.days}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Action Board */}
+        {(() => {
+          const yoursAll = actionBoardItems[portalPhase]?.yours || [];
+          const oursAll = actionBoardItems[portalPhase]?.ours || [];
+          const yoursDone = yoursAll.filter(i => i.done).length;
+          const oursDone = oursAll.filter(i => i.done).length;
+          const yoursTotal = hasDbActionItems ? (showCompleted ? yoursAll.length : yoursAll.length + yoursDone) : yoursAll.length;
+          const oursTotal = hasDbActionItems ? (showCompleted ? oursAll.length : oursAll.length + oursDone) : oursAll.length;
+          const yoursProgress = yoursTotal > 0 ? (yoursDone / yoursTotal) * 100 : 0;
+          const oursProgress = oursTotal > 0 ? (oursDone / oursTotal) * 100 : 0;
+          return (
+            <>
+              {hasDoneItems && (
+                <div className="flex justify-end mb-3">
+                  <button
+                    onClick={() => setShowCompleted(!showCompleted)}
+                    className="text-xs font-medium text-[#3e8692] hover:text-[#2d6570] transition-colors flex items-center gap-1.5"
+                  >
+                    {showCompleted ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    {showCompleted ? 'Hide completed' : 'Show completed'}
+                  </button>
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                {/* Your Court */}
+                <Card className="border-0 shadow-lg rounded-xl overflow-hidden">
+                  <div className="h-1 bg-gradient-to-r from-orange-400 to-amber-400" />
+                  <CardHeader className="pb-2 pt-5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-br from-orange-100 to-amber-50 rounded-xl">
+                          <ArrowRight className="h-4 w-4 text-orange-600" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base font-bold text-gray-900">Your Court</CardTitle>
+                          <p className="text-xs text-gray-400 mt-0.5">Awaiting your action</p>
+                        </div>
+                      </div>
+                      {yoursTotal > 0 && (
+                        <span className="text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-full">
+                          {yoursDone}/{yoursTotal}
+                        </span>
+                      )}
+                    </div>
+                    {yoursTotal > 0 && (
+                      <div className="mt-3 h-1.5 bg-orange-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-orange-400 to-amber-400 rounded-full transition-all duration-500 ease-out"
+                          style={{ width: `${yoursProgress}%` }}
+                        />
+                      </div>
+                    )}
+                  </CardHeader>
+                  <CardContent className="pt-1 pb-5">
+                    <div className="space-y-1.5">
+                      {yoursAll.map((item, i) => (
+                        <div
+                          key={i}
+                          className={`flex items-start gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
+                            item.done
+                              ? 'bg-gray-50/80'
+                              : 'bg-orange-50/40 hover:bg-orange-50/70'
+                          }`}
+                        >
+                          <div className="mt-0.5 flex-shrink-0">
+                            {item.done ? (
+                              <div className="h-5 w-5 rounded-full bg-orange-100 flex items-center justify-center">
+                                <CheckCircle2 className="h-4 w-4 text-orange-500" />
+                              </div>
+                            ) : (
+                              <div className="h-5 w-5 rounded-full border-2 border-orange-300" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className={`text-sm leading-relaxed ${
+                              item.done
+                                ? 'text-gray-400 line-through decoration-gray-300'
+                                : 'text-gray-700 font-medium'
+                            }`}>
+                              {item.text}
+                            </span>
+                            {'attachment_url' in item && (item as any).attachment_url && (
+                              <a href={(item as any).attachment_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 mt-1 text-xs text-orange-600 hover:text-orange-700 hover:underline">
+                                <ExternalLink className="h-3 w-3" />
+                                {(item as any).attachment_label || 'View'}
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {yoursAll.length === 0 && (
+                        <p className="text-sm text-gray-400 text-center py-4">All caught up!</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Our Court */}
+                <Card className="border-0 shadow-lg rounded-xl overflow-hidden">
+                  <div className="h-1 bg-gradient-to-r from-[#3e8692] to-[#5ba3ad]" />
+                  <CardHeader className="pb-2 pt-5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-br from-[#e8f4f5] to-[#d4edef] rounded-xl">
+                          <Briefcase className="h-4 w-4 text-[#3e8692]" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base font-bold text-gray-900">Our Court</CardTitle>
+                          <p className="text-xs text-gray-400 mt-0.5">We're on it</p>
+                        </div>
+                      </div>
+                      {oursTotal > 0 && (
+                        <span className="text-xs font-semibold text-[#3e8692] bg-[#e8f4f5] px-2 py-1 rounded-full">
+                          {oursDone}/{oursTotal}
+                        </span>
+                      )}
+                    </div>
+                    {oursTotal > 0 && (
+                      <div className="mt-3 h-1.5 bg-[#e8f4f5] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-[#3e8692] to-[#5ba3ad] rounded-full transition-all duration-500 ease-out"
+                          style={{ width: `${oursProgress}%` }}
+                        />
+                      </div>
+                    )}
+                  </CardHeader>
+                  <CardContent className="pt-1 pb-5">
+                    <div className="space-y-1.5">
+                      {oursAll.map((item, i) => (
+                        <div
+                          key={i}
+                          className={`flex items-start gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
+                            item.done
+                              ? 'bg-gray-50/80'
+                              : 'bg-[#3e8692]/[0.04] hover:bg-[#3e8692]/[0.07]'
+                          }`}
+                        >
+                          <div className="mt-0.5 flex-shrink-0">
+                            {item.done ? (
+                              <div className="h-5 w-5 rounded-full bg-[#e8f4f5] flex items-center justify-center">
+                                <CheckCircle2 className="h-4 w-4 text-[#3e8692]" />
+                              </div>
+                            ) : (
+                              <div className="h-5 w-5 rounded-full border-2 border-[#3e8692]/30" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className={`text-sm leading-relaxed ${
+                              item.done
+                                ? 'text-gray-400 line-through decoration-gray-300'
+                                : 'text-gray-700 font-medium'
+                            }`}>
+                              {item.text}
+                            </span>
+                            {'attachment_url' in item && (item as any).attachment_url && (
+                              <a href={(item as any).attachment_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 mt-1 text-xs text-[#3e8692] hover:text-[#2d6570] hover:underline">
+                                <ExternalLink className="h-3 w-3" />
+                                {(item as any).attachment_label || 'View'}
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {oursAll.length === 0 && (
+                        <p className="text-sm text-gray-400 text-center py-4">All caught up!</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          );
+        })()}
+
+        {/* Onboarding Banner — only in kickoff phase */}
+        {portalPhase === 'kickoff' && hasOnboardingResponse === false && onboardingFormSlug && (
+          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10 bg-gradient-to-r from-[#3e8692]/10 to-[#3e8692]/5">
+            <CardContent className="flex items-center justify-between py-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                  <FileText className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Complete Your Onboarding</h3>
+                  <p className="text-sm text-gray-600">Help us get started by filling out your onboarding form.</p>
+                </div>
+              </div>
+              <Button
+                onClick={() => {
+                  window.open(`${window.location.origin}/public/forms/${onboardingFormSlug}?client=${clientId}`, '_blank');
+                }}
+                className="bg-[#3e8692] hover:bg-[#2d6570] text-white px-6"
+              >
+                Fill Out Form
+                <ExternalLink className="h-4 w-4 ml-2" />
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Client Context Section */}
         {(clientContext || linkedCRMAccount) && (
@@ -667,8 +1676,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </Card>
         )}
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-10">
+        {/* Stats Cards — discovery & tracker only */}
+        {portalPhase !== 'kickoff' && <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-10">
           <Card className="group relative hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-0 shadow-md overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-[#3e8692]/5 to-[#3e8692]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
             <CardContent className="pt-6 pb-5 relative">
@@ -728,10 +1737,45 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
               </div>
             </CardContent>
           </Card>
-        </div>
 
-        {/* Weekly Status Section */}
-        {weeklyUpdates.length > 0 && (
+          {/* Live KOL Status Metrics — shown in discovery/tracker when KOLs exist */}
+          {portalPhase !== 'kickoff' && kolRoster.length > 0 && (
+            <>
+              <Card className="group relative hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-0 shadow-md overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                <CardContent className="pt-6 pb-5 relative">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-500 mb-1">KOLs Secured</p>
+                      <p className="text-3xl font-bold text-gray-900">{kolsSecured}<span className="text-lg text-gray-400 font-normal">/{kolRoster.length}</span></p>
+                    </div>
+                    <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg">
+                      <UserCheck className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="group relative hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-0 shadow-md overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                <CardContent className="pt-6 pb-5 relative">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-500 mb-1">Content Live</p>
+                      <p className="text-3xl font-bold text-gray-900">{contentLive}</p>
+                    </div>
+                    <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
+                      <Eye className="h-6 w-6 text-white" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </div>}
+
+        {/* Weekly Status Section — discovery & tracker only */}
+        {portalPhase !== 'kickoff' && weeklyUpdates.length > 0 && (
           <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10 border-l-4 border-l-[#3e8692]">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
@@ -807,8 +1851,216 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </Card>
         )}
 
-        {/* Campaigns Section */}
-        <Card className="border-0 shadow-lg rounded-xl overflow-hidden">
+        {/* Form Submissions & Resources Row — discovery & tracker only */}
+        {portalPhase !== 'kickoff' && (formSubmissions.length > 0 || (clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url)) || formAttachments.length > 0) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+            {/* Form Submissions */}
+            {formSubmissions.length > 0 && (
+              <Card className="border-0 shadow-lg rounded-xl overflow-hidden h-full">
+                <CardHeader className="bg-white border-b border-gray-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg">
+                      <ClipboardList className="h-5 w-5 text-white" />
+                    </div>
+                    <CardTitle className="text-xl font-bold text-gray-900">Form Submissions</CardTitle>
+                    <span className="text-sm text-gray-500">({formSubmissions.length})</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Submitted Forms</h4>
+                  <div className="space-y-3">
+                    {formSubmissions.map((sub) => (
+                      <div
+                        key={sub.id}
+                        onClick={() => setViewingSubmission(sub)}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-orange-50 border border-gray-100 hover:border-orange-200 transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-orange-500" />
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900 group-hover:text-orange-700">{sub.formName}</p>
+                            <p className="text-xs text-gray-500">
+                              {new Date(sub.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </p>
+                          </div>
+                        </div>
+                        {sub.attachments.length > 0 && (
+                          <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
+                            {sub.attachments.length} {sub.attachments.length === 1 ? 'file' : 'files'}
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Resources */}
+            {((clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url)) || formAttachments.length > 0) && (
+              <Card className="border-0 shadow-lg rounded-xl overflow-hidden h-full">
+                <CardHeader className="bg-white border-b border-gray-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                      <LinkIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <CardTitle className="text-xl font-bold text-gray-900">Resources</CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6">
+                  {clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url) && (
+                    <div className="space-y-3">
+                      {clientContext.telegram_url && (
+                        <a
+                          href={clientContext.telegram_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-[#3e8692]/5 hover:border-[#3e8692]/20 border border-gray-100 transition-all group"
+                        >
+                          <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                            <Send className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900 group-hover:text-[#3e8692]">Telegram Group</p>
+                            <p className="text-xs text-gray-500">Open chat</p>
+                          </div>
+                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-[#3e8692]" />
+                        </a>
+                      )}
+                      {clientContext.shared_drive_url && (
+                        <a
+                          href={clientContext.shared_drive_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-[#3e8692]/5 hover:border-[#3e8692]/20 border border-gray-100 transition-all group"
+                        >
+                          <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                            <FolderOpen className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900 group-hover:text-[#3e8692]">Shared Drive</p>
+                            <p className="text-xs text-gray-500">View files</p>
+                          </div>
+                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-[#3e8692]" />
+                        </a>
+                      )}
+                      {clientContext.gtm_sync_url && (
+                        <a
+                          href={clientContext.gtm_sync_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-[#3e8692]/5 hover:border-[#3e8692]/20 border border-gray-100 transition-all group"
+                        >
+                          <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
+                            <Globe className="h-5 w-5 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900 group-hover:text-[#3e8692]">GTM Sync / Tracker</p>
+                            <p className="text-xs text-gray-500">Open tracker</p>
+                          </div>
+                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-[#3e8692]" />
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  {formAttachments.length > 0 && (
+                    <div className={clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url) ? 'mt-6 pt-6 border-t border-gray-100' : ''}>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3">Uploaded Files</h4>
+                      <div className="space-y-3">
+                        {formAttachments.map((att, i) => {
+                          const ext = att.fileName.split('.').pop()?.toLowerCase() || '';
+                          const isPdf = ext === 'pdf';
+                          const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
+                          const isDoc = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
+                          const iconColor = isPdf ? 'text-red-500 bg-red-100' : isImage ? 'text-blue-500 bg-blue-100' : isDoc ? 'text-indigo-500 bg-indigo-100' : 'text-gray-500 bg-gray-100';
+                          return (
+                            <a
+                              key={i}
+                              href={att.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 border border-gray-100 transition-all group"
+                            >
+                              <div className={`p-2 rounded-lg ${iconColor}`}>
+                                {isImage ? <ImageIcon className="h-4 w-4" /> : <File className="h-4 w-4" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-800 truncate">{att.fileName}</p>
+                                <p className="text-xs text-gray-400">{att.label}</p>
+                              </div>
+                              <ExternalLink className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Form Submission Detail Dialog */}
+        <Dialog open={!!viewingSubmission} onOpenChange={() => setViewingSubmission(null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold text-gray-900">
+                {viewingSubmission?.formName}
+              </DialogTitle>
+              <p className="text-sm text-gray-500">
+                Submitted {viewingSubmission && new Date(viewingSubmission.submittedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              </p>
+            </DialogHeader>
+            {viewingSubmission && (
+              <div className="space-y-6 mt-4">
+                <div className="space-y-3">
+                  {viewingSubmission.fields.map((f, i) => (
+                    <div key={i} className="border-l-4 border-l-orange-300 pl-4 py-2">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{f.label}</p>
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap">{f.answer}</p>
+                    </div>
+                  ))}
+                </div>
+                {viewingSubmission.attachments.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Attachments</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {viewingSubmission.attachments.map((att, i) => {
+                        const ext = att.fileName.split('.').pop()?.toLowerCase() || '';
+                        const isPdf = ext === 'pdf';
+                        const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
+                        const isDoc = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
+                        const iconColor = isPdf ? 'text-red-500 bg-red-100' : isImage ? 'text-blue-500 bg-blue-100' : isDoc ? 'text-indigo-500 bg-indigo-100' : 'text-gray-500 bg-gray-100';
+                        return (
+                          <a
+                            key={i}
+                            href={att.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 border border-gray-100 transition-all group"
+                          >
+                            <div className={`p-2 rounded-lg ${iconColor}`}>
+                              {isImage ? <ImageIcon className="h-4 w-4" /> : <File className="h-4 w-4" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-gray-800 truncate group-hover:text-orange-700">{att.fileName}</p>
+                              <p className="text-xs text-gray-400">{att.label}</p>
+                            </div>
+                            <Download className="h-4 w-4 text-gray-400 group-hover:text-orange-500 flex-shrink-0" />
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Campaigns Section — discovery & tracker only */}
+        {portalPhase !== 'kickoff' && <Card className="border-0 shadow-lg rounded-xl overflow-hidden mt-10">
           <CardHeader className="bg-white border-b border-gray-100 pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <CardTitle className="text-xl font-bold text-gray-900">Your Campaigns</CardTitle>
@@ -964,10 +2216,103 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
-        {/* Meeting Notes Section */}
-        {meetingNotes.length > 0 && (
+        {/* KOL Roster — tracker only */}
+        {portalPhase === 'tracker' && kolRoster.length > 0 && (
+          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mt-8">
+            <CardHeader className="bg-white border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                  <Users className="h-5 w-5 text-white" />
+                </div>
+                <CardTitle className="text-xl font-bold text-gray-900">KOL Roster</CardTitle>
+                <span className="text-sm text-gray-500">({kolRoster.length} KOLs)</span>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              {(() => {
+                const grouped = kolRoster.reduce<Record<string, KolRosterEntry[]>>((acc, kol) => {
+                  const key = kol.campaignId;
+                  if (!acc[key]) acc[key] = [];
+                  acc[key].push(kol);
+                  return acc;
+                }, {});
+                return (
+                  <div className="space-y-6">
+                    {Object.entries(grouped).map(([campaignId, kols]) => (
+                      <div key={campaignId}>
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                          <Megaphone className="h-4 w-4 text-[#3e8692]" />
+                          {kols[0].campaignName}
+                          <span className="text-xs text-gray-400 font-normal">({kols.length})</span>
+                        </h4>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-gray-200">
+                                <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">KOL</th>
+                                <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Platform</th>
+                                <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tier</th>
+                                <th className="text-left py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Content</th>
+                                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Impressions</th>
+                                <th className="text-right py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Engagement</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {kols.map((kol) => (
+                                <tr key={kol.id} className="hover:bg-gray-50">
+                                  <td className="py-2.5 px-3">
+                                    {kol.link ? (
+                                      <a href={kol.link} target="_blank" rel="noopener noreferrer" className="text-[#3e8692] hover:underline font-medium">
+                                        {kol.name}
+                                      </a>
+                                    ) : (
+                                      <span className="font-medium text-gray-900">{kol.name}</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-gray-600 capitalize">{kol.platform || '—'}</td>
+                                  <td className="py-2.5 px-3 text-gray-600 capitalize">{kol.tier || '—'}</td>
+                                  <td className="py-2.5 px-3">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${kol.statusColor}`}>
+                                      {kol.displayStatus}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right">
+                                    {kol.contentLinks.length > 0 ? (
+                                      <div className="flex items-center justify-end gap-1">
+                                        {kol.contentLinks.slice(0, 3).map((link, i) => (
+                                          <a key={i} href={link} target="_blank" rel="noopener noreferrer" className="text-[#3e8692] hover:text-[#2d6570]">
+                                            <ExternalLink className="h-3.5 w-3.5" />
+                                          </a>
+                                        ))}
+                                        {kol.contentLinks.length > 3 && (
+                                          <span className="text-xs text-gray-400">+{kol.contentLinks.length - 3}</span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-gray-400">—</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 px-3 text-right text-gray-700 font-medium">{kol.impressions > 0 ? formatNumber(kol.impressions) : '—'}</td>
+                                  <td className="py-2.5 px-3 text-right text-gray-700 font-medium">{kol.engagement > 0 ? formatNumber(kol.engagement) : '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Meeting Notes Section — discovery & tracker only */}
+        {portalPhase !== 'kickoff' && meetingNotes.length > 0 && (
           <Card className="border-0 shadow-lg rounded-xl overflow-hidden mt-8">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
@@ -1058,8 +2403,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </DialogContent>
         </Dialog>
 
-        {/* Decision Log Section */}
-        {decisionLog.length > 0 && (
+        {/* Decision Log Section — discovery & tracker only */}
+        {portalPhase !== 'kickoff' && decisionLog.length > 0 && (
           <Card className="border-0 shadow-lg rounded-xl overflow-hidden mt-8">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
@@ -1084,6 +2429,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             </CardContent>
           </Card>
         )}
+
 
         {/* Footer */}
         <div className="mt-12 pt-8 border-t border-gray-200">

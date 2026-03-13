@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useSearchParams } from 'next/navigation';
 import { FormService, FormWithFields, FieldType } from '@/lib/formService';
 import { CheckCircle2, FileText, Loader, Calendar as CalendarIcon, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -22,6 +23,8 @@ const supabasePublic = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function PublicFormPage({ params }: { params: { id: string } }) {
   const formId = params.id;
+  const searchParams = useSearchParams();
+  const clientId = searchParams.get('client');
   const [form, setForm] = useState<FormWithFields | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -255,6 +258,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
         {
           form_id: form!.id,
           response_data: responseDataWithFiles,
+          client_id: clientId || undefined,
         },
         supabasePublic
       );

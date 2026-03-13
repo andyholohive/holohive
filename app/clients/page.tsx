@@ -15,10 +15,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { ClientService, ClientWithAccess } from '@/lib/clientService';
+import { FormService, FormWithStats } from '@/lib/formService';
 import { UserService } from '@/lib/userService';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare } from 'lucide-react';
+import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
@@ -80,6 +81,21 @@ type WeeklyUpdate = {
   updated_at: string;
 };
 
+type ActionItem = {
+  id: string;
+  client_id: string;
+  text: string;
+  court: 'yours' | 'ours';
+  phase: 'kickoff' | 'discovery' | 'tracker';
+  is_done: boolean;
+  is_hidden: boolean;
+  display_order: number;
+  attachment_url: string | null;
+  attachment_label: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type CampaignStatus = 'Planning' | 'Active' | 'Paused' | 'Completed';
 type ClientWithStatus = ClientWithAccess & {
   campaignsByStatus?: Record<CampaignStatus, number>;
@@ -111,6 +127,9 @@ export default function ClientsPage() {
   const [linkedAccounts, setLinkedAccounts] = useState<Record<string, CRMOpportunity[]>>({});
   const [isSharePortalOpen, setIsSharePortalOpen] = useState(false);
   const [clientToShare, setClientToShare] = useState<ClientWithAccess | null>(null);
+  const [shareForms, setShareForms] = useState<FormWithStats[]>([]);
+  const [shareExtraForms, setShareExtraForms] = useState<string[]>([]);
+  const [shareAddFormOpen, setShareAddFormOpen] = useState(false);
   // Meeting notes state
   const [clientMeetingNotes, setClientMeetingNotes] = useState<Record<string, MeetingNote[]>>({});
   const [meetingNotesModalClient, setMeetingNotesModalClient] = useState<ClientWithAccess | null>(null);
@@ -123,7 +142,7 @@ export default function ClientsPage() {
   // Client context state
   const [clientContexts, setClientContexts] = useState<Record<string, ClientContext>>({});
   const [contextModalClient, setContextModalClient] = useState<ClientWithAccess | null>(null);
-  const [contextForm, setContextForm] = useState<{ engagement_type: string; scope: string; start_date: Date | undefined; milestones: string; client_contacts: string; holohive_contacts: string }>({ engagement_type: '', scope: '', start_date: undefined, milestones: '', client_contacts: '', holohive_contacts: '' });
+  const [contextForm, setContextForm] = useState<{ engagement_type: string; scope: string; start_date: Date | undefined; milestones: string; client_contacts: string; holohive_contacts: string; telegram_url: string; shared_drive_url: string; gtm_sync_url: string; onboarding_phase: string }>({ engagement_type: '', scope: '', start_date: undefined, milestones: '', client_contacts: '', holohive_contacts: '', telegram_url: '', shared_drive_url: '', gtm_sync_url: '', onboarding_phase: '' });
   // Decision log state
   const [clientDecisionLogs, setClientDecisionLogs] = useState<Record<string, DecisionLogEntry[]>>({});
   const [decisionForm, setDecisionForm] = useState<{ decision_date: Date | undefined; summary: string }>({ decision_date: undefined, summary: '' });
@@ -138,6 +157,14 @@ export default function ClientsPage() {
   const [editingWeeklyId, setEditingWeeklyId] = useState<string | null>(null);
   const [isWeeklyFormOpen, setIsWeeklyFormOpen] = useState(false);
   const [deletingWeeklyId, setDeletingWeeklyId] = useState<string | null>(null);
+  // Action items state
+  const [clientActionItems, setClientActionItems] = useState<Record<string, ActionItem[]>>({});
+  const [actionItemForm, setActionItemForm] = useState<{ text: string; court: 'yours' | 'ours'; attachment_url: string; attachment_label: string }>({ text: '', court: 'yours', attachment_url: '', attachment_label: '' });
+  const [editingActionItemId, setEditingActionItemId] = useState<string | null>(null);
+  const [isActionItemFormOpen, setIsActionItemFormOpen] = useState(false);
+  const [deletingActionItemId, setDeletingActionItemId] = useState<string | null>(null);
+  const [contextModalTab, setContextModalTab] = useState<string>('context');
+  const [actionBoardPhase, setActionBoardPhase] = useState<string>('kickoff');
   // New client form state
   const [newClient, setNewClient] = useState({
     name: '',
@@ -150,7 +177,9 @@ export default function ClientsPage() {
     is_whitelisted: false,
     whitelist_partner_id: null as string | null,
     logo_url: null as string | null,
+    approved_domains: [] as string[],
   });
+  const [domainInput, setDomainInput] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -226,9 +255,17 @@ export default function ClientsPage() {
     return true;
   };
 
-  const openSharePortal = (client: ClientWithAccess) => {
+  const openSharePortal = async (client: ClientWithAccess) => {
     setClientToShare(client);
+    setShareExtraForms([]);
+    setShareAddFormOpen(false);
     setIsSharePortalOpen(true);
+    try {
+      const forms = await FormService.getAllForms();
+      setShareForms(forms.filter(f => f.status === 'published'));
+    } catch (err) {
+      console.error('Error fetching forms:', err);
+    }
   };
 
   const copyPortalLink = () => {
@@ -238,6 +275,23 @@ export default function ClientsPage() {
     toast({
       title: 'Link Copied',
       description: 'Portal link has been copied to clipboard',
+    });
+  };
+
+  const ONBOARDING_FORM_SLUG = 'holo-hive-onboarding';
+
+  const getFormUrl = (formSlugOrId: string) => {
+    if (!clientToShare) return '';
+    return `${typeof window !== 'undefined' ? window.location.origin : ''}/public/forms/${formSlugOrId}?client=${clientToShare.id}`;
+  };
+
+  const copyFormLink = (formSlugOrId: string, formName: string) => {
+    const url = getFormUrl(formSlugOrId);
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    toast({
+      title: 'Link Copied',
+      description: `${formName} link has been copied to clipboard`,
     });
   };
 
@@ -353,6 +407,15 @@ export default function ClientsPage() {
         weekMap[w.client_id].push(w);
       }
       setClientWeeklyUpdates(weekMap);
+
+      // Fetch action items
+      const { data: actionData } = await supabase.from('client_action_items').select('*').order('display_order', { ascending: true });
+      const actionMap: Record<string, ActionItem[]> = {};
+      for (const item of (actionData || [])) {
+        if (!actionMap[item.client_id]) actionMap[item.client_id] = [];
+        actionMap[item.client_id].push(item as ActionItem);
+      }
+      setClientActionItems(actionMap);
     } catch (err) {
       setError('Failed to load clients');
     } finally {
@@ -400,6 +463,106 @@ export default function ClientsPage() {
       map[w.client_id].push(w);
     }
     setClientWeeklyUpdates(map);
+  };
+
+  // Action items
+  const refreshActionItems = async () => {
+    const { data } = await supabase.from('client_action_items').select('*').order('display_order', { ascending: true });
+    const map: Record<string, ActionItem[]> = {};
+    for (const item of (data || [])) {
+      if (!map[item.client_id]) map[item.client_id] = [];
+      map[item.client_id].push(item as ActionItem);
+    }
+    setClientActionItems(map);
+  };
+
+  const DEFAULT_ACTION_ITEMS: { text: string; court: 'yours' | 'ours'; phase: 'kickoff' | 'discovery' | 'tracker'; display_order: number }[] = [
+    // Kickoff (Days 1-2): Onboarding & Setup + Project Review
+    { text: 'Complete onboarding form', court: 'yours', phase: 'kickoff', display_order: 0 },
+    { text: 'Upload assets & documentation (branding, decks, product links)', court: 'yours', phase: 'kickoff', display_order: 1 },
+    { text: 'Confirm workspace access', court: 'yours', phase: 'kickoff', display_order: 2 },
+    { text: 'Workspace setup & onboarding overview', court: 'ours', phase: 'kickoff', display_order: 0 },
+    { text: 'Project, product & resource review', court: 'ours', phase: 'kickoff', display_order: 1 },
+    { text: 'Ecosystem & market positioning analysis', court: 'ours', phase: 'kickoff', display_order: 2 },
+    // Discovery (Days 3-5): Strategy, GTM & Outreach Prep
+    { text: 'Submit graphic materials vault', court: 'yours', phase: 'discovery', display_order: 0 },
+    { text: 'Review campaign brief', court: 'yours', phase: 'discovery', display_order: 1 },
+    { text: 'Confirm weekly sync schedule', court: 'yours', phase: 'discovery', display_order: 2 },
+    { text: 'Internal strategy & narrative positioning review', court: 'ours', phase: 'discovery', display_order: 0 },
+    { text: 'KOL outreach brief preparation & translation', court: 'ours', phase: 'discovery', display_order: 1 },
+    { text: 'KOL selection & shortlist preparation', court: 'ours', phase: 'discovery', display_order: 2 },
+    { text: 'Initial content brief preparation', court: 'ours', phase: 'discovery', display_order: 3 },
+    { text: 'Regional GTM plan development', court: 'ours', phase: 'discovery', display_order: 4 },
+    // Tracker (Days 6-7): Campaign Deployment & Activation
+    { text: 'Review & approve KOL shortlist', court: 'yours', phase: 'tracker', display_order: 0 },
+    { text: 'Review & approve content brief', court: 'yours', phase: 'tracker', display_order: 1 },
+    { text: 'Approve content drafts', court: 'yours', phase: 'tracker', display_order: 2 },
+    { text: 'Campaign tracker deployment', court: 'ours', phase: 'tracker', display_order: 0 },
+    { text: 'Creator outreach with translated content brief', court: 'ours', phase: 'tracker', display_order: 1 },
+    { text: 'Content schedule planning & finalization', court: 'ours', phase: 'tracker', display_order: 2 },
+    { text: 'First activations scheduled', court: 'ours', phase: 'tracker', display_order: 3 },
+    { text: 'Performance tracking & reporting', court: 'ours', phase: 'tracker', display_order: 4 },
+  ];
+
+  const seedActionItems = async (clientId: string) => {
+    const existing = clientActionItems[clientId];
+    if (existing && existing.length > 0) return;
+    const rows = DEFAULT_ACTION_ITEMS.map(item => ({ client_id: clientId, ...item }));
+    const { error } = await supabase.from('client_action_items').insert(rows);
+    if (error) { console.error('Error seeding action items:', error); return; }
+    await refreshActionItems();
+  };
+
+  const handleActionItemSubmit = async () => {
+    if (!contextModalClient || !actionItemForm.text.trim()) return;
+    try {
+      const attachUrl = actionItemForm.attachment_url.trim() || null;
+      const attachLabel = actionItemForm.attachment_label.trim() || null;
+      if (editingActionItemId) {
+        await supabase.from('client_action_items').update({
+          text: actionItemForm.text.trim(),
+          court: actionItemForm.court,
+          attachment_url: attachUrl,
+          attachment_label: attachLabel,
+          updated_at: new Date().toISOString(),
+        }).eq('id', editingActionItemId);
+      } else {
+        const items = clientActionItems[contextModalClient.id] || [];
+        const phaseItems = items.filter(i => i.phase === actionBoardPhase && i.court === actionItemForm.court);
+        const maxOrder = phaseItems.length > 0 ? Math.max(...phaseItems.map(i => i.display_order)) + 1 : 0;
+        await supabase.from('client_action_items').insert({
+          client_id: contextModalClient.id,
+          text: actionItemForm.text.trim(),
+          court: actionItemForm.court,
+          phase: actionBoardPhase,
+          display_order: maxOrder,
+          attachment_url: attachUrl,
+          attachment_label: attachLabel,
+        });
+      }
+      await refreshActionItems();
+      setIsActionItemFormOpen(false);
+      setEditingActionItemId(null);
+      setActionItemForm({ text: '', court: 'yours', attachment_url: '', attachment_label: '' });
+    } catch (err) {
+      console.error('Error saving action item:', err);
+    }
+  };
+
+  const toggleActionItemDone = async (item: ActionItem) => {
+    await supabase.from('client_action_items').update({ is_done: !item.is_done, updated_at: new Date().toISOString() }).eq('id', item.id);
+    await refreshActionItems();
+  };
+
+  const toggleActionItemHidden = async (item: ActionItem) => {
+    await supabase.from('client_action_items').update({ is_hidden: !item.is_hidden, updated_at: new Date().toISOString() }).eq('id', item.id);
+    await refreshActionItems();
+  };
+
+  const deleteActionItem = async (id: string) => {
+    await supabase.from('client_action_items').delete().eq('id', id);
+    await refreshActionItems();
+    setDeletingActionItemId(null);
   };
 
   const addMeetingNote = async (clientId: string, note: { title: string; content: string; meeting_date: string; attendees: string; action_items: string }) => {
@@ -619,6 +782,7 @@ export default function ClientsPage() {
     const crmStartDate = crmAccount?.closed_at || crmAccount?.qualified_at || crmAccount?.created_at;
 
     setContextModalClient(client);
+    setContextModalTab('context');
     setContextForm({
       engagement_type: ctx?.engagement_type || '',
       scope: crmAccount ? crmScope : (ctx?.scope || ''),
@@ -628,6 +792,10 @@ export default function ClientsPage() {
       milestones: ctx?.milestones || '',
       client_contacts: ctx?.client_contacts || '',
       holohive_contacts: ctx?.holohive_contacts || '',
+      telegram_url: (ctx as any)?.telegram_url || '',
+      shared_drive_url: (ctx as any)?.shared_drive_url || '',
+      gtm_sync_url: (ctx as any)?.gtm_sync_url || '',
+      onboarding_phase: (ctx as any)?.onboarding_phase || '',
     });
   };
 
@@ -642,6 +810,10 @@ export default function ClientsPage() {
       milestones: contextForm.milestones || null,
       client_contacts: contextForm.client_contacts || null,
       holohive_contacts: contextForm.holohive_contacts || null,
+      telegram_url: contextForm.telegram_url || null,
+      shared_drive_url: contextForm.shared_drive_url || null,
+      gtm_sync_url: contextForm.gtm_sync_url || null,
+      onboarding_phase: contextForm.onboarding_phase || null,
       updated_at: new Date().toISOString(),
     };
     try {
@@ -779,7 +951,9 @@ export default function ClientsPage() {
       is_whitelisted: client.is_whitelisted || false,
       whitelist_partner_id: client.whitelist_partner_id,
       logo_url: (client as any).logo_url || null,
+      approved_domains: (client as any).approved_domains || [],
     });
+    setDomainInput('');
     setLogoPreview((client as any).logo_url || null);
     setLogoFile(null);
     setIsEditMode(true);
@@ -802,7 +976,9 @@ export default function ClientsPage() {
       is_whitelisted: false,
       whitelist_partner_id: null,
       logo_url: null,
+      approved_domains: [],
     });
+    setDomainInput('');
   };
   const handleDeleteClient = (client: ClientWithAccess) => {
     setClientToDelete(client);
@@ -915,7 +1091,8 @@ export default function ClientsPage() {
           is_whitelisted: newClient.is_whitelisted,
           whitelist_partner_id: newClient.whitelist_partner_id,
           logo_url: logoUrl,
-        });
+          approved_domains: newClient.approved_domains.length > 0 ? newClient.approved_domains : null,
+        } as any);
       } else {
         const client = await ClientService.createClient(
           newClient.name.trim(),
@@ -1929,6 +2106,63 @@ export default function ClientsPage() {
                           </div>
                         )}
                       </div>
+                      <div className="grid gap-2">
+                        <Label>Approved Domains</Label>
+                        <p className="text-xs text-gray-500">Anyone with an email at these domains can access this client's campaigns.</p>
+                        <div className="flex gap-2">
+                          <Textarea
+                            value={domainInput}
+                            onChange={(e) => setDomainInput(e.target.value)}
+                            placeholder={"Enter domains (comma or newline separated)\ne.g. partner.com, agency.com"}
+                            className="auth-input min-h-[60px] flex-1"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            const entries = domainInput
+                              .split(/[\n,]+/)
+                              .map(entry => entry.trim().toLowerCase().replace(/^@/, ''))
+                              .filter(entry => entry.length > 0 && /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(entry));
+                            const current = newClient.approved_domains;
+                            const newDomains = entries.filter(d => !current.includes(d));
+                            if (newDomains.length > 0) {
+                              setNewClient({ ...newClient, approved_domains: [...current, ...newDomains] });
+                              setDomainInput('');
+                            }
+                          }}
+                          disabled={!domainInput.trim()}
+                          className="hover:opacity-90 w-fit"
+                          style={{ backgroundColor: '#3e8692', color: 'white' }}
+                        >
+                          Add Domains
+                        </Button>
+                        {newClient.approved_domains.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {newClient.approved_domains.map((domain, index) => (
+                              <div
+                                key={index}
+                                className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-800 rounded-full text-sm"
+                              >
+                                <Globe className="h-3.5 w-3.5" />
+                                @{domain}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setNewClient({
+                                      ...newClient,
+                                      approved_domains: newClient.approved_domains.filter((_, i) => i !== index),
+                                    });
+                                  }}
+                                  className="ml-1 text-blue-500 hover:text-blue-700"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <DialogFooter>
                       <Button type="button" variant="outline" onClick={handleCloseClientModal}>
@@ -2204,43 +2438,102 @@ export default function ClientsPage() {
         <Dialog open={isSharePortalOpen} onOpenChange={setIsSharePortalOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Share Portal: {clientToShare?.name}</DialogTitle>
+              <DialogTitle>Share Links: {clientToShare?.name}</DialogTitle>
               <DialogDescription>
-                Share this client portal by copying the link below.
+                Share portal and form links with this client.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="share-portal-link">Portal Link</Label>
+                <Label>Portal Link</Label>
                 <div className="flex gap-2">
                   <Input
-                    id="share-portal-link"
                     value={`${typeof window !== 'undefined' ? window.location.origin : ''}/public/portal/${clientToShare?.slug || clientToShare?.id}`}
                     readOnly
                     className="flex-1 auth-input"
                   />
-                  <Button
-                    variant="outline"
-                    className="h-10"
-                    onClick={copyPortalLink}
-                  >
+                  <Button variant="outline" className="h-10" onClick={copyPortalLink}>
                     <Copy className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="h-10"
-                    onClick={() => {
-                      if (typeof window !== 'undefined' && clientToShare) {
-                        window.open(`${window.location.origin}/public/portal/${clientToShare.slug || clientToShare.id}`, '_blank');
-                      }
-                    }}
-                  >
+                  <Button variant="outline" className="h-10" onClick={() => {
+                    if (typeof window !== 'undefined' && clientToShare) {
+                      window.open(`${window.location.origin}/public/portal/${clientToShare.slug || clientToShare.id}`, '_blank');
+                    }
+                  }}>
                     <ExternalLink className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>Onboarding Form</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={getFormUrl(ONBOARDING_FORM_SLUG)}
+                    readOnly
+                    className="flex-1 auth-input"
+                  />
+                  <Button variant="outline" className="h-10" onClick={() => copyFormLink(ONBOARDING_FORM_SLUG, 'Onboarding form')}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" className="h-10" onClick={() => {
+                    const url = getFormUrl(ONBOARDING_FORM_SLUG);
+                    if (url) window.open(url, '_blank');
+                  }}>
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              {shareExtraForms.map(formSlugOrId => {
+                const form = shareForms.find(f => (f.slug || f.id) === formSlugOrId);
+                if (!form) return null;
+                return (
+                  <div key={formSlugOrId} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>{form.name}</Label>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-gray-400 hover:text-red-500" onClick={() => setShareExtraForms(prev => prev.filter(s => s !== formSlugOrId))}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input value={getFormUrl(formSlugOrId)} readOnly className="flex-1 auth-input" />
+                      <Button variant="outline" className="h-10" onClick={() => copyFormLink(formSlugOrId, form.name)}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" className="h-10" onClick={() => {
+                        const url = getFormUrl(formSlugOrId);
+                        if (url) window.open(url, '_blank');
+                      }}>
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+              {(() => {
+                const availableForms = shareForms.filter(f => (f.slug || f.id) !== ONBOARDING_FORM_SLUG && !shareExtraForms.includes(f.slug || f.id));
+                if (availableForms.length === 0) return null;
+                return shareAddFormOpen ? (
+                  <div className="space-y-2">
+                    <Label>Add Form</Label>
+                    <Select onValueChange={v => { setShareExtraForms(prev => [...prev, v]); setShareAddFormOpen(false); }}>
+                      <SelectTrigger className="auth-input">
+                        <SelectValue placeholder="Select a form..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableForms.map(f => (
+                          <SelectItem key={f.id} value={f.slug || f.id}>{f.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => setShareAddFormOpen(true)}>
+                    <Plus className="h-4 w-4 mr-1" /> Add Form
+                  </Button>
+                );
+              })()}
               <p className="text-sm text-gray-500">
-                Clients can access this portal using their registered email address ({clientToShare?.email}).
+                Clients can access the portal using their registered email address ({clientToShare?.email}).
               </p>
             </div>
           </DialogContent>
@@ -2493,81 +2786,225 @@ export default function ClientsPage() {
         </Dialog>
 
         {/* Client Context Modal */}
-        <Dialog open={!!contextModalClient} onOpenChange={(open) => { if (!open) setContextModalClient(null); }}>
-          <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-hidden">
+        <Dialog open={!!contextModalClient} onOpenChange={(open) => { if (!open) { setContextModalClient(null); setIsActionItemFormOpen(false); setEditingActionItemId(null); setDeletingActionItemId(null); } }}>
+          <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden">
             <DialogHeader>
               <DialogTitle>Client Context — {contextModalClient?.name}</DialogTitle>
-              <DialogDescription>Set up engagement context for this client.</DialogDescription>
+              <DialogDescription>Manage engagement context and action board for this client.</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1 pb-4">
-              <div className="grid gap-2">
-                <Label>Engagement Type</Label>
-                <Select value={contextForm.engagement_type} onValueChange={(v) => setContextForm({ ...contextForm, engagement_type: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select type" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="KOL">KOL</SelectItem>
-                    <SelectItem value="GTM">GTM</SelectItem>
-                    <SelectItem value="Advisory">Advisory</SelectItem>
-                    <SelectItem value="Hybrid">Hybrid</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center justify-between">
-                  <Label>Scope</Label>
-                  {contextModalClient && getLinkedCRMAccount(contextModalClient.id) && (
-                    <span className="text-xs text-[#3e8692] font-medium">From Pipeline</span>
-                  )}
-                </div>
-                {contextModalClient && getLinkedCRMAccount(contextModalClient.id) ? (
-                  <div className="flex h-auto min-h-[80px] w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">{contextForm.scope || '—'}</div>
-                ) : (
-                  <Textarea value={contextForm.scope} onChange={(e) => setContextForm({ ...contextForm, scope: e.target.value })} placeholder="Project description, regions, etc." className="auth-input" rows={3} />
-                )}
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center justify-between">
-                  <Label>Start Date</Label>
-                  {contextModalClient && getLinkedCRMAccount(contextModalClient.id) && (
-                    <span className="text-xs text-[#3e8692] font-medium">From Pipeline</span>
-                  )}
-                </div>
-                {contextModalClient && getLinkedCRMAccount(contextModalClient.id) ? (
-                  <div className="flex h-10 w-full items-center rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                    <CalendarIcon className="mr-2 h-4 w-4 text-gray-400" />
-                    {contextForm.start_date ? contextForm.start_date.toLocaleDateString() : '—'}
+            <Tabs value={contextModalTab} onValueChange={(v) => {
+              setContextModalTab(v);
+              if (v === 'actionboard' && contextModalClient) {
+                seedActionItems(contextModalClient.id);
+              }
+            }}>
+              <TabsList className="mb-3">
+                <TabsTrigger value="context">Context</TabsTrigger>
+                <TabsTrigger value="actionboard">Action Board</TabsTrigger>
+              </TabsList>
+              <TabsContent value="context">
+                <div className="space-y-4 max-h-[55vh] overflow-y-auto px-1 pb-4">
+                  <div className="grid gap-2">
+                    <Label>Engagement Type</Label>
+                    <Select value={contextForm.engagement_type} onValueChange={(v) => setContextForm({ ...contextForm, engagement_type: v })}>
+                      <SelectTrigger className="auth-input"><SelectValue placeholder="Select type" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="KOL">KOL</SelectItem>
+                        <SelectItem value="GTM">GTM</SelectItem>
+                        <SelectItem value="Advisory">Advisory</SelectItem>
+                        <SelectItem value="Hybrid">Hybrid</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                ) : (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" className="auth-input justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: contextForm.start_date ? '#111827' : '#9ca3af' }}>
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {contextForm.start_date ? contextForm.start_date.toLocaleDateString() : 'Select start date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={contextForm.start_date} onSelect={(date) => setContextForm({ ...contextForm, start_date: date || undefined })} initialFocus classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }} modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }} />
-                    </PopoverContent>
-                  </Popover>
-                )}
-              </div>
-              <div className="grid gap-2">
-                <Label>Milestones</Label>
-                <Textarea value={contextForm.milestones} onChange={(e) => setContextForm({ ...contextForm, milestones: e.target.value })} placeholder="Expected milestones..." className="auth-input" rows={3} />
-              </div>
-              <div className="grid gap-2">
-                <Label>Client Contacts</Label>
-                <Input value={contextForm.client_contacts} onChange={(e) => setContextForm({ ...contextForm, client_contacts: e.target.value })} placeholder="Primary contacts on client side" className="auth-input" />
-              </div>
-              <div className="grid gap-2">
-                <Label>Holo Hive Contacts</Label>
-                <Input value={contextForm.holohive_contacts} onChange={(e) => setContextForm({ ...contextForm, holohive_contacts: e.target.value })} placeholder="Primary contacts on Holo Hive side" className="auth-input" />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setContextModalClient(null)}>Cancel</Button>
-              <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleContextSubmit}>Save Context</Button>
-            </DialogFooter>
+                  <div className="grid gap-2">
+                    <Label>Onboarding Phase</Label>
+                    <Select value={contextForm.onboarding_phase} onValueChange={(v) => setContextForm({ ...contextForm, onboarding_phase: v === 'auto' ? '' : v })}>
+                      <SelectTrigger className="auth-input"><SelectValue placeholder="Auto (default)" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Auto (default)</SelectItem>
+                        <SelectItem value="kickoff">Kickoff</SelectItem>
+                        <SelectItem value="discovery">Discovery</SelectItem>
+                        <SelectItem value="tracker">Tracker</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Scope</Label>
+                      {contextModalClient && getLinkedCRMAccount(contextModalClient.id) && (
+                        <span className="text-xs text-[#3e8692] font-medium">From Pipeline</span>
+                      )}
+                    </div>
+                    {contextModalClient && getLinkedCRMAccount(contextModalClient.id) ? (
+                      <div className="flex h-auto min-h-[80px] w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">{contextForm.scope || '—'}</div>
+                    ) : (
+                      <Textarea value={contextForm.scope} onChange={(e) => setContextForm({ ...contextForm, scope: e.target.value })} placeholder="Project description, regions, etc." className="auth-input" rows={3} />
+                    )}
+                  </div>
+                  <div className="grid gap-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Start Date</Label>
+                      {contextModalClient && getLinkedCRMAccount(contextModalClient.id) && (
+                        <span className="text-xs text-[#3e8692] font-medium">From Pipeline</span>
+                      )}
+                    </div>
+                    {contextModalClient && getLinkedCRMAccount(contextModalClient.id) ? (
+                      <div className="flex h-10 w-full items-center rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                        <CalendarIcon className="mr-2 h-4 w-4 text-gray-400" />
+                        {contextForm.start_date ? contextForm.start_date.toLocaleDateString() : '—'}
+                      </div>
+                    ) : (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="auth-input justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: contextForm.start_date ? '#111827' : '#9ca3af' }}>
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {contextForm.start_date ? contextForm.start_date.toLocaleDateString() : 'Select start date'}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar mode="single" selected={contextForm.start_date} onSelect={(date) => setContextForm({ ...contextForm, start_date: date || undefined })} initialFocus classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }} modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }} />
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Milestones</Label>
+                    <Textarea value={contextForm.milestones} onChange={(e) => setContextForm({ ...contextForm, milestones: e.target.value })} placeholder="Expected milestones..." className="auth-input" rows={3} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Client Contacts</Label>
+                    <Input value={contextForm.client_contacts} onChange={(e) => setContextForm({ ...contextForm, client_contacts: e.target.value })} placeholder="Primary contacts on client side" className="auth-input" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Holo Hive Contacts</Label>
+                    <Input value={contextForm.holohive_contacts} onChange={(e) => setContextForm({ ...contextForm, holohive_contacts: e.target.value })} placeholder="Primary contacts on Holo Hive side" className="auth-input" />
+                  </div>
+                  <div className="border-t pt-4 mt-2">
+                    <p className="text-sm font-semibold text-gray-700 mb-3">Resource Links (shown in client portal)</p>
+                    <div className="grid gap-3">
+                      <div className="grid gap-1">
+                        <Label className="text-xs">Telegram Group URL</Label>
+                        <Input value={contextForm.telegram_url} onChange={(e) => setContextForm({ ...contextForm, telegram_url: e.target.value })} placeholder="https://t.me/..." className="auth-input" />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-xs">Shared Drive URL</Label>
+                        <Input value={contextForm.shared_drive_url} onChange={(e) => setContextForm({ ...contextForm, shared_drive_url: e.target.value })} placeholder="https://drive.google.com/..." className="auth-input" />
+                      </div>
+                      <div className="grid gap-1">
+                        <Label className="text-xs">GTM Sync / Tracker URL</Label>
+                        <Input value={contextForm.gtm_sync_url} onChange={(e) => setContextForm({ ...contextForm, gtm_sync_url: e.target.value })} placeholder="https://..." className="auth-input" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter className="mt-4">
+                  <Button variant="outline" onClick={() => setContextModalClient(null)}>Cancel</Button>
+                  <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleContextSubmit}>Save Context</Button>
+                </DialogFooter>
+              </TabsContent>
+              <TabsContent value="actionboard">
+                <Tabs value={actionBoardPhase} onValueChange={setActionBoardPhase}>
+                  <TabsList className="mb-3">
+                    <TabsTrigger value="kickoff">Kickoff</TabsTrigger>
+                    <TabsTrigger value="discovery">Discovery</TabsTrigger>
+                    <TabsTrigger value="tracker">Tracker</TabsTrigger>
+                  </TabsList>
+                  {(['kickoff', 'discovery', 'tracker'] as const).map(phase => {
+                    const items = contextModalClient ? (clientActionItems[contextModalClient.id] || []).filter(i => i.phase === phase) : [];
+                    const yoursItems = items.filter(i => i.court === 'yours').sort((a, b) => a.display_order - b.display_order);
+                    const oursItems = items.filter(i => i.court === 'ours').sort((a, b) => a.display_order - b.display_order);
+                    const renderItem = (item: ActionItem) => (
+                      <div key={item.id} className={`p-2 rounded-lg ${item.is_hidden ? 'opacity-40' : ''} ${item.is_done ? 'bg-gray-50' : 'bg-white'} border`}>
+                        {deletingActionItemId === item.id ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-600">Delete this item?</span>
+                            <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => deleteActionItem(item.id)}>Delete</Button>
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setDeletingActionItemId(null)}>Cancel</Button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <Checkbox checked={item.is_done} onCheckedChange={() => toggleActionItemDone(item)} />
+                              <span className={`flex-1 text-sm ${item.is_done ? 'line-through text-gray-400' : 'text-gray-700'}`}>{item.text}</span>
+                              <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-gray-100" onClick={() => toggleActionItemHidden(item)}>
+                                {item.is_hidden ? <EyeOff className="h-3.5 w-3.5 text-gray-400" /> : <Eye className="h-3.5 w-3.5 text-gray-400" />}
+                              </Button>
+                              <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-gray-100" onClick={() => {
+                                setEditingActionItemId(item.id);
+                                setActionItemForm({ text: item.text, court: item.court, attachment_url: item.attachment_url || '', attachment_label: item.attachment_label || '' });
+                                setIsActionItemFormOpen(true);
+                              }}>
+                                <Pencil className="h-3.5 w-3.5 text-gray-400" />
+                              </Button>
+                              <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-red-50" onClick={() => setDeletingActionItemId(item.id)}>
+                                <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                              </Button>
+                            </div>
+                            {item.attachment_url && (
+                              <div className="ml-8 mt-1">
+                                <a href={item.attachment_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#3e8692] hover:underline">
+                                  <LinkIcon className="h-3 w-3" />
+                                  {item.attachment_label || 'View attachment'}
+                                </a>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                    return (
+                      <TabsContent key={phase} value={phase}>
+                        <div className="max-h-[50vh] overflow-y-auto space-y-4 px-1 pb-2">
+                          {/* Your Court */}
+                          <div>
+                            <p className="text-xs font-semibold text-orange-600 uppercase tracking-wider mb-2">Your Court (Client)</p>
+                            <div className="space-y-1.5">
+                              {yoursItems.map(renderItem)}
+                              {yoursItems.length === 0 && <p className="text-xs text-gray-400 py-1">No items</p>}
+                            </div>
+                          </div>
+                          {/* Our Court */}
+                          <div>
+                            <p className="text-xs font-semibold text-[#3e8692] uppercase tracking-wider mb-2">Our Court (Holo Hive)</p>
+                            <div className="space-y-1.5">
+                              {oursItems.map(renderItem)}
+                              {oursItems.length === 0 && <p className="text-xs text-gray-400 py-1">No items</p>}
+                            </div>
+                          </div>
+                          {/* Add Item Form */}
+                          {isActionItemFormOpen && actionBoardPhase === phase ? (
+                            <div className="border rounded-lg p-3 space-y-2 bg-gray-50">
+                              <Input value={actionItemForm.text} onChange={(e) => setActionItemForm({ ...actionItemForm, text: e.target.value })} placeholder="Action item text" className="auth-input" autoFocus />
+                              <div className="grid grid-cols-2 gap-2">
+                                <Input value={actionItemForm.attachment_url} onChange={(e) => setActionItemForm({ ...actionItemForm, attachment_url: e.target.value })} placeholder="Link URL (optional)" className="auth-input" />
+                                <Input value={actionItemForm.attachment_label} onChange={(e) => setActionItemForm({ ...actionItemForm, attachment_label: e.target.value })} placeholder="Link label (optional)" className="auth-input" />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Select value={actionItemForm.court} onValueChange={(v: 'yours' | 'ours') => setActionItemForm({ ...actionItemForm, court: v })}>
+                                  <SelectTrigger className="auth-input w-[160px]"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="yours">Your Court</SelectItem>
+                                    <SelectItem value="ours">Our Court</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleActionItemSubmit} disabled={!actionItemForm.text.trim()}>
+                                  {editingActionItemId ? 'Save' : 'Add'}
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => { setIsActionItemFormOpen(false); setEditingActionItemId(null); setActionItemForm({ text: '', court: 'yours', attachment_url: '', attachment_label: '' }); }}>Cancel</Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <Button size="sm" variant="outline" className="text-xs" onClick={() => { setIsActionItemFormOpen(true); setEditingActionItemId(null); setActionItemForm({ text: '', court: 'yours', attachment_url: '', attachment_label: '' }); }}>
+                              <Plus className="h-3.5 w-3.5 mr-1" /> Add Item
+                            </Button>
+                          )}
+                        </div>
+                      </TabsContent>
+                    );
+                  })}
+                </Tabs>
+              </TabsContent>
+            </Tabs>
           </DialogContent>
         </Dialog>
 

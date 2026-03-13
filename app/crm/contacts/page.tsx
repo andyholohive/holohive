@@ -333,7 +333,7 @@ export default function ContactsPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full gap-6">
+      <div className="flex flex-col gap-6">
         {/* Header skeleton */}
         <div className="flex items-center justify-between">
           <div>
@@ -372,7 +372,7 @@ export default function ContactsPage() {
   const unlinkedContacts = contacts.length - linkedContacts;
 
   return (
-    <div className="flex flex-col h-full gap-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -565,7 +565,7 @@ export default function ContactsPage() {
         </div>
       ) : viewMode === 'table' ? (
         /* Table View */
-        <div className="rounded-lg border bg-white overflow-hidden">
+        <div className="rounded-lg border bg-white overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50">

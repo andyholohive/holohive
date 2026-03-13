@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
     const linkUrl = `${baseUrl}/links`;
     const message = `<b>New Link Submitted</b>\n\n` +
       `<b>Name:</b> ${name.trim()}\n` +
+      `<b>URL:</b> ${url.trim()}\n` +
       `<b>Client:</b> ${client?.trim() || 'N/A'}\n` +
       `<b>Type:</b> ${link_types?.map((t: string) => t.charAt(0).toUpperCase() + t.slice(1)).join(', ') || 'N/A'}\n\n` +
       `<a href="${linkUrl}">View Links</a>`;

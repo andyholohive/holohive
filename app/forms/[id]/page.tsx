@@ -14,9 +14,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Plus, Edit, Trash2, Save, Share2, Copy, CheckCircle2, GripVertical, FileText, Download, Eye, ExternalLink, X, Bold, Italic, Palette, Upload, Minus, Globe, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, Save, Share2, Copy, CheckCircle2, GripVertical, FileText, Download, Eye, ExternalLink, X, Bold, Italic, Palette, Upload, Minus, Globe, Link as LinkIcon, Building2, Check, ChevronsUpDown } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
 import { FormService, FormWithFields, FormField, FieldType, FormStatus, FormResponse } from '@/lib/formService';
+import { ClientService } from '@/lib/clientService';
 import { CustomColorPicker } from '@/components/ui/custom-color-picker';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -1206,6 +1209,9 @@ export default function FormBuilderPage() {
   const [loadingResponses, setLoadingResponses] = useState(false);
   const [selectedResponse, setSelectedResponse] = useState<FormResponse | null>(null);
   const [isResponseDialogOpen, setIsResponseDialogOpen] = useState(false);
+  const [allClients, setAllClients] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [linkingResponseId, setLinkingResponseId] = useState<string | null>(null);
+  const [linkClientSearch, setLinkClientSearch] = useState('');
 
   // Page management state
   const [currentPage, setCurrentPage] = useState(1);
@@ -1594,6 +1600,39 @@ export default function FormBuilderPage() {
         description: 'Failed to delete response',
         variant: 'destructive',
       });
+    }
+  };
+
+  const fetchClients = async () => {
+    try {
+      const clients = await ClientService.getAllClients();
+      setAllClients(clients.map(c => ({ id: c.id, name: c.name, email: c.email || '' })));
+    } catch (err) {
+      console.error('Error fetching clients:', err);
+    }
+  };
+
+  const handleLinkClient = async (responseId: string, clientId: string) => {
+    try {
+      await FormService.linkResponseToClient(responseId, clientId);
+      setLinkingResponseId(null);
+      setLinkClientSearch('');
+      await fetchResponses();
+      toast({ title: 'Linked', description: 'Response linked to client' });
+    } catch (error) {
+      console.error('Error linking response:', error);
+      toast({ title: 'Error', description: 'Failed to link response', variant: 'destructive' });
+    }
+  };
+
+  const handleUnlinkClient = async (responseId: string) => {
+    try {
+      await FormService.linkResponseToClient(responseId, null);
+      await fetchResponses();
+      toast({ title: 'Unlinked', description: 'Client removed from response' });
+    } catch (error) {
+      console.error('Error unlinking response:', error);
+      toast({ title: 'Error', description: 'Failed to unlink response', variant: 'destructive' });
     }
   };
 
@@ -2634,6 +2673,7 @@ export default function FormBuilderPage() {
                         <TableHead>Submitted</TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
+                        <TableHead>Client</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -2645,6 +2685,47 @@ export default function FormBuilderPage() {
                           </TableCell>
                           <TableCell>{response.submitted_by_name || '-'}</TableCell>
                           <TableCell>{response.submitted_by_email || '-'}</TableCell>
+                          <TableCell>
+                            {response.client_name ? (
+                              <div className="flex items-center gap-1.5">
+                                <Badge variant="secondary" className="text-xs bg-[#e8f4f5] text-[#3e8692]">
+                                  <Building2 className="h-3 w-3 mr-1" />
+                                  {response.client_name}
+                                </Badge>
+                                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-gray-400 hover:text-red-500" onClick={() => handleUnlinkClient(response.id)} title="Unlink client">
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Popover open={linkingResponseId === response.id} onOpenChange={(open) => { if (!open) { setLinkingResponseId(null); } }}>
+                                <PopoverTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="text-xs text-gray-400 hover:text-[#3e8692] h-7 px-2" onClick={() => { setLinkingResponseId(response.id); fetchClients(); }}>
+                                    <LinkIcon className="h-3 w-3 mr-1" />
+                                    Link Client
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-64 p-0 z-[90]" align="start">
+                                  <Command>
+                                    <CommandInput placeholder="Search clients..." />
+                                    <CommandList>
+                                      <CommandEmpty>No clients found.</CommandEmpty>
+                                      <CommandGroup>
+                                        {allClients.map(client => (
+                                          <CommandItem key={client.id} value={`${client.name} ${client.email}`} onSelect={() => handleLinkClient(response.id, client.id)}>
+                                            <Building2 className="mr-2 h-4 w-4 text-gray-400" />
+                                            <div>
+                                              <div className="font-medium text-sm">{client.name}</div>
+                                              {client.email && <div className="text-xs text-gray-500">{client.email}</div>}
+                                            </div>
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                            )}
+                          </TableCell>
                           <TableCell>
                             <div className="flex gap-2">
                               <Button variant="outline" size="sm" onClick={() => handleViewResponse(response)} title="View response">
@@ -2910,7 +2991,7 @@ export default function FormBuilderPage() {
               <div className="space-y-6">
                 {/* Submission Info */}
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
                     <div>
                       <Label className="text-xs font-semibold text-gray-600 uppercase">Submitted</Label>
                       <p className="text-sm font-medium text-gray-900 mt-1">
@@ -2927,6 +3008,19 @@ export default function FormBuilderPage() {
                       <Label className="text-xs font-semibold text-gray-600 uppercase">Email</Label>
                       <p className="text-sm font-medium text-gray-900 mt-1">
                         {selectedResponse.submitted_by_email || '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-semibold text-gray-600 uppercase">Client</Label>
+                      <p className="text-sm font-medium text-gray-900 mt-1">
+                        {selectedResponse.client_name ? (
+                          <Badge variant="secondary" className="text-xs bg-[#e8f4f5] text-[#3e8692]">
+                            <Building2 className="h-3 w-3 mr-1" />
+                            {selectedResponse.client_name}
+                          </Badge>
+                        ) : (
+                          <span className="text-gray-400">Unlinked</span>
+                        )}
                       </p>
                     </div>
                   </div>

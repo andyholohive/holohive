@@ -215,6 +215,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
   const [emailError, setEmailError] = useState('');
   const [clientEmail, setClientEmail] = useState<string | null>(null);
   const [approvedEmails, setApprovedEmails] = useState<string[]>([]);
+  const [approvedDomains, setApprovedDomains] = useState<string[]>([]);
   const [loadingClientEmail, setLoadingClientEmail] = useState(true);
   const [campaignUuid, setCampaignUuid] = useState<string | null>(null);
 
@@ -332,7 +333,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     if (clientEmail) {
       checkCachedAuth();
     }
-  }, [clientEmail, approvedEmails]);
+  }, [clientEmail, approvedEmails, approvedDomains]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -384,8 +385,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           const cachedDomain = cachedEmailLower ? getEmailDomain(cachedEmailLower) : null;
           const clientDomain = getEmailDomain(clientEmailLower);
           const isSameDomain = cachedDomain && clientDomain && cachedDomain === clientDomain;
+          const isApprovedDomain = approvedDomains.some(domain =>
+            cachedDomain?.toLowerCase() === domain.toLowerCase()
+          );
 
-          if (cachedEmail && (isClientEmail || isApprovedEmail || isSameDomain)) {
+          if (cachedEmail && (isClientEmail || isApprovedEmail || isSameDomain || isApprovedDomain)) {
             setEmail(cachedEmail);
             setIsAuthenticated(true);
             return;
@@ -440,7 +444,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(campaignId);
       let query = supabasePublic
         .from('campaigns')
-        .select('id, client_id, approved_emails');
+        .select('id, client_id, approved_emails, approved_domains');
 
       if (isUUID) {
         query = query.eq('id', campaignId);
@@ -462,12 +466,13 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       // Store the campaign UUID for logging
       setCampaignUuid(campaignData.id);
 
-      // Store approved emails from campaign
+      // Store approved emails and domains from campaign
       setApprovedEmails((campaignData.approved_emails as string[]) || []);
+      setApprovedDomains((campaignData.approved_domains as string[]) || []);
 
       const { data: clientData, error: clientError } = await supabasePublic
         .from('clients')
-        .select('email')
+        .select('email, approved_domains')
         .eq('id', campaignData.client_id)
         .single();
 
@@ -481,6 +486,15 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       }
 
       setClientEmail(clientData.email);
+
+      // Merge client-level approved domains with campaign-level
+      const clientDomains = (clientData.approved_domains as string[]) || [];
+      if (clientDomains.length > 0) {
+        setApprovedDomains(prev => {
+          const merged = new Set([...prev, ...clientDomains]);
+          return Array.from(merged);
+        });
+      }
     } catch (e: any) {
       console.error('Error fetching client email:', e);
       setError(e.message || 'Failed to load campaign access information');
@@ -552,8 +566,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     const enteredDomain = getEmailDomain(emailLower);
     const clientDomain = getEmailDomain(authorizedEmailLower);
     const isSameDomain = enteredDomain && clientDomain && enteredDomain === clientDomain;
+    const isApprovedDomain = approvedDomains.some(domain =>
+      enteredDomain?.toLowerCase() === domain.toLowerCase()
+    );
 
-    if (!isClientEmail && !isApprovedEmail && !isSameDomain) {
+    if (!isClientEmail && !isApprovedEmail && !isSameDomain && !isApprovedDomain) {
       setEmailError('This email address is not authorized to access this campaign');
       return;
     }
