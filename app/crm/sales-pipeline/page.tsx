@@ -23,7 +23,7 @@ import {
   Plus, Minus, Search, Trash2, X, LayoutGrid, TableIcon, GripVertical, Loader2,
   Target, AlertTriangle, ArrowRight, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronUp,
   Phone, MessageSquare, Calendar, FileText, StickyNote, Zap, RotateCcw, Clock, Edit, Copy, Check, ChevronsUpDown,
-  Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown, Paperclip
+  Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown, Paperclip, Eye, Image
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -76,6 +76,7 @@ import {
 import { UserService } from '@/lib/userService';
 import { BookingService } from '@/lib/bookingService';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow, format } from 'date-fns';
 
 // ============================================
@@ -148,6 +149,9 @@ export default function SalesPipelinePage() {
 
   // UI state
   const [searchTerm, setSearchTerm] = useState('');
+  const [actionsSearch, setActionsSearch] = useState('');
+  const [pipelineSearch, setPipelineSearch] = useState('');
+  const [orbitSearch, setOrbitSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates'>('actions');
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('table');
   const [pathFilter, setPathFilter] = useState<'all' | 'closer' | 'sdr'>('all');
@@ -182,6 +186,7 @@ export default function SalesPipelinePage() {
   // Orbit/Closed Lost reason prompts
   const [orbitPrompt, setOrbitPrompt] = useState<{ oppId: string; oppName: string; fromStage: string } | null>(null);
   const [orbitReasonValue, setOrbitReasonValue] = useState<OrbitReason>('no_response');
+  const [orbitFollowupDays, setOrbitFollowupDays] = useState<number>(90);
   const [closedLostPrompt, setClosedLostPrompt] = useState<{ oppId: string; oppName: string; fromStage: string } | null>(null);
   const [closedLostReasonValue, setClosedLostReasonValue] = useState('');
 
@@ -234,13 +239,14 @@ export default function SalesPipelinePage() {
   const [isBulkBumping, setIsBulkBumping] = useState(false);
   const [isBulkMoving, setIsBulkMoving] = useState(false);
   const outreachSearchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const OUTREACH_PAGE_SIZE = 50;
 
   // Actions tab state
   const [actionFilter, setActionFilter] = useState<'all' | 'mine' | 'urgent'>('mine');
   const [actionPhaseFilter, setActionPhaseFilter] = useState<'all' | 'outreach' | 'closing' | 'orbit' | 'non_urgent'>('all');
   const [alertCardFilter, setAlertCardFilter] = useState<'none' | 'booking_needed' | 'overdue' | 'stale' | 'at_risk' | 'meetings'>('none');
-  const [actionSort, setActionSort] = useState<'priority' | 'stage' | 'temperature' | 'value' | 'name' | 'newest' | 'oldest'>(() => {
+  const [actionSort, setActionSort] = useState<'priority' | 'stage' | 'temperature' | 'value' | 'name' | 'newest' | 'oldest' | 'timing'>(() => {
     if (typeof window !== 'undefined' && user?.id) {
       return (localStorage.getItem(`action_sort_${user.id}`) as any) || 'priority';
     }
@@ -259,6 +265,8 @@ export default function SalesPipelinePage() {
   const [editingTemplate, setEditingTemplate] = useState<SalesDmTemplate | null>(null);
   const [templateForm, setTemplateForm] = useState<CreateSalesDmTemplateData>({ name: '', stage: 'cold_dm', sub_type: 'general', content: '' });
   const [isTemplateSubmitting, setIsTemplateSubmitting] = useState(false);
+  const [previewTemplate, setPreviewTemplate] = useState<SalesDmTemplate | null>(null);
+  const [templateTagFilter, setTemplateTagFilter] = useState<string>('all');
 
   // Activity log popup (shown after action execution)
   const [activityLogPrompt, setActivityLogPrompt] = useState<{
@@ -279,6 +287,12 @@ export default function SalesPipelinePage() {
     meeting_time?: string;
   }>({ title: '', description: '', outcome: '', next_step: '' });
   const [isActivityLogSubmitting, setIsActivityLogSubmitting] = useState(false);
+  const [templatePopoverOpen, setTemplatePopoverOpen] = useState(false);
+
+  // Dashboard time period filter
+  const [dashboardPeriod, setDashboardPeriod] = useState<'today' | '7d' | '30d' | 'all' | 'custom'>('all');
+  const [dashboardCustomFrom, setDashboardCustomFrom] = useState('');
+  const [dashboardCustomTo, setDashboardCustomTo] = useState('');
 
   // DnD sensors
   const sensors = useSensors(
@@ -291,7 +305,33 @@ export default function SalesPipelinePage() {
   // ============================================
 
   const dashboardMetrics = useMemo(() => {
-    const all = opportunities;
+    // Filter opportunities by selected time period
+    let all = opportunities;
+    if (dashboardPeriod !== 'all') {
+      const now = new Date();
+      let fromDate: Date | null = null;
+      let toDate: Date | null = null;
+      if (dashboardPeriod === 'today') {
+        fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      } else if (dashboardPeriod === '7d') {
+        fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (dashboardPeriod === '30d') {
+        fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      } else if (dashboardPeriod === 'custom') {
+        if (dashboardCustomFrom) fromDate = new Date(dashboardCustomFrom);
+        if (dashboardCustomTo) {
+          toDate = new Date(dashboardCustomTo);
+          toDate.setHours(23, 59, 59, 999);
+        }
+      }
+      all = opportunities.filter(o => {
+        if (!o.created_at) return false;
+        const created = new Date(o.created_at);
+        if (fromDate && created < fromDate) return false;
+        if (toDate && created > toDate) return false;
+        return true;
+      });
+    }
     const pipelineActive = all.filter(o => PIPELINE_STAGES.includes(o.stage as SalesPipelineStage));
     const closedWon = all.filter(o => o.stage === 'v2_closed_won');
     const closedLost = all.filter(o => o.stage === 'v2_closed_lost');
@@ -467,7 +507,7 @@ export default function SalesPipelinePage() {
       worstConversion,
       slowestStage,
     };
-  }, [opportunities, metrics.bamfamViolations, outreachTotal]);
+  }, [opportunities, metrics.bamfamViolations, outreachTotal, dashboardPeriod, dashboardCustomFrom, dashboardCustomTo]);
 
   // ============================================
   // Data Fetching
@@ -546,28 +586,30 @@ export default function SalesPipelinePage() {
   // Filtered Opportunities
   // ============================================
 
-  const filteredOpportunities = opportunities.filter(opp => {
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      const matchesName = opp.name.toLowerCase().includes(term);
-      const matchesPoc = opp.poc_handle?.toLowerCase().includes(term);
-      if (!matchesName && !matchesPoc) return false;
-    }
+  const matchesSearch = (opp: SalesPipelineOpportunity, term: string) => {
+    if (!term) return true;
+    const t = term.toLowerCase();
+    return opp.name.toLowerCase().includes(t) || (opp.poc_handle?.toLowerCase().includes(t) ?? false);
+  };
+
+  const filteredOpportunities = useMemo(() => opportunities.filter(opp => {
+    if (!matchesSearch(opp, pipelineSearch)) return false;
     if (pathFilter === 'closer' && opp.dm_account !== 'closer') return false;
     if (pathFilter === 'sdr' && opp.dm_account !== 'sdr') return false;
     return true;
-  });
+  }), [opportunities, pipelineSearch, pathFilter]);
 
   const getStageOpps = (stage: SalesPipelineStage) =>
     filteredOpportunities.filter(o => o.stage === stage).sort((a, b) => a.position - b.position);
 
   const visiblePipelineStages = (pathFilter === 'closer' ? PATH_A_STAGES : PIPELINE_STAGES).filter(s => s !== 'cold_dm');
 
-  const orbitOpps = filteredOpportunities.filter(o => o.stage === 'orbit');
-  const orbitByReason = ORBIT_REASONS.map(r => ({
+  const allOrbitOpps = useMemo(() => opportunities.filter(o => o.stage === 'orbit'), [opportunities]);
+  const orbitOpps = useMemo(() => orbitSearch ? allOrbitOpps.filter(o => matchesSearch(o, orbitSearch)) : allOrbitOpps, [allOrbitOpps, orbitSearch]);
+  const orbitByReason = useMemo(() => ORBIT_REASONS.map(r => ({
     ...r,
     opps: orbitOpps.filter(o => o.orbit_reason === r.value),
-  }));
+  })), [orbitOpps]);
 
   // ============================================
   // CRUD Handlers
@@ -693,9 +735,11 @@ export default function SalesPipelinePage() {
       await SalesPipelineService.update(oppId, {
         stage: 'orbit' as OpportunityStage,
         orbit_reason: orbitReasonValue,
+        orbit_followup_days: orbitFollowupDays,
       });
       setOrbitPrompt(null);
       setOrbitReasonValue('no_response');
+      setOrbitFollowupDays(90);
       await fetchData();
       // Open activity log popup
       openActivityLogPrompt(oppId, oppName, 'note', `Moved to orbit — ${reasonLabel}`);
@@ -1009,6 +1053,7 @@ export default function SalesPipelinePage() {
       next_meeting_at: opp.next_meeting_at || undefined,
       next_meeting_type: opp.next_meeting_type || undefined,
       notes: opp.notes || undefined,
+      orbit_followup_days: opp.orbit_followup_days || 90,
     });
   };
 
@@ -1227,8 +1272,9 @@ export default function SalesPipelinePage() {
 
       case 'orbit': {
         const daysSinceUpdated = Math.floor((Date.now() - new Date(opp.updated_at).getTime()) / (1000 * 60 * 60 * 24));
-        if (daysSinceUpdated > 90) {
-          return { label: 'Resurrect', hint: '90+ days — re-engage or mark lost', priority: 'low', actionType: 'open_detail', isActionable: true, sortScore: 70, alternatives: [
+        const followupThreshold = opp.orbit_followup_days || 90;
+        if (daysSinceUpdated > followupThreshold) {
+          return { label: 'Resurrect', hint: `${followupThreshold}+ days — re-engage or mark lost`, priority: 'low', actionType: 'open_detail', isActionable: true, sortScore: 70, alternatives: [
             { label: 'Back to Warm', actionType: 'stage_change', targetStage: 'warm', variant: 'default', quick: true },
             { label: 'Book Meeting', actionType: 'stage_change', targetStage: 'booked', variant: 'default' },
             { label: 'Lost', actionType: 'stage_change', targetStage: 'v2_closed_lost', variant: 'danger' },
@@ -1351,6 +1397,15 @@ export default function SalesPipelinePage() {
       items = items.filter(({ opp }) => alertCardOppIds.has(opp.id));
     }
 
+    // Apply actions search
+    if (actionsSearch) {
+      const term = actionsSearch.toLowerCase();
+      items = items.filter(({ opp }) =>
+        opp.name.toLowerCase().includes(term) ||
+        opp.poc_handle?.toLowerCase().includes(term)
+      );
+    }
+
     if (actionSort === 'priority' && actionPhaseFilter !== 'non_urgent') return items;
     const stageIdx: Record<string, number> = {};
     [...PIPELINE_STAGES, 'orbit', 'nurture', 'v2_closed_lost'].forEach((s, i) => { stageIdx[s] = i; });
@@ -1363,10 +1418,15 @@ export default function SalesPipelinePage() {
         case 'name': return (a.opp.name || '').localeCompare(b.opp.name || '');
         case 'newest': return new Date(b.opp.created_at).getTime() - new Date(a.opp.created_at).getTime();
         case 'oldest': return new Date(a.opp.created_at).getTime() - new Date(b.opp.created_at).getTime();
+        case 'timing': {
+          const aDate = a.opp.last_bump_date || a.opp.last_contacted_at || a.opp.created_at;
+          const bDate = b.opp.last_bump_date || b.opp.last_contacted_at || b.opp.created_at;
+          return new Date(aDate).getTime() - new Date(bDate).getTime();
+        }
         default: return 0;
       }
     });
-  }, [actionPhaseFilter, outreachActions, closingActions, orbitActions, actionItems, nonUrgentItems, actionSort, alertCardOppIds]);
+  }, [actionPhaseFilter, outreachActions, closingActions, orbitActions, actionItems, nonUrgentItems, actionSort, alertCardOppIds, actionsSearch]);
 
   // ============================================
   // Actions Tab: Execute handler
@@ -1627,11 +1687,15 @@ export default function SalesPipelinePage() {
                   </div>
                 )}
 
-                {/* Last contacted */}
-                {opp.last_contacted_at && (
+                {/* Last bumped */}
+                {(opp.last_bump_date || opp.last_contacted_at) && (
                   <div className="flex items-center gap-1.5">
                     <Clock className="h-3 w-3 flex-shrink-0" />
-                    <span>{formatDistanceToNow(new Date(opp.last_contacted_at), { addSuffix: true })}</span>
+                    <span>
+                      {opp.last_bump_date
+                        ? `Bumped ${formatDistanceToNow(new Date(opp.last_bump_date), { addSuffix: true })}`
+                        : `Contacted ${formatDistanceToNow(new Date(opp.last_contacted_at!), { addSuffix: true })}`}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1752,7 +1816,7 @@ export default function SalesPipelinePage() {
               <span className="font-semibold text-orange-700 mt-2" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
                 Orbit
               </span>
-              <Badge variant="secondary" className="text-xs font-medium mt-1">{orbitOpps.length}</Badge>
+              <Badge variant="secondary" className="text-xs font-medium mt-1">{allOrbitOpps.length}</Badge>
             </div>
           </DroppableColumn>
         </div>
@@ -2496,10 +2560,15 @@ export default function SalesPipelinePage() {
         };
       }
 
-      // Orbit — show time in orbit
+      // Orbit — show days remaining until follow-up is due
       if (opp.stage === 'orbit') {
         const d = daysAgo(opp.updated_at);
-        if (d !== null) return { text: `${d}d in orbit`, color: d > 90 ? 'text-amber-500 font-medium' : 'text-gray-500' };
+        if (d !== null) {
+          const threshold = opp.orbit_followup_days || 90;
+          const remaining = threshold - d;
+          if (remaining <= 0) return { text: `Overdue ${Math.abs(remaining)}d`, color: 'text-amber-500 font-medium' };
+          return { text: `${remaining}d left`, color: remaining <= 7 ? 'text-amber-500' : 'text-gray-500' };
+        }
       }
 
       // Default — days since last contact
@@ -2574,6 +2643,21 @@ export default function SalesPipelinePage() {
           </div>
         </div>
 
+        {/* Search bar */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search actions..."
+            defaultValue={actionsSearch}
+            onChange={e => {
+              const v = e.target.value;
+              if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+              searchDebounceRef.current = setTimeout(() => setActionsSearch(v), 300);
+            }}
+            className="pl-9 h-9 text-sm auth-input max-w-xs"
+          />
+        </div>
+
         {/* Alert Card Filter Banner */}
         {alertCardFilter !== 'none' && (
           <div className={`flex items-center justify-between px-4 py-2.5 rounded-lg mb-3 ${
@@ -2646,7 +2730,7 @@ export default function SalesPipelinePage() {
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-violet-600 hover:bg-violet-100 rounded-md transition-colors">
                 <ArrowUpDown className="h-3.5 w-3.5" />
-                Sort: {actionSort === 'priority' ? 'Priority' : actionSort === 'stage' ? 'Stage' : actionSort === 'temperature' ? 'Temp' : actionSort === 'value' ? 'Value' : actionSort === 'newest' ? 'Newest' : actionSort === 'oldest' ? 'Oldest' : 'Name'}
+                Sort: {actionSort === 'priority' ? 'Priority' : actionSort === 'stage' ? 'Stage' : actionSort === 'temperature' ? 'Temp' : actionSort === 'value' ? 'Value' : actionSort === 'newest' ? 'Newest' : actionSort === 'oldest' ? 'Oldest' : actionSort === 'timing' ? 'Timing' : 'Name'}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-40">
@@ -2656,6 +2740,7 @@ export default function SalesPipelinePage() {
                 { key: 'temperature' as const, label: 'Temperature' },
                 { key: 'value' as const, label: 'Deal Value' },
                 { key: 'name' as const, label: 'Name (A-Z)' },
+                { key: 'timing' as const, label: 'Last Bumped' },
                 { key: 'newest' as const, label: 'Newest First' },
                 { key: 'oldest' as const, label: 'Oldest First' },
               ]).map(s => (
@@ -3287,6 +3372,12 @@ export default function SalesPipelinePage() {
                       </SelectContent>
                     </Select>
                 </div>
+                {editingOpp?.stage === 'orbit' && (
+                  <div className="grid gap-2">
+                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Orbit Follow-up Days</Label>
+                    <Input type="number" min={1} value={form.orbit_followup_days || 90} onChange={e => setForm(f => ({ ...f, orbit_followup_days: Math.max(1, parseInt(e.target.value) || 90) }))} className="auth-input" />
+                  </div>
+                )}
                 <div className="grid gap-2">
                   <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Notes</Label>
                   <Textarea value={form.notes || ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Additional notes..." className="auth-input" rows={3} />
@@ -3514,21 +3605,27 @@ export default function SalesPipelinePage() {
 
               {/* Add activity form */}
               <div className="space-y-3 mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-1 mb-1">
+                  {([
+                    { key: 'note' as const, label: 'Note', icon: <StickyNote className="h-3.5 w-3.5" />, color: 'bg-gray-100 text-gray-700 border-gray-200' },
+                    { key: 'message' as const, label: 'Message', icon: <MessageSquare className="h-3.5 w-3.5" />, color: 'bg-sky-100 text-sky-700 border-sky-200' },
+                    { key: 'meeting' as const, label: 'Meeting', icon: <Calendar className="h-3.5 w-3.5" />, color: 'bg-purple-100 text-purple-700 border-purple-200' },
+                    { key: 'proposal' as const, label: 'Proposal', icon: <FileText className="h-3.5 w-3.5" />, color: 'bg-amber-100 text-amber-700 border-amber-200' },
+                  ]).map(t => (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => setActivityForm(f => ({ ...f, type: t.key }))}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                        activityForm.type === t.key ? t.color : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      {t.icon}
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
                 <div className="flex gap-2">
-                  <Select
-                    value={activityForm.type}
-                    onValueChange={v => setActivityForm(f => ({ ...f, type: v as ActivityType }))}
-                  >
-                    <SelectTrigger className="h-9 text-sm w-28 auth-input">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="note">Note</SelectItem>
-                      <SelectItem value="message">Message</SelectItem>
-                      <SelectItem value="meeting">Meeting</SelectItem>
-                      <SelectItem value="proposal">Proposal</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <Input
                     placeholder="Title..."
                     value={activityForm.title}
@@ -4163,70 +4260,94 @@ export default function SalesPipelinePage() {
 
     return (
       <Dialog open={!!activityLogPrompt} onOpenChange={open => { if (!open) { setActivityLogPrompt(null); setActivityLogForm({ title: '', description: '', outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined }); } }}>
-        <DialogContent className="sm:max-w-md z-[80]">
+        <DialogContent className="sm:max-w-md z-[80] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Log Activity — {activityLogPrompt?.oppName}</DialogTitle>
             <DialogDescription>Add context to this activity before saving.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            {/* Type badge (read-only) */}
-            {typeInfo && (
-              <div className="flex items-center gap-2">
-                <Badge className={`${typeInfo.color} border-0 gap-1`}>
-                  {typeInfo.icon}
-                  {typeInfo.label}
-                </Badge>
-              </div>
-            )}
+          <div className="space-y-4 overflow-y-auto flex-1 px-1 -mx-1">
+            {/* Type selector */}
+            <div className="flex flex-wrap items-center gap-1">
+              {([
+                { key: 'note' as ActivityType, label: 'Note', icon: <StickyNote className="h-3.5 w-3.5" />, color: 'bg-gray-100 text-gray-700 border-gray-300' },
+                { key: 'message' as ActivityType, label: 'Message', icon: <MessageSquare className="h-3.5 w-3.5" />, color: 'bg-sky-100 text-sky-700 border-sky-300' },
+                { key: 'meeting' as ActivityType, label: 'Meeting', icon: <Calendar className="h-3.5 w-3.5" />, color: 'bg-purple-100 text-purple-700 border-purple-300' },
+                { key: 'proposal' as ActivityType, label: 'Proposal', icon: <FileText className="h-3.5 w-3.5" />, color: 'bg-amber-100 text-amber-700 border-amber-300' },
+                { key: 'bump' as ActivityType, label: 'Bump', icon: <Zap className="h-3.5 w-3.5" />, color: 'bg-orange-100 text-orange-700 border-orange-300' },
+              ]).map(t => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setActivityLogPrompt(prev => prev ? { ...prev, type: t.key } : prev)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors ${
+                    activityLogPrompt?.type === t.key ? t.color : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  {t.icon}
+                  {t.label}
+                </button>
+              ))}
+            </div>
 
-            {/* Template picker for message type */}
-            {activityLogPrompt?.type === 'message' && (() => {
+            {/* Template picker for message/bump type */}
+            {(activityLogPrompt?.type === 'message' || activityLogPrompt?.type === 'bump') && (() => {
               const opp = opportunities.find(o => o.id === activityLogPrompt.oppId);
               const oppStage = opp?.stage || '';
-              const stageTemplates = templates.filter(t => t.is_active && t.stage === oppStage);
-              const allActiveTemplates = templates.filter(t => t.is_active);
-              const hasStageTemplates = stageTemplates.length > 0;
+              const stageTemplates = templates.filter(t => t.is_active && (t.stage === oppStage || (activityLogPrompt.type === 'bump' && t.stage === 'bump')));
+              const otherTemplates = templates.filter(t => t.is_active && t.stage !== oppStage && !(activityLogPrompt.type === 'bump' && t.stage === 'bump'));
               return (
                 <div className="grid gap-1.5">
                   <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">DM Template <span className="font-normal normal-case text-gray-400">(optional)</span></Label>
-                  <Select
-                    value="placeholder"
-                    onValueChange={templateId => {
-                      if (templateId === 'none') {
-                        setActivityLogForm(f => ({ ...f, description: '' }));
-                        return;
-                      }
-                      const tmpl = templates.find(t => t.id === templateId);
-                      if (tmpl) setActivityLogForm(f => ({ ...f, description: tmpl.content }));
-                    }}
-                  >
-                    <SelectTrigger className="auth-input">
-                      <SelectValue placeholder="Pick a template..." />
-                    </SelectTrigger>
-                    <SelectContent className="z-[90]">
-                      <SelectItem value="none">No template</SelectItem>
-                      {hasStageTemplates && (
-                        <>
-                          <SelectItem value="__stage_header" disabled className="text-xs font-semibold text-gray-400 uppercase">
-                            Current Stage — {oppStage.replace(/_/g, ' ')}
-                          </SelectItem>
-                          {stageTemplates.map(t => (
-                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                          ))}
-                        </>
-                      )}
-                      {allActiveTemplates.filter(t => t.stage !== oppStage).length > 0 && (
-                        <>
-                          <SelectItem value="__other_header" disabled className="text-xs font-semibold text-gray-400 uppercase">
-                            Other Stages
-                          </SelectItem>
-                          {allActiveTemplates.filter(t => t.stage !== oppStage).map(t => (
-                            <SelectItem key={t.id} value={t.id}>{t.name} ({t.stage.replace(/_/g, ' ')})</SelectItem>
-                          ))}
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={templatePopoverOpen} onOpenChange={setTemplatePopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" className="auth-input justify-between font-normal text-sm h-10">
+                        Pick a template...
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-[90]" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search templates..." />
+                        <CommandList>
+                          <CommandEmpty>No templates found.</CommandEmpty>
+                          <CommandGroup>
+                            <CommandItem onSelect={() => { setActivityLogForm(f => ({ ...f, description: '' })); setTemplatePopoverOpen(false); }}>
+                              No template
+                            </CommandItem>
+                          </CommandGroup>
+                          {stageTemplates.length > 0 && (
+                            <CommandGroup heading={`Current Stage — ${oppStage.replace(/_/g, ' ')}`}>
+                              {stageTemplates.map(t => (
+                                <CommandItem key={t.id} onSelect={() => { setActivityLogForm(f => ({ ...f, description: t.content })); setTemplatePopoverOpen(false); }}>
+                                  <div className="flex items-center gap-2 w-full">
+                                    <span>{t.name}</span>
+                                    {(t.tags || []).length > 0 && (
+                                      <span className="text-[10px] text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">{(t.tags || []).join(', ')}</span>
+                                    )}
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          )}
+                          {otherTemplates.length > 0 && (
+                            <CommandGroup heading="Other Stages">
+                              {otherTemplates.map(t => (
+                                <CommandItem key={t.id} onSelect={() => { setActivityLogForm(f => ({ ...f, description: t.content })); setTemplatePopoverOpen(false); }}>
+                                  <div className="flex items-center gap-2 w-full">
+                                    <span>{t.name}</span>
+                                    <span className="text-gray-400 text-xs">({t.stage.replace(/_/g, ' ')})</span>
+                                    {(t.tags || []).length > 0 && (
+                                      <span className="text-[10px] text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">{(t.tags || []).join(', ')}</span>
+                                    )}
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               );
             })()}
@@ -4487,8 +4608,17 @@ export default function SalesPipelinePage() {
             ))}
           </SelectContent>
         </Select>
+        <div>
+          <label className="text-sm font-medium mb-1 block">Follow up in X days</label>
+          <Input
+            type="number"
+            min={1}
+            value={orbitFollowupDays}
+            onChange={e => setOrbitFollowupDays(Math.max(1, parseInt(e.target.value) || 90))}
+          />
+        </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOrbitPrompt(null)}>Cancel</Button>
+          <Button variant="outline" onClick={() => { setOrbitPrompt(null); setOrbitFollowupDays(90); }}>Cancel</Button>
           <Button onClick={confirmOrbit} style={{ backgroundColor: '#3e8692' }}>Confirm</Button>
         </DialogFooter>
       </DialogContent>
@@ -4732,15 +4862,6 @@ export default function SalesPipelinePage() {
           <p className="text-gray-600">Playbook-driven sales pipeline</p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search opportunities..."
-              className="pl-10 w-64 auth-input"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
-          </div>
           <Button
             onClick={() => { setForm({ name: '', owner_id: user?.id || undefined }); setIsCreateOpen(true); }}
             className="hover:opacity-90"
@@ -4850,6 +4971,47 @@ export default function SalesPipelinePage() {
             <p className="text-[11px] text-gray-400 mt-1">{dashboardMetrics.meetingsToday > 0 ? 'Today' : 'This week'}</p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Time Period Filter */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-medium text-gray-500 mr-1">Period:</span>
+        {([
+          { key: 'all', label: 'All Time' },
+          { key: 'today', label: 'Today' },
+          { key: '7d', label: '7 Days' },
+          { key: '30d', label: '30 Days' },
+          { key: 'custom', label: 'Custom' },
+        ] as const).map(opt => (
+          <button
+            key={opt.key}
+            onClick={() => setDashboardPeriod(opt.key)}
+            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+              dashboardPeriod === opt.key
+                ? 'bg-[#3e8692] text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+        {dashboardPeriod === 'custom' && (
+          <div className="flex items-center gap-1.5 ml-1">
+            <input
+              type="date"
+              value={dashboardCustomFrom}
+              onChange={e => setDashboardCustomFrom(e.target.value)}
+              className="px-2 py-1 text-xs border border-gray-300 rounded-md"
+            />
+            <span className="text-xs text-gray-400">to</span>
+            <input
+              type="date"
+              value={dashboardCustomTo}
+              onChange={e => setDashboardCustomTo(e.target.value)}
+              className="px-2 py-1 text-xs border border-gray-300 rounded-md"
+            />
+          </div>
+        )}
       </div>
 
       {/* Sales Dashboard */}
@@ -5144,7 +5306,7 @@ export default function SalesPipelinePage() {
               <RotateCcw className="h-4 w-4" />
               Orbit
               {orbitOpps.length > 0 && (
-                <Badge variant="secondary" className="ml-1">{orbitOpps.length}</Badge>
+                <Badge variant="secondary" className="ml-1">{allOrbitOpps.length}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="templates" className="flex items-center gap-2">
@@ -5199,10 +5361,36 @@ export default function SalesPipelinePage() {
         </TabsContent>
 
         <TabsContent value="pipeline" className="mt-0">
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search pipeline..."
+              defaultValue={pipelineSearch}
+              onChange={e => {
+                const v = e.target.value;
+                if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+                searchDebounceRef.current = setTimeout(() => setPipelineSearch(v), 300);
+              }}
+              className="pl-9 h-9 text-sm auth-input max-w-xs"
+            />
+          </div>
           {viewMode === 'kanban' ? renderKanban() : renderTable()}
         </TabsContent>
 
         <TabsContent value="orbit" className="mt-0">
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search orbit..."
+              defaultValue={orbitSearch}
+              onChange={e => {
+                const v = e.target.value;
+                if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+                searchDebounceRef.current = setTimeout(() => setOrbitSearch(v), 300);
+              }}
+              className="pl-9 h-9 text-sm auth-input max-w-xs"
+            />
+          </div>
           {renderOrbitTab()}
         </TabsContent>
 
@@ -5238,7 +5426,7 @@ export default function SalesPipelinePage() {
                   <Target className="h-4 w-4 text-emerald-700" />
                   <h4 className="font-semibold text-emerald-700">Pipeline</h4>
                   <Badge variant="secondary" className="text-xs font-medium">
-                    {filteredOpportunities.filter(o => PIPELINE_STAGES.includes(o.stage as SalesPipelineStage) && o.stage !== 'cold_dm').length}
+                    {opportunities.filter(o => PIPELINE_STAGES.includes(o.stage as SalesPipelineStage) && o.stage !== 'cold_dm').length}
                   </Badge>
                 </div>
                 {overviewSections.pipeline ? <ChevronUp className="h-4 w-4 text-emerald-500" /> : <ChevronDown className="h-4 w-4 text-emerald-500" />}
@@ -5259,7 +5447,7 @@ export default function SalesPipelinePage() {
                 <div className="flex items-center gap-2">
                   <RotateCcw className="h-4 w-4 text-amber-700" />
                   <h4 className="font-semibold text-amber-700">Orbit</h4>
-                  <Badge variant="secondary" className="text-xs font-medium">{orbitOpps.length}</Badge>
+                  <Badge variant="secondary" className="text-xs font-medium">{allOrbitOpps.length}</Badge>
                 </div>
                 {overviewSections.orbit ? <ChevronUp className="h-4 w-4 text-amber-500" /> : <ChevronDown className="h-4 w-4 text-amber-500" />}
               </button>
@@ -5286,9 +5474,13 @@ export default function SalesPipelinePage() {
               { value: 'bump', label: 'Bumps' },
             ];
 
-            const filteredTemplates = templateStageFilter === 'all'
-              ? templates
-              : templates.filter(t => t.stage === templateStageFilter);
+            const allTags = [...new Set(templates.flatMap(t => t.tags || []))];
+
+            const filteredTemplates = templates.filter(t => {
+              if (templateStageFilter !== 'all' && t.stage !== templateStageFilter) return false;
+              if (templateTagFilter !== 'all' && !(t.tags || []).includes(templateTagFilter)) return false;
+              return true;
+            });
 
             const getSubTypeLabel = (subType: string) => {
               const labels: Record<string, string> = {
@@ -5323,7 +5515,7 @@ export default function SalesPipelinePage() {
                 const created = await SalesPipelineService.createTemplate(templateForm);
                 setTemplates(prev => [...prev, created]);
                 setIsTemplateDialogOpen(false);
-                setTemplateForm({ name: '', stage: 'cold_dm', sub_type: 'general', content: '' });
+                setTemplateForm({ name: '', stage: 'cold_dm', sub_type: 'general', content: '', tags: [], attachments: [] });
               } catch (err) {
                 console.error('Error creating template:', err);
               } finally {
@@ -5339,7 +5531,7 @@ export default function SalesPipelinePage() {
                 setTemplates(prev => prev.map(t => t.id === updated.id ? updated : t));
                 setEditingTemplate(null);
                 setIsTemplateDialogOpen(false);
-                setTemplateForm({ name: '', stage: 'cold_dm', sub_type: 'general', content: '' });
+                setTemplateForm({ name: '', stage: 'cold_dm', sub_type: 'general', content: '', tags: [], attachments: [] });
               } catch (err) {
                 console.error('Error updating template:', err);
               } finally {
@@ -5358,13 +5550,13 @@ export default function SalesPipelinePage() {
 
             const openEditDialog = (t: SalesDmTemplate) => {
               setEditingTemplate(t);
-              setTemplateForm({ name: t.name, stage: t.stage, sub_type: t.sub_type, content: t.content, variables: t.variables });
+              setTemplateForm({ name: t.name, stage: t.stage, sub_type: t.sub_type, content: t.content, variables: t.variables, tags: t.tags || [], attachments: t.attachments || [] });
               setIsTemplateDialogOpen(true);
             };
 
             const openCreateDialog = () => {
               setEditingTemplate(null);
-              setTemplateForm({ name: '', stage: 'cold_dm', sub_type: 'general', content: '' });
+              setTemplateForm({ name: '', stage: 'cold_dm', sub_type: 'general', content: '', tags: [], attachments: [] });
               setIsTemplateDialogOpen(true);
             };
 
@@ -5398,6 +5590,36 @@ export default function SalesPipelinePage() {
                   </Button>
                 </div>
 
+                {/* Tag filter pills */}
+                {allTags.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-gray-500 font-medium">Tags:</span>
+                    <button
+                      onClick={() => setTemplateTagFilter('all')}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                        templateTagFilter === 'all'
+                          ? 'bg-[#3e8692] text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      All
+                    </button>
+                    {allTags.map(tag => (
+                      <button
+                        key={tag}
+                        onClick={() => setTemplateTagFilter(tag)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                          templateTagFilter === tag
+                            ? 'bg-[#3e8692] text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {/* Template cards grid */}
                 {filteredTemplates.length === 0 ? (
                   <div className="text-center py-12 text-gray-500">
@@ -5409,11 +5631,20 @@ export default function SalesPipelinePage() {
                     {filteredTemplates.map(t => {
                       const stageColor = getStageColorForTemplate(t.stage);
                       return (
-                        <Card key={t.id} className="overflow-hidden">
+                        <Card key={t.id} className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => setPreviewTemplate(t)}>
                           <CardContent className="p-4 space-y-3">
                             <div className="flex items-start justify-between">
                               <h4 className="font-semibold text-sm text-gray-900 line-clamp-1">{t.name}</h4>
-                              <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                              <div className="flex items-center gap-1 ml-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => setPreviewTemplate(t)}
+                                  title="Preview"
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -5443,13 +5674,24 @@ export default function SalesPipelinePage() {
                                 </Button>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <Badge className={`${stageColor.bg} ${stageColor.text} text-xs border-0`}>
                                 {getStageLabelForTemplate(t.stage)}
                               </Badge>
                               <Badge variant="outline" className="text-xs">
                                 {getSubTypeLabel(t.sub_type)}
                               </Badge>
+                              {(t.tags || []).map(tag => (
+                                <Badge key={tag} className="text-[10px] bg-teal-50 text-teal-700 border-0">
+                                  {tag}
+                                </Badge>
+                              ))}
+                              {(t.attachments || []).length > 0 && (
+                                <span className="inline-flex items-center gap-0.5 text-[10px] text-gray-500">
+                                  <Image className="h-3 w-3" />
+                                  {t.attachments.length}
+                                </span>
+                              )}
                             </div>
                             <p className="text-sm text-gray-600 line-clamp-4 whitespace-pre-wrap">{t.content}</p>
                             {t.variables && t.variables.length > 0 && (
@@ -5471,7 +5713,7 @@ export default function SalesPipelinePage() {
                 {/* Create/Edit Template Dialog */}
                 <Dialog open={isTemplateDialogOpen} onOpenChange={(open) => {
                   setIsTemplateDialogOpen(open);
-                  if (!open) { setEditingTemplate(null); setTemplateForm({ name: '', stage: 'cold_dm', sub_type: 'general', content: '' }); }
+                  if (!open) { setEditingTemplate(null); setTemplateForm({ name: '', stage: 'cold_dm', sub_type: 'general', content: '', tags: [], attachments: [] }); }
                 }}>
                   <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
@@ -5530,6 +5772,41 @@ export default function SalesPipelinePage() {
                         </div>
                       </div>
                       <div>
+                        <Label>Tags</Label>
+                        <div className="space-y-2">
+                          {(templateForm.tags || []).length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {(templateForm.tags || []).map(tag => (
+                                <Badge key={tag} className="text-xs bg-teal-50 text-teal-700 border-0 gap-1">
+                                  {tag}
+                                  <button
+                                    type="button"
+                                    onClick={() => setTemplateForm(prev => ({ ...prev, tags: (prev.tags || []).filter(t => t !== tag) }))}
+                                    className="hover:text-red-500"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                          <Input
+                            placeholder="Type a tag and press Enter (e.g., Token Launch, DeFi)"
+                            className="auth-input"
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const val = (e.target as HTMLInputElement).value.trim();
+                                if (val && !(templateForm.tags || []).includes(val)) {
+                                  setTemplateForm(prev => ({ ...prev, tags: [...(prev.tags || []), val] }));
+                                  (e.target as HTMLInputElement).value = '';
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div>
                         <Label>Content</Label>
                         <Textarea
                           value={templateForm.content}
@@ -5538,6 +5815,53 @@ export default function SalesPipelinePage() {
                           rows={6}
                           className="auth-input"
                         />
+                      </div>
+                      <div>
+                        <Label>Attachments</Label>
+                        <div className="space-y-2">
+                          {(templateForm.attachments || []).length > 0 && (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {(templateForm.attachments || []).map((att, idx) => (
+                                <div key={idx} className="relative group">
+                                  <img src={att.url} alt={att.name} className="h-16 w-16 object-cover rounded border" />
+                                  <button
+                                    type="button"
+                                    onClick={() => setTemplateForm(prev => ({ ...prev, attachments: (prev.attachments || []).filter((_, i) => i !== idx) }))}
+                                    className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                  <p className="text-[9px] text-gray-500 truncate w-16 text-center mt-0.5">{att.name}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            className="auth-input"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              try {
+                                const fileExt = file.name.split('.').pop();
+                                const filePath = `templates/${Date.now()}.${fileExt}`;
+                                const { error: uploadError } = await supabase.storage
+                                  .from('crm-attachments')
+                                  .upload(filePath, file, { cacheControl: '3600', upsert: false });
+                                if (uploadError) throw uploadError;
+                                const { data: { publicUrl } } = supabase.storage.from('crm-attachments').getPublicUrl(filePath);
+                                setTemplateForm(prev => ({
+                                  ...prev,
+                                  attachments: [...(prev.attachments || []), { url: publicUrl, name: file.name }],
+                                }));
+                              } catch (err) {
+                                console.error('Error uploading attachment:', err);
+                              }
+                              e.target.value = '';
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
                     <DialogFooter>
@@ -5551,6 +5875,74 @@ export default function SalesPipelinePage() {
                         {isTemplateSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                         {editingTemplate ? 'Save Changes' : 'Create Template'}
                       </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Preview Template Dialog */}
+                <Dialog open={!!previewTemplate} onOpenChange={(open) => { if (!open) setPreviewTemplate(null); }}>
+                  <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
+                    <DialogHeader>
+                      <DialogTitle>{previewTemplate?.name}</DialogTitle>
+                      <DialogDescription>Template preview</DialogDescription>
+                    </DialogHeader>
+                    {previewTemplate && (
+                      <div className="space-y-4 overflow-y-auto flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge className={`${getStageColorForTemplate(previewTemplate.stage).bg} ${getStageColorForTemplate(previewTemplate.stage).text} text-xs border-0`}>
+                            {getStageLabelForTemplate(previewTemplate.stage)}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {getSubTypeLabel(previewTemplate.sub_type)}
+                          </Badge>
+                          {(previewTemplate.tags || []).map(tag => (
+                            <Badge key={tag} className="text-[10px] bg-teal-50 text-teal-700 border-0">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-800 whitespace-pre-wrap">
+                          {previewTemplate.content}
+                        </div>
+                        {previewTemplate.variables && previewTemplate.variables.length > 0 && (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs text-gray-500 font-medium">Variables:</span>
+                            {previewTemplate.variables.map(v => (
+                              <span key={v} className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-mono">
+                                [{v}]
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {(previewTemplate.attachments || []).length > 0 && (
+                          <div className="space-y-2">
+                            <span className="text-xs text-gray-500 font-medium">Attachments:</span>
+                            <div className="grid grid-cols-2 gap-2">
+                              {previewTemplate.attachments.map((att, idx) => (
+                                <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="block">
+                                  <img src={att.url} alt={att.name} className="w-full rounded border hover:opacity-90 transition-opacity" />
+                                  <p className="text-[10px] text-gray-500 mt-1 truncate">{att.name}</p>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          if (previewTemplate) {
+                            navigator.clipboard.writeText(previewTemplate.content);
+                            toast({ title: 'Copied to clipboard' });
+                          }
+                        }}
+                      >
+                        <Copy className="h-4 w-4 mr-1" />
+                        Copy
+                      </Button>
+                      <Button variant="outline" onClick={() => setPreviewTemplate(null)}>Close</Button>
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>

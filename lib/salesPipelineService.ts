@@ -104,6 +104,8 @@ export interface SalesDmTemplate {
   sub_type: string;
   content: string;
   variables: string[];
+  tags: string[];
+  attachments: { url: string; name: string }[];
   is_active: boolean;
   created_by: string | null;
   created_at: string;
@@ -116,6 +118,8 @@ export interface CreateSalesDmTemplateData {
   sub_type?: string;
   content: string;
   variables?: string[];
+  tags?: string[];
+  attachments?: { url: string; name: string }[];
 }
 
 // ============================================
@@ -135,6 +139,7 @@ export interface SalesPipelineOpportunity extends CRMOpportunity {
   calendly_booked_date: string | null;
   gc_opened: string;
   orbit_reason: OrbitReason | null;
+  orbit_followup_days: number | null;
   closed_lost_reason: string | null;
   dedup_key: string | null;
   next_meeting_at: string | null;
@@ -178,6 +183,7 @@ export interface CreateSalesPipelineOpportunityData {
   position?: number;
   poc_platform?: PocPlatform;
   poc_handle?: string;
+  orbit_followup_days?: number;
 }
 
 export interface CreateActivityData {
@@ -278,6 +284,7 @@ export class SalesPipelineService {
     updates: Partial<CreateSalesPipelineOpportunityData> & {
       warm_sub_state?: WarmSubState | null;
       orbit_reason?: OrbitReason | null;
+      orbit_followup_days?: number;
       closed_lost_reason?: string | null;
       next_meeting_at?: string | null;
       next_meeting_type?: string | null;
