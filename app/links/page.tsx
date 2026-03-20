@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import {
   Plus, Search, Edit, Trash2, ExternalLink, Link as LinkIcon,
-  Check, ChevronsUpDown, X, ChevronRight, ChevronDown, Building2, BookOpen, Users, Info
+  ChevronsUpDown, X, ChevronRight, ChevronDown, Building2, BookOpen, Users, Info
 } from 'lucide-react';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,6 +31,7 @@ interface Link {
   url: string;
   description: string | null;
   client: string | null;
+  client_id: string | null;
   link_types: string[];
   access: 'public' | 'partners' | 'team' | 'client';
   status: 'active' | 'inactive' | 'archived';
@@ -38,6 +39,11 @@ interface Link {
   created_at: string;
   updated_at: string;
 }
+
+type ClientOption = {
+  id: string;
+  name: string;
+};
 
 const LINK_TYPES = [
   { value: 'client delivery', label: 'Client Delivery' },
@@ -66,6 +72,7 @@ export default function LinksPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [links, setLinks] = useState<Link[]>([]);
+  const [clients, setClients] = useState<ClientOption[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Tab state
@@ -82,6 +89,7 @@ export default function LinksPage() {
     url: '',
     description: '',
     client: '',
+    client_id: '' as string,
     link_types: [] as string[],
     access: 'team' as 'public' | 'partners' | 'team' | 'client'
   });
@@ -94,21 +102,15 @@ export default function LinksPage() {
   const [collapsedClients, setCollapsedClients] = useState<Set<string>>(new Set());
 
   // Combobox state
-  const [clientPopoverOpen, setClientPopoverOpen] = useState(false);
   const [linkTypesPopoverOpen, setLinkTypesPopoverOpen] = useState(false);
+  const [clientInputMode, setClientInputMode] = useState<'select' | 'text'>('select');
 
-  // Get unique client names from existing links for suggestions
-  const clientSuggestions = useMemo(() => {
-    const clients = new Set<string>();
-    links.forEach(link => {
-      if (link.client && link.client.trim()) {
-        clients.add(link.client.trim());
-      }
-    });
-    // Always include "Holo Hive" as an option
-    clients.add('Holo Hive');
-    return Array.from(clients).sort();
-  }, [links]);
+  // Client lookup map
+  const clientMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    clients.forEach(c => { map[c.id] = c.name; });
+    return map;
+  }, [clients]);
 
   useEffect(() => {
     fetchLinks();
@@ -117,10 +119,11 @@ export default function LinksPage() {
   const fetchLinks = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('links')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const [{ data, error }, { data: clientData }] = await Promise.all([
+        supabase.from('links').select('*').order('created_at', { ascending: false }),
+        supabase.from('clients').select('id, name').order('name'),
+      ]);
+      setClients(clientData || []);
 
       if (error) throw error;
       setLinks(data || []);
@@ -144,9 +147,11 @@ export default function LinksPage() {
         url: link.url,
         description: link.description || '',
         client: link.client || '',
+        client_id: link.client_id || '',
         link_types: link.link_types || [],
         access: link.access
       });
+      setClientInputMode(link.client_id ? 'select' : 'text');
     } else {
       setEditingLink(null);
       setFormData({
@@ -154,9 +159,11 @@ export default function LinksPage() {
         url: '',
         description: '',
         client: clientName || (activeTab === 'holohive' ? 'Holo Hive' : ''),
+        client_id: '',
         link_types: activeTab === 'guide' ? ['guide'] : [],
         access: 'team'
       });
+      setClientInputMode('select');
     }
     setIsDialogOpen(true);
   };
@@ -171,7 +178,7 @@ export default function LinksPage() {
       return;
     }
 
-    if (!formData.client.trim()) {
+    if (!formData.client_id && !formData.client.trim()) {
       toast({
         title: 'Error',
         description: 'Client is required',
@@ -192,13 +199,15 @@ export default function LinksPage() {
     setIsSubmitting(true);
     try {
       if (editingLink) {
+        const clientName = formData.client_id ? (clientMap[formData.client_id] || formData.client.trim()) : formData.client.trim();
         const { error } = await supabase
           .from('links')
           .update({
             name: formData.name.trim(),
             url: formData.url.trim(),
             description: formData.description.trim() || null,
-            client: formData.client.trim() || null,
+            client: clientName || null,
+            client_id: formData.client_id || null,
             link_types: formData.link_types,
             access: formData.access,
             updated_at: new Date().toISOString()
@@ -208,13 +217,15 @@ export default function LinksPage() {
         if (error) throw error;
         toast({ title: 'Link updated' });
       } else {
+        const clientName = formData.client_id ? (clientMap[formData.client_id] || formData.client.trim()) : formData.client.trim();
         const { error } = await supabase
           .from('links')
           .insert({
             name: formData.name.trim(),
             url: formData.url.trim(),
             description: formData.description.trim() || null,
-            client: formData.client.trim() || null,
+            client: clientName || null,
+            client_id: formData.client_id || null,
             link_types: formData.link_types,
             access: formData.access,
             status: 'active',
@@ -224,13 +235,24 @@ export default function LinksPage() {
         if (error) throw error;
         toast({ title: 'Link created' });
 
+        // Log activity for client-access links
+        if (formData.access === 'client' && formData.client_id) {
+          await supabase.from('client_activity_log').insert({
+            client_id: formData.client_id,
+            activity_type: 'link_added',
+            title: 'New resource shared',
+            description: formData.name.trim(),
+            created_by: user?.id || null,
+          });
+        }
+
         // Send Telegram notification to terminal chat (same as form submission)
         try {
           const baseUrl = window.location.origin;
           const linkUrl = `${baseUrl}/links`;
           const message = `<b>New Link Submitted</b>\n\n` +
             `<b>Name:</b> ${formData.name.trim()}\n` +
-            `<b>Client:</b> ${formData.client.trim() || 'N/A'}\n` +
+            `<b>Client:</b> ${formData.client_id ? (clientMap[formData.client_id] || formData.client.trim()) : formData.client.trim() || 'N/A'}\n` +
             `<b>Type:</b> ${formData.link_types.map((t: string) => t.charAt(0).toUpperCase() + t.slice(1)).join(', ') || 'N/A'}\n\n` +
             `<a href="${linkUrl}">View Links</a>`;
 
@@ -346,19 +368,19 @@ export default function LinksPage() {
   // Group links by client
   const groupedLinks = () => {
     const groups: { clientName: string; links: Link[] }[] = [];
-    const clientMap = new Map<string, Link[]>();
+    const clientGroups = new Map<string, Link[]>();
 
     // Group by client
     filteredLinks.forEach(link => {
-      const clientName = link.client || 'No Client';
-      if (!clientMap.has(clientName)) {
-        clientMap.set(clientName, []);
+      const name = (link.client_id && clientMap[link.client_id]) ? clientMap[link.client_id] : (link.client || 'No Client');
+      if (!clientGroups.has(name)) {
+        clientGroups.set(name, []);
       }
-      clientMap.get(clientName)!.push(link);
+      clientGroups.get(name)!.push(link);
     });
 
     // Convert to array and sort links within each group alphabetically
-    clientMap.forEach((links, clientName) => {
+    clientGroups.forEach((links, clientName) => {
       // Sort links alphabetically by name
       links.sort((a, b) => a.name.localeCompare(b.name));
       groups.push({ clientName, links });
@@ -714,50 +736,45 @@ export default function LinksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Client <span className="text-red-500">*</span></Label>
-              <Popover open={clientPopoverOpen} onOpenChange={setClientPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between font-normal"
-                  >
-                    {formData.client || 'Select or type client...'}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0">
-                  <Command>
-                    <CommandInput
-                      placeholder="Search or type client name..."
-                      value={formData.client}
-                      onValueChange={(value) => setFormData({ ...formData, client: value })}
-                    />
-                    <CommandList>
-                      <CommandEmpty>
-                        <div className="py-2 px-3 text-sm">
-                          Press enter to use "{formData.client}"
-                        </div>
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {clientSuggestions.map(client => (
-                          <CommandItem
-                            key={client}
-                            value={client}
-                            onSelect={() => {
-                              setFormData({ ...formData, client });
-                              setClientPopoverOpen(false);
-                            }}
-                          >
-                            <Check className={`mr-2 h-4 w-4 ${formData.client === client ? 'opacity-100' : 'opacity-0'}`} />
-                            {client}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <div className="flex items-center justify-between">
+                <Label>Client <span className="text-red-500">*</span></Label>
+                <button
+                  type="button"
+                  className="text-xs text-[#3e8692] cursor-pointer"
+                  onClick={() => {
+                    setClientInputMode(clientInputMode === 'select' ? 'text' : 'select');
+                    setFormData({ ...formData, client_id: '', client: '' });
+                  }}
+                >
+                  {clientInputMode === 'select' ? 'Type custom name' : 'Select from clients'}
+                </button>
+              </div>
+              {clientInputMode === 'select' ? (
+                <Select
+                  value={formData.client_id || '_holo_hive'}
+                  onValueChange={(v) => {
+                    if (v === '_holo_hive') {
+                      setFormData({ ...formData, client_id: '', client: 'Holo Hive' });
+                    } else {
+                      const selected = clients.find(c => c.id === v);
+                      setFormData({ ...formData, client_id: v, client: selected?.name || '' });
+                    }
+                  }}
+                >
+                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select client" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_holo_hive">Holo Hive (Internal)</SelectItem>
+                    {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={formData.client}
+                  onChange={(e) => setFormData({ ...formData, client: e.target.value, client_id: '' })}
+                  placeholder="Type client or group name..."
+                  className="auth-input"
+                />
+              )}
             </div>
 
             <div className="space-y-2">

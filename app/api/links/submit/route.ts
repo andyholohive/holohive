@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, url, description, client, link_types, access } = body;
+    const { name, url, description, client, client_id, link_types, access } = body;
 
     // Validate required fields
     if (!name || !name.trim()) {
@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
         url: url.trim(),
         description: description?.trim() || null,
         client: client?.trim() || null,
+        client_id: client_id || null,
         link_types: link_types || [],
         access: access || 'team',
         status: 'active'

@@ -1,10 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -13,21 +11,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import dynamic from 'next/dynamic';
-import 'react-quill/dist/quill.snow.css';
 import { useAuth } from '@/contexts/AuthContext';
-
-const ReactQuill = dynamic(() => import('react-quill'), { ssr: false });
-import { supabase } from '@/lib/supabase';
 import { UserService } from '@/lib/userService';
+import { TaskService, Task } from '@/lib/taskService';
+import { ClientService } from '@/lib/clientService';
+import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { useToast } from '@/hooks/use-toast';
 import {
   Plus,
   ListTodo,
   Search,
   Trash2,
-  Edit,
-  Calendar as CalendarIcon,
   ChevronUp,
   ChevronDown,
   ChevronRight,
@@ -41,26 +35,15 @@ import {
   PauseCircle,
   PlayCircle,
   MessageCircle,
+  Clock,
 } from 'lucide-react';
 
-type Task = {
-  id: string;
-  task_name: string;
-  assigned_to: string | null;
-  assigned_to_name: string | null;
-  due_date: string | null;
-  latest_comment: string | null;
-  frequency: string;
-  task_type: string;
-  link: string | null;
-  description: string | null;
-  status: string;
-  created_by: string | null;
-  created_by_name: string | null;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-};
+const STALE_DAYS = 7;
+function isTaskStale(task: Task): boolean {
+  if (task.status === 'complete' || task.status === 'paused') return false;
+  const diff = Date.now() - new Date(task.updated_at).getTime();
+  return diff > STALE_DAYS * 24 * 60 * 60 * 1000;
+}
 
 type TeamMember = {
   id: string;
@@ -150,9 +133,10 @@ const toLocalDateString = (date: Date) => {
 const COL: Record<string, string> = {
   reorder: 'w-[50px]',
   status: 'w-[36px]',
-  taskName: 'w-[22%] min-w-[180px]',
+  taskName: 'w-[20%] min-w-[180px]',
+  client: 'w-[110px]',
   dueDate: 'w-[110px]',
-  comment: 'w-[14%] min-w-[100px]',
+  comment: 'w-[12%] min-w-[100px]',
   frequency: 'w-[100px]',
   type: 'w-[140px]',
   link: 'w-[80px]',
@@ -161,10 +145,11 @@ const COL: Record<string, string> = {
   actions: 'w-[80px]',
 };
 
-type ColumnKey = 'taskName' | 'dueDate' | 'comment' | 'frequency' | 'type' | 'link' | 'createdBy' | 'created';
+type ColumnKey = 'taskName' | 'client' | 'dueDate' | 'comment' | 'frequency' | 'type' | 'link' | 'createdBy' | 'created';
 
 const COLUMN_DEFS: { key: ColumnKey; label: string }[] = [
   { key: 'taskName', label: 'Task Name' },
+  { key: 'client', label: 'Client' },
   { key: 'dueDate', label: 'Due Date' },
   { key: 'comment', label: 'Comment' },
   { key: 'frequency', label: 'Frequency' },
@@ -184,6 +169,8 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState<string>('one-time');
   const [searchTerm, setSearchTerm] = useState('');
   const [collapsedUsers, setCollapsedUsers] = useState<Set<string>>(new Set());
@@ -241,22 +228,10 @@ export default function TasksPage() {
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
   const [newRowName, setNewRowName] = useState('');
 
-  // Form state
+  // Modal state
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({
-    task_name: '',
-    assigned_to: '' as string,
-    due_date: undefined as Date | undefined,
-    frequency: '' as string,
-    task_type: '' as string,
-    link: '',
-    latest_comment: '',
-    description: '',
-    status: 'to_do' as string,
-  });
 
   useEffect(() => {
     fetchTasks();
@@ -267,16 +242,24 @@ export default function TasksPage() {
           .map(u => ({ id: u.id, name: u.name || u.email, email: u.email, role: u.role, profile_photo_url: u.profile_photo_url || null }))
       );
     });
+    ClientService.getAllClients().then((c) => {
+      setClients(c.map(cl => ({ id: cl.id, name: cl.name })));
+    }).catch(() => {});
   }, []);
 
   const fetchTasks = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('tasks')
-      .select('*')
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: false });
-    setTasks(data || []);
+    try {
+      const data = await TaskService.getAllTasks();
+      setTasks(data);
+      // Load comment counts
+      if (data.length > 0) {
+        const counts = await TaskService.getCommentCounts(data.map(t => t.id));
+        setCommentCounts(counts);
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    }
     setLoading(false);
   };
 
@@ -380,10 +363,7 @@ export default function TasksPage() {
     setEditingValue('');
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, [field]: value, updated_at: new Date().toISOString() } : t));
     try {
-      await supabase.from('tasks').update({
-        [field]: value,
-        updated_at: new Date().toISOString(),
-      }).eq('id', taskId);
+      await TaskService.updateField(taskId, field, value);
     } catch (error) {
       console.error('Error saving:', error);
       await fetchTasks();
@@ -394,10 +374,7 @@ export default function TasksPage() {
     const updates: Record<string, string | null> = { [field]: value || null, ...extra };
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates, updated_at: new Date().toISOString() } : t));
     try {
-      await supabase.from('tasks').update({
-        ...updates,
-        updated_at: new Date().toISOString(),
-      }).eq('id', taskId);
+      await TaskService.updateTask(taskId, updates);
     } catch (error) {
       console.error('Error saving:', error);
       await fetchTasks();
@@ -411,10 +388,7 @@ export default function TasksPage() {
     setEditingValue('');
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, due_date: dateStr, updated_at: new Date().toISOString() } : t));
     try {
-      await supabase.from('tasks').update({
-        due_date: dateStr,
-        updated_at: new Date().toISOString(),
-      }).eq('id', taskId);
+      await TaskService.updateField(taskId, 'due_date', dateStr);
     } catch (error) {
       console.error('Error saving:', error);
       await fetchTasks();
@@ -422,93 +396,15 @@ export default function TasksPage() {
   };
 
   const openForm = (task?: Task) => {
-    if (task) {
-      setEditingId(task.id);
-      setForm({
-        task_name: task.task_name,
-        assigned_to: task.assigned_to || '',
-        due_date: task.due_date ? new Date(task.due_date + 'T00:00:00') : undefined,
-        frequency: task.frequency,
-        task_type: task.task_type,
-        link: task.link || '',
-        latest_comment: task.latest_comment || '',
-        description: task.description || '',
-        status: task.status || 'to_do',
-      });
-    } else {
-      setEditingId(null);
-      setForm({
-        task_name: '',
-        assigned_to: '',
-        due_date: undefined,
-        frequency: '',
-        task_type: '',
-        link: '',
-        latest_comment: '',
-        description: '',
-        status: 'to_do',
-      });
-    }
+    setEditingTask(task || null);
     setIsFormOpen(true);
-  };
-
-  const handleSubmit = async () => {
-    if (!form.task_name.trim() || !form.frequency || !form.task_type) return;
-    if (!user?.id || !userProfile) return;
-
-    setSubmitting(true);
-    try {
-      const assignedMember = teamMembers.find(m => m.id === form.assigned_to);
-      const payload = {
-        task_name: form.task_name.trim(),
-        assigned_to: form.assigned_to || null,
-        assigned_to_name: assignedMember?.name || null,
-        due_date: form.due_date ? toLocalDateString(form.due_date) : null,
-        frequency: form.frequency,
-        task_type: form.task_type,
-        link: form.link.trim() || null,
-        latest_comment: form.latest_comment.trim() || null,
-        description: form.description.trim() || null,
-        status: form.status,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (editingId) {
-        const { error } = await supabase
-          .from('tasks')
-          .update(payload)
-          .eq('id', editingId);
-        if (error) throw error;
-        toast({ title: 'Updated', description: 'Task updated successfully.' });
-      } else {
-        const { error } = await supabase
-          .from('tasks')
-          .insert({
-            ...payload,
-            created_by: user.id,
-            created_by_name: userProfile.name || userProfile.email || 'Unknown',
-          });
-        if (error) throw error;
-        toast({ title: 'Created', description: 'Task created successfully.' });
-      }
-
-      setIsFormOpen(false);
-      setEditingId(null);
-      setForm({ task_name: '', assigned_to: '', due_date: undefined, frequency: '', task_type: '', link: '', latest_comment: '', description: '', status: 'to_do' });
-      await fetchTasks();
-    } catch (err) {
-      console.error('Error saving task:', err);
-      toast({ title: 'Error', description: 'Failed to save task.', variant: 'destructive' });
-    } finally {
-      setSubmitting(false);
-    }
   };
 
   const handleDelete = async (id: string) => {
     setDeletingId(null);
     setTasks(prev => prev.filter(t => t.id !== id));
     try {
-      await supabase.from('tasks').delete().eq('id', id);
+      await TaskService.deleteTask(id);
     } catch (error) {
       console.error('Error deleting:', error);
       await fetchTasks();
@@ -545,9 +441,9 @@ export default function TasksPage() {
     }));
 
     try {
-      await Promise.all([
-        supabase.from('tasks').update({ sort_order: newCurrentOrder }).eq('id', current.id),
-        supabase.from('tasks').update({ sort_order: newSwapOrder }).eq('id', swap.id),
+      await TaskService.reorderTasks([
+        { id: current.id, sort_order: newCurrentOrder },
+        { id: swap.id, sort_order: newSwapOrder },
       ]);
     } catch (error) {
       console.error('Error reordering:', error);
@@ -588,7 +484,7 @@ export default function TasksPage() {
       const defaultFrequency = activeTab === 'one-time' ? 'one-time' : activeTab === 'recurring' ? 'daily' : 'one-time';
       const defaultType = activeTab === 'client-sop' ? 'Client SOP' : 'General';
 
-      const { error } = await supabase.from('tasks').insert({
+      await TaskService.createTask({
         task_name: name,
         assigned_to: assignedTo,
         assigned_to_name: assignedMember?.name || null,
@@ -596,8 +492,8 @@ export default function TasksPage() {
         task_type: defaultType,
         created_by: user.id,
         created_by_name: userProfile.name || userProfile.email || 'Unknown',
+        status: 'to_do',
       });
-      if (error) throw error;
       await fetchTasks();
     } catch (err) {
       console.error('Error adding task:', err);
@@ -628,8 +524,14 @@ export default function TasksPage() {
     return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   };
 
+  const clientMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    clients.forEach(c => { map[c.id] = c.name; });
+    return map;
+  }, [clients]);
+
   const colLabel: Record<ColumnKey, string> = {
-    taskName: 'Task Name', dueDate: 'Due Date', comment: 'Comment',
+    taskName: 'Task Name', client: 'Client', dueDate: 'Due Date', comment: 'Comment',
     frequency: 'Frequency', type: 'Type', link: 'Link',
     createdBy: 'Created By', created: 'Created',
   };
@@ -681,10 +583,15 @@ export default function TasksPage() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span
-                      className="text-gray-900 font-medium line-clamp-2 cursor-pointer"
+                      className="text-gray-900 font-medium line-clamp-2 cursor-pointer inline-flex items-center gap-1.5"
                       onDoubleClick={() => startEditing(task.id, 'task_name', task.task_name)}
                     >
                       {task.task_name}
+                      {isTaskStale(task) && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 flex-shrink-0">
+                          <Clock className="h-2.5 w-2.5" /> Stale
+                        </span>
+                      )}
                     </span>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" align="start" className="max-w-xs text-xs">
@@ -696,13 +603,44 @@ export default function TasksPage() {
               </TooltipProvider>
             ) : (
               <span
-                className="text-gray-900 font-medium line-clamp-2 cursor-pointer"
+                className="text-gray-900 font-medium line-clamp-2 cursor-pointer inline-flex items-center gap-1.5"
                 onDoubleClick={() => startEditing(task.id, 'task_name', task.task_name)}
                 title="Double-click to edit"
               >
                 {task.task_name}
+                {isTaskStale(task) && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 flex-shrink-0">
+                    <Clock className="h-2.5 w-2.5" /> Stale
+                  </span>
+                )}
               </span>
             )}
+          </td>
+        );
+      case 'client':
+        return (
+          <td key={col} className={`py-3 px-3 ${COL.client}`}>
+            <Select
+              value={task.client_id || '_none'}
+              onValueChange={(v) => saveSelectField(task.id, 'client_id', v === '_none' ? '' : v)}
+            >
+              <SelectTrigger
+                className="border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 truncate max-w-[100px]"
+                style={{ outline: 'none', boxShadow: 'none' }}
+              >
+                <SelectValue>
+                  {task.client_id && clientMap[task.client_id] ? (
+                    <span className="text-gray-700">{clientMap[task.client_id]}</span>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none">No client</SelectItem>
+                {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </td>
         );
       case 'dueDate':
@@ -727,31 +665,45 @@ export default function TasksPage() {
             </Popover>
           </td>
         );
-      case 'comment':
+      case 'comment': {
+        const count = commentCounts[task.id] || 0;
         return (
           <td key={col} className={`py-3 px-3 ${COL.comment}`}>
-            {isEditingField('latest_comment') ? (
-              <textarea
-                value={editingValue}
-                onChange={(e) => setEditingValue(e.target.value)}
-                onBlur={saveInlineEdit}
-                onKeyDown={(e) => { if (e.key === 'Escape') cancelEditing(); }}
-                className="w-full min-w-[140px] border-none shadow-none p-0 bg-transparent focus:outline-none focus:ring-0 text-xs resize-none"
-                style={{ outline: 'none', boxShadow: 'none' }}
-                rows={2}
-                autoFocus
-              />
-            ) : (
-              <span
-                className="text-gray-600 line-clamp-2 whitespace-pre-wrap cursor-pointer text-xs"
-                onDoubleClick={() => startEditing(task.id, 'latest_comment', task.latest_comment || '')}
-                title="Double-click to edit"
-              >
-                {task.latest_comment || '—'}
-              </span>
-            )}
+            <div className="flex items-center gap-1.5">
+              {count > 0 && (
+                <button
+                  className="inline-flex items-center gap-1 text-xs text-[#3e8692] hover:underline cursor-pointer"
+                  onClick={() => openForm(task)}
+                  title="View comments"
+                >
+                  <MessageCircle className="h-3 w-3" />
+                  {count}
+                </button>
+              )}
+              {isEditingField('latest_comment') ? (
+                <textarea
+                  value={editingValue}
+                  onChange={(e) => setEditingValue(e.target.value)}
+                  onBlur={saveInlineEdit}
+                  onKeyDown={(e) => { if (e.key === 'Escape') cancelEditing(); }}
+                  className="w-full min-w-[140px] border-none shadow-none p-0 bg-transparent focus:outline-none focus:ring-0 text-xs resize-none"
+                  style={{ outline: 'none', boxShadow: 'none' }}
+                  rows={2}
+                  autoFocus
+                />
+              ) : (
+                <span
+                  className="text-gray-600 line-clamp-2 whitespace-pre-wrap cursor-pointer text-xs flex-1"
+                  onDoubleClick={() => startEditing(task.id, 'latest_comment', task.latest_comment || '')}
+                  title="Double-click to edit"
+                >
+                  {task.latest_comment || (count === 0 ? '—' : '')}
+                </span>
+              )}
+            </div>
           </td>
         );
+      }
       case 'frequency':
         return (
           <td key={col} className={`py-3 px-3 ${COL.frequency}`}>
@@ -1161,201 +1113,15 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {/* Add/Edit Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) { setIsFormOpen(false); setEditingId(null); } }}>
-        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>{editingId ? 'Edit Task' : 'Add Task'}</DialogTitle>
-            <DialogDescription>
-              {editingId ? 'Update the task details below.' : 'Create a new task for the team.'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1 pb-4">
-            {/* Task Name */}
-            <div className="grid gap-2">
-              <Label>Task Name <span className="text-red-500">*</span></Label>
-              <Input
-                value={form.task_name}
-                onChange={(e) => setForm({ ...form, task_name: e.target.value })}
-                placeholder="Enter task name"
-                className="auth-input"
-              />
-            </div>
-
-            {/* Description */}
-            <div className="grid gap-2">
-              <Label>Description</Label>
-              <div className="task-editor-wrapper">
-                <style jsx global>{`
-                  .task-editor-wrapper {
-                    height: 200px;
-                    min-height: 150px;
-                    max-height: 50vh;
-                    overflow-y: auto;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 0.375rem;
-                    resize: vertical;
-                  }
-                  .task-editor-wrapper .ql-toolbar {
-                    position: sticky;
-                    top: 0;
-                    z-index: 10;
-                    background: white;
-                    border-top: none;
-                    border-left: none;
-                    border-right: none;
-                  }
-                  .task-editor-wrapper .ql-container {
-                    border: none;
-                    min-height: 120px;
-                  }
-                `}</style>
-                <ReactQuill
-                  theme="snow"
-                  value={form.description}
-                  onChange={(value) => setForm({ ...form, description: value })}
-                  modules={{
-                    toolbar: [
-                      [{ 'header': [1, 2, 3, false] }],
-                      ['bold', 'italic', 'underline'],
-                      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                      [{ 'indent': '-1'}, { 'indent': '+1' }],
-                      ['link'],
-                      ['clean']
-                    ],
-                  }}
-                  placeholder="Add a description (shown on hover)..."
-                  className="bg-white"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Assigned To */}
-              <div className="grid gap-2">
-                <Label>Assigned To</Label>
-                <Select value={form.assigned_to} onValueChange={(v) => setForm({ ...form, assigned_to: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select team member" /></SelectTrigger>
-                  <SelectContent>
-                    {teamMembers.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Due Date */}
-              <div className="grid gap-2">
-                <Label>Due Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="auth-input justify-start text-left font-normal"
-                      style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.due_date ? '#111827' : '#9ca3af' }}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {form.due_date ? form.due_date.toLocaleDateString() : 'Select date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={form.due_date}
-                      onSelect={(date) => setForm({ ...form, due_date: date || undefined })}
-                      initialFocus
-                      classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
-                      modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Frequency */}
-              <div className="grid gap-2">
-                <Label>Frequency <span className="text-red-500">*</span></Label>
-                <Select value={form.frequency} onValueChange={(v) => setForm({ ...form, frequency: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select frequency" /></SelectTrigger>
-                  <SelectContent>
-                    {FREQUENCIES.map((f) => <SelectItem key={f} value={f}>{FREQUENCY_LABELS[f]}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Task Type */}
-              <div className="grid gap-2">
-                <Label>Task Type <span className="text-red-500">*</span></Label>
-                <Select value={form.task_type} onValueChange={(v) => setForm({ ...form, task_type: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select type" /></SelectTrigger>
-                  <SelectContent>
-                    {TASK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              {/* Status */}
-              <div className="grid gap-2">
-                <Label>Status</Label>
-                <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select status" /></SelectTrigger>
-                  <SelectContent>
-                    {STATUSES.map((s) => {
-                      const cfg = STATUS_CONFIG[s];
-                      const Icon = cfg.icon;
-                      return (
-                        <SelectItem key={s} value={s}>
-                          <div className="flex items-center gap-2">
-                            <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
-                            {cfg.label}
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Link */}
-              <div className="grid gap-2">
-                <Label>Link</Label>
-                <Input
-                  value={form.link}
-                  onChange={(e) => setForm({ ...form, link: e.target.value })}
-                  placeholder="https://..."
-                  className="auth-input"
-                />
-              </div>
-            </div>
-
-            {/* Latest Comment */}
-            <div className="grid gap-2">
-              <Label>Latest Comment</Label>
-              <Textarea
-                value={form.latest_comment}
-                onChange={(e) => setForm({ ...form, latest_comment: e.target.value })}
-                placeholder="Add a comment or note..."
-                className="auth-input"
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setIsFormOpen(false); setEditingId(null); }}>Cancel</Button>
-            <Button
-              className="hover:opacity-90"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              onClick={handleSubmit}
-              disabled={!form.task_name.trim() || !form.frequency || !form.task_type || submitting}
-            >
-              {submitting ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-              ) : editingId ? 'Save Changes' : 'Add Task'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Task Detail Modal */}
+      <TaskDetailModal
+        open={isFormOpen}
+        onOpenChange={(open) => { if (!open) { setIsFormOpen(false); setEditingTask(null); } }}
+        task={editingTask}
+        teamMembers={teamMembers}
+        clients={clients}
+        onSaved={fetchTasks}
+      />
 
       {/* Delete Confirmation */}
       <Dialog open={!!deletingId} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>

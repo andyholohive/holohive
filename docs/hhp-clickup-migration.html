@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HHP ClickUp Migration Plan</title>
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root {
+    --teal: #3e8692;
+    --teal-light: #e8f4f6;
+    --teal-dark: #2c6069;
+    --teal-900: #1a3f47;
+    --red: #dc2626;
+    --orange: #ea580c;
+    --amber: #d97706;
+    --green: #16a34a;
+    --blue: #2563eb;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+    --shadow-lg: 0 10px 15px rgba(0,0,0,0.1), 0 4px 6px rgba(0,0,0,0.05);
+    --radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+    color: var(--gray-800);
+    background: #f0f2f5;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ============ STICKY NAV ============ */
+  .nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--gray-200);
+    padding: 0 2rem;
+    display: none;
+  }
+  .nav.visible { display: block; }
+  .nav-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    height: 52px;
+    gap: 0.25rem;
+    overflow-x: auto;
+  }
+  .nav-brand {
+    font-weight: 800;
+    font-size: 0.85rem;
+    color: var(--teal);
+    margin-right: 1.5rem;
+    white-space: nowrap;
+  }
+  .nav a {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--gray-400);
+    text-decoration: none;
+    padding: 0.4rem 0.75rem;
+    border-radius: 6px;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .nav a:hover { color: var(--gray-700); background: var(--gray-100); }
+  .nav a.active { color: var(--teal); background: var(--teal-light); }
+
+  /* ============ COVER ============ */
+  .cover {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(160deg, var(--teal-900) 0%, var(--teal-dark) 30%, var(--teal) 70%, #5bb8c5 100%);
+    color: white;
+    text-align: center;
+    padding: 3rem 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 20% 80%, rgba(255,255,255,0.06) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(255,255,255,0.04) 0%, transparent 50%);
+  }
+  .cover-content { position: relative; max-width: 700px; }
+  .cover .version-badge {
+    display: inline-block;
+    padding: 0.35rem 1rem;
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    opacity: 0.7;
+    margin-bottom: 2rem;
+  }
+  .cover h1 {
+    font-size: 3.5rem;
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+  }
+  .cover h1 .arrow { display: inline-block; margin: 0 0.3rem; opacity: 0.5; font-weight: 400; }
+  .cover .subtitle {
+    font-size: 1.15rem;
+    opacity: 0.8;
+    margin-top: 1rem;
+    font-weight: 400;
+  }
+  .cover .tagline {
+    margin-top: 2.5rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.5rem 1.25rem;
+    background: rgba(255,255,255,0.12);
+    border-radius: 8px;
+  }
+  .cover .tagline i { width: 16px; height: 16px; }
+  .cover .scroll-hint {
+    position: absolute;
+    bottom: 2.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    opacity: 0.4;
+    animation: fade-bounce 2.5s ease-in-out infinite;
+  }
+  .cover .scroll-hint span { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+  .cover .scroll-hint i { width: 20px; height: 20px; }
+  @keyframes fade-bounce {
+    0%, 100% { opacity: 0.4; transform: translateX(-50%) translateY(0); }
+    50% { opacity: 0.7; transform: translateX(-50%) translateY(6px); }
+  }
+
+  /* ============ LAYOUT ============ */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+  section { padding: 5rem 0; scroll-margin-top: 60px; }
+  .section-header { margin-bottom: 3rem; }
+  .section-divider { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+  .section-divider hr { border: none; border-top: 1px solid var(--gray-200); }
+
+  .step-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .step-number {
+    width: 28px; height: 28px;
+    background: var(--teal);
+    color: white;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 800;
+  }
+  .step-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--teal);
+  }
+
+  h2 { font-size: 2.25rem; font-weight: 900; color: var(--gray-900); letter-spacing: -0.02em; line-height: 1.2; }
+  h3 { font-size: 1.15rem; font-weight: 700; color: var(--gray-900); }
+  .section-desc { font-size: 1rem; color: var(--gray-500); margin-top: 0.75rem; max-width: 640px; line-height: 1.7; }
+
+  /* ============ CARDS ============ */
+  .card {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    transition: box-shadow 0.2s, transform 0.2s;
+  }
+  .card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  .card-pad { padding: 1.5rem; }
+
+  /* ============ ICON BOXES ============ */
+  .icon-box {
+    width: 44px; height: 44px; min-width: 44px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .icon-box i { width: 22px; height: 22px; }
+
+  /* Check circles for lists */
+  .check-circle {
+    width: 20px; height: 20px; min-width: 20px;
+    background: #dcfce7;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .check-circle i { width: 12px; height: 12px; color: var(--green); }
+
+  /* ============ GOAL BANNER ============ */
+  .goal-banner {
+    background: white;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius);
+    padding: 2rem;
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+    box-shadow: var(--shadow);
+  }
+  .goal-banner p { color: var(--gray-600); margin-top: 0.25rem; font-size: 0.9rem; }
+  .principles { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.25rem; }
+  .principle-pill {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    font-size: 0.8rem; font-weight: 600; color: var(--gray-700);
+    background: var(--gray-100); padding: 0.4rem 0.85rem; border-radius: 8px;
+  }
+  .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); flex-shrink: 0; }
+
+  /* ============ DEPENDENCY GRID ============ */
+  .dep-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+  .dep-card-title {
+    font-size: 0.9rem; font-weight: 800; color: var(--gray-900);
+    margin-bottom: 1rem; display: flex; align-items: center; gap: 0.75rem;
+  }
+  .dep-list { list-style: none; }
+  .dep-list li {
+    font-size: 0.85rem; color: var(--gray-600);
+    padding: 0.4rem 0; display: flex; align-items: center; gap: 0.5rem;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .dep-list li:last-child { border-bottom: none; }
+
+  /* ============ ARCHITECTURE ============ */
+  .arch-wrapper {
+    background: white; border: 1px solid var(--gray-200);
+    border-radius: var(--radius); padding: 3rem 2.5rem; box-shadow: var(--shadow);
+  }
+  .arch-root { text-align: center; margin-bottom: 1.5rem; }
+  .arch-root-badge {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: var(--teal); color: white; font-weight: 800; font-size: 1rem;
+    padding: 0.65rem 2rem; border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(62,134,146,0.3);
+  }
+  .arch-root-badge i { width: 18px; height: 18px; }
+  .arch-line { width: 2px; height: 32px; background: linear-gradient(to bottom, var(--teal), var(--gray-300)); margin: 0 auto; }
+  .arch-split {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;
+    margin-top: 0.75rem; position: relative;
+  }
+  .arch-split::before {
+    content: ''; position: absolute; top: 0; left: 25%; right: 25%;
+    height: 2px; background: var(--gray-300);
+  }
+  .arch-node {
+    border: 2px solid var(--gray-200); border-radius: 10px;
+    padding: 1.25rem; position: relative; background: white;
+  }
+  .arch-node::before {
+    content: ''; position: absolute; top: -18px; left: 50%;
+    width: 2px; height: 18px; background: var(--gray-300);
+  }
+  .arch-node-title {
+    font-size: 0.9rem; font-weight: 700; color: var(--gray-900);
+    margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.5rem;
+  }
+  .arch-node-title i { width: 18px; height: 18px; color: var(--teal); }
+  .arch-tags { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .arch-tag {
+    font-size: 0.75rem; font-weight: 500; background: var(--gray-100);
+    color: var(--gray-600); padding: 0.25rem 0.65rem; border-radius: 6px;
+  }
+  .arch-dashboards {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;
+    margin-top: 2rem; padding-top: 2rem; border-top: 2px dashed var(--gray-200);
+  }
+  .arch-dash {
+    text-align: center; padding: 1.25rem 1rem; border-radius: 10px;
+    border: 1px solid var(--gray-200); background: var(--gray-50);
+  }
+  .arch-dash-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 0.5rem auto;
+  }
+  .arch-dash-icon i { width: 20px; height: 20px; }
+  .arch-dash h5 { font-size: 0.82rem; font-weight: 700; color: var(--gray-800); }
+  .arch-dash p { font-size: 0.72rem; color: var(--gray-400); margin-top: 0.15rem; }
+
+  /* ============ DASHBOARD DETAIL CARDS ============ */
+  .dash-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+  .dash-card-header {
+    padding: 1.1rem 1.35rem; font-weight: 700; font-size: 0.9rem;
+    display: flex; align-items: center; gap: 0.5rem;
+    border-bottom: 2px solid transparent;
+  }
+  .dash-card-header i { width: 18px; height: 18px; }
+  .dash-card-header.type-member { background: #eff6ff; color: var(--blue); border-bottom-color: #93c5fd; }
+  .dash-card-header.type-admin { background: #fef3c7; color: #92400e; border-bottom-color: #fcd34d; }
+  .dash-card-header.type-client { background: var(--teal-light); color: var(--teal-dark); border-bottom-color: #7ec8d3; }
+  .dash-card-body { padding: 1.25rem 1.35rem; }
+  .dash-card-body .audience {
+    font-size: 0.78rem; color: var(--gray-500);
+    margin-bottom: 1rem; padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .dash-card-body .audience strong { color: var(--gray-700); }
+  .dash-feature-list { list-style: none; }
+  .dash-feature-list li {
+    font-size: 0.82rem; color: var(--gray-700);
+    padding: 0.45rem 0; border-bottom: 1px solid var(--gray-100);
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .dash-feature-list li:last-child { border-bottom: none; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ============ TASK MOCK ============ */
+  .task-mock-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start; }
+  .task-mock { border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-lg); }
+  .task-mock-header {
+    background: linear-gradient(135deg, var(--teal-dark), var(--teal));
+    color: white; padding: 1rem 1.5rem; font-weight: 700; font-size: 0.85rem;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .task-mock-header i { width: 16px; height: 16px; }
+  .task-mock-body { padding: 0.25rem 1.5rem; background: white; }
+  .task-field {
+    display: flex; align-items: center; padding: 0.7rem 0;
+    border-bottom: 1px solid var(--gray-100); font-size: 0.85rem;
+  }
+  .task-field:last-child { border-bottom: none; }
+  .field-label {
+    width: 120px; min-width: 120px; color: var(--gray-400);
+    font-weight: 600; font-size: 0.72rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .field-value { color: var(--gray-800); }
+  .tag {
+    display: inline-block; padding: 0.2rem 0.6rem;
+    border-radius: 5px; font-size: 0.75rem; font-weight: 600;
+  }
+  .tag-red { background: #fef2f2; color: var(--red); }
+  .tag-green { background: #f0fdf4; color: var(--green); }
+  .tag-blue { background: #eff6ff; color: var(--blue); }
+  .tag-amber { background: #fffbeb; color: var(--amber); }
+  .tag-teal { background: var(--teal-light); color: var(--teal-dark); }
+
+  .task-fields-desc {
+    padding: 1.5rem; background: var(--gray-50);
+    border: 1px solid var(--gray-200); border-radius: var(--radius);
+  }
+  .task-fields-desc h4 { font-size: 0.85rem; font-weight: 700; color: var(--gray-900); margin-bottom: 1rem; }
+  .field-row {
+    display: flex; align-items: flex-start; gap: 0.6rem;
+    padding: 0.5rem 0; border-bottom: 1px solid var(--gray-200); font-size: 0.82rem;
+  }
+  .field-row:last-child { border-bottom: none; }
+  .field-row strong { color: var(--gray-800); min-width: 90px; }
+  .field-row span { color: var(--gray-500); }
+
+  /* ============ ACCOUNTABILITY ============ */
+  .acc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
+  .acc-card { padding: 1.5rem; display: flex; gap: 1.25rem; align-items: flex-start; }
+  .acc-card h4 { font-size: 0.9rem; font-weight: 700; color: var(--gray-900); }
+  .acc-card p { font-size: 0.82rem; color: var(--gray-500); margin-top: 0.3rem; line-height: 1.5; }
+
+  /* ============ PHASE TIMELINE ============ */
+  .timeline { position: relative; padding-left: 4rem; }
+  .timeline::before {
+    content: ''; position: absolute; left: 19px; top: 20px; bottom: 20px;
+    width: 3px;
+    background: linear-gradient(to bottom, var(--gray-300), var(--teal), var(--green));
+    border-radius: 3px;
+  }
+  .phase { position: relative; margin-bottom: 2rem; }
+  .phase:last-child { margin-bottom: 0; }
+  .phase-marker {
+    position: absolute; left: -4rem; top: 1.35rem;
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 0.8rem; color: white; z-index: 1;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  .phase-marker.c0 { background: var(--gray-400); }
+  .phase-marker.c1 { background: var(--blue); }
+  .phase-marker.c2 { background: var(--amber); }
+  .phase-marker.c3 { background: var(--orange); }
+  .phase-marker.c4 { background: var(--green); }
+  .phase-content {
+    background: white; border: 1px solid var(--gray-200);
+    border-radius: var(--radius); padding: 1.75rem;
+    box-shadow: var(--shadow-sm); transition: box-shadow 0.2s;
+  }
+  .phase-content:hover { box-shadow: var(--shadow); }
+  .phase-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.75rem; }
+  .phase-title { font-size: 1.05rem; font-weight: 800; color: var(--gray-900); }
+  .phase-duration {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--gray-400);
+    background: var(--gray-100); padding: 0.2rem 0.6rem; border-radius: 5px;
+  }
+  .phase-body { font-size: 0.88rem; color: var(--gray-600); line-height: 1.65; }
+  .phase-body ul { margin-top: 0.5rem; padding-left: 1.25rem; }
+  .phase-body li { margin-bottom: 0.3rem; }
+  .phase-callout {
+    margin-top: 1rem; padding: 0.75rem 1rem; background: var(--gray-50);
+    border-radius: 8px; font-size: 0.82rem; color: var(--gray-600);
+    border-left: 4px solid var(--teal); font-weight: 500;
+  }
+  .phase-callout.warning { background: #fef2f2; border-left-color: var(--red); color: #991b1b; }
+  .phase-callout.success { background: #f0fdf4; border-left-color: var(--green); color: #166534; }
+
+  /* ============ READINESS TABLE ============ */
+  .ready-table {
+    width: 100%; border-collapse: separate; border-spacing: 0;
+    background: white; border-radius: var(--radius); overflow: hidden;
+    border: 1px solid var(--gray-200); box-shadow: var(--shadow);
+  }
+  .ready-table th {
+    text-align: left; font-size: 0.68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em; color: var(--gray-400);
+    padding: 0.85rem 1.5rem; border-bottom: 2px solid var(--gray-200);
+    background: var(--gray-50);
+  }
+  .ready-table td {
+    padding: 0.85rem 1.5rem; font-size: 0.88rem;
+    border-bottom: 1px solid var(--gray-100); color: var(--gray-700);
+  }
+  .ready-table tr:last-child td { border-bottom: none; }
+  .ready-table tbody tr:hover { background: var(--gray-50); }
+  .status-badge {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    font-weight: 700; font-size: 0.75rem; padding: 0.25rem 0.65rem; border-radius: 6px;
+  }
+  .status-badge.required { background: #fef2f2; color: var(--red); }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+  /* ============ BLOCKER ============ */
+  .blocker {
+    margin-top: 2rem;
+    background: linear-gradient(135deg, #fef2f2, #fff1f2);
+    border: 2px solid #fecaca; border-radius: var(--radius);
+    padding: 1.5rem 2rem; display: flex; align-items: center; gap: 1.25rem;
+  }
+  .blocker-icon {
+    width: 48px; height: 48px; min-width: 48px;
+    background: #fee2e2; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .blocker-icon i { width: 24px; height: 24px; color: var(--red); }
+  .blocker h4 { font-size: 0.95rem; font-weight: 800; color: #991b1b; }
+  .blocker p { font-size: 0.82rem; color: #b91c1c; margin-top: 0.15rem; }
+
+  /* ============ RESPONSIVE ============ */
+  @media print {
+    .cover { min-height: auto; padding: 3rem; page-break-after: always; }
+    .nav { display: none !important; }
+    section { padding: 2.5rem 0; }
+    body { background: white; }
+    .card:hover, .phase-content:hover { transform: none; box-shadow: var(--shadow-sm); }
+  }
+  @media (max-width: 768px) {
+    .dep-grid, .dash-grid, .arch-dashboards, .arch-split, .acc-grid, .task-mock-wrapper {
+      grid-template-columns: 1fr;
+    }
+    h2 { font-size: 1.75rem; }
+    .cover h1 { font-size: 2.25rem; }
+    .container { padding: 0 1.25rem; }
+    .timeline { padding-left: 3.5rem; }
+    .phase-marker { left: -3.5rem; width: 36px; height: 36px; font-size: 0.75rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ NAV ============ -->
+<div class="nav" id="stickyNav">
+  <div class="nav-inner">
+    <span class="nav-brand">HHP Migration</span>
+    <a href="#objective">Objective</a>
+    <a href="#dependencies">Dependencies</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#dashboards">Dashboards</a>
+    <a href="#task-model">Task Model</a>
+    <a href="#accountability">Accountability</a>
+    <a href="#phases">Phases</a>
+    <a href="#readiness">Readiness</a>
+  </div>
+</div>
+
+<!-- ============ COVER ============ -->
+<div class="cover">
+  <div class="cover-content">
+    <div class="version-badge">Draft v1 &mdash; Internal &amp; Confidential</div>
+    <h1>ClickUp <span class="arrow">&rarr;</span> HHP</h1>
+    <p class="subtitle">Complete migration plan &amp; architecture overview for replacing ClickUp with the HHP Portal as the sole task management system.</p>
+    <div class="tagline">
+      <i data-lucide="check-circle-2"></i>
+      Barebones stability first, optimization later
+    </div>
+  </div>
+  <div class="scroll-hint">
+    <span>Scroll</span>
+    <i data-lucide="chevron-down"></i>
+  </div>
+</div>
+
+<!-- ============ 1. OBJECTIVE ============ -->
+<section id="objective">
+  <div class="container">
+    <div class="section-header">
+      <div class="step-indicator">
+        <div class="step-number">1</div>
+        <span class="step-label">Objective</span>
+      </div>
+      <h2>Migration Goal</h2>
+      <p class="section-desc">Replace ClickUp with HHP as the sole internal task management system. Phase 1 replicates mission-critical features only.</p>
+    </div>
+
+    <div class="goal-banner">
+      <div class="icon-box" style="background:var(--teal-light)">
+        <i data-lucide="target" style="color:var(--teal)"></i>
+      </div>
+      <div>
+        <h3>Zero-disruption cutover</h3>
+        <p>Move all internal Ops + client execution management from ClickUp to HHP without any of the following:</p>
+        <div class="principles">
+          <span class="principle-pill"><span class="pip"></span> Task visibility loss</span>
+          <span class="principle-pill"><span class="pip"></span> Broken recurring systems</span>
+          <span class="principle-pill"><span class="pip"></span> Automation gaps</span>
+          <span class="principle-pill"><span class="pip"></span> Reduced accountability</span>
+          <span class="principle-pill"><span class="pip"></span> Campaign disruption</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"><hr/></div>
+
+<!-- ============ 2. DEPENDENCIES ============ -->
+<section id="dependencies">
+  <div class="container">
+    <div class="section-header">
+      <div class="step-indicator">
+        <div class="step-number">2</div>
+        <span class="step-label">Non-Negotiables</span>
+      </div>
+      <h2>Current Dependency Map</h2>
+      <p class="section-desc">Everything below must exist in HHP before migration begins. These are the features the team relies on daily in ClickUp.</p>
+    </div>
+
+    <div class="dep-grid">
+      <div class="card dep-card card-pad">
+        <div class="dep-card-title">
+          <div class="icon-box" style="background:#eff6ff">
+            <i data-lucide="clipboard-list" style="color:var(--blue)"></i>
+          </div>
+          Core Task Layer
+        </div>
+        <ul class="dep-list">
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Assignees</li>
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Due dates</li>
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Priority levels</li>
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Status pipeline</li>
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Custom fields (Frequency, Link, Task Type)</li>
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Recurring tasks</li>
+        </ul>
+      </div>
+
+      <div class="card dep-card card-pad">
+        <div class="dep-card-title">
+          <div class="icon-box" style="background:#fef3c7">
+            <i data-lucide="file-text" style="color:var(--amber)"></i>
+          </div>
+          Content &amp; Collaboration
+        </div>
+        <ul class="dep-list">
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Checklists</li>
+          <li><span class="check-circle"><i data-lucide="check"></i></span> SOPs</li>
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Templates</li>
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Attachments</li>
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Comment threads</li>
+        </ul>
+      </div>
+
+      <div class="card dep-card card-pad">
+        <div class="dep-card-title">
+          <div class="icon-box" style="background:#fce7f3">
+            <i data-lucide="zap" style="color:#db2777"></i>
+          </div>
+          Automation &amp; Oversight
+        </div>
+        <ul class="dep-list">
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Status change triggers</li>
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Auto-assign rules</li>
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Reminder logic</li>
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Form &rarr; Task creation</li>
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Dashboard by team member</li>
+          <li><span class="check-circle"><i data-lucide="check"></i></span> Tasks per client view</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"><hr/></div>
+
+<!-- ============ 3. ARCHITECTURE ============ -->
+<section id="architecture">
+  <div class="container">
+    <div class="section-header">
+      <div class="step-indicator">
+        <div class="step-number">3</div>
+        <span class="step-label">Architecture</span>
+      </div>
+      <h2>Proposed HHP Structure</h2>
+      <p class="section-desc">Replacing ClickUp's Lists model with a workspace + dashboard architecture. Single source of truth, no fragmentation.</p>
+    </div>
+
+    <div class="arch-wrapper">
+      <div class="arch-root">
+        <div class="arch-root-badge">
+          <i data-lucide="square-check"></i>
+          HHP Portal
+        </div>
+      </div>
+      <div class="arch-line"></div>
+
+      <div class="arch-split">
+        <div class="arch-node">
+          <div class="arch-node-title">
+            <i data-lucide="users"></i>
+            Team Workspace
+          </div>
+          <div class="arch-tags">
+            <span class="arch-tag">Internal Ops</span>
+            <span class="arch-tag">Sales</span>
+            <span class="arch-tag">Research</span>
+            <span class="arch-tag">Admin</span>
+          </div>
+        </div>
+        <div class="arch-node">
+          <div class="arch-node-title">
+            <i data-lucide="target"></i>
+            Client Workspace
+          </div>
+          <div class="arch-tags">
+            <span class="arch-tag">Client Execution</span>
+            <span class="arch-tag">Campaigns</span>
+            <span class="arch-tag">Deliverables</span>
+            <span class="arch-tag">WDR / DR</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="arch-dashboards">
+        <div class="arch-dash">
+          <div class="arch-dash-icon" style="background:#eff6ff">
+            <i data-lucide="user" style="color:var(--blue)"></i>
+          </div>
+          <h5>My Dashboard</h5>
+          <p>Per team member</p>
+        </div>
+        <div class="arch-dash">
+          <div class="arch-dash-icon" style="background:#fef3c7">
+            <i data-lucide="settings" style="color:#92400e"></i>
+          </div>
+          <h5>Admin Dashboard</h5>
+          <p>Partners / C-Level</p>
+        </div>
+        <div class="arch-dash">
+          <div class="arch-dash-icon" style="background:var(--teal-light)">
+            <i data-lucide="layout-grid" style="color:var(--teal-dark)"></i>
+          </div>
+          <h5>Client Dashboard</h5>
+          <p>Per client, internal use</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"><hr/></div>
+
+<!-- ============ 4. DASHBOARDS ============ -->
+<section id="dashboards">
+  <div class="container">
+    <div class="section-header">
+      <div class="step-indicator">
+        <div class="step-number">4</div>
+        <span class="step-label">Dashboards</span>
+      </div>
+      <h2>Three Dashboard Types</h2>
+      <p class="section-desc">Dashboards are a core structural component &mdash; not an afterthought. Each serves a distinct audience and purpose.</p>
+    </div>
+
+    <div class="dash-grid">
+      <div class="card">
+        <div class="dash-card-header type-member">
+          <i data-lucide="user"></i>
+          My Dashboard
+        </div>
+        <div class="dash-card-body">
+          <p class="audience">Replaces ClickUp "My Work" view.<br>Visible to: <strong>team member + Partners/Admin</strong></p>
+          <ul class="dash-feature-list">
+            <li><span class="dot" style="background:var(--blue)"></span> All assigned tasks</li>
+            <li><span class="dot" style="background:var(--blue)"></span> Tasks by status (To Do / In Progress / Review / Done)</li>
+            <li><span class="dot" style="background:var(--red)"></span> Overdue tasks highlighted</li>
+            <li><span class="dot" style="background:var(--amber)"></span> Recurring tasks due this week</li>
+            <li><span class="dot" style="background:var(--blue)"></span> Upcoming deadlines (7-day view)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="dash-card-header type-admin">
+          <i data-lucide="settings"></i>
+          Admin Overview
+        </div>
+        <div class="dash-card-body">
+          <p class="audience">Partners &amp; C-Level only.<br>Replaces ClickUp team dashboards.</p>
+          <ul class="dash-feature-list">
+            <li><span class="dot" style="background:var(--amber)"></span> Open tasks per team member</li>
+            <li><span class="dot" style="background:var(--red)"></span> Overdue count per member</li>
+            <li><span class="dot" style="background:var(--green)"></span> Completed this week per member</li>
+            <li><span class="dot" style="background:var(--amber)"></span> Active tasks per client</li>
+            <li><span class="dot" style="background:var(--red)"></span> Overdue per client</li>
+            <li><span class="dot" style="background:var(--gray-400)"></span> Internal Ops snapshot</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="dash-card-header type-client">
+          <i data-lucide="layout-grid"></i>
+          Client View
+        </div>
+        <div class="dash-card-body">
+          <p class="audience">Per-client internal execution view.<br>Connected to <strong>current campaign manager</strong>.</p>
+          <ul class="dash-feature-list">
+            <li><span class="dot" style="background:var(--teal)"></span> Active campaigns</li>
+            <li><span class="dot" style="background:var(--teal)"></span> Open tasks</li>
+            <li><span class="dot" style="background:var(--teal)"></span> Upcoming deliverables</li>
+            <li><span class="dot" style="background:var(--red)"></span> Overdue items</li>
+            <li><span class="dot" style="background:var(--teal)"></span> WDR / Delivery Rundowns</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"><hr/></div>
+
+<!-- ============ 5. TASK MODEL ============ -->
+<section id="task-model">
+  <div class="container">
+    <div class="section-header">
+      <div class="step-indicator">
+        <div class="step-number">5</div>
+        <span class="step-label">Task Model</span>
+      </div>
+      <h2>Task Structure</h2>
+      <p class="section-desc">Every task in HHP carries the same core fields &mdash; consistent across Internal Ops, Client Execution, and Sales.</p>
+    </div>
+
+    <div class="task-mock-wrapper">
+      <div class="card task-mock">
+        <div class="task-mock-header">
+          <i data-lucide="check-square"></i>
+          Publish weekly KOL report for Client X
+        </div>
+        <div class="task-mock-body">
+          <div class="task-field"><span class="field-label">Assignee</span><span class="field-value">Sarah K.</span></div>
+          <div class="task-field"><span class="field-label">Due Date</span><span class="field-value">Mar 21, 2026</span></div>
+          <div class="task-field"><span class="field-label">Priority</span><span class="field-value"><span class="tag tag-red">High</span></span></div>
+          <div class="task-field"><span class="field-label">Status</span><span class="field-value"><span class="tag tag-blue">In Progress</span></span></div>
+          <div class="task-field"><span class="field-label">Frequency</span><span class="field-value"><span class="tag tag-teal">Weekly</span></span></div>
+          <div class="task-field"><span class="field-label">Task Type</span><span class="field-value"><span class="tag tag-amber">Delivery</span></span></div>
+          <div class="task-field"><span class="field-label">Link</span><span class="field-value" style="color:var(--blue)">docs.google.com/...</span></div>
+          <div class="task-field"><span class="field-label">Attachments</span><span class="field-value">report_v3.pdf</span></div>
+          <div class="task-field"><span class="field-label">Recurring</span><span class="field-value"><span class="tag tag-green">Every Monday</span></span></div>
+        </div>
+      </div>
+
+      <div class="task-fields-desc">
+        <h4>Required Fields on Every Task</h4>
+        <div class="field-row"><strong>Assignee</strong> <span>Who is responsible. Single or multi-assign.</span></div>
+        <div class="field-row"><strong>Due Date</strong> <span>Date + optional time. Triggers overdue alerts.</span></div>
+        <div class="field-row"><strong>Priority</strong> <span>Urgent / High / Medium / Low. Drives sort order.</span></div>
+        <div class="field-row"><strong>Status</strong> <span>To Do &rarr; In Progress &rarr; Review &rarr; Done.</span></div>
+        <div class="field-row"><strong>Frequency</strong> <span>Custom field. One-time, Daily, Weekly, Monthly.</span></div>
+        <div class="field-row"><strong>Task Type</strong> <span>Custom field. Delivery, Research, Internal, Sales.</span></div>
+        <div class="field-row"><strong>Link</strong> <span>External reference URL (Google Docs, sheets, etc.)</span></div>
+        <div class="field-row"><strong>Attachments</strong> <span>File uploads with preview. PDFs, images, docs.</span></div>
+        <div class="field-row"><strong>Comments</strong> <span>Threaded discussion with @mentions.</span></div>
+        <div class="field-row"><strong>Recurring</strong> <span>Auto-recreates task on schedule.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"><hr/></div>
+
+<!-- ============ 6. ACCOUNTABILITY ============ -->
+<section id="accountability">
+  <div class="container">
+    <div class="section-header">
+      <div class="step-indicator">
+        <div class="step-number">6</div>
+        <span class="step-label">Improvement Over ClickUp</span>
+      </div>
+      <h2>Accountability Enhancements</h2>
+      <p class="section-desc">Fixes the ClickUp problem of "tasks completed but not marked done." These are behavior-correcting systems, not just features.</p>
+    </div>
+
+    <div class="acc-grid">
+      <div class="card acc-card card-pad">
+        <div class="icon-box" style="background:#fef2f2">
+          <i data-lucide="bell-ring" style="color:var(--red)"></i>
+        </div>
+        <div>
+          <h4>Overdue TG Bot Alert</h4>
+          <p>Auto-notification via Telegram bot when any task passes its due date. Immediate visibility &mdash; no need to open the app.</p>
+        </div>
+      </div>
+
+      <div class="card acc-card card-pad">
+        <div class="icon-box" style="background:#eff6ff">
+          <i data-lucide="bar-chart-3" style="color:var(--blue)"></i>
+        </div>
+        <div>
+          <h4>Weekly Incomplete Task Report</h4>
+          <p>Automated report sent to each team member showing overdue and stale tasks. Admin dashboard mirrors this data.</p>
+        </div>
+      </div>
+
+      <div class="card acc-card card-pad">
+        <div class="icon-box" style="background:#fffbeb">
+          <i data-lucide="clock" style="color:var(--amber)"></i>
+        </div>
+        <div>
+          <h4>7-Day Stale Rule</h4>
+          <p>No task can sit "In Progress" for more than 7 days without a comment or status update. Flagged automatically on dashboards.</p>
+        </div>
+      </div>
+
+      <div class="card acc-card card-pad">
+        <div class="icon-box" style="background:#f0fdf4">
+          <i data-lucide="circle-check" style="color:var(--green)"></i>
+        </div>
+        <div>
+          <h4>Friday Auto-Summary</h4>
+          <p>"Tasks completed this week per team member" &mdash; sent every Friday. Creates positive accountability and transparency.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"><hr/></div>
+
+<!-- ============ 7. MIGRATION PHASES ============ -->
+<section id="phases">
+  <div class="container">
+    <div class="section-header">
+      <div class="step-indicator">
+        <div class="step-number">7</div>
+        <span class="step-label">Rollout</span>
+      </div>
+      <h2>Migration Phases</h2>
+      <p class="section-desc">A controlled, phased migration that never puts active campaigns at risk. Parallel run before any hard cutover.</p>
+    </div>
+
+    <div class="timeline">
+      <div class="phase">
+        <div class="phase-marker c0">0</div>
+        <div class="phase-content">
+          <div class="phase-head">
+            <span class="phase-title">Feature Parity Audit</span>
+            <span class="phase-duration">Week 1</span>
+          </div>
+          <div class="phase-body">
+            Before moving anything, confirm HHP can support every non-negotiable:
+            <ul>
+              <li>Recurring tasks &amp; automation triggers</li>
+              <li>Auto-assign &amp; reminders</li>
+              <li>Form &rarr; task creation</li>
+              <li>Full status pipeline replication</li>
+            </ul>
+            <div class="phase-callout warning">If any item fails &rarr; migration pauses until resolved. No workarounds.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-marker c1">1</div>
+        <div class="phase-content">
+          <div class="phase-head">
+            <span class="phase-title">Parallel Run</span>
+            <span class="phase-duration">Weeks 2 &ndash; 4</span>
+          </div>
+          <div class="phase-body">
+            Do <strong>NOT</strong> hard switch. Run both systems simultaneously.
+            <ul>
+              <li><strong>New tasks</strong> created in HHP only</li>
+              <li><strong>Old tasks</strong> continue in ClickUp (no new additions)</li>
+              <li>Monitor: friction, missing features, behavioral gaps</li>
+            </ul>
+            <div class="phase-callout">Rule: HHP = new work &bull; ClickUp = legacy work only</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-marker c2">2</div>
+        <div class="phase-content">
+          <div class="phase-head">
+            <span class="phase-title">Active Task Migration</span>
+            <span class="phase-duration">Week 5</span>
+          </div>
+          <div class="phase-body">
+            Only migrate what's alive:
+            <ul>
+              <li>Active client tasks</li>
+              <li>Recurring weekly tasks</li>
+              <li>Open sales tasks</li>
+            </ul>
+            <div class="phase-callout">Do NOT migrate: completed tasks, archived history, closed campaigns. Historical access stays in ClickUp (read-only).</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-marker c3">3</div>
+        <div class="phase-content">
+          <div class="phase-head">
+            <span class="phase-title">Automation Replication</span>
+            <span class="phase-duration">Week 6</span>
+          </div>
+          <div class="phase-body">
+            Rebuild all automation behavior in HHP:
+            <ul>
+              <li>Status change triggers</li>
+              <li>Reminder logic &amp; auto-assign rules</li>
+              <li>Recurring weekly updates</li>
+              <li>Form &rarr; task logic</li>
+            </ul>
+            <div class="phase-callout">Automations should be behavior-correcting, not just duplicating ClickUp logic. Build in the accountability improvements from Step 6.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-marker c4">4</div>
+        <div class="phase-content">
+          <div class="phase-head">
+            <span class="phase-title">Hard Cutover</span>
+            <span class="phase-duration">Week 7+</span>
+          </div>
+          <div class="phase-body">
+            Only proceed when <strong>all gates pass</strong>:
+            <ul>
+              <li>All active tasks exist in HHP</li>
+              <li>Recurring tasks confirmed working</li>
+              <li>Automations verified end-to-end</li>
+              <li>All three dashboards stable</li>
+            </ul>
+            <div class="phase-callout success">Lock ClickUp (no editing) &bull; Announce HHP as sole operational system &bull; Remove ClickUp from daily workflow</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="section-divider"><hr/></div>
+
+<!-- ============ 8. READINESS ============ -->
+<section id="readiness">
+  <div class="container">
+    <div class="section-header">
+      <div class="step-indicator">
+        <div class="step-number">8</div>
+        <span class="step-label">Gate Check</span>
+      </div>
+      <h2>Minimum Requirements Before Cutover</h2>
+      <p class="section-desc">Every item below must be confirmed working in HHP. If any single item fails, the migration stays paused.</p>
+    </div>
+
+    <table class="ready-table">
+      <thead>
+        <tr>
+          <th style="width:30%">Feature</th>
+          <th style="width:18%">Status</th>
+          <th>Implementation Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Assignees</strong></td><td><span class="status-badge required"><span class="status-dot"></span> Required</span></td><td>Single + multi-assignee support</td></tr>
+        <tr><td><strong>Due Dates</strong></td><td><span class="status-badge required"><span class="status-dot"></span> Required</span></td><td>Date + time precision, triggers overdue alerts</td></tr>
+        <tr><td><strong>Status Pipeline</strong></td><td><span class="status-badge required"><span class="status-dot"></span> Required</span></td><td>Custom statuses per workspace category</td></tr>
+        <tr><td><strong>Recurring Tasks</strong></td><td><span class="status-badge required"><span class="status-dot"></span> Required</span></td><td>Weekly, bi-weekly, monthly cycles</td></tr>
+        <tr><td><strong>Automations</strong></td><td><span class="status-badge required"><span class="status-dot"></span> Required</span></td><td>Status triggers, auto-assign, reminders</td></tr>
+        <tr><td><strong>Form &rarr; Task</strong></td><td><span class="status-badge required"><span class="status-dot"></span> Required</span></td><td>External form submission creates internal task</td></tr>
+        <tr><td><strong>Dashboard (per member)</strong></td><td><span class="status-badge required"><span class="status-dot"></span> Required</span></td><td>"My Work" equivalent with status grouping</td></tr>
+        <tr><td><strong>Dashboard (admin)</strong></td><td><span class="status-badge required"><span class="status-dot"></span> Required</span></td><td>Team member + client oversight views</td></tr>
+        <tr><td><strong>Attachments</strong></td><td><span class="status-badge required"><span class="status-dot"></span> Required</span></td><td>File upload, preview, download</td></tr>
+        <tr><td><strong>Comments</strong></td><td><span class="status-badge required"><span class="status-dot"></span> Required</span></td><td>Threaded comments with @mentions</td></tr>
+      </tbody>
+    </table>
+
+    <div class="blocker">
+      <div class="blocker-icon">
+        <i data-lucide="alert-triangle"></i>
+      </div>
+      <div>
+        <h4>Hard Blocker</h4>
+        <p>Without all items confirmed working, migration is paused. No exceptions, no workarounds.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div style="height:4rem"></div>
+
+<!-- ============ SCRIPTS ============ -->
+<script>
+  // Initialize Lucide icons
+  lucide.createIcons();
+
+  // Sticky nav visibility
+  const nav = document.getElementById('stickyNav');
+  const cover = document.querySelector('.cover');
+  const sections = document.querySelectorAll('section[id]');
+  const navLinks = nav.querySelectorAll('a');
+
+  const observer = new IntersectionObserver(([entry]) => {
+    nav.classList.toggle('visible', !entry.isIntersecting);
+  }, { threshold: 0 });
+  observer.observe(cover);
+
+  // Active nav link on scroll
+  const sectionObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        navLinks.forEach(a => a.classList.remove('active'));
+        const active = nav.querySelector('a[href="#' + entry.target.id + '"]');
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-30% 0px -70% 0px' });
+  sections.forEach(s => sectionObserver.observe(s));
+</script>
+</body>
+</html>

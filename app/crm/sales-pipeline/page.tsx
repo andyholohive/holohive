@@ -509,6 +509,43 @@ export default function SalesPipelinePage() {
     };
   }, [opportunities, metrics.bamfamViolations, outreachTotal, dashboardPeriod, dashboardCustomFrom, dashboardCustomTo]);
 
+  // Alert metrics — always computed from ALL opportunities (unfiltered)
+  const alertMetrics = useMemo(() => {
+    const all = opportunities;
+    const pipelineActive = all.filter(o => PIPELINE_STAGES.includes(o.stage as SalesPipelineStage));
+
+    const nowDate = new Date();
+    const todayStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+    const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const bamfamViolations = metrics.bamfamViolations;
+
+    const now = new Date().toISOString();
+    const overdueFollowups = pipelineActive.filter(o =>
+      o.next_meeting_at && o.next_meeting_at < now
+    ).length;
+
+    const staleDeals = pipelineActive.filter(o => {
+      const lastDate = o.last_contacted_at || o.last_bump_date || o.created_at;
+      if (!lastDate) return true;
+      const daysSince = Math.floor((Date.now() - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24));
+      return daysSince >= 7;
+    }).length;
+
+    const dealsAtRisk = all.filter(o =>
+      ['discovery_done', 'proposal_call', 'v2_contract'].includes(o.stage) && o.temperature_score < 40
+    ).length;
+
+    const meetingsThisWeek = pipelineActive.filter(o =>
+      o.next_meeting_at && new Date(o.next_meeting_at) >= todayStart && new Date(o.next_meeting_at) < weekEnd
+    ).length;
+    const meetingsToday = pipelineActive.filter(o =>
+      o.next_meeting_at && new Date(o.next_meeting_at) >= todayStart && new Date(o.next_meeting_at) < new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
+    ).length;
+
+    return { bamfamViolations, overdueFollowups, staleDeals, dealsAtRisk, meetingsThisWeek, meetingsToday };
+  }, [opportunities, metrics.bamfamViolations]);
+
   // ============================================
   // Data Fetching
   // ============================================
@@ -4873,11 +4910,11 @@ export default function SalesPipelinePage() {
         </div>
       </div>
 
-      {/* Attention Cards — urgency items for managers (clickable) */}
+      {/* Attention Cards — urgency items for managers (clickable, always unfiltered) */}
       <div className="grid grid-cols-5 gap-3">
         {/* Booking Needed */}
         <Card
-          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'booking_needed' ? 'ring-2 ring-red-400 shadow-md' : ''} ${dashboardMetrics.bamfamViolations > 0 ? 'border-l-red-500 bg-red-50' : 'border-l-gray-200 bg-white'}`}
+          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'booking_needed' ? 'ring-2 ring-red-400 shadow-md' : ''} ${alertMetrics.bamfamViolations > 0 ? 'border-l-red-500 bg-red-50' : 'border-l-gray-200 bg-white'}`}
           onClick={() => {
             if (alertCardFilter === 'booking_needed') { setAlertCardFilter('none'); return; }
             setAlertCardFilter('booking_needed'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
@@ -4885,17 +4922,17 @@ export default function SalesPipelinePage() {
         >
           <CardContent className="pt-3 pb-3 px-4">
             <div className="flex items-center gap-1.5 mb-1">
-              <Calendar className={`h-3.5 w-3.5 ${dashboardMetrics.bamfamViolations > 0 ? 'text-red-500' : 'text-gray-400'}`} />
-              <p className={`text-[11px] font-semibold uppercase tracking-wider ${dashboardMetrics.bamfamViolations > 0 ? 'text-red-500' : 'text-gray-400'}`}>Booking Needed</p>
+              <Calendar className={`h-3.5 w-3.5 ${alertMetrics.bamfamViolations > 0 ? 'text-red-500' : 'text-gray-400'}`} />
+              <p className={`text-[11px] font-semibold uppercase tracking-wider ${alertMetrics.bamfamViolations > 0 ? 'text-red-500' : 'text-gray-400'}`}>Booking Needed</p>
             </div>
-            <p className={`text-2xl font-bold leading-none ${dashboardMetrics.bamfamViolations > 0 ? 'text-red-700' : 'text-gray-900'}`}>{dashboardMetrics.bamfamViolations}</p>
+            <p className={`text-2xl font-bold leading-none ${alertMetrics.bamfamViolations > 0 ? 'text-red-700' : 'text-gray-900'}`}>{alertMetrics.bamfamViolations}</p>
             <p className="text-[11px] text-gray-400 mt-1">No future meeting set</p>
           </CardContent>
         </Card>
 
         {/* Overdue */}
         <Card
-          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'overdue' ? 'ring-2 ring-orange-400 shadow-md' : ''} ${dashboardMetrics.overdueFollowups > 0 ? 'border-l-orange-500 bg-orange-50' : 'border-l-gray-200 bg-white'}`}
+          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'overdue' ? 'ring-2 ring-orange-400 shadow-md' : ''} ${alertMetrics.overdueFollowups > 0 ? 'border-l-orange-500 bg-orange-50' : 'border-l-gray-200 bg-white'}`}
           onClick={() => {
             if (alertCardFilter === 'overdue') { setAlertCardFilter('none'); return; }
             setAlertCardFilter('overdue'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
@@ -4903,17 +4940,17 @@ export default function SalesPipelinePage() {
         >
           <CardContent className="pt-3 pb-3 px-4">
             <div className="flex items-center gap-1.5 mb-1">
-              <Clock className={`h-3.5 w-3.5 ${dashboardMetrics.overdueFollowups > 0 ? 'text-orange-500' : 'text-gray-400'}`} />
-              <p className={`text-[11px] font-semibold uppercase tracking-wider ${dashboardMetrics.overdueFollowups > 0 ? 'text-orange-500' : 'text-gray-400'}`}>Overdue</p>
+              <Clock className={`h-3.5 w-3.5 ${alertMetrics.overdueFollowups > 0 ? 'text-orange-500' : 'text-gray-400'}`} />
+              <p className={`text-[11px] font-semibold uppercase tracking-wider ${alertMetrics.overdueFollowups > 0 ? 'text-orange-500' : 'text-gray-400'}`}>Overdue</p>
             </div>
-            <p className={`text-2xl font-bold leading-none ${dashboardMetrics.overdueFollowups > 0 ? 'text-orange-700' : 'text-gray-900'}`}>{dashboardMetrics.overdueFollowups}</p>
+            <p className={`text-2xl font-bold leading-none ${alertMetrics.overdueFollowups > 0 ? 'text-orange-700' : 'text-gray-900'}`}>{alertMetrics.overdueFollowups}</p>
             <p className="text-[11px] text-gray-400 mt-1">Past meeting date</p>
           </CardContent>
         </Card>
 
         {/* Stale */}
         <Card
-          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'stale' ? 'ring-2 ring-amber-400 shadow-md' : ''} ${dashboardMetrics.staleDeals > 0 ? 'border-l-amber-500 bg-amber-50' : 'border-l-gray-200 bg-white'}`}
+          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'stale' ? 'ring-2 ring-amber-400 shadow-md' : ''} ${alertMetrics.staleDeals > 0 ? 'border-l-amber-500 bg-amber-50' : 'border-l-gray-200 bg-white'}`}
           onClick={() => {
             if (alertCardFilter === 'stale') { setAlertCardFilter('none'); return; }
             setAlertCardFilter('stale'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
@@ -4921,17 +4958,17 @@ export default function SalesPipelinePage() {
         >
           <CardContent className="pt-3 pb-3 px-4">
             <div className="flex items-center gap-1.5 mb-1">
-              <RotateCcw className={`h-3.5 w-3.5 ${dashboardMetrics.staleDeals > 0 ? 'text-amber-500' : 'text-gray-400'}`} />
-              <p className={`text-[11px] font-semibold uppercase tracking-wider ${dashboardMetrics.staleDeals > 0 ? 'text-amber-600' : 'text-gray-400'}`}>Stale (7d+)</p>
+              <RotateCcw className={`h-3.5 w-3.5 ${alertMetrics.staleDeals > 0 ? 'text-amber-500' : 'text-gray-400'}`} />
+              <p className={`text-[11px] font-semibold uppercase tracking-wider ${alertMetrics.staleDeals > 0 ? 'text-amber-600' : 'text-gray-400'}`}>Stale (7d+)</p>
             </div>
-            <p className={`text-2xl font-bold leading-none ${dashboardMetrics.staleDeals > 0 ? 'text-amber-700' : 'text-gray-900'}`}>{dashboardMetrics.staleDeals}</p>
+            <p className={`text-2xl font-bold leading-none ${alertMetrics.staleDeals > 0 ? 'text-amber-700' : 'text-gray-900'}`}>{alertMetrics.staleDeals}</p>
             <p className="text-[11px] text-gray-400 mt-1">No contact in 7+ days</p>
           </CardContent>
         </Card>
 
         {/* At Risk */}
         <Card
-          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'at_risk' ? 'ring-2 ring-rose-400 shadow-md' : ''} ${dashboardMetrics.dealsAtRisk > 0 ? 'border-l-rose-500 bg-rose-50' : 'border-l-gray-200 bg-white'}`}
+          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'at_risk' ? 'ring-2 ring-rose-400 shadow-md' : ''} ${alertMetrics.dealsAtRisk > 0 ? 'border-l-rose-500 bg-rose-50' : 'border-l-gray-200 bg-white'}`}
           onClick={() => {
             if (alertCardFilter === 'at_risk') { setAlertCardFilter('none'); return; }
             setAlertCardFilter('at_risk'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
@@ -4939,17 +4976,17 @@ export default function SalesPipelinePage() {
         >
           <CardContent className="pt-3 pb-3 px-4">
             <div className="flex items-center gap-1.5 mb-1">
-              <TrendingUp className={`h-3.5 w-3.5 ${dashboardMetrics.dealsAtRisk > 0 ? 'text-rose-500' : 'text-gray-400'}`} />
-              <p className={`text-[11px] font-semibold uppercase tracking-wider ${dashboardMetrics.dealsAtRisk > 0 ? 'text-rose-500' : 'text-gray-400'}`}>At Risk</p>
+              <TrendingUp className={`h-3.5 w-3.5 ${alertMetrics.dealsAtRisk > 0 ? 'text-rose-500' : 'text-gray-400'}`} />
+              <p className={`text-[11px] font-semibold uppercase tracking-wider ${alertMetrics.dealsAtRisk > 0 ? 'text-rose-500' : 'text-gray-400'}`}>At Risk</p>
             </div>
-            <p className={`text-2xl font-bold leading-none ${dashboardMetrics.dealsAtRisk > 0 ? 'text-rose-700' : 'text-gray-900'}`}>{dashboardMetrics.dealsAtRisk}</p>
+            <p className={`text-2xl font-bold leading-none ${alertMetrics.dealsAtRisk > 0 ? 'text-rose-700' : 'text-gray-900'}`}>{alertMetrics.dealsAtRisk}</p>
             <p className="text-[11px] text-gray-400 mt-1">Closing deals, temp &lt; 40</p>
           </CardContent>
         </Card>
 
         {/* Meetings */}
         <Card
-          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'meetings' ? 'ring-2 ring-blue-400 shadow-md' : ''} ${dashboardMetrics.meetingsToday > 0 ? 'border-l-blue-500 bg-blue-50' : 'border-l-gray-200 bg-white'}`}
+          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'meetings' ? 'ring-2 ring-blue-400 shadow-md' : ''} ${alertMetrics.meetingsToday > 0 ? 'border-l-blue-500 bg-blue-50' : 'border-l-gray-200 bg-white'}`}
           onClick={() => {
             if (alertCardFilter === 'meetings') { setAlertCardFilter('none'); return; }
             setAlertCardFilter('meetings'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
@@ -4957,61 +4994,20 @@ export default function SalesPipelinePage() {
         >
           <CardContent className="pt-3 pb-3 px-4">
             <div className="flex items-center gap-1.5 mb-1">
-              <Calendar className={`h-3.5 w-3.5 ${dashboardMetrics.meetingsToday > 0 ? 'text-blue-500' : 'text-gray-400'}`} />
-              <p className={`text-[11px] font-semibold uppercase tracking-wider ${dashboardMetrics.meetingsToday > 0 ? 'text-blue-500' : 'text-gray-400'}`}>Meetings</p>
+              <Calendar className={`h-3.5 w-3.5 ${alertMetrics.meetingsToday > 0 ? 'text-blue-500' : 'text-gray-400'}`} />
+              <p className={`text-[11px] font-semibold uppercase tracking-wider ${alertMetrics.meetingsToday > 0 ? 'text-blue-500' : 'text-gray-400'}`}>Meetings</p>
             </div>
             <div className="flex items-baseline gap-1.5">
-              <p className={`text-2xl font-bold leading-none ${dashboardMetrics.meetingsToday > 0 ? 'text-blue-700' : 'text-gray-900'}`}>
-                {dashboardMetrics.meetingsToday > 0 ? dashboardMetrics.meetingsToday : dashboardMetrics.meetingsThisWeek}
+              <p className={`text-2xl font-bold leading-none ${alertMetrics.meetingsToday > 0 ? 'text-blue-700' : 'text-gray-900'}`}>
+                {alertMetrics.meetingsToday > 0 ? alertMetrics.meetingsToday : alertMetrics.meetingsThisWeek}
               </p>
-              {dashboardMetrics.meetingsToday > 0 && dashboardMetrics.meetingsThisWeek > dashboardMetrics.meetingsToday && (
-                <p className="text-xs text-blue-400">+{dashboardMetrics.meetingsThisWeek - dashboardMetrics.meetingsToday} wk</p>
+              {alertMetrics.meetingsToday > 0 && alertMetrics.meetingsThisWeek > alertMetrics.meetingsToday && (
+                <p className="text-xs text-blue-400">+{alertMetrics.meetingsThisWeek - alertMetrics.meetingsToday} wk</p>
               )}
             </div>
-            <p className="text-[11px] text-gray-400 mt-1">{dashboardMetrics.meetingsToday > 0 ? 'Today' : 'This week'}</p>
+            <p className="text-[11px] text-gray-400 mt-1">{alertMetrics.meetingsToday > 0 ? 'Today' : 'This week'}</p>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Time Period Filter */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-medium text-gray-500 mr-1">Period:</span>
-        {([
-          { key: 'all', label: 'All Time' },
-          { key: 'today', label: 'Today' },
-          { key: '7d', label: '7 Days' },
-          { key: '30d', label: '30 Days' },
-          { key: 'custom', label: 'Custom' },
-        ] as const).map(opt => (
-          <button
-            key={opt.key}
-            onClick={() => setDashboardPeriod(opt.key)}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-              dashboardPeriod === opt.key
-                ? 'bg-[#3e8692] text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
-        {dashboardPeriod === 'custom' && (
-          <div className="flex items-center gap-1.5 ml-1">
-            <input
-              type="date"
-              value={dashboardCustomFrom}
-              onChange={e => setDashboardCustomFrom(e.target.value)}
-              className="px-2 py-1 text-xs border border-gray-300 rounded-md"
-            />
-            <span className="text-xs text-gray-400">to</span>
-            <input
-              type="date"
-              value={dashboardCustomTo}
-              onChange={e => setDashboardCustomTo(e.target.value)}
-              className="px-2 py-1 text-xs border border-gray-300 rounded-md"
-            />
-          </div>
-        )}
       </div>
 
       {/* Sales Dashboard */}
@@ -5055,6 +5051,78 @@ export default function SalesPipelinePage() {
           </div>
           {showDashboard ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
         </div>
+        {/* Time Period Filter */}
+        {showDashboard && <div className="flex items-center gap-2 flex-wrap px-5 pb-2" onClick={e => e.stopPropagation()}>
+          <span className="text-xs font-medium text-gray-500 mr-1">Period:</span>
+          {([
+            { key: 'all', label: 'All Time' },
+            { key: 'today', label: 'Today' },
+            { key: '7d', label: '7 Days' },
+            { key: '30d', label: '30 Days' },
+            { key: 'custom', label: 'Custom' },
+          ] as const).map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => setDashboardPeriod(opt.key)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                dashboardPeriod === opt.key
+                  ? 'bg-[#3e8692] text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+          {dashboardPeriod === 'custom' && (
+            <div className="flex items-center gap-1.5 ml-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="h-7 px-2.5 text-xs justify-start font-normal gap-1.5"
+                    style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: dashboardCustomFrom ? '#111827' : '#9ca3af' }}
+                  >
+                    <Calendar className="h-3 w-3" />
+                    {dashboardCustomFrom ? format(new Date(dashboardCustomFrom + 'T00:00:00'), 'MMM d, yyyy') : 'From'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                  <CalendarPicker
+                    mode="single"
+                    selected={dashboardCustomFrom ? new Date(dashboardCustomFrom + 'T00:00:00') : undefined}
+                    onSelect={date => setDashboardCustomFrom(date ? format(date, 'yyyy-MM-dd') : '')}
+                    initialFocus
+                    classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                    modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                  />
+                </PopoverContent>
+              </Popover>
+              <span className="text-xs text-gray-400">to</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="h-7 px-2.5 text-xs justify-start font-normal gap-1.5"
+                    style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: dashboardCustomTo ? '#111827' : '#9ca3af' }}
+                  >
+                    <Calendar className="h-3 w-3" />
+                    {dashboardCustomTo ? format(new Date(dashboardCustomTo + 'T00:00:00'), 'MMM d, yyyy') : 'To'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                  <CalendarPicker
+                    mode="single"
+                    selected={dashboardCustomTo ? new Date(dashboardCustomTo + 'T00:00:00') : undefined}
+                    onSelect={date => setDashboardCustomTo(date ? format(date, 'yyyy-MM-dd') : '')}
+                    initialFocus
+                    classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                    modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+        </div>}
         {showDashboard && (
           <CardContent className="pt-0 pb-6 px-5 space-y-6">
 

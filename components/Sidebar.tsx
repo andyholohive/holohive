@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChangelog } from '@/contexts/ChangelogContext';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -413,6 +413,75 @@ export default function Sidebar({ children }: SidebarProps) {
                         </span>
                       </Button>
                     </Link>
+                    {/* Task sub-nav */}
+                    {!isSidebarCollapsed && pathname.startsWith('/tasks') && (
+                      <div className="pl-6 space-y-0.5">
+                        <Link href="/tasks" legacyBehavior>
+                          <Button
+                            asChild
+                            variant={pathname === '/tasks' ? 'secondary' : 'ghost'}
+                            className="w-full justify-start h-7 text-xs"
+                          >
+                            <span>
+                              <ListTodo className="h-3.5 w-3.5 mr-2" />
+                              All Tasks
+                            </span>
+                          </Button>
+                        </Link>
+                        <Link href="/tasks/my-dashboard" legacyBehavior>
+                          <Button
+                            asChild
+                            variant={pathname === '/tasks/my-dashboard' ? 'secondary' : 'ghost'}
+                            className="w-full justify-start h-7 text-xs"
+                          >
+                            <span>
+                              <LayoutDashboard className="h-3.5 w-3.5 mr-2" />
+                              My Dashboard
+                            </span>
+                          </Button>
+                        </Link>
+                        {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
+                          <>
+                            <Link href="/tasks/admin" legacyBehavior>
+                              <Button
+                                asChild
+                                variant={pathname === '/tasks/admin' ? 'secondary' : 'ghost'}
+                                className="w-full justify-start h-7 text-xs"
+                              >
+                                <span>
+                                  <ShieldCheck className="h-3.5 w-3.5 mr-2" />
+                                  Admin Overview
+                                </span>
+                              </Button>
+                            </Link>
+                            <Link href="/tasks/automations" legacyBehavior>
+                              <Button
+                                asChild
+                                variant={pathname === '/tasks/automations' ? 'secondary' : 'ghost'}
+                                className="w-full justify-start h-7 text-xs"
+                              >
+                                <span>
+                                  <Zap className="h-3.5 w-3.5 mr-2" />
+                                  Automations
+                                </span>
+                              </Button>
+                            </Link>
+                            <Link href="/tasks/templates" legacyBehavior>
+                              <Button
+                                asChild
+                                variant={pathname === '/tasks/templates' ? 'secondary' : 'ghost'}
+                                className="w-full justify-start h-7 text-xs"
+                              >
+                                <span>
+                                  <FileText className="h-3.5 w-3.5 mr-2" />
+                                  Templates
+                                </span>
+                              </Button>
+                            </Link>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -440,6 +509,23 @@ export default function Sidebar({ children }: SidebarProps) {
                     </span>
                   </Button>
                 </Link>
+                {/* Mindshare Monitor - Admin only */}
+                {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
+                  <Link href="/mindshare" legacyBehavior>
+                    <Button
+                      asChild
+                      variant={pathname.startsWith('/mindshare') ? 'default' : 'ghost'}
+                      className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                      style={pathname.startsWith('/mindshare') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                      title={isSidebarCollapsed ? 'Mindshare' : undefined}
+                    >
+                      <span>
+                        <TrendingUp className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                        {!isSidebarCollapsed && 'Mindshare'}
+                      </span>
+                    </Button>
+                  </Link>
+                )}
                 {/* Forms tab - Admin only */}
                 {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                   <Link href="/forms" legacyBehavior>

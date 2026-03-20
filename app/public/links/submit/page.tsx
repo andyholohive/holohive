@@ -47,42 +47,53 @@ export default function LinkSubmitPage() {
   const [error, setError] = useState<string | null>(null);
   const [linkTypesPopoverOpen, setLinkTypesPopoverOpen] = useState(false);
   const [clientPopoverOpen, setClientPopoverOpen] = useState(false);
-  const [existingClients, setExistingClients] = useState<string[]>([]);
+  const [clientOptions, setClientOptions] = useState<{ id: string; name: string; isDb: boolean }[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
     url: '',
     description: '',
     client: '',
+    client_id: '',
     link_types: [] as string[],
     access: 'team'
   });
 
-  // Fetch existing clients for suggestions
+  // Fetch actual clients + existing text names from links
   useEffect(() => {
     const fetchClients = async () => {
-      const { data } = await supabase
-        .from('links')
-        .select('client')
-        .not('client', 'is', null);
+      const [{ data: dbClients }, { data: linkData }] = await Promise.all([
+        supabase.from('clients').select('id, name').order('name'),
+        supabase.from('links').select('client').not('client', 'is', null),
+      ]);
 
-      if (data) {
-        const clients = new Set<string>();
-        data.forEach((link: { client: string | null }) => {
-          if (link.client && link.client.trim()) {
-            clients.add(link.client.trim());
-          }
-        });
-        clients.add('Holo Hive');
-        setExistingClients(Array.from(clients).sort());
+      const options: { id: string; name: string; isDb: boolean }[] = [];
+      const seen = new Set<string>();
+
+      // Add real clients first
+      for (const c of (dbClients || [])) {
+        options.push({ id: c.id, name: c.name, isDb: true });
+        seen.add(c.name.toLowerCase());
       }
+
+      // Add text-only entries that don't match a real client
+      for (const link of (linkData || [])) {
+        const name = (link as any).client?.trim();
+        if (name && !seen.has(name.toLowerCase())) {
+          options.push({ id: '', name, isDb: false });
+          seen.add(name.toLowerCase());
+        }
+      }
+
+      // Always include Holo Hive
+      if (!seen.has('holo hive')) {
+        options.push({ id: '', name: 'Holo Hive', isDb: false });
+      }
+
+      setClientOptions(options);
     };
     fetchClients();
   }, []);
-
-  const clientSuggestions = useMemo(() => {
-    return existingClients;
-  }, [existingClients]);
 
   const toggleLinkType = (type: string) => {
     setFormData(prev => ({
@@ -117,7 +128,7 @@ export default function LinkSubmitPage() {
       return;
     }
 
-    if (!formData.client.trim()) {
+    if (!formData.client.trim() && !formData.client_id) {
       setError('Client is required');
       return;
     }
@@ -253,26 +264,26 @@ export default function LinkSubmitPage() {
                     <CommandInput
                       placeholder="Search or type client name..."
                       value={formData.client}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, client: value }))}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, client: value, client_id: '' }))}
                     />
                     <CommandList>
                       <CommandEmpty>
                         <div className="py-2 px-3 text-sm">
-                          Press enter to use "{formData.client}"
+                          Press enter to use &quot;{formData.client}&quot;
                         </div>
                       </CommandEmpty>
                       <CommandGroup>
-                        {clientSuggestions.map(client => (
+                        {clientOptions.map(opt => (
                           <CommandItem
-                            key={client}
-                            value={client}
+                            key={opt.id || opt.name}
+                            value={opt.name}
                             onSelect={() => {
-                              setFormData(prev => ({ ...prev, client }));
+                              setFormData(prev => ({ ...prev, client: opt.name, client_id: opt.id }));
                               setClientPopoverOpen(false);
                             }}
                           >
-                            <Check className={`mr-2 h-4 w-4 ${formData.client === client ? 'opacity-100' : 'opacity-0'}`} />
-                            {client}
+                            <Check className={`mr-2 h-4 w-4 ${formData.client === opt.name ? 'opacity-100' : 'opacity-0'}`} />
+                            {opt.name}
                           </CommandItem>
                         ))}
                       </CommandGroup>

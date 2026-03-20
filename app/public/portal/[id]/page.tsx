@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -42,7 +42,9 @@ import {
   CheckCircle2,
   Circle,
   Lock,
-  ArrowRight
+  ArrowRight,
+  AlertCircle,
+  Bell,
 } from 'lucide-react';
 import 'react-quill/dist/quill.snow.css';
 
@@ -225,8 +227,18 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcomePhase, setWelcomePhase] = useState<'enter' | 'ready' | 'opening' | 'done'>('enter');
   const [portalFadeIn, setPortalFadeIn] = useState(false);
-  const [actionItems, setActionItems] = useState<{ id: string; text: string; court: string; phase: string; is_done: boolean; display_order: number; attachment_url: string | null; attachment_label: string | null }[]>([]);
+  const [actionItems, setActionItems] = useState<{ id: string; text: string; court: string; phase: string; is_done: boolean; display_order: number; attachment_url: string | null; attachment_label: string | null; milestone_id: string | null }[]>([]);
+  const [milestones, setMilestones] = useState<{ id: string; name: string; subtitle: string | null; status: string; status_message: string | null; display_order: number }[]>([]);
+  const [expandedMilestoneId, setExpandedMilestoneId] = useState<string | null>(null);
+  const [clientLinks, setClientLinks] = useState<{ id: string; name: string; url: string; description: string | null; link_types: string[] }[]>([]);
+  const [recentActivities, setRecentActivities] = useState<{ id: string; activity_type: string; title: string; description: string | null; created_by_name: string | null; created_at: string; is_read: boolean }[]>([]);
+  const [activityLimit, setActivityLimit] = useState(5);
+  const [totalActivities, setTotalActivities] = useState(0);
+  const [totalUnread, setTotalUnread] = useState(0);
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [mindshareEnabled, setMindshareEnabled] = useState(false);
+  const [mindshareWeekly, setMindshareWeekly] = useState<{ week_number: number; week_start: string; mention_count: number; mindshare_pct: number }[]>([]);
 
   // UI states
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed'>('all');
@@ -301,6 +313,10 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       fetchDecisionLog();
       fetchWeeklyUpdates();
       fetchActionItems();
+      fetchMilestones();
+      fetchMindshare();
+      fetchClientLinks();
+      fetchRecentActivities();
       checkOnboardingStatus();
       fetchKolRoster();
       fetchFormSubmissions();
@@ -584,13 +600,99 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     try {
       const { data } = await supabasePublic
         .from('client_action_items')
-        .select('id, text, court, phase, is_done, display_order, attachment_url, attachment_label')
+        .select('id, text, court, phase, is_done, display_order, attachment_url, attachment_label, milestone_id')
         .eq('client_id', clientId)
         .eq('is_hidden', false)
         .order('display_order', { ascending: true });
       setActionItems(data || []);
     } catch (err) {
       console.error('Error fetching action items:', err);
+    }
+  }
+
+  async function fetchMilestones() {
+    if (!clientId) return;
+    try {
+      const { data } = await supabasePublic
+        .from('client_milestones')
+        .select('id, name, subtitle, status, status_message, display_order, is_visible')
+        .eq('client_id', clientId)
+        .eq('is_visible', true)
+        .order('display_order', { ascending: true });
+      setMilestones(data || []);
+      // Auto-expand the first active milestone
+      const active = (data || []).find(m => m.status === 'active');
+      if (active) setExpandedMilestoneId(active.id);
+    } catch (err) {
+      console.error('Error fetching milestones:', err);
+    }
+  }
+
+  async function fetchMindshare() {
+    if (!clientId) return;
+    try {
+      const { data: config } = await supabasePublic
+        .from('client_mindshare_config')
+        .select('is_enabled')
+        .eq('client_id', clientId)
+        .single();
+      if (!config?.is_enabled) {
+        setMindshareEnabled(false);
+        return;
+      }
+      setMindshareEnabled(true);
+      const { data: weekly } = await supabasePublic
+        .from('client_mindshare_weekly')
+        .select('week_number, week_start, mention_count, mindshare_pct')
+        .eq('client_id', clientId)
+        .order('week_number', { ascending: true });
+      setMindshareWeekly(weekly || []);
+    } catch (err) {
+      console.error('Error fetching mindshare:', err);
+    }
+  }
+
+  async function fetchRecentActivities(limit = 5) {
+    if (!clientId) return;
+    try {
+      const [{ data }, { count }, { count: unreadCount }] = await Promise.all([
+        supabasePublic
+          .from('client_activity_log')
+          .select('id, activity_type, title, description, created_by_name, created_at, is_read')
+          .eq('client_id', clientId)
+          .order('created_at', { ascending: false })
+          .limit(limit),
+        supabasePublic
+          .from('client_activity_log')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId),
+        supabasePublic
+          .from('client_activity_log')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', clientId)
+          .eq('is_read', false),
+      ]);
+      setRecentActivities(data || []);
+      setTotalActivities(count || 0);
+      setTotalUnread(unreadCount || 0);
+    } catch (err) {
+      console.error('Error fetching activities:', err);
+    }
+  }
+
+  async function fetchClientLinks() {
+    if (!clientId) return;
+    try {
+      const { data } = await supabasePublic
+        .from('links')
+        .select('id, name, url, description, link_types')
+        .eq('client_id', clientId)
+        .eq('access', 'client')
+        .eq('status', 'active')
+        .order('name');
+      setClientLinks(data || []);
+    } catch (err) {
+      console.error('Error fetching client links:', err);
     }
   }
 
@@ -806,128 +908,21 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     totalBudget: campaigns.reduce((sum, c) => sum + (c.total_budget || 0), 0),
   };
 
-  // Compute portal phase
-  const portalPhase: 'kickoff' | 'discovery' | 'tracker' = (() => {
-    if (clientContext?.onboarding_phase) {
-      return clientContext.onboarding_phase as 'kickoff' | 'discovery' | 'tracker';
-    }
-    if (hasOnboardingResponse === false || hasOnboardingResponse === null) {
-      return 'kickoff';
-    }
-    if (earliestSubmissionDate) {
-      const daysSince = Math.floor((Date.now() - new Date(earliestSubmissionDate).getTime()) / (1000 * 60 * 60 * 24));
-      return daysSince < 5 ? 'discovery' : 'tracker';
-    }
-    return 'kickoff';
-  })();
-
-  // Compute days since submission for timeline
-  const daysSinceSubmission = earliestSubmissionDate
-    ? Math.floor((Date.now() - new Date(earliestSubmissionDate).getTime()) / (1000 * 60 * 60 * 24))
-    : 0;
-
-  // Timeline milestone states
-  const timelineNodes = [
-    {
-      label: 'Kickoff & Briefing',
-      days: 'Day 1',
-      completed: hasOnboardingResponse === true,
-      active: portalPhase === 'kickoff',
-    },
-    {
-      label: 'Deep-Dive Audit & DD',
-      days: 'Day 2-3',
-      completed: portalPhase === 'discovery' || portalPhase === 'tracker',
-      active: portalPhase === 'discovery' && daysSinceSubmission < 4,
-    },
-    {
-      label: 'Strategy & GTM Sync',
-      days: 'Day 4',
-      completed: (portalPhase === 'discovery' && daysSinceSubmission >= 4) || portalPhase === 'tracker',
-      active: portalPhase === 'discovery' && daysSinceSubmission >= 4,
-    },
-    {
-      label: 'KOL Shortlist & Deployment',
-      days: 'Day 5-7',
-      completed: portalPhase === 'tracker',
-      active: portalPhase === 'tracker',
-    },
-  ];
-
-  // Action board items per phase
-  // Hardcoded fallback for un-seeded clients
-  const fallbackActionBoardItems = {
-    kickoff: {
-      yours: [
-        { text: 'Complete onboarding form', done: hasOnboardingResponse === true },
-        { text: 'Upload assets & documentation (branding, decks, product links)', done: false },
-        { text: 'Confirm workspace access', done: false },
-      ],
-      ours: [
-        { text: 'Workspace setup & onboarding overview', done: false },
-        { text: 'Project, product & resource review', done: false },
-        { text: 'Ecosystem & market positioning analysis', done: false },
-      ],
-    },
-    discovery: {
-      yours: [
-        { text: 'Submit graphic materials vault', done: formSubmissions.some(s => s.attachments.length > 0) },
-        { text: 'Review campaign brief', done: false },
-        { text: 'Confirm weekly sync schedule', done: false },
-      ],
-      ours: [
-        { text: 'Internal strategy & narrative positioning review', done: false },
-        { text: 'KOL outreach brief preparation & translation', done: false },
-        { text: 'KOL selection & shortlist preparation', done: false },
-        { text: 'Initial content brief preparation', done: false },
-        { text: 'Regional GTM plan development', done: false },
-      ],
-    },
-    tracker: {
-      yours: [
-        { text: 'Review & approve KOL shortlist', done: false },
-        { text: 'Review & approve content brief', done: false },
-        { text: 'Approve content drafts', done: false },
-      ],
-      ours: [
-        { text: 'Campaign tracker deployment', done: false },
-        { text: 'Creator outreach with translated content brief', done: kolRoster.length > 0 },
-        { text: 'Content schedule planning & finalization', done: kolRoster.some(k => k.contentLinks.length > 0) },
-        { text: 'First activations scheduled', done: false },
-        { text: 'Performance tracking & reporting', done: false },
-      ],
-    },
-  };
-
-  const hasDbActionItems = actionItems.length > 0;
-  const phaseActionItems = hasDbActionItems
-    ? actionItems.filter(i => i.phase === portalPhase)
-    : [];
-  const dbYoursItems = phaseActionItems.filter(i => i.court === 'yours').sort((a, b) => a.display_order - b.display_order);
-  const dbOursItems = phaseActionItems.filter(i => i.court === 'ours').sort((a, b) => a.display_order - b.display_order);
-  const doneYoursCount = dbYoursItems.filter(i => i.is_done).length;
-  const doneOursCount = dbOursItems.filter(i => i.is_done).length;
-  const hasDoneItems = hasDbActionItems && (doneYoursCount > 0 || doneOursCount > 0);
-
-  const actionBoardItems = hasDbActionItems
-    ? {
-        [portalPhase]: {
-          yours: (showCompleted ? dbYoursItems : dbYoursItems.filter(i => !i.is_done)).map(i => ({ text: i.text, done: i.is_done, attachment_url: i.attachment_url, attachment_label: i.attachment_label })),
-          ours: (showCompleted ? dbOursItems : dbOursItems.filter(i => !i.is_done)).map(i => ({ text: i.text, done: i.is_done, attachment_url: i.attachment_url, attachment_label: i.attachment_label })),
-        },
-      }
-    : fallbackActionBoardItems;
+  // Milestone-driven progress
+  const completedMilestones = milestones.filter(m => m.status === 'complete').length;
+  const activeMilestone = milestones.find(m => m.status === 'active');
+  const portalPhase: 'kickoff' | 'discovery' | 'tracker' = activeMilestone ? 'discovery' : completedMilestones === milestones.length && milestones.length > 0 ? 'tracker' : 'kickoff';
 
   // KOL live status metrics
   const kolsSecured = kolRoster.filter(k => k.status === 'Onboarded' || k.status === 'Concluded').length;
   const contentLive = kolRoster.filter(k => k.contentLinks.length > 0).length;
 
-  // Welcome subtitle per phase
-  const welcomeSubtitle = portalPhase === 'kickoff'
-    ? "Let's get started — complete the steps below to kick off your campaign."
-    : portalPhase === 'discovery'
-    ? "We're building your campaign strategy. Here's where things stand."
-    : "Your campaign is live. Track everything in one place.";
+  // Welcome subtitle
+  const welcomeSubtitle = activeMilestone
+    ? `Current milestone: ${activeMilestone.name}`
+    : completedMilestones === milestones.length && milestones.length > 0
+    ? "All milestones complete. Your campaign is live."
+    : "Let's get started — complete the steps below to kick off your campaign.";
 
   // Loading state
   if (loadingClientEmail) {
@@ -1321,248 +1316,6 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </p>
         </div>
 
-        {/* 7-Day Timeline */}
-        <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10">
-          <CardContent className="p-6 sm:p-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
-                <Activity className="h-5 w-5 text-white" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">Onboarding Progress</h3>
-            </div>
-            <div className="relative flex items-start justify-between">
-              {/* Background connector lines */}
-              {timelineNodes.map((_, i) => {
-                if (i === 0) return null;
-                const segmentWidth = 100 / timelineNodes.length;
-                return (
-                  <div
-                    key={`line-${i}`}
-                    className="absolute top-4 h-0.5 -translate-y-1/2"
-                    style={{
-                      left: `${segmentWidth * (i - 0.5)}%`,
-                      width: `${segmentWidth}%`,
-                      borderTop: timelineNodes[i - 1].completed
-                        ? '2px solid #3e8692'
-                        : '2px dashed #d1d5db',
-                    }}
-                  />
-                );
-              })}
-              {timelineNodes.map((node, i) => {
-                const isCompleted = node.completed;
-                const isActive = node.active && !node.completed;
-                const isLocked = !isCompleted && !isActive;
-                return (
-                  <div key={i} className="flex flex-col items-center text-center relative z-10" style={{ width: `${100 / timelineNodes.length}%` }}>
-                    {/* Node circle */}
-                    <div className={`relative z-10 flex items-center justify-center w-8 h-8 rounded-full mb-2 ${
-                      isCompleted
-                        ? 'bg-[#3e8692] text-white'
-                        : isActive
-                        ? 'bg-white border-2 border-[#3e8692]'
-                        : 'bg-gray-200 text-gray-400'
-                    }`}
-                    style={isActive ? { animation: 'pulse 2s ease-in-out infinite', boxShadow: '0 0 0 4px rgba(62,134,146,0.2)' } : {}}
-                    >
-                      {isCompleted ? (
-                        <CheckCircle2 className="h-5 w-5" />
-                      ) : isActive ? (
-                        <Circle className="h-4 w-4 text-[#3e8692]" />
-                      ) : (
-                        <Lock className="h-3.5 w-3.5" />
-                      )}
-                    </div>
-                    {/* Label */}
-                    <p className={`text-xs sm:text-sm font-medium leading-tight px-1 ${
-                      isCompleted ? 'text-[#3e8692]' : isActive ? 'text-gray-900 font-bold' : 'text-gray-400'
-                    }`}>
-                      {node.label}
-                    </p>
-                    <p className={`text-[10px] sm:text-xs mt-0.5 ${isLocked ? 'text-gray-300' : 'text-gray-500'}`}>
-                      {node.days}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Action Board */}
-        {(() => {
-          const yoursAll = actionBoardItems[portalPhase]?.yours || [];
-          const oursAll = actionBoardItems[portalPhase]?.ours || [];
-          const yoursDone = yoursAll.filter(i => i.done).length;
-          const oursDone = oursAll.filter(i => i.done).length;
-          const yoursTotal = hasDbActionItems ? (showCompleted ? yoursAll.length : yoursAll.length + yoursDone) : yoursAll.length;
-          const oursTotal = hasDbActionItems ? (showCompleted ? oursAll.length : oursAll.length + oursDone) : oursAll.length;
-          const yoursProgress = yoursTotal > 0 ? (yoursDone / yoursTotal) * 100 : 0;
-          const oursProgress = oursTotal > 0 ? (oursDone / oursTotal) * 100 : 0;
-          return (
-            <>
-              {hasDoneItems && (
-                <div className="flex justify-end mb-3">
-                  <button
-                    onClick={() => setShowCompleted(!showCompleted)}
-                    className="text-xs font-medium text-[#3e8692] hover:text-[#2d6570] transition-colors flex items-center gap-1.5"
-                  >
-                    {showCompleted ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                    {showCompleted ? 'Hide completed' : 'Show completed'}
-                  </button>
-                </div>
-              )}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                {/* Your Court */}
-                <Card className="border-0 shadow-lg rounded-xl overflow-hidden">
-                  <div className="h-1 bg-gradient-to-r from-orange-400 to-amber-400" />
-                  <CardHeader className="pb-2 pt-5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-gradient-to-br from-orange-100 to-amber-50 rounded-xl">
-                          <ArrowRight className="h-4 w-4 text-orange-600" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-base font-bold text-gray-900">Your Court</CardTitle>
-                          <p className="text-xs text-gray-400 mt-0.5">Awaiting your action</p>
-                        </div>
-                      </div>
-                      {yoursTotal > 0 && (
-                        <span className="text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-full">
-                          {yoursDone}/{yoursTotal}
-                        </span>
-                      )}
-                    </div>
-                    {yoursTotal > 0 && (
-                      <div className="mt-3 h-1.5 bg-orange-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-orange-400 to-amber-400 rounded-full transition-all duration-500 ease-out"
-                          style={{ width: `${yoursProgress}%` }}
-                        />
-                      </div>
-                    )}
-                  </CardHeader>
-                  <CardContent className="pt-1 pb-5">
-                    <div className="space-y-1.5">
-                      {yoursAll.map((item, i) => (
-                        <div
-                          key={i}
-                          className={`flex items-start gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
-                            item.done
-                              ? 'bg-gray-50/80'
-                              : 'bg-orange-50/40 hover:bg-orange-50/70'
-                          }`}
-                        >
-                          <div className="mt-0.5 flex-shrink-0">
-                            {item.done ? (
-                              <div className="h-5 w-5 rounded-full bg-orange-100 flex items-center justify-center">
-                                <CheckCircle2 className="h-4 w-4 text-orange-500" />
-                              </div>
-                            ) : (
-                              <div className="h-5 w-5 rounded-full border-2 border-orange-300" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className={`text-sm leading-relaxed ${
-                              item.done
-                                ? 'text-gray-400 line-through decoration-gray-300'
-                                : 'text-gray-700 font-medium'
-                            }`}>
-                              {item.text}
-                            </span>
-                            {'attachment_url' in item && (item as any).attachment_url && (
-                              <a href={(item as any).attachment_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 mt-1 text-xs text-orange-600 hover:text-orange-700 hover:underline">
-                                <ExternalLink className="h-3 w-3" />
-                                {(item as any).attachment_label || 'View'}
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                      {yoursAll.length === 0 && (
-                        <p className="text-sm text-gray-400 text-center py-4">All caught up!</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Our Court */}
-                <Card className="border-0 shadow-lg rounded-xl overflow-hidden">
-                  <div className="h-1 bg-gradient-to-r from-[#3e8692] to-[#5ba3ad]" />
-                  <CardHeader className="pb-2 pt-5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-gradient-to-br from-[#e8f4f5] to-[#d4edef] rounded-xl">
-                          <Briefcase className="h-4 w-4 text-[#3e8692]" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-base font-bold text-gray-900">Our Court</CardTitle>
-                          <p className="text-xs text-gray-400 mt-0.5">We're on it</p>
-                        </div>
-                      </div>
-                      {oursTotal > 0 && (
-                        <span className="text-xs font-semibold text-[#3e8692] bg-[#e8f4f5] px-2 py-1 rounded-full">
-                          {oursDone}/{oursTotal}
-                        </span>
-                      )}
-                    </div>
-                    {oursTotal > 0 && (
-                      <div className="mt-3 h-1.5 bg-[#e8f4f5] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-gradient-to-r from-[#3e8692] to-[#5ba3ad] rounded-full transition-all duration-500 ease-out"
-                          style={{ width: `${oursProgress}%` }}
-                        />
-                      </div>
-                    )}
-                  </CardHeader>
-                  <CardContent className="pt-1 pb-5">
-                    <div className="space-y-1.5">
-                      {oursAll.map((item, i) => (
-                        <div
-                          key={i}
-                          className={`flex items-start gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 ${
-                            item.done
-                              ? 'bg-gray-50/80'
-                              : 'bg-[#3e8692]/[0.04] hover:bg-[#3e8692]/[0.07]'
-                          }`}
-                        >
-                          <div className="mt-0.5 flex-shrink-0">
-                            {item.done ? (
-                              <div className="h-5 w-5 rounded-full bg-[#e8f4f5] flex items-center justify-center">
-                                <CheckCircle2 className="h-4 w-4 text-[#3e8692]" />
-                              </div>
-                            ) : (
-                              <div className="h-5 w-5 rounded-full border-2 border-[#3e8692]/30" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className={`text-sm leading-relaxed ${
-                              item.done
-                                ? 'text-gray-400 line-through decoration-gray-300'
-                                : 'text-gray-700 font-medium'
-                            }`}>
-                              {item.text}
-                            </span>
-                            {'attachment_url' in item && (item as any).attachment_url && (
-                              <a href={(item as any).attachment_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 mt-1 text-xs text-[#3e8692] hover:text-[#2d6570] hover:underline">
-                                <ExternalLink className="h-3 w-3" />
-                                {(item as any).attachment_label || 'View'}
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                      {oursAll.length === 0 && (
-                        <p className="text-sm text-gray-400 text-center py-4">All caught up!</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </>
-          );
-        })()}
-
         {/* Onboarding Banner — only in kickoff phase */}
         {portalPhase === 'kickoff' && hasOnboardingResponse === false && onboardingFormSlug && (
           <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10 bg-gradient-to-r from-[#3e8692]/10 to-[#3e8692]/5">
@@ -1589,15 +1342,312 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </Card>
         )}
 
-        {/* Client Context Section */}
-        {(clientContext || linkedCRMAccount) && (
+        {/* Campaign Onboarding Milestones */}
+        {milestones.length > 0 && (
+          <Card id="section-milestones" className="border-0 shadow-lg rounded-xl overflow-hidden mb-10">
+            <CardContent className="p-6 sm:p-8">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                    <Activity className="h-5 w-5 text-white" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">Campaign Onboarding</h3>
+                </div>
+                <div className="text-right">
+                  {activeMilestone && <p className="text-sm font-semibold text-gray-900">{activeMilestone.name}</p>}
+                  <p className="text-xs text-gray-500">{completedMilestones} of {milestones.length} milestones complete</p>
+                </div>
+              </div>
+
+              {/* Progress bar with dots */}
+              <div className="relative mb-6 flex items-center" style={{ height: '20px' }}>
+                {/* Bar */}
+                <div className="absolute left-0 right-0 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${milestones.length > 1 ? (completedMilestones / (milestones.length - 1)) * 100 : 0}%`, backgroundColor: '#3e8692' }} />
+                </div>
+                {/* Dots */}
+                <div className="relative w-full flex justify-between">
+                  {milestones.map((ms) => {
+                    const isComplete = ms.status === 'complete';
+                    const isActive = ms.status === 'active';
+                    return (
+                      <div key={ms.id} className="flex items-center justify-center">
+                        {isActive ? (
+                          <div className="relative flex items-center justify-center">
+                            <div className="absolute w-6 h-6 rounded-full bg-[#3e8692]/20 animate-ping" style={{ animationDuration: '2s' }} />
+                            <div className="absolute w-5 h-5 rounded-full bg-[#3e8692]/10 animate-pulse" />
+                            <div className="relative w-4 h-4 rounded-full border-[3px] border-[#3e8692] bg-white" />
+                          </div>
+                        ) : (
+                          <div className={`rounded-full ${isComplete ? 'w-3 h-3 bg-[#3e8692]' : 'w-3 h-3 bg-gray-300'}`} />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Milestone cards */}
+              <div className="space-y-3">
+                {milestones.map((ms) => {
+                  const msItems = actionItems.filter(i => i.milestone_id === ms.id);
+                  const yoursItems = msItems.filter(i => i.court === 'yours').sort((a, b) => a.display_order - b.display_order);
+                  const oursItems = msItems.filter(i => i.court === 'ours').sort((a, b) => a.display_order - b.display_order);
+                  const isExpanded = expandedMilestoneId === ms.id;
+                  const isComplete = ms.status === 'complete';
+                  const isActive = ms.status === 'active';
+                  const isUpcoming = ms.status === 'upcoming';
+
+                  return (
+                    <div
+                      key={ms.id}
+                      className={`rounded-xl border transition-all ${isActive ? 'border-gray-300 bg-white shadow-md' : isComplete ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50'}`}
+                    >
+                      {/* Header */}
+                      <div
+                        className="flex items-center gap-3 px-5 py-4 cursor-pointer"
+                        onClick={() => setExpandedMilestoneId(isExpanded ? null : ms.id)}
+                      >
+                        {isComplete ? (
+                          <div className="w-8 h-8 rounded-full bg-[#3e8692] flex items-center justify-center flex-shrink-0">
+                            <CheckCircle2 className="h-5 w-5 text-white" />
+                          </div>
+                        ) : isActive ? (
+                          <div className="w-8 h-8 rounded-full bg-[#3e8692]/10 border-2 border-[#3e8692] flex items-center justify-center flex-shrink-0">
+                            <div className="w-3 h-3 rounded-full bg-[#3e8692]" />
+                          </div>
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                            <Lock className="h-4 w-4 text-gray-300" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-semibold ${isUpcoming ? 'text-gray-400' : 'text-gray-900'}`}>{ms.name}</p>
+                          {ms.subtitle && <p className={`text-sm ${isUpcoming ? 'text-gray-300' : 'text-gray-500'}`}>{ms.subtitle}</p>}
+                        </div>
+                        <span className={`text-xs font-medium px-3 py-1 rounded-full ${isComplete ? 'bg-[#3e8692]/10 text-[#3e8692]' : isActive ? 'bg-orange-100 text-orange-700' : 'text-gray-400'}`}>
+                          {isComplete ? 'Complete' : isActive ? 'Action needed' : 'Upcoming'}
+                        </span>
+                        {isUpcoming ? null : isExpanded ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+                      </div>
+
+                      {/* Expanded content */}
+                      {isExpanded && !isUpcoming && (
+                        <div className="px-5 pb-5 space-y-4 border-t border-gray-100">
+                          {/* Two-column action items */}
+                          {(oursItems.length > 0 || yoursItems.length > 0) && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                              <div>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="w-2 h-2 rounded-full bg-[#3e8692]" />
+                                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Holo Hive</p>
+                                </div>
+                                <div className="space-y-2">
+                                  {oursItems.map(item => (
+                                    <div key={item.id} className="flex items-start gap-2.5">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-[#3e8692] flex-shrink-0 mt-[7px]" />
+                                      <span className={`text-sm leading-5 ${item.is_done ? 'line-through text-gray-400' : 'text-gray-700'}`}>{item.text}</span>
+                                    </div>
+                                  ))}
+                                  {oursItems.length === 0 && <p className="text-xs text-gray-400">No items</p>}
+                                </div>
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="w-2 h-2 rounded-full bg-orange-500" />
+                                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Your Tasks</p>
+                                </div>
+                                <div className="space-y-2">
+                                  {yoursItems.map(item => (
+                                    <div key={item.id} className="flex items-start gap-2.5">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0 mt-[7px]" />
+                                      <div>
+                                        <span className={`text-sm ${item.is_done ? 'line-through text-gray-400' : 'text-gray-700'}`}>{item.text}</span>
+                                        {item.attachment_url && (
+                                          <a href={item.attachment_url} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex items-center gap-1 text-xs text-[#3e8692] hover:underline">
+                                            <ExternalLink className="h-3 w-3" />
+                                            {item.attachment_label || 'View'}
+                                          </a>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                  {yoursItems.length === 0 && <p className="text-xs text-gray-400">No items</p>}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Status message banner */}
+                          {ms.status_message && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-start gap-3">
+                              <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                              <p className="text-sm text-amber-800">{ms.status_message}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        {/* Milestone-based progress is rendered above */}
+
+        {/* Recent Activities — rendered in floating button modal */}
+
+        {/* Korean Mindshare Tracker */}
+        {mindshareEnabled && (
           <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10">
-            <CardHeader className="bg-gradient-to-r from-[#3e8692]/5 to-transparent pb-4">
+            <CardContent className="p-6 sm:p-8 space-y-6">
               <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                  <BarChart3 className="h-5 w-5 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">Korean Mindshare Tracker</h3>
+              </div>
+              {/* Stats row */}
+              <div className="grid grid-cols-2 gap-6">
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 mb-1">Current mindshare</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {mindshareWeekly.length > 0 ? `${mindshareWeekly[mindshareWeekly.length - 1].mindshare_pct}%` : '0%'}
+                  </p>
+                  <p className="text-xs text-gray-400">vs. benchmark</p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <p className="text-xs text-gray-500 mb-1">Telegram mentions</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {mindshareWeekly.length > 0 ? mindshareWeekly[mindshareWeekly.length - 1].mention_count : 0}
+                  </p>
+                  <p className="text-xs text-gray-400">this week</p>
+                </div>
+              </div>
+
+              {/* Mindshare growth vs benchmark */}
+              <div className="border border-gray-100 rounded-xl p-5">
+                <h4 className="text-sm font-bold text-gray-900 mb-0.5">Mindshare growth vs. benchmark</h4>
+                <p className="text-xs text-gray-500 mb-4">% of benchmark penetration · weekly</p>
+
+                {/* Donut + description */}
+                {mindshareWeekly.length > 0 && (
+                  <div className="flex items-center gap-5 mb-5">
+                    <div className="relative w-16 h-16 flex-shrink-0">
+                      <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                        <circle cx="18" cy="18" r="14" fill="none" stroke="#e5e7eb" strokeWidth="3.5" />
+                        <circle cx="18" cy="18" r="14" fill="none" stroke="#3e8692" strokeWidth="3.5"
+                          strokeDasharray={`${mindshareWeekly[mindshareWeekly.length - 1].mindshare_pct * 0.88} 88`}
+                          strokeLinecap="round" />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-xs font-bold text-gray-900">{mindshareWeekly[mindshareWeekly.length - 1].mindshare_pct}%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{client?.name} — early signal</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Mentions beginning to register across tracked Korean Telegram channels. Benchmark reflects a well-penetrated project at full market saturation.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Legend */}
+                <div className="flex items-center gap-4 text-xs text-gray-500 mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm bg-[#3e8692]" />
+                    <span>{client?.name || 'Client'}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 rounded-sm bg-gray-300" />
+                    <span>Benchmark (100%)</span>
+                  </div>
+                </div>
+
+                {/* Chart */}
+                <div className="relative h-40 border-l border-b border-gray-200">
+                  {[100, 80, 60, 40, 20, 0].map((val) => (
+                    <div key={val} className="absolute left-0 flex items-center" style={{ bottom: `${(val / 110) * 100}%` }}>
+                      <span className="text-[10px] text-gray-400 w-8 text-right pr-2">{val}%</span>
+                      {val === 100 && <div className="absolute left-8 right-0 border-t border-dashed border-gray-300" style={{ width: 'calc(100% - 2rem)' }} />}
+                    </div>
+                  ))}
+                  <div className="absolute left-10 right-0 bottom-0 h-full flex items-end gap-1">
+                    {Array.from({ length: 8 }, (_, i) => {
+                      const week = mindshareWeekly.find(w => w.week_number === i + 1);
+                      const pct = week ? week.mindshare_pct : 0;
+                      return (
+                        <div key={i} className="flex-1 flex flex-col items-center justify-end h-full">
+                          {pct > 0 && (
+                            <div className="w-full max-w-[24px] bg-[#3e8692] rounded-t-sm transition-all duration-500" style={{ height: `${(pct / 110) * 100}%` }} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="flex ml-10 mt-1">
+                  {Array.from({ length: 8 }, (_, i) => (
+                    <div key={i} className="flex-1 text-center">
+                      <span className="text-[10px] text-gray-400">W{i + 1}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Weekly mention volume */}
+              <div className="border border-gray-100 rounded-xl p-5">
+                <h4 className="text-sm font-bold text-gray-900 mb-0.5">Weekly mention volume</h4>
+                <p className="text-xs text-gray-500 mb-4">Telegram scans across Korean regional channels</p>
+
+                <div className="relative h-32 border-l border-b border-gray-200">
+                  {(() => {
+                    const maxMentions = Math.max(15, ...mindshareWeekly.map(w => w.mention_count));
+                    const step = Math.ceil(maxMentions / 3);
+                    const ticks = [0, step, step * 2, step * 3];
+                    return ticks.map(val => (
+                      <div key={val} className="absolute left-0 flex items-center" style={{ bottom: `${(val / (step * 3)) * 100}%` }}>
+                        <span className="text-[10px] text-gray-400 w-6 text-right pr-1.5">{val}</span>
+                      </div>
+                    ));
+                  })()}
+                  <div className="absolute left-8 right-0 bottom-0 h-full flex items-end gap-1">
+                    {Array.from({ length: 8 }, (_, i) => {
+                      const week = mindshareWeekly.find(w => w.week_number === i + 1);
+                      const count = week ? week.mention_count : 0;
+                      const maxMentions = Math.max(15, ...mindshareWeekly.map(w => w.mention_count));
+                      const barHeight = maxMentions > 0 ? (count / maxMentions) * 100 : 0;
+                      return (
+                        <div key={i} className="flex-1 flex flex-col items-center justify-end h-full">
+                          {count > 0 && (
+                            <div className="w-full max-w-[24px] bg-[#3e8692] rounded-t-sm transition-all duration-500" style={{ height: `${barHeight}%` }} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="flex ml-8 mt-1">
+                  {Array.from({ length: 8 }, (_, i) => (
+                    <div key={i} className="flex-1 text-center">
+                      <span className="text-[10px] text-gray-400">W{i + 1}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Client Context Section — hidden when mindshare tracker is disabled */}
+        {mindshareEnabled && (clientContext || linkedCRMAccount) && (
+          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10">
+            <CardContent className="p-6 sm:p-8">
+              <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
                   <Briefcase className="h-5 w-5 text-white" />
                 </div>
-                <CardTitle className="text-xl font-bold text-gray-900">Engagement Overview</CardTitle>
+                <h3 className="text-lg font-bold text-gray-900">Engagement Overview</h3>
                 {clientContext?.engagement_type && (
                   <span className="px-3 py-1 bg-[#e8f4f5] text-[#3e8692] text-sm font-medium rounded-full">{clientContext.engagement_type}</span>
                 )}
@@ -1611,8 +1661,6 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   ) : null;
                 })()}
               </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-2">
               {/* Scope — full width (use CRM scope if available, formatted nicely) */}
               {(() => {
                 const crmScope = linkedCRMAccount?.scope;
@@ -1852,7 +1900,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         )}
 
         {/* Form Submissions & Resources Row — discovery & tracker only */}
-        {portalPhase !== 'kickoff' && (formSubmissions.length > 0 || (clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url)) || formAttachments.length > 0) && (
+        {portalPhase !== 'kickoff' && (formSubmissions.length > 0 || (clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url)) || clientLinks.length > 0 || formAttachments.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
             {/* Form Submissions */}
             {formSubmissions.length > 0 && (
@@ -1897,8 +1945,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             )}
 
             {/* Resources */}
-            {((clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url)) || formAttachments.length > 0) && (
-              <Card className="border-0 shadow-lg rounded-xl overflow-hidden h-full">
+            {((clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url)) || clientLinks.length > 0 || formAttachments.length > 0) && (
+              <Card id="section-resources" className="border-0 shadow-lg rounded-xl overflow-hidden h-full">
                 <CardHeader className="bg-white border-b border-gray-100 pb-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
@@ -1963,8 +2011,30 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                       )}
                     </div>
                   )}
+                  {clientLinks.length > 0 && (
+                    <div className={clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url) ? 'mt-4 space-y-3' : 'space-y-3'}>
+                      {clientLinks.map(link => (
+                        <a
+                          key={link.id}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-[#3e8692]/5 hover:border-[#3e8692]/20 border border-gray-100 transition-all group"
+                        >
+                          <div className="p-2 bg-[#e8f4f5] rounded-lg group-hover:bg-[#d4edef] transition-colors">
+                            <LinkIcon className="h-5 w-5 text-[#3e8692]" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900 group-hover:text-[#3e8692]">{link.name}</p>
+                            {link.description && <p className="text-xs text-gray-500">{link.description}</p>}
+                          </div>
+                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-[#3e8692]" />
+                        </a>
+                      ))}
+                    </div>
+                  )}
                   {formAttachments.length > 0 && (
-                    <div className={clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url) ? 'mt-6 pt-6 border-t border-gray-100' : ''}>
+                    <div className={(clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url)) || clientLinks.length > 0 ? 'mt-6 pt-6 border-t border-gray-100' : ''}>
                       <h4 className="text-sm font-semibold text-gray-700 mb-3">Uploaded Files</h4>
                       <div className="space-y-3">
                         {formAttachments.map((att, i) => {
@@ -2060,7 +2130,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         </Dialog>
 
         {/* Campaigns Section — discovery & tracker only */}
-        {portalPhase !== 'kickoff' && <Card className="border-0 shadow-lg rounded-xl overflow-hidden mt-10">
+        {portalPhase !== 'kickoff' && <Card id="section-campaigns" className="border-0 shadow-lg rounded-xl overflow-hidden mt-10">
           <CardHeader className="bg-white border-b border-gray-100 pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <CardTitle className="text-xl font-bold text-gray-900">Your Campaigns</CardTitle>
@@ -2220,7 +2290,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
         {/* KOL Roster — tracker only */}
         {portalPhase === 'tracker' && kolRoster.length > 0 && (
-          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mt-8">
+          <Card id="section-kol-roster" className="border-0 shadow-lg rounded-xl overflow-hidden mt-8">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
@@ -2448,6 +2518,117 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </div>
         </div>
       </main>
+
+      {/* Floating Activity Button + Dropdown */}
+      {recentActivities.length > 0 && (
+        <div className="fixed top-[73px] left-0 right-0 z-40 pointer-events-none">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-end">
+            <div className="pointer-events-auto relative mt-3">
+              <button
+                onClick={() => setActivityModalOpen(!activityModalOpen)}
+                className="relative w-11 h-11 rounded-full bg-[#3e8692] shadow-lg flex items-center justify-center hover:bg-[#2d6570] transition-colors cursor-pointer"
+              >
+                <Bell className="h-5 w-5 text-white" />
+                {totalUnread > 0 && (
+                  <div className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
+                    <span className="text-white text-[10px] font-bold">!</span>
+                  </div>
+                )}
+              </button>
+
+              {/* Dropdown */}
+              {activityModalOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setActivityModalOpen(false)} />
+                  <div className="absolute right-0 top-[52px] z-50 w-[380px] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-[#3e8692]" />
+                        <p className="text-sm font-bold text-gray-900">Recent Activity</p>
+                      </div>
+                      <span className="text-xs text-gray-400">{totalActivities} total</span>
+                    </div>
+                    <div className="max-h-[400px] overflow-y-auto">
+                      <div className="p-3 space-y-1">
+                        {recentActivities.map((activity) => {
+                          const timeAgo = (() => {
+                            const diff = Date.now() - new Date(activity.created_at).getTime();
+                            const mins = Math.floor(diff / 60000);
+                            if (mins < 60) return `${mins}m ago`;
+                            const hours = Math.floor(mins / 60);
+                            if (hours < 24) return `${hours}h ago`;
+                            const days = Math.floor(hours / 24);
+                            if (days < 7) return `${days}d ago`;
+                            return new Date(activity.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          })();
+
+                          const iconColor = activity.activity_type === 'milestone_status' ? 'bg-[#3e8692]'
+                            : activity.activity_type === 'campaign_status' ? 'bg-blue-500'
+                            : activity.activity_type === 'link_added' ? 'bg-purple-500'
+                            : activity.activity_type === 'resource_updated' ? 'bg-green-500'
+                            : 'bg-gray-400';
+
+                          const scrollTarget = activity.activity_type === 'milestone_status' ? 'section-milestones'
+                            : activity.activity_type === 'campaign_status' ? 'section-campaigns'
+                            : activity.activity_type === 'link_added' || activity.activity_type === 'resource_updated' ? 'section-resources'
+                            : null;
+
+                          return (
+                            <div
+                              key={activity.id}
+                              className={`flex items-start gap-3 px-3 py-2.5 rounded-lg transition-colors ${!activity.is_read ? 'bg-[#3e8692]/[0.04]' : ''} ${scrollTarget ? 'hover:bg-gray-50 cursor-pointer' : ''}`}
+                              onClick={async () => {
+                                if (!activity.is_read) {
+                                  setRecentActivities(prev => prev.map(a => a.id === activity.id ? { ...a, is_read: true } : a));
+                                  setTotalUnread(prev => Math.max(0, prev - 1));
+                                  await supabasePublic.from('client_activity_log').update({ is_read: true }).eq('id', activity.id);
+                                }
+                                if (scrollTarget) {
+                                  const el = document.getElementById(scrollTarget);
+                                  if (el) {
+                                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    setActivityModalOpen(false);
+                                  }
+                                }
+                              }}
+                            >
+                              <div className={`w-5 h-5 rounded-full ${iconColor} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                                <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-sm font-medium text-gray-900 truncate">{activity.title}</p>
+                                  {!activity.is_read && <div className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />}
+                                </div>
+                                {activity.description && <p className="text-xs text-gray-500 truncate">{activity.description}</p>}
+                              </div>
+                              <span className="text-[11px] text-gray-400 flex-shrink-0 mt-0.5">{timeAgo}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {totalActivities > recentActivities.length && (
+                      <div className="px-4 py-2.5 border-t border-gray-100 text-center">
+                        <button
+                          onClick={() => {
+                            const newLimit = activityLimit + 5;
+                            setActivityLimit(newLimit);
+                            fetchRecentActivities(newLimit);
+                          }}
+                          className="text-xs font-medium text-[#3e8692] cursor-pointer"
+                        >
+                          Show more ({totalActivities - recentActivities.length} remaining)
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

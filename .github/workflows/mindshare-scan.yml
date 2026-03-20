@@ -1,0 +1,40 @@
+name: Mindshare Scan
+
+on:
+  schedule:
+    # Every 10 minutes
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r scripts/tg-mindshare/requirements.txt
+
+      - name: Run scan
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          TG_SESSION_STRING: ${{ secrets.TG_SESSION_STRING }}
+          API_URL: ${{ secrets.MINDSHARE_API_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SCAN_MINUTES: '12'
+        run: python scripts/tg-mindshare/scan.py
+
+  # Weekly aggregation — every Sunday at midnight UTC
+  aggregate:
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '*/10 * * * *' && false  # disabled, use separate workflow
+    steps: []

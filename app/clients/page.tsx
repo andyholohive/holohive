@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { ClientService, ClientWithAccess } from '@/lib/clientService';
@@ -19,7 +20,7 @@ import { FormService, FormWithStats } from '@/lib/formService';
 import { UserService } from '@/lib/userService';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff } from 'lucide-react';
+import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff, ChevronDown, ChevronUp, Lock, Circle } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
@@ -92,6 +93,20 @@ type ActionItem = {
   display_order: number;
   attachment_url: string | null;
   attachment_label: string | null;
+  milestone_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type Milestone = {
+  id: string;
+  client_id: string;
+  name: string;
+  subtitle: string | null;
+  status: 'complete' | 'active' | 'upcoming';
+  status_message: string | null;
+  is_visible: boolean;
+  display_order: number;
   created_at: string;
   updated_at: string;
 };
@@ -157,14 +172,20 @@ export default function ClientsPage() {
   const [editingWeeklyId, setEditingWeeklyId] = useState<string | null>(null);
   const [isWeeklyFormOpen, setIsWeeklyFormOpen] = useState(false);
   const [deletingWeeklyId, setDeletingWeeklyId] = useState<string | null>(null);
-  // Action items state
+  // Mindshare config state
+  const [clientMindshareEnabled, setClientMindshareEnabled] = useState<Record<string, boolean>>({});
+  // Action items & milestones state
   const [clientActionItems, setClientActionItems] = useState<Record<string, ActionItem[]>>({});
+  const [clientMilestones, setClientMilestones] = useState<Record<string, Milestone[]>>({});
   const [actionItemForm, setActionItemForm] = useState<{ text: string; court: 'yours' | 'ours'; attachment_url: string; attachment_label: string }>({ text: '', court: 'yours', attachment_url: '', attachment_label: '' });
   const [editingActionItemId, setEditingActionItemId] = useState<string | null>(null);
   const [isActionItemFormOpen, setIsActionItemFormOpen] = useState(false);
   const [deletingActionItemId, setDeletingActionItemId] = useState<string | null>(null);
   const [contextModalTab, setContextModalTab] = useState<string>('context');
-  const [actionBoardPhase, setActionBoardPhase] = useState<string>('kickoff');
+  const [activeMilestoneId, setActiveMilestoneId] = useState<string | null>(null);
+  const [milestoneForm, setMilestoneForm] = useState<{ name: string; subtitle: string; status_message: string }>({ name: '', subtitle: '', status_message: '' });
+  const [isMilestoneFormOpen, setIsMilestoneFormOpen] = useState(false);
+  const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
   // New client form state
   const [newClient, setNewClient] = useState({
     name: '',
@@ -416,6 +437,23 @@ export default function ClientsPage() {
         actionMap[item.client_id].push(item as ActionItem);
       }
       setClientActionItems(actionMap);
+
+      // Fetch milestones
+      const { data: milestoneData } = await supabase.from('client_milestones').select('*').order('display_order', { ascending: true });
+      const msMap: Record<string, Milestone[]> = {};
+      for (const ms of (milestoneData || [])) {
+        if (!msMap[ms.client_id]) msMap[ms.client_id] = [];
+        msMap[ms.client_id].push(ms as Milestone);
+      }
+      setClientMilestones(msMap);
+
+      // Fetch mindshare configs
+      const { data: mindshareData } = await supabase.from('client_mindshare_config').select('client_id, is_enabled');
+      const msEnabled: Record<string, boolean> = {};
+      for (const mc of (mindshareData || [])) {
+        msEnabled[mc.client_id] = mc.is_enabled;
+      }
+      setClientMindshareEnabled(msEnabled);
     } catch (err) {
       setError('Failed to load clients');
     } finally {
@@ -465,7 +503,7 @@ export default function ClientsPage() {
     setClientWeeklyUpdates(map);
   };
 
-  // Action items
+  // Action items & milestones
   const refreshActionItems = async () => {
     const { data } = await supabase.from('client_action_items').select('*').order('display_order', { ascending: true });
     const map: Record<string, ActionItem[]> = {};
@@ -476,45 +514,100 @@ export default function ClientsPage() {
     setClientActionItems(map);
   };
 
-  const DEFAULT_ACTION_ITEMS: { text: string; court: 'yours' | 'ours'; phase: 'kickoff' | 'discovery' | 'tracker'; display_order: number }[] = [
-    // Kickoff (Days 1-2): Onboarding & Setup + Project Review
-    { text: 'Complete onboarding form', court: 'yours', phase: 'kickoff', display_order: 0 },
-    { text: 'Upload assets & documentation (branding, decks, product links)', court: 'yours', phase: 'kickoff', display_order: 1 },
-    { text: 'Confirm workspace access', court: 'yours', phase: 'kickoff', display_order: 2 },
-    { text: 'Workspace setup & onboarding overview', court: 'ours', phase: 'kickoff', display_order: 0 },
-    { text: 'Project, product & resource review', court: 'ours', phase: 'kickoff', display_order: 1 },
-    { text: 'Ecosystem & market positioning analysis', court: 'ours', phase: 'kickoff', display_order: 2 },
-    // Discovery (Days 3-5): Strategy, GTM & Outreach Prep
-    { text: 'Submit graphic materials vault', court: 'yours', phase: 'discovery', display_order: 0 },
-    { text: 'Review campaign brief', court: 'yours', phase: 'discovery', display_order: 1 },
-    { text: 'Confirm weekly sync schedule', court: 'yours', phase: 'discovery', display_order: 2 },
-    { text: 'Internal strategy & narrative positioning review', court: 'ours', phase: 'discovery', display_order: 0 },
-    { text: 'KOL outreach brief preparation & translation', court: 'ours', phase: 'discovery', display_order: 1 },
-    { text: 'KOL selection & shortlist preparation', court: 'ours', phase: 'discovery', display_order: 2 },
-    { text: 'Initial content brief preparation', court: 'ours', phase: 'discovery', display_order: 3 },
-    { text: 'Regional GTM plan development', court: 'ours', phase: 'discovery', display_order: 4 },
-    // Tracker (Days 6-7): Campaign Deployment & Activation
-    { text: 'Review & approve KOL shortlist', court: 'yours', phase: 'tracker', display_order: 0 },
-    { text: 'Review & approve content brief', court: 'yours', phase: 'tracker', display_order: 1 },
-    { text: 'Approve content drafts', court: 'yours', phase: 'tracker', display_order: 2 },
-    { text: 'Campaign tracker deployment', court: 'ours', phase: 'tracker', display_order: 0 },
-    { text: 'Creator outreach with translated content brief', court: 'ours', phase: 'tracker', display_order: 1 },
-    { text: 'Content schedule planning & finalization', court: 'ours', phase: 'tracker', display_order: 2 },
-    { text: 'First activations scheduled', court: 'ours', phase: 'tracker', display_order: 3 },
-    { text: 'Performance tracking & reporting', court: 'ours', phase: 'tracker', display_order: 4 },
+  const refreshMilestones = async () => {
+    const { data } = await supabase.from('client_milestones').select('*').order('display_order', { ascending: true });
+    const map: Record<string, Milestone[]> = {};
+    for (const ms of (data || [])) {
+      if (!map[ms.client_id]) map[ms.client_id] = [];
+      map[ms.client_id].push(ms as Milestone);
+    }
+    setClientMilestones(map);
+  };
+
+  const DEFAULT_MILESTONES: { name: string; subtitle: string; status: 'complete' | 'active' | 'upcoming'; items: { text: string; court: 'yours' | 'ours' }[] }[] = [
+    { name: 'Kickoff & workspace setup', subtitle: 'Workspace initialized', status: 'active', items: [
+      { text: 'Complete onboarding form', court: 'yours' },
+      { text: 'Upload assets & documentation (branding, decks, product links)', court: 'yours' },
+      { text: 'Confirm workspace & Telegram group access', court: 'yours' },
+      { text: 'Workspace & portal setup', court: 'ours' },
+      { text: 'Telegram group created', court: 'ours' },
+      { text: 'Shared drive & resource folder prepared', court: 'ours' },
+    ]},
+    { name: 'Project & ecosystem review', subtitle: 'Deep dive underway', status: 'upcoming', items: [
+      { text: 'Submit graphic materials vault', court: 'yours' },
+      { text: 'Confirm weekly sync schedule', court: 'yours' },
+      { text: 'Project, product & resource review', court: 'ours' },
+      { text: 'Ecosystem & market positioning analysis', court: 'ours' },
+      { text: 'Internal strategy & narrative positioning review', court: 'ours' },
+    ]},
+    { name: 'KOL outreach brief', subtitle: 'Ready for your review', status: 'upcoming', items: [
+      { text: 'Review the KOL outreach brief', court: 'yours' },
+      { text: 'Share feedback to unblock KOL circulation', court: 'yours' },
+      { text: 'KOL outreach brief drafted', court: 'ours' },
+      { text: 'APAC translation underway', court: 'ours' },
+      { text: 'KOL shortlist being compiled', court: 'ours' },
+    ]},
+    { name: 'KOL shortlist & tracker', subtitle: 'Campaign tracker goes live', status: 'upcoming', items: [
+      { text: 'Review & approve KOL shortlist', court: 'yours' },
+      { text: 'Approve selected KOL rates & deliverables', court: 'yours' },
+      { text: 'Campaign tracker deployed', court: 'ours' },
+      { text: 'Creator outreach with translated content brief', court: 'ours' },
+      { text: 'KOL onboarding & contract coordination', court: 'ours' },
+    ]},
+    { name: 'Content brief & phase plan', subtitle: 'Full phased brief delivered', status: 'upcoming', items: [
+      { text: 'Review & approve content brief', court: 'yours' },
+      { text: 'Approve content drafts & scripts', court: 'yours' },
+      { text: 'Content brief preparation & localization', court: 'ours' },
+      { text: 'Content schedule planning & finalization', court: 'ours' },
+      { text: 'Draft review coordination with KOLs', court: 'ours' },
+    ]},
+    { name: 'Regional GTM', subtitle: 'Regional strategy mapped', status: 'upcoming', items: [
+      { text: 'Review GTM plan & provide regional context', court: 'yours' },
+      { text: 'Regional GTM plan development', court: 'ours' },
+      { text: 'Market-specific KOL & channel mapping', court: 'ours' },
+    ]},
+    { name: 'Campaign activation', subtitle: 'First activations go live', status: 'upcoming', items: [
+      { text: 'Final approval on go-live content', court: 'yours' },
+      { text: 'First activations scheduled & published', court: 'ours' },
+      { text: 'Performance tracking & weekly reporting', court: 'ours' },
+      { text: 'Engagement monitoring & optimization', court: 'ours' },
+    ]},
   ];
 
-  const seedActionItems = async (clientId: string) => {
-    const existing = clientActionItems[clientId];
+  const seedMilestones = async (clientId: string) => {
+    const existing = clientMilestones[clientId];
     if (existing && existing.length > 0) return;
-    const rows = DEFAULT_ACTION_ITEMS.map(item => ({ client_id: clientId, ...item }));
-    const { error } = await supabase.from('client_action_items').insert(rows);
-    if (error) { console.error('Error seeding action items:', error); return; }
-    await refreshActionItems();
+    try {
+      for (let i = 0; i < DEFAULT_MILESTONES.length; i++) {
+        const ms = DEFAULT_MILESTONES[i];
+        const { data: inserted } = await supabase.from('client_milestones').insert({
+          client_id: clientId,
+          name: ms.name,
+          subtitle: ms.subtitle,
+          status: ms.status,
+          display_order: i,
+        }).select().single();
+        if (inserted) {
+          const rows = ms.items.map((item, j) => ({
+            client_id: clientId,
+            text: item.text,
+            court: item.court,
+            phase: 'kickoff' as const,
+            milestone_id: inserted.id,
+            display_order: j,
+          }));
+          await supabase.from('client_action_items').insert(rows);
+        }
+      }
+      await refreshMilestones();
+      await refreshActionItems();
+    } catch (err) {
+      console.error('Error seeding milestones:', err);
+    }
   };
 
   const handleActionItemSubmit = async () => {
-    if (!contextModalClient || !actionItemForm.text.trim()) return;
+    if (!contextModalClient || !actionItemForm.text.trim() || !activeMilestoneId) return;
     try {
       const attachUrl = actionItemForm.attachment_url.trim() || null;
       const attachLabel = actionItemForm.attachment_label.trim() || null;
@@ -528,13 +621,14 @@ export default function ClientsPage() {
         }).eq('id', editingActionItemId);
       } else {
         const items = clientActionItems[contextModalClient.id] || [];
-        const phaseItems = items.filter(i => i.phase === actionBoardPhase && i.court === actionItemForm.court);
-        const maxOrder = phaseItems.length > 0 ? Math.max(...phaseItems.map(i => i.display_order)) + 1 : 0;
+        const msItems = items.filter(i => i.milestone_id === activeMilestoneId && i.court === actionItemForm.court);
+        const maxOrder = msItems.length > 0 ? Math.max(...msItems.map(i => i.display_order)) + 1 : 0;
         await supabase.from('client_action_items').insert({
           client_id: contextModalClient.id,
           text: actionItemForm.text.trim(),
           court: actionItemForm.court,
-          phase: actionBoardPhase,
+          phase: 'kickoff',
+          milestone_id: activeMilestoneId,
           display_order: maxOrder,
           attachment_url: attachUrl,
           attachment_label: attachLabel,
@@ -549,9 +643,109 @@ export default function ClientsPage() {
     }
   };
 
-  const toggleActionItemDone = async (item: ActionItem) => {
-    await supabase.from('client_action_items').update({ is_done: !item.is_done, updated_at: new Date().toISOString() }).eq('id', item.id);
+  const handleMilestoneSubmit = async () => {
+    if (!contextModalClient || !milestoneForm.name.trim()) return;
+    try {
+      if (editingMilestoneId) {
+        await supabase.from('client_milestones').update({
+          name: milestoneForm.name.trim(),
+          subtitle: milestoneForm.subtitle.trim() || null,
+          status_message: milestoneForm.status_message.trim() || null,
+        }).eq('id', editingMilestoneId);
+      } else {
+        const existing = clientMilestones[contextModalClient.id] || [];
+        const maxOrder = existing.length > 0 ? Math.max(...existing.map(m => m.display_order)) + 1 : 0;
+        await supabase.from('client_milestones').insert({
+          client_id: contextModalClient.id,
+          name: milestoneForm.name.trim(),
+          subtitle: milestoneForm.subtitle.trim() || null,
+          status_message: milestoneForm.status_message.trim() || null,
+          display_order: maxOrder,
+        });
+      }
+      await refreshMilestones();
+      setIsMilestoneFormOpen(false);
+      setEditingMilestoneId(null);
+      setMilestoneForm({ name: '', subtitle: '', status_message: '' });
+    } catch (err) {
+      console.error('Error saving milestone:', err);
+    }
+  };
+
+  const logActivity = async (clientId: string, activityType: string, title: string, description?: string, metadata?: Record<string, any>) => {
+    try {
+      await supabase.from('client_activity_log').insert({
+        client_id: clientId,
+        activity_type: activityType,
+        title,
+        description: description || null,
+        metadata: metadata || {},
+        created_by: userProfile?.id || null,
+        created_by_name: userProfile?.name || userProfile?.email || null,
+      });
+    } catch (err) {
+      console.error('Error logging activity:', err);
+    }
+  };
+
+  const setMilestoneStatus = async (id: string, status: 'complete' | 'active' | 'upcoming') => {
+    const ms = Object.values(clientMilestones).flat().find(m => m.id === id);
+    await supabase.from('client_milestones').update({ status }).eq('id', id);
+    await refreshMilestones();
+    if (ms) {
+      const label = status === 'complete' ? 'completed' : status === 'active' ? 'activated' : 'set to upcoming';
+      await logActivity(ms.client_id, 'milestone_status', `Milestone ${label}`, ms.name);
+    }
+  };
+
+  const toggleMindshare = async (clientId: string) => {
+    const current = clientMindshareEnabled[clientId] ?? false;
+    const { data: existing } = await supabase.from('client_mindshare_config').select('id').eq('client_id', clientId).single();
+    if (existing) {
+      await supabase.from('client_mindshare_config').update({ is_enabled: !current }).eq('client_id', clientId);
+    } else {
+      await supabase.from('client_mindshare_config').insert({ client_id: clientId, is_enabled: true });
+    }
+    setClientMindshareEnabled(prev => ({ ...prev, [clientId]: !current }));
+  };
+
+  const toggleMilestoneVisibility = async (id: string, isVisible: boolean) => {
+    await supabase.from('client_milestones').update({ is_visible: !isVisible }).eq('id', id);
+    await refreshMilestones();
+  };
+
+  const deleteMilestone = async (id: string) => {
+    await supabase.from('client_action_items').update({ milestone_id: null }).eq('milestone_id', id);
+    await supabase.from('client_milestones').delete().eq('id', id);
+    await refreshMilestones();
     await refreshActionItems();
+  };
+
+  const toggleActionItemDone = async (item: ActionItem) => {
+    const newDone = !item.is_done;
+    await supabase.from('client_action_items').update({ is_done: newDone, updated_at: new Date().toISOString() }).eq('id', item.id);
+    await refreshActionItems();
+
+    // Auto-update milestone status based on action item completion
+    if (item.milestone_id) {
+      const { data: msItems } = await supabase
+        .from('client_action_items')
+        .select('id, is_done')
+        .eq('milestone_id', item.milestone_id);
+
+      if (msItems && msItems.length > 0) {
+        const allDone = msItems.every(i => i.id === item.id ? newDone : i.is_done);
+        const currentMs = Object.values(clientMilestones).flat().find(m => m.id === item.milestone_id);
+        if (allDone && currentMs?.status !== 'complete') {
+          await supabase.from('client_milestones').update({ status: 'complete' }).eq('id', item.milestone_id);
+          await refreshMilestones();
+          await logActivity(item.client_id, 'milestone_status', 'Milestone completed', currentMs?.name || '');
+        } else if (!allDone && currentMs?.status === 'complete') {
+          await supabase.from('client_milestones').update({ status: 'active' }).eq('id', item.milestone_id);
+          await refreshMilestones();
+        }
+      }
+    }
   };
 
   const toggleActionItemHidden = async (item: ActionItem) => {
@@ -823,6 +1017,15 @@ export default function ClientsPage() {
         await supabase.from('client_context').insert(payload);
       }
       await refreshClientContexts();
+      // Log resource changes
+      const oldCtx = existing as any;
+      const changes: string[] = [];
+      if ((payload.telegram_url || '') !== (oldCtx?.telegram_url || '')) changes.push('Telegram group');
+      if ((payload.shared_drive_url || '') !== (oldCtx?.shared_drive_url || '')) changes.push('Shared drive');
+      if ((payload.gtm_sync_url || '') !== (oldCtx?.gtm_sync_url || '')) changes.push('GTM tracker');
+      if (changes.length > 0) {
+        await logActivity(contextModalClient.id, 'resource_updated', 'Resources updated', changes.join(', '));
+      }
       setContextModalClient(null);
     } catch (err) {
       console.error('Error saving context:', err);
@@ -2795,7 +2998,7 @@ export default function ClientsPage() {
             <Tabs value={contextModalTab} onValueChange={(v) => {
               setContextModalTab(v);
               if (v === 'actionboard' && contextModalClient) {
-                seedActionItems(contextModalClient.id);
+                seedMilestones(contextModalClient.id);
               }
             }}>
               <TabsList className="mb-3">
@@ -2896,6 +3099,20 @@ export default function ClientsPage() {
                       </div>
                     </div>
                   </div>
+                  {/* Portal Feature Toggles */}
+                  <div className="border rounded-lg p-3 bg-gray-50">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Portal Features</p>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Korean Mindshare Tracker</p>
+                        <p className="text-xs text-gray-500">Show mindshare analytics on the client portal</p>
+                      </div>
+                      <Switch
+                        checked={contextModalClient ? (clientMindshareEnabled[contextModalClient.id] ?? false) : false}
+                        onCheckedChange={() => contextModalClient && toggleMindshare(contextModalClient.id)}
+                      />
+                    </div>
+                  </div>
                 </div>
                 <DialogFooter className="mt-4">
                   <Button variant="outline" onClick={() => setContextModalClient(null)}>Cancel</Button>
@@ -2903,106 +3120,205 @@ export default function ClientsPage() {
                 </DialogFooter>
               </TabsContent>
               <TabsContent value="actionboard">
-                <Tabs value={actionBoardPhase} onValueChange={setActionBoardPhase}>
-                  <TabsList className="mb-3">
-                    <TabsTrigger value="kickoff">Kickoff</TabsTrigger>
-                    <TabsTrigger value="discovery">Discovery</TabsTrigger>
-                    <TabsTrigger value="tracker">Tracker</TabsTrigger>
-                  </TabsList>
-                  {(['kickoff', 'discovery', 'tracker'] as const).map(phase => {
-                    const items = contextModalClient ? (clientActionItems[contextModalClient.id] || []).filter(i => i.phase === phase) : [];
-                    const yoursItems = items.filter(i => i.court === 'yours').sort((a, b) => a.display_order - b.display_order);
-                    const oursItems = items.filter(i => i.court === 'ours').sort((a, b) => a.display_order - b.display_order);
-                    const renderItem = (item: ActionItem) => (
-                      <div key={item.id} className={`p-2 rounded-lg ${item.is_hidden ? 'opacity-40' : ''} ${item.is_done ? 'bg-gray-50' : 'bg-white'} border`}>
-                        {deletingActionItemId === item.id ? (
+                {(() => {
+                  const milestones = contextModalClient ? (clientMilestones[contextModalClient.id] || []) : [];
+                  const allItems = contextModalClient ? (clientActionItems[contextModalClient.id] || []) : [];
+                  const completedCount = milestones.filter(m => m.status === 'complete').length;
+
+                  const renderActionItem = (item: ActionItem) => (
+                    <div key={item.id} className={`p-2 rounded-lg ${item.is_hidden ? 'opacity-40' : ''} ${item.is_done ? 'bg-gray-50' : 'bg-white'} border`}>
+                      {deletingActionItemId === item.id ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600">Delete this item?</span>
+                          <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => deleteActionItem(item.id)}>Delete</Button>
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setDeletingActionItemId(null)}>Cancel</Button>
+                        </div>
+                      ) : (
+                        <>
                           <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-600">Delete this item?</span>
-                            <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => deleteActionItem(item.id)}>Delete</Button>
-                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setDeletingActionItemId(null)}>Cancel</Button>
+                            <Checkbox checked={item.is_done} onCheckedChange={() => toggleActionItemDone(item)} />
+                            <span className={`flex-1 text-sm ${item.is_done ? 'line-through text-gray-400' : 'text-gray-700'}`}>{item.text}</span>
+                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-gray-100" onClick={() => toggleActionItemHidden(item)}>
+                              {item.is_hidden ? <EyeOff className="h-3.5 w-3.5 text-gray-400" /> : <Eye className="h-3.5 w-3.5 text-gray-400" />}
+                            </Button>
+                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-gray-100" onClick={() => {
+                              setEditingActionItemId(item.id);
+                              setActionItemForm({ text: item.text, court: item.court, attachment_url: item.attachment_url || '', attachment_label: item.attachment_label || '' });
+                              setActiveMilestoneId(item.milestone_id);
+                              setIsActionItemFormOpen(true);
+                            }}>
+                              <Pencil className="h-3.5 w-3.5 text-gray-400" />
+                            </Button>
+                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-red-50" onClick={() => setDeletingActionItemId(item.id)}>
+                              <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                            </Button>
                           </div>
-                        ) : (
-                          <>
-                            <div className="flex items-center gap-2">
-                              <Checkbox checked={item.is_done} onCheckedChange={() => toggleActionItemDone(item)} />
-                              <span className={`flex-1 text-sm ${item.is_done ? 'line-through text-gray-400' : 'text-gray-700'}`}>{item.text}</span>
-                              <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-gray-100" onClick={() => toggleActionItemHidden(item)}>
-                                {item.is_hidden ? <EyeOff className="h-3.5 w-3.5 text-gray-400" /> : <Eye className="h-3.5 w-3.5 text-gray-400" />}
-                              </Button>
-                              <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-gray-100" onClick={() => {
-                                setEditingActionItemId(item.id);
-                                setActionItemForm({ text: item.text, court: item.court, attachment_url: item.attachment_url || '', attachment_label: item.attachment_label || '' });
-                                setIsActionItemFormOpen(true);
-                              }}>
-                                <Pencil className="h-3.5 w-3.5 text-gray-400" />
-                              </Button>
-                              <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-red-50" onClick={() => setDeletingActionItemId(item.id)}>
-                                <Trash2 className="h-3.5 w-3.5 text-red-400" />
-                              </Button>
+                          {item.attachment_url && (
+                            <div className="ml-8 mt-1">
+                              <a href={item.attachment_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#3e8692] hover:underline">
+                                <LinkIcon className="h-3 w-3" />
+                                {item.attachment_label || 'View attachment'}
+                              </a>
                             </div>
-                            {item.attachment_url && (
-                              <div className="ml-8 mt-1">
-                                <a href={item.attachment_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#3e8692] hover:underline">
-                                  <LinkIcon className="h-3 w-3" />
-                                  {item.attachment_label || 'View attachment'}
-                                </a>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+
+                  return (
+                    <div className="max-h-[55vh] overflow-y-auto space-y-3 px-1 pb-2">
+                      {/* Progress summary */}
+                      <div className="flex items-center justify-between text-sm text-gray-500 mb-1">
+                        <span>{completedCount} of {milestones.length} milestones complete</span>
+                        <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => { setIsMilestoneFormOpen(true); setEditingMilestoneId(null); setMilestoneForm({ name: '', subtitle: '', status_message: '' }); }}>
+                          <Plus className="h-3 w-3 mr-1" /> Add Milestone
+                        </Button>
+                      </div>
+
+                      {/* Progress bar */}
+                      {milestones.length > 0 && (
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-300" style={{ width: `${(completedCount / milestones.length) * 100}%`, backgroundColor: '#3e8692' }} />
+                        </div>
+                      )}
+
+                      {/* Milestone form */}
+                      {isMilestoneFormOpen && (
+                        <div className="border rounded-lg p-3 space-y-2 bg-gray-50">
+                          <Input value={milestoneForm.name} onChange={(e) => setMilestoneForm({ ...milestoneForm, name: e.target.value })} placeholder="Milestone name" className="auth-input" autoFocus />
+                          <Input value={milestoneForm.subtitle} onChange={(e) => setMilestoneForm({ ...milestoneForm, subtitle: e.target.value })} placeholder="Subtitle (optional)" className="auth-input" />
+                          <Input value={milestoneForm.status_message} onChange={(e) => setMilestoneForm({ ...milestoneForm, status_message: e.target.value })} placeholder="Status message for client (optional)" className="auth-input" />
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleMilestoneSubmit} disabled={!milestoneForm.name.trim()}>
+                              {editingMilestoneId ? 'Save' : 'Add'}
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => { setIsMilestoneFormOpen(false); setEditingMilestoneId(null); }}>Cancel</Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Milestone cards */}
+                      {milestones.map((ms) => {
+                        const msItems = allItems.filter(i => i.milestone_id === ms.id);
+                        const yoursItems = msItems.filter(i => i.court === 'yours').sort((a, b) => a.display_order - b.display_order);
+                        const oursItems = msItems.filter(i => i.court === 'ours').sort((a, b) => a.display_order - b.display_order);
+                        const isExpanded = activeMilestoneId === ms.id;
+                        const statusColor = ms.status === 'complete' ? 'border-green-200 bg-green-50/30' : ms.status === 'active' ? 'border-[#3e8692] bg-[#3e8692]/5' : 'border-gray-200 bg-gray-50/50';
+                        const StatusIcon = ms.status === 'complete' ? CheckCircle : ms.status === 'active' ? Circle : Lock;
+                        const statusIconColor = ms.status === 'complete' ? 'text-green-500' : ms.status === 'active' ? 'text-[#3e8692]' : 'text-gray-300';
+                        const statusBadge = ms.status === 'complete' ? { label: 'Complete', bg: 'bg-green-100 text-green-700' } : ms.status === 'active' ? { label: 'Active', bg: 'bg-[#e8f4f5] text-[#3e8692]' } : { label: 'Upcoming', bg: 'bg-gray-100 text-gray-500' };
+
+                        return (
+                          <div key={ms.id} className={`border rounded-lg overflow-hidden ${statusColor} ${!ms.is_visible ? 'opacity-50' : ''}`}>
+                            {/* Milestone header */}
+                            <div
+                              className="flex items-center gap-3 px-3 py-2.5 cursor-pointer"
+                              onClick={() => setActiveMilestoneId(isExpanded ? null : ms.id)}
+                            >
+                              <StatusIcon className={`h-5 w-5 flex-shrink-0 ${statusIconColor}`} />
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <p className={`text-sm font-semibold ${ms.status === 'upcoming' ? 'text-gray-400' : 'text-gray-900'}`}>{ms.name}</p>
+                                  {!ms.is_visible && <EyeOff className="h-3 w-3 text-gray-400" />}
+                                </div>
+                                {ms.subtitle && <p className={`text-xs ${ms.status === 'upcoming' ? 'text-gray-300' : 'text-gray-500'}`}>{ms.subtitle}</p>}
+                              </div>
+                              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${statusBadge.bg}`}>{statusBadge.label}</span>
+                              {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+                            </div>
+
+                            {/* Expanded content */}
+                            {isExpanded && (
+                              <div className="px-3 pb-3 space-y-3 border-t border-gray-100">
+                                {/* Status controls */}
+                                <div className="flex items-center gap-1.5 pt-2">
+                                  <span className="text-[10px] text-gray-500 mr-1">Status:</span>
+                                  {(['complete', 'active', 'upcoming'] as const).map(s => (
+                                    <Button key={s} size="sm" variant={ms.status === s ? 'default' : 'outline'} className="h-6 text-[10px] px-2"
+                                      style={ms.status === s ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                                      onClick={() => setMilestoneStatus(ms.id, s)}
+                                    >
+                                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                                    </Button>
+                                  ))}
+                                  <div className="ml-auto flex gap-1">
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title={ms.is_visible ? 'Hide from portal' : 'Show on portal'} onClick={() => toggleMilestoneVisibility(ms.id, ms.is_visible)}>
+                                      {ms.is_visible ? <Eye className="h-3 w-3 text-gray-400" /> : <EyeOff className="h-3 w-3 text-gray-400" />}
+                                    </Button>
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => {
+                                      setEditingMilestoneId(ms.id);
+                                      setMilestoneForm({ name: ms.name, subtitle: ms.subtitle || '', status_message: ms.status_message || '' });
+                                      setIsMilestoneFormOpen(true);
+                                    }}>
+                                      <Pencil className="h-3 w-3 text-gray-400" />
+                                    </Button>
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-red-50" onClick={() => deleteMilestone(ms.id)}>
+                                      <Trash2 className="h-3 w-3 text-red-400" />
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                {/* Status message */}
+                                {ms.status_message && (
+                                  <div className="bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                                    <p className="text-xs text-amber-800">{ms.status_message}</p>
+                                  </div>
+                                )}
+
+                                {/* Action items by court */}
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <p className="text-[10px] font-semibold text-[#3e8692] uppercase tracking-wider mb-1.5">Holo Hive</p>
+                                    <div className="space-y-1">{oursItems.map(renderActionItem)}</div>
+                                    {oursItems.length === 0 && <p className="text-xs text-gray-400 py-1">No items</p>}
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-semibold text-orange-600 uppercase tracking-wider mb-1.5">Your Tasks</p>
+                                    <div className="space-y-1">{yoursItems.map(renderActionItem)}</div>
+                                    {yoursItems.length === 0 && <p className="text-xs text-gray-400 py-1">No items</p>}
+                                  </div>
+                                </div>
+
+                                {/* Add Item */}
+                                {isActionItemFormOpen && activeMilestoneId === ms.id ? (
+                                  <div className="border rounded-lg p-3 space-y-2 bg-white">
+                                    <Input value={actionItemForm.text} onChange={(e) => setActionItemForm({ ...actionItemForm, text: e.target.value })} placeholder="Action item text" className="auth-input" autoFocus />
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <Input value={actionItemForm.attachment_url} onChange={(e) => setActionItemForm({ ...actionItemForm, attachment_url: e.target.value })} placeholder="Link URL (optional)" className="auth-input" />
+                                      <Input value={actionItemForm.attachment_label} onChange={(e) => setActionItemForm({ ...actionItemForm, attachment_label: e.target.value })} placeholder="Link label (optional)" className="auth-input" />
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Select value={actionItemForm.court} onValueChange={(v: 'yours' | 'ours') => setActionItemForm({ ...actionItemForm, court: v })}>
+                                        <SelectTrigger className="auth-input w-[160px]"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="yours">Your Tasks</SelectItem>
+                                          <SelectItem value="ours">Holo Hive</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleActionItemSubmit} disabled={!actionItemForm.text.trim()}>
+                                        {editingActionItemId ? 'Save' : 'Add'}
+                                      </Button>
+                                      <Button size="sm" variant="outline" onClick={() => { setIsActionItemFormOpen(false); setEditingActionItemId(null); setActionItemForm({ text: '', court: 'yours', attachment_url: '', attachment_label: '' }); }}>Cancel</Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <Button size="sm" variant="outline" className="text-xs" onClick={() => { setActiveMilestoneId(ms.id); setIsActionItemFormOpen(true); setEditingActionItemId(null); setActionItemForm({ text: '', court: 'yours', attachment_url: '', attachment_label: '' }); }}>
+                                    <Plus className="h-3.5 w-3.5 mr-1" /> Add Item
+                                  </Button>
+                                )}
                               </div>
                             )}
-                          </>
-                        )}
-                      </div>
-                    );
-                    return (
-                      <TabsContent key={phase} value={phase}>
-                        <div className="max-h-[50vh] overflow-y-auto space-y-4 px-1 pb-2">
-                          {/* Your Court */}
-                          <div>
-                            <p className="text-xs font-semibold text-orange-600 uppercase tracking-wider mb-2">Your Court (Client)</p>
-                            <div className="space-y-1.5">
-                              {yoursItems.map(renderItem)}
-                              {yoursItems.length === 0 && <p className="text-xs text-gray-400 py-1">No items</p>}
-                            </div>
                           </div>
-                          {/* Our Court */}
-                          <div>
-                            <p className="text-xs font-semibold text-[#3e8692] uppercase tracking-wider mb-2">Our Court (Holo Hive)</p>
-                            <div className="space-y-1.5">
-                              {oursItems.map(renderItem)}
-                              {oursItems.length === 0 && <p className="text-xs text-gray-400 py-1">No items</p>}
-                            </div>
-                          </div>
-                          {/* Add Item Form */}
-                          {isActionItemFormOpen && actionBoardPhase === phase ? (
-                            <div className="border rounded-lg p-3 space-y-2 bg-gray-50">
-                              <Input value={actionItemForm.text} onChange={(e) => setActionItemForm({ ...actionItemForm, text: e.target.value })} placeholder="Action item text" className="auth-input" autoFocus />
-                              <div className="grid grid-cols-2 gap-2">
-                                <Input value={actionItemForm.attachment_url} onChange={(e) => setActionItemForm({ ...actionItemForm, attachment_url: e.target.value })} placeholder="Link URL (optional)" className="auth-input" />
-                                <Input value={actionItemForm.attachment_label} onChange={(e) => setActionItemForm({ ...actionItemForm, attachment_label: e.target.value })} placeholder="Link label (optional)" className="auth-input" />
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Select value={actionItemForm.court} onValueChange={(v: 'yours' | 'ours') => setActionItemForm({ ...actionItemForm, court: v })}>
-                                  <SelectTrigger className="auth-input w-[160px]"><SelectValue /></SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="yours">Your Court</SelectItem>
-                                    <SelectItem value="ours">Our Court</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleActionItemSubmit} disabled={!actionItemForm.text.trim()}>
-                                  {editingActionItemId ? 'Save' : 'Add'}
-                                </Button>
-                                <Button size="sm" variant="outline" onClick={() => { setIsActionItemFormOpen(false); setEditingActionItemId(null); setActionItemForm({ text: '', court: 'yours', attachment_url: '', attachment_label: '' }); }}>Cancel</Button>
-                              </div>
-                            </div>
-                          ) : (
-                            <Button size="sm" variant="outline" className="text-xs" onClick={() => { setIsActionItemFormOpen(true); setEditingActionItemId(null); setActionItemForm({ text: '', court: 'yours', attachment_url: '', attachment_label: '' }); }}>
-                              <Plus className="h-3.5 w-3.5 mr-1" /> Add Item
-                            </Button>
-                          )}
-                        </div>
-                      </TabsContent>
-                    );
-                  })}
-                </Tabs>
+                        );
+                      })}
+
+                      {milestones.length === 0 && !isMilestoneFormOpen && (
+                        <p className="text-sm text-gray-400 text-center py-4">No milestones yet. They will be auto-created when you first open this tab.</p>
+                      )}
+                    </div>
+                  );
+                })()}
               </TabsContent>
             </Tabs>
           </DialogContent>
