@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChangelog } from '@/contexts/ChangelogContext';
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -21,7 +22,8 @@ interface SidebarProps {
 export default function Sidebar({ children }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { userProfile, signOut } = useAuth();
+  const { userProfile, signOut, loading: authLoading } = useAuth();
+  const { isGuest, canView, loading: guestLoading } = useGuestPermissions();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('sidebarCollapsed');
@@ -100,6 +102,19 @@ export default function Sidebar({ children }: SidebarProps) {
     return userProfile?.email?.charAt(0).toUpperCase() || 'U';
   };
 
+  // For guests: don't show any restricted nav until permissions are loaded
+  const isGuestUser = userProfile?.role === 'guest';
+  const guestStillLoading = isGuestUser && guestLoading;
+
+  // Helper: hide nav items guests can't access (or still loading)
+  const guestHide = (pageKey: string) => guestStillLoading || (isGuestUser && !canView(pageKey));
+
+  // Helper: hide entire sections when guest has no access to any item in it
+  const guestHideSection = (pageKeys: string[]) => guestStillLoading || (isGuestUser && pageKeys.every(k => !canView(k)));
+
+  // Helper: hide items that guests should never see
+  const guestHideAlways = guestStillLoading || isGuestUser;
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
       {/* Header */}
@@ -158,8 +173,13 @@ export default function Sidebar({ children }: SidebarProps) {
           <div className="flex flex-col h-full">
             {/* Navigation */}
             <nav className="p-4 space-y-4 flex-1 overflow-y-auto">
-              {/* Holo GPT - Top of sidebar */}
-              <div className="space-y-2">
+              {!userProfile ? (
+                <div className="space-y-3 py-2">
+                  {[1,2,3,4,5].map(i => <div key={i} className="h-8 bg-gray-100 rounded animate-pulse" />)}
+                </div>
+              ) : <>
+              {/* Holo GPT - Top of sidebar — hidden for guests */}
+              {!guestHideAlways && (<div className="space-y-2">
                 <Link href="/chat" legacyBehavior>
                   <Button
                     asChild
@@ -174,9 +194,10 @@ export default function Sidebar({ children }: SidebarProps) {
                     </span>
                   </Button>
                 </Link>
-              </div>
+              </div>)}
 
               {/* People Section */}
+              {!guestHideSection(['/clients']) && <>
               {!isSidebarCollapsed && (
                 <div className="flex items-center space-x-2">
                   <User className="h-4 w-4 text-gray-400" />
@@ -184,8 +205,8 @@ export default function Sidebar({ children }: SidebarProps) {
                 </div>
               )}
               <div className="space-y-2">
-                {/* Team tab */}
-                <Link href="/team" legacyBehavior>
+                {/* Team tab — hidden for guests */}
+                {!isGuest && (<Link href="/team" legacyBehavior>
                   <Button
                     asChild
                     variant={pathname.startsWith('/team') ? 'default' : 'ghost'}
@@ -198,25 +219,29 @@ export default function Sidebar({ children }: SidebarProps) {
                       {!isSidebarCollapsed && 'Team'}
                     </span>
                   </Button>
-                </Link>
+                </Link>)}
                 {/* Clients tab */}
-                <Link href="/clients" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/clients') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/clients') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Clients' : undefined}
-                  >
-                    <span>
-                      <Users className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Clients'}
-                    </span>
-                  </Button>
-                </Link>
+                {!guestHide('/clients') && (
+                  <Link href="/clients" legacyBehavior>
+                    <Button
+                      asChild
+                      variant={pathname.startsWith('/clients') ? 'default' : 'ghost'}
+                      className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                      style={pathname.startsWith('/clients') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                      title={isSidebarCollapsed ? 'Clients' : undefined}
+                    >
+                      <span>
+                        <Users className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                        {!isSidebarCollapsed && 'Clients'}
+                      </span>
+                    </Button>
+                  </Link>
+                )}
               </div>
+              </>}
 
               {/* KOLs Section */}
+              {!guestHideSection(['/kols', '/lists', '/campaigns']) && <>
               {!isSidebarCollapsed && (
                 <div className="flex items-center space-x-2">
                   <Crown className="h-4 w-4 text-gray-400" />
@@ -225,7 +250,7 @@ export default function Sidebar({ children }: SidebarProps) {
               )}
               <div className="space-y-2">
                 {/* KOLs tab */}
-                <Link href="/kols" legacyBehavior>
+                {!guestHide('/kols') && (<Link href="/kols" legacyBehavior>
                   <Button
                     asChild
                     variant={pathname.startsWith('/kols') ? 'default' : 'ghost'}
@@ -238,9 +263,9 @@ export default function Sidebar({ children }: SidebarProps) {
                       {!isSidebarCollapsed && 'KOLs'}
                     </span>
                   </Button>
-                </Link>
+                </Link>)}
                 {/* Lists tab */}
-                <Link href="/lists" legacyBehavior>
+                {!guestHide('/lists') && (<Link href="/lists" legacyBehavior>
                   <Button
                     asChild
                     variant={pathname.startsWith('/lists') ? 'default' : 'ghost'}
@@ -253,9 +278,9 @@ export default function Sidebar({ children }: SidebarProps) {
                       {!isSidebarCollapsed && 'Lists'}
                     </span>
                   </Button>
-                </Link>
+                </Link>)}
                 {/* Campaigns tab */}
-                <Link href="/campaigns" legacyBehavior>
+                {!guestHide('/campaigns') && (<Link href="/campaigns" legacyBehavior>
                   <Button
                     asChild
                     variant={pathname.startsWith('/campaigns') ? 'default' : 'ghost'}
@@ -268,10 +293,12 @@ export default function Sidebar({ children }: SidebarProps) {
                       {!isSidebarCollapsed && 'Campaigns'}
                     </span>
                   </Button>
-                </Link>
+                </Link>)}
               </div>
+              </>}
 
               {/* CRM Section */}
+              {!guestHideSection(['/crm/sales-pipeline', '/crm/network', '/crm/contacts', '/crm/submissions', '/crm/meetings']) && <>
               {!isSidebarCollapsed && (
                 <div className="flex items-center space-x-2">
                   <DollarSign className="h-4 w-4 text-gray-400" />
@@ -280,7 +307,7 @@ export default function Sidebar({ children }: SidebarProps) {
               )}
               <div className="space-y-2">
                 {/* Sales Pipeline tab */}
-                <Link href="/crm/sales-pipeline" legacyBehavior>
+                {!guestHide('/crm/sales-pipeline') && (<Link href="/crm/sales-pipeline" legacyBehavior>
                   <Button
                     asChild
                     variant={pathname.startsWith('/crm/sales-pipeline') ? 'default' : 'ghost'}
@@ -293,9 +320,9 @@ export default function Sidebar({ children }: SidebarProps) {
                       {!isSidebarCollapsed && 'Sales'}
                     </span>
                   </Button>
-                </Link>
+                </Link>)}
                 {/* Network tab */}
-                <Link href="/crm/network" legacyBehavior>
+                {!guestHide('/crm/network') && (<Link href="/crm/network" legacyBehavior>
                   <Button
                     asChild
                     variant={pathname.startsWith('/crm/network') ? 'default' : 'ghost'}
@@ -308,9 +335,9 @@ export default function Sidebar({ children }: SidebarProps) {
                       {!isSidebarCollapsed && 'Network'}
                     </span>
                   </Button>
-                </Link>
+                </Link>)}
                 {/* Contacts tab */}
-                <Link href="/crm/contacts" legacyBehavior>
+                {!guestHide('/crm/contacts') && (<Link href="/crm/contacts" legacyBehavior>
                   <Button
                     asChild
                     variant={pathname.startsWith('/crm/contacts') ? 'default' : 'ghost'}
@@ -323,9 +350,9 @@ export default function Sidebar({ children }: SidebarProps) {
                       {!isSidebarCollapsed && 'Contacts'}
                     </span>
                   </Button>
-                </Link>
+                </Link>)}
                 {/* Submissions tab */}
-                <Link href="/crm/submissions" legacyBehavior>
+                {!guestHide('/crm/submissions') && (<Link href="/crm/submissions" legacyBehavior>
                   <Button
                     asChild
                     variant={pathname.startsWith('/crm/submissions') ? 'default' : 'ghost'}
@@ -338,9 +365,9 @@ export default function Sidebar({ children }: SidebarProps) {
                       {!isSidebarCollapsed && 'Submissions'}
                     </span>
                   </Button>
-                </Link>
+                </Link>)}
                 {/* Meetings tab */}
-                <Link href="/crm/meetings" legacyBehavior>
+                {!guestHide('/crm/meetings') && (<Link href="/crm/meetings" legacyBehavior>
                   <Button
                     asChild
                     variant={pathname.startsWith('/crm/meetings') ? 'default' : 'ghost'}
@@ -353,7 +380,7 @@ export default function Sidebar({ children }: SidebarProps) {
                       {!isSidebarCollapsed && 'Meetings'}
                     </span>
                   </Button>
-                </Link>
+                </Link>)}
                 {/* Telegram Chats tab - Super Admin only */}
                 {userProfile?.role === 'super_admin' && (
                   <Link href="/crm/telegram" legacyBehavior>
@@ -372,6 +399,7 @@ export default function Sidebar({ children }: SidebarProps) {
                   </Link>
                 )}
               </div>
+              </>}
 
               {/* Workspace Section - only visible to Andy (testing) */}
               {userProfile?.email === 'andy@holohive.io' && (
@@ -487,6 +515,7 @@ export default function Sidebar({ children }: SidebarProps) {
               )}
 
               {/* Documents Section */}
+              {!guestHideSection(['/delivery-logs', '/links']) && <>
               {!isSidebarCollapsed && (
                 <div className="flex items-center space-x-2">
                   <FileText className="h-4 w-4 text-gray-400" />
@@ -495,7 +524,7 @@ export default function Sidebar({ children }: SidebarProps) {
               )}
               <div className="space-y-2">
                 {/* Delivery Logs tab */}
-                <Link href="/delivery-logs" legacyBehavior>
+                {!guestHide('/delivery-logs') && (<Link href="/delivery-logs" legacyBehavior>
                   <Button
                     asChild
                     variant={pathname.startsWith('/delivery-logs') ? 'default' : 'ghost'}
@@ -508,7 +537,7 @@ export default function Sidebar({ children }: SidebarProps) {
                       {!isSidebarCollapsed && 'Delivery Logs'}
                     </span>
                   </Button>
-                </Link>
+                </Link>)}
                 {/* Mindshare Monitor - Admin only */}
                 {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                   <Link href="/mindshare" legacyBehavior>
@@ -544,7 +573,7 @@ export default function Sidebar({ children }: SidebarProps) {
                   </Link>
                 )}
                 {/* Links tab */}
-                <Link href="/links" legacyBehavior>
+                {!guestHide('/links') && (<Link href="/links" legacyBehavior>
                   <Button
                     asChild
                     variant={pathname.startsWith('/links') ? 'default' : 'ghost'}
@@ -557,22 +586,24 @@ export default function Sidebar({ children }: SidebarProps) {
                       {!isSidebarCollapsed && 'Links'}
                     </span>
                   </Button>
-                </Link>
-                {/* Templates tab */}
-                <Link href="/templates" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/templates') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/templates') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Templates' : undefined}
-                  >
-                    <span>
-                      <MessageSquare className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Templates'}
-                    </span>
-                  </Button>
-                </Link>
+                </Link>)}
+                {/* Templates tab — hidden for guests */}
+                {!guestHideAlways && (
+                  <Link href="/templates" legacyBehavior>
+                    <Button
+                      asChild
+                      variant={pathname.startsWith('/templates') ? 'default' : 'ghost'}
+                      className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                      style={pathname.startsWith('/templates') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                      title={isSidebarCollapsed ? 'Templates' : undefined}
+                    >
+                      <span>
+                        <MessageSquare className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                        {!isSidebarCollapsed && 'Templates'}
+                      </span>
+                    </Button>
+                  </Link>
+                )}
                 {/* SOPs tab - Admin only */}
                 {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                   <Link href="/sops" legacyBehavior>
@@ -591,8 +622,10 @@ export default function Sidebar({ children }: SidebarProps) {
                   </Link>
                 )}
               </div>
+              </>}
 
-              {/* Admin Section */}
+              {/* Admin Section — hidden for guests */}
+              {!guestHideAlways && (<>
               {!isSidebarCollapsed && (
                 <div className="flex items-center space-x-2">
                   <Settings className="h-4 w-4 text-gray-400" />
@@ -648,7 +681,9 @@ export default function Sidebar({ children }: SidebarProps) {
                   </Button>
                 </Link>
               </div>
+              </>)}
 
+              </>}
             </nav>
             {/* Collapse Button at Bottom */}
             <div className="p-4 border-t border-gray-200">

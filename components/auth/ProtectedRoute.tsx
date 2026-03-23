@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useGuestPermissions } from '@/hooks/useGuestPermissions'
 import { LogOut, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -14,6 +15,8 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
   const { user, userProfile, loading, signOut } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
+  const { isGuest, canAccessPath, firstAllowedPath, loading: guestLoading } = useGuestPermissions()
 
   useEffect(() => {
     if (!loading && !user) {
@@ -25,12 +28,25 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
   useEffect(() => {
     if (!loading && user && userProfile && requiredRoles && requiredRoles.length > 0) {
       if (!requiredRoles.includes(userProfile.role)) {
-        router.push('/') // Redirect to home if role not allowed
+        if (isGuest && firstAllowedPath) {
+          router.push(firstAllowedPath)
+        } else {
+          router.push('/')
+        }
       }
     }
-  }, [user, userProfile, loading, requiredRoles, router])
+  }, [user, userProfile, loading, requiredRoles, router, isGuest, firstAllowedPath])
 
-  if (loading) {
+  // Redirect guests from pages they can't access
+  useEffect(() => {
+    if (!loading && !guestLoading && isGuest && pathname && !canAccessPath(pathname)) {
+      if (firstAllowedPath) {
+        router.push(firstAllowedPath)
+      }
+    }
+  }, [loading, guestLoading, isGuest, pathname, canAccessPath, firstAllowedPath, router])
+
+  if (loading || guestLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2" style={{ borderBottomColor: '#3e8692' }}></div>
@@ -81,8 +97,13 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
   // Check role access
   if (requiredRoles && requiredRoles.length > 0 && userProfile) {
     if (!requiredRoles.includes(userProfile.role)) {
-      return null // Will redirect
+      return null // Will redirect via useEffect
     }
+  }
+
+  // Guest on unauthorized page — will redirect via useEffect
+  if (isGuest && pathname && !canAccessPath(pathname)) {
+    return null
   }
 
   return <>{children}</>

@@ -3,22 +3,26 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useGuestPermissions } from '@/hooks/useGuestPermissions';
 
 export default function Home() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, userProfile, loading } = useAuth();
+  const { isGuest, firstAllowedPath, loading: guestLoading } = useGuestPermissions();
 
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !guestLoading) {
       if (user) {
-        // If user is authenticated, redirect to campaigns
-        router.push('/campaigns');
+        if (isGuest && firstAllowedPath) {
+          router.push(firstAllowedPath);
+        } else {
+          router.push('/campaigns');
+        }
       } else {
-        // If user is not authenticated, redirect to auth
         router.push('/auth');
       }
     }
-  }, [user, loading, router]);
+  }, [user, loading, guestLoading, isGuest, firstAllowedPath, router]);
 
   // Show loading spinner while determining redirect
   return (

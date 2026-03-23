@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Shield, Loader2, UserCheck, UserX, Clock, Ban, Trash2 } from 'lucide-react';
+import { Search, Shield, Loader2, UserCheck, UserX, Clock, Ban, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,8 +39,25 @@ export default function TeamPage() {
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [guestPermsOpen, setGuestPermsOpen] = useState<string | null>(null);
+  const [guestPerms, setGuestPerms] = useState<Record<string, Record<string, { can_view: boolean; can_edit: boolean; can_delete: boolean }>>>({});
   const { toast } = useToast();
   const { userProfile } = useAuth();
+
+  const GUEST_PAGES = [
+    { key: '/crm/sales-pipeline', label: 'Sales Pipeline', group: 'CRM' },
+    { key: '/crm/network', label: 'Network', group: 'CRM' },
+    { key: '/crm/contacts', label: 'Contacts', group: 'CRM' },
+    { key: '/crm/submissions', label: 'Submissions', group: 'CRM' },
+    { key: '/crm/meetings', label: 'Meetings', group: 'CRM' },
+    { key: '/clients', label: 'Clients', group: 'Core' },
+    { key: '/campaigns', label: 'Campaigns', group: 'Core' },
+    { key: '/kols', label: 'KOLs', group: 'Core' },
+    { key: '/links', label: 'Links', group: 'Core' },
+    { key: '/delivery-logs', label: 'Delivery Logs', group: 'Core' },
+    { key: '/lists', label: 'Lists', group: 'Core' },
+    { key: '/tasks', label: 'Tasks', group: 'Core' },
+  ];
 
   useEffect(() => {
     fetchTeamMembers();
@@ -232,7 +250,6 @@ export default function TeamPage() {
       const { data: users, error } = await supabase
         .from('users')
         .select('*')
-        .neq('role', 'guest')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -255,6 +272,44 @@ export default function TeamPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadGuestPerms = async (userId: string) => {
+    const { data } = await supabase.from('guest_permissions').select('*').eq('user_id', userId);
+    const perms: Record<string, { can_view: boolean; can_edit: boolean; can_delete: boolean }> = {};
+    for (const p of (data || [])) {
+      perms[p.page_key] = { can_view: p.can_view, can_edit: p.can_edit, can_delete: p.can_delete };
+    }
+    setGuestPerms(prev => ({ ...prev, [userId]: perms }));
+  };
+
+  const toggleGuestPerm = async (userId: string, pageKey: string, field: 'can_view' | 'can_edit' | 'can_delete') => {
+    const current = guestPerms[userId]?.[pageKey] || { can_view: false, can_edit: false, can_delete: false };
+    const newVal = !current[field];
+
+    // If disabling view, disable edit and delete too
+    const updates = { ...current, [field]: newVal };
+    if (field === 'can_view' && !newVal) {
+      updates.can_edit = false;
+      updates.can_delete = false;
+    }
+    // If enabling edit or delete, enable view too
+    if ((field === 'can_edit' || field === 'can_delete') && newVal) {
+      updates.can_view = true;
+    }
+
+    setGuestPerms(prev => ({
+      ...prev,
+      [userId]: { ...prev[userId], [pageKey]: updates }
+    }));
+
+    // Upsert to DB
+    const { data: existing } = await supabase.from('guest_permissions').select('id').eq('user_id', userId).eq('page_key', pageKey).single();
+    if (existing) {
+      await supabase.from('guest_permissions').update(updates).eq('id', existing.id);
+    } else {
+      await supabase.from('guest_permissions').insert({ user_id: userId, page_key: pageKey, ...updates });
     }
   };
 
@@ -431,6 +486,7 @@ export default function TeamPage() {
                           <SelectContent>
                             <SelectItem value="member">Member</SelectItem>
                             <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="guest">Guest</SelectItem>
                             {isSuperAdmin && (
                               <SelectItem value="super_admin">Super Admin</SelectItem>
                             )}
@@ -688,6 +744,53 @@ export default function TeamPage() {
                                 <Trash2 className="h-3 w-3 mr-1" />
                                 Remove
                               </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Guest Permissions */}
+                      {member.role === 'guest' && isAdmin && (
+                        <div className="pt-2 border-t border-gray-100">
+                          <button
+                            className="flex items-center justify-between w-full text-sm font-medium text-gray-700 py-1 cursor-pointer"
+                            onClick={() => {
+                              if (guestPermsOpen === member.id) {
+                                setGuestPermsOpen(null);
+                              } else {
+                                setGuestPermsOpen(member.id);
+                                if (!guestPerms[member.id]) loadGuestPerms(member.id);
+                              }
+                            }}
+                          >
+                            <span>Page Permissions</span>
+                            {guestPermsOpen === member.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </button>
+                          {guestPermsOpen === member.id && (
+                            <div className="mt-2 space-y-1">
+                              <div className="grid grid-cols-[1fr,auto,auto,auto] gap-x-2 text-[10px] text-gray-500 uppercase tracking-wider pb-1 border-b border-gray-100">
+                                <span>Page</span>
+                                <span className="w-12 text-center">View</span>
+                                <span className="w-12 text-center">Edit</span>
+                                <span className="w-12 text-center">Delete</span>
+                              </div>
+                              {GUEST_PAGES.map(page => {
+                                const perms = guestPerms[member.id]?.[page.key] || { can_view: false, can_edit: false, can_delete: false };
+                                return (
+                                  <div key={page.key} className="grid grid-cols-[1fr,auto,auto,auto] gap-x-2 items-center py-0.5">
+                                    <span className="text-xs text-gray-700">{page.label}</span>
+                                    <div className="w-12 flex justify-center">
+                                      <Checkbox checked={perms.can_view} onCheckedChange={() => toggleGuestPerm(member.id, page.key, 'can_view')} />
+                                    </div>
+                                    <div className="w-12 flex justify-center">
+                                      <Checkbox checked={perms.can_edit} onCheckedChange={() => toggleGuestPerm(member.id, page.key, 'can_edit')} />
+                                    </div>
+                                    <div className="w-12 flex justify-center">
+                                      <Checkbox checked={perms.can_delete} onCheckedChange={() => toggleGuestPerm(member.id, page.key, 'can_delete')} />
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
