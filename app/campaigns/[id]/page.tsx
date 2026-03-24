@@ -4092,26 +4092,11 @@ const CampaignDetailsPage = () => {
                                 .map(entry => entry.trim().toLowerCase())
                                 .filter(entry => entry.length > 0);
                               const currentEmails = (form as any)?.approved_emails || [];
-                              const currentDomains = (form as any)?.approved_domains || [];
-                              let newEmails: string[] = [];
-                              let newDomains: string[] = [];
-                              entries.forEach(entry => {
-                                if (entry.includes('@') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry)) {
-                                  if (!currentEmails.includes(entry)) newEmails.push(entry);
-                                } else {
-                                  const domain = entry.replace(/^@/, '');
-                                  if (/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domain)) {
-                                    if (!currentDomains.includes(domain)) newDomains.push(domain);
-                                  }
-                                }
-                              });
+                              const newEmails = entries.filter(entry =>
+                                entry.includes('@') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry) && !currentEmails.includes(entry)
+                              );
                               if (newEmails.length > 0) {
                                 handleChange('approved_emails' as any, [...currentEmails, ...newEmails]);
-                              }
-                              if (newDomains.length > 0) {
-                                handleChange('approved_domains' as any, [...currentDomains, ...newDomains]);
-                              }
-                              if (newEmails.length > 0 || newDomains.length > 0) {
                                 setEmailInput('');
                               }
                             }}
@@ -4125,8 +4110,7 @@ const CampaignDetailsPage = () => {
                       )}
                       {(() => {
                         const emails = (editMode ? (form as any)?.approved_emails : campaign?.approved_emails) || [];
-                        const domains = (editMode ? (form as any)?.approved_domains : (campaign as any)?.approved_domains) || [];
-                        return emails.length > 0 || domains.length > 0 ? (
+                        return emails.length > 0 ? (
                           <div className={`flex flex-wrap gap-2 ${editMode ? 'mt-3' : ''}`}>
                             {emails.map((email: string, index: number) => (
                               <div
@@ -4142,27 +4126,6 @@ const CampaignDetailsPage = () => {
                                       handleChange('approved_emails' as any, currentEmails.filter((_: string, i: number) => i !== index));
                                     }}
                                     className="ml-1 text-gray-500 hover:text-gray-700"
-                                  >
-                                    ×
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                            {domains.map((domain: string, index: number) => (
-                              <div
-                                key={`domain-${index}`}
-                                className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-800 rounded-full text-sm"
-                              >
-                                <Globe className="h-3.5 w-3.5" />
-                                @{domain}
-                                {editMode && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const currentDomains = (form as any)?.approved_domains || [];
-                                      handleChange('approved_domains' as any, currentDomains.filter((_: string, i: number) => i !== index));
-                                    }}
-                                    className="ml-1 text-blue-500 hover:text-blue-700"
                                   >
                                     ×
                                   </button>

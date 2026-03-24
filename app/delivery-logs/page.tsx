@@ -75,6 +75,13 @@ const triggerBadge = (trigger: string) => {
 
 type EditingCell = { entryId: string; field: string } | null;
 
+const toLocalDateStr = (d: Date) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function DeliveryLogsPage() {
   const { user } = useAuth();
 
@@ -105,7 +112,7 @@ export default function DeliveryLogsPage() {
     location: '',
     trigger: '',
     notes: '',
-    logged_at: new Date().toISOString().split('T')[0],
+    logged_at: toLocalDateStr(new Date()),
   });
   const [inlineNewWhoMode, setInlineNewWhoMode] = useState<'team' | 'custom'>('team');
 
@@ -141,15 +148,39 @@ export default function DeliveryLogsPage() {
   useEffect(() => {
     const fetchClients = async () => {
       setClientsLoading(true);
-      const { data } = await supabase
-        .from('clients')
-        .select('id, name, logo_url, is_active')
-        .eq('is_active', true)
-        .is('archived_at', null)
-        .order('name');
-      setClients(data || []);
-      if (data && data.length > 0 && !selectedClientId) {
-        setSelectedClientId(data[0].id);
+      const [{ data: clientData }, { data: logData }] = await Promise.all([
+        supabase
+          .from('clients')
+          .select('id, name, logo_url, is_active')
+          .eq('is_active', true)
+          .is('archived_at', null),
+        supabase
+          .from('client_delivery_log')
+          .select('client_id, updated_at')
+          .order('updated_at', { ascending: false }),
+      ]);
+
+      // Build a map of client_id -> latest activity timestamp
+      const latestActivity = new Map<string, string>();
+      for (const log of (logData || [])) {
+        if (!latestActivity.has(log.client_id)) {
+          latestActivity.set(log.client_id, log.updated_at);
+        }
+      }
+
+      // Sort: clients with recent activity first, then alphabetically
+      const sorted = (clientData || []).sort((a, b) => {
+        const aTime = latestActivity.get(a.id) || '';
+        const bTime = latestActivity.get(b.id) || '';
+        if (aTime && bTime) return bTime.localeCompare(aTime);
+        if (aTime) return -1;
+        if (bTime) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      setClients(sorted);
+      if (sorted.length > 0 && !selectedClientId) {
+        setSelectedClientId(sorted[0].id);
       }
       setClientsLoading(false);
     };
@@ -235,7 +266,7 @@ export default function DeliveryLogsPage() {
 
   const saveDateField = async (entryId: string, date: Date | undefined) => {
     if (!date) return;
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = toLocalDateStr(date);
     setEditingCell(null);
     setEditingValue('');
     setEntries(prev => prev.map(e => e.id === entryId ? { ...e, logged_at: dateStr, updated_at: new Date().toISOString() } : e));
@@ -266,7 +297,7 @@ export default function DeliveryLogsPage() {
       created_by: user?.id,
     });
     setIsAddingInline(false);
-    setInlineNew({ work_type: '', action: '', who: '', method: '', location: '', trigger: '', notes: '', logged_at: new Date().toISOString().split('T')[0] });
+    setInlineNew({ work_type: '', action: '', who: '', method: '', location: '', trigger: '', notes: '', logged_at: toLocalDateStr(new Date()) });
     setInlineNewWhoMode('team');
     await fetchEntries();
   };
@@ -315,7 +346,7 @@ export default function DeliveryLogsPage() {
       location: form.location.trim() || null,
       trigger: form.trigger || null,
       notes: form.notes.trim() || null,
-      logged_at: form.logged_at.toISOString().split('T')[0],
+      logged_at: toLocalDateStr(form.logged_at),
       updated_at: new Date().toISOString(),
     };
     setIsFormOpen(false);
@@ -708,7 +739,7 @@ export default function DeliveryLogsPage() {
                                 <Calendar
                                   mode="single"
                                   selected={inlineNew.logged_at ? new Date(inlineNew.logged_at + 'T00:00:00') : undefined}
-                                  onSelect={(date) => setInlineNew({ ...inlineNew, logged_at: date ? date.toISOString().split('T')[0] : '' })}
+                                  onSelect={(date) => setInlineNew({ ...inlineNew, logged_at: date ? toLocalDateStr(date) : '' })}
                                   initialFocus
                                   classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
                                   modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
@@ -812,7 +843,7 @@ export default function DeliveryLogsPage() {
                               <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleInlineAdd} disabled={!inlineNew.work_type || !inlineNew.action.trim()}>
                                 <Check className="h-4 w-4 text-green-600" />
                               </Button>
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setIsAddingInline(false); setInlineNew({ work_type: '', action: '', who: '', method: '', location: '', trigger: '', notes: '', logged_at: new Date().toISOString().split('T')[0] }); }}>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setIsAddingInline(false); setInlineNew({ work_type: '', action: '', who: '', method: '', location: '', trigger: '', notes: '', logged_at: toLocalDateStr(new Date()) }); }}>
                                 <X className="h-4 w-4 text-gray-400" />
                               </Button>
                             </div>

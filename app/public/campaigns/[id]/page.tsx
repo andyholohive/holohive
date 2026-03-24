@@ -444,7 +444,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(campaignId);
       let query = supabasePublic
         .from('campaigns')
-        .select('id, client_id, approved_emails, approved_domains');
+        .select('id, client_id, approved_emails');
 
       if (isUUID) {
         query = query.eq('id', campaignId);
@@ -466,9 +466,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       // Store the campaign UUID for logging
       setCampaignUuid(campaignData.id);
 
-      // Store approved emails and domains from campaign
+      // Approved emails from campaign level
       setApprovedEmails((campaignData.approved_emails as string[]) || []);
-      setApprovedDomains((campaignData.approved_domains as string[]) || []);
 
       const { data: clientData, error: clientError } = await supabasePublic
         .from('clients')
@@ -486,15 +485,8 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       }
 
       setClientEmail(clientData.email);
-
-      // Merge client-level approved domains with campaign-level
-      const clientDomains = (clientData.approved_domains as string[]) || [];
-      if (clientDomains.length > 0) {
-        setApprovedDomains(prev => {
-          const merged = new Set([...prev, ...clientDomains]);
-          return Array.from(merged);
-        });
-      }
+      // Approved domains from client level only
+      setApprovedDomains((clientData.approved_domains as string[]) || []);
     } catch (e: any) {
       console.error('Error fetching client email:', e);
       setError(e.message || 'Failed to load campaign access information');

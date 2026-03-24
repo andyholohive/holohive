@@ -13,6 +13,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { ClientService, ClientWithAccess } from '@/lib/clientService';
@@ -186,6 +187,12 @@ export default function ClientsPage() {
   const [milestoneForm, setMilestoneForm] = useState<{ name: string; subtitle: string; status_message: string }>({ name: '', subtitle: '', status_message: '' });
   const [isMilestoneFormOpen, setIsMilestoneFormOpen] = useState(false);
   const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
+  const [milestoneTemplates, setMilestoneTemplates] = useState<{ id: string; name: string; description: string | null; milestones: any[]; is_default: boolean }[]>([]);
+  const [showTemplatePickerFor, setShowTemplatePickerFor] = useState<string | null>(null);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [saveTemplateName, setSaveTemplateName] = useState('');
+  const [clientApprovedDomains, setClientApprovedDomains] = useState<string[]>([]);
+  const [contextDomainInput, setContextDomainInput] = useState('');
   // New client form state
   const [newClient, setNewClient] = useState({
     name: '',
@@ -447,6 +454,10 @@ export default function ClientsPage() {
       }
       setClientMilestones(msMap);
 
+      // Fetch milestone templates
+      const { data: templateData } = await supabase.from('milestone_templates').select('*').order('is_default', { ascending: false }).order('name');
+      setMilestoneTemplates(templateData || []);
+
       // Fetch mindshare configs
       const { data: mindshareData } = await supabase.from('client_mindshare_config').select('client_id, is_enabled');
       const msEnabled: Record<string, boolean> = {};
@@ -525,69 +536,87 @@ export default function ClientsPage() {
   };
 
   const DEFAULT_MILESTONES: { name: string; subtitle: string; status: 'complete' | 'active' | 'upcoming'; items: { text: string; court: 'yours' | 'ours' }[] }[] = [
-    { name: 'Kickoff & workspace setup', subtitle: 'Workspace initialized', status: 'active', items: [
-      { text: 'Complete onboarding form', court: 'yours' },
-      { text: 'Upload assets & documentation (branding, decks, product links)', court: 'yours' },
-      { text: 'Confirm workspace & Telegram group access', court: 'yours' },
-      { text: 'Workspace & portal setup', court: 'ours' },
-      { text: 'Telegram group created', court: 'ours' },
-      { text: 'Shared drive & resource folder prepared', court: 'ours' },
+    { name: 'Kickoff & Setup', subtitle: 'Onboarding form completed — workspace initialized', status: 'active', items: [
+      { text: 'Provide additional assets & documentation (branding, decks, briefs)', court: 'yours' },
+      { text: 'Confirm workspace access', court: 'yours' },
+      { text: 'Onboarding portal link shared', court: 'ours' },
+      { text: 'Client workspace initialized', court: 'ours' },
+      { text: 'Onboarding form accessible and ready to receive project assets', court: 'ours' },
     ]},
-    { name: 'Project & ecosystem review', subtitle: 'Deep dive underway', status: 'upcoming', items: [
-      { text: 'Submit graphic materials vault', court: 'yours' },
-      { text: 'Confirm weekly sync schedule', court: 'yours' },
-      { text: 'Project, product & resource review', court: 'ours' },
-      { text: 'Ecosystem & market positioning analysis', court: 'ours' },
-      { text: 'Internal strategy & narrative positioning review', court: 'ours' },
+    { name: 'Project & Ecosystem Review', subtitle: 'Deep dive underway', status: 'upcoming', items: [
+      { text: 'Set up weekly sync meeting', court: 'yours' },
+      { text: 'Project, product & resource review in progress', court: 'ours' },
+      { text: 'Ecosystem & positioning analysis underway', court: 'ours' },
+      { text: 'Narrative & market positioning review', court: 'ours' },
+      { text: 'KOL outreach brief preparation starting', court: 'ours' },
     ]},
-    { name: 'KOL outreach brief', subtitle: 'Ready for your review', status: 'upcoming', items: [
-      { text: 'Review the KOL outreach brief', court: 'yours' },
+    { name: 'Outreach Brief Delivery', subtitle: 'Awaiting your review before KOL circulation', status: 'upcoming', items: [
+      { text: 'Review KOL outreach brief', court: 'yours' },
       { text: 'Share feedback to unblock KOL circulation', court: 'yours' },
-      { text: 'KOL outreach brief drafted', court: 'ours' },
+      { text: 'Initial outreach brief prepared', court: 'ours' },
       { text: 'APAC translation underway', court: 'ours' },
       { text: 'KOL shortlist being compiled', court: 'ours' },
     ]},
-    { name: 'KOL shortlist & tracker', subtitle: 'Campaign tracker goes live', status: 'upcoming', items: [
-      { text: 'Review & approve KOL shortlist', court: 'yours' },
-      { text: 'Approve selected KOL rates & deliverables', court: 'yours' },
-      { text: 'Campaign tracker deployed', court: 'ours' },
-      { text: 'Creator outreach with translated content brief', court: 'ours' },
-      { text: 'KOL onboarding & contract coordination', court: 'ours' },
+    { name: 'KOL Shortlist & Tracker Launch', subtitle: 'Campaign tracker goes live', status: 'upcoming', items: [
+      { text: 'Review & confirm KOL shortlist', court: 'yours' },
+      { text: 'KOL shortlist locked', court: 'ours' },
+      { text: 'Campaign tracker live with selections & activity log', court: 'ours' },
+      { text: 'Incentive budget documentation prepared (if requested)', court: 'ours' },
     ]},
-    { name: 'Content brief & phase plan', subtitle: 'Full phased brief delivered', status: 'upcoming', items: [
-      { text: 'Review & approve content brief', court: 'yours' },
-      { text: 'Approve content drafts & scripts', court: 'yours' },
-      { text: 'Content brief preparation & localization', court: 'ours' },
-      { text: 'Content schedule planning & finalization', court: 'ours' },
-      { text: 'Draft review coordination with KOLs', court: 'ours' },
+    { name: 'Content Brief & Execution Breakdown', subtitle: 'Phased content brief finalized', status: 'upcoming', items: [
+      { text: 'Review & approve finalized content brief', court: 'yours' },
+      { text: 'Initial KOL content brief finalized with campaign phase breakdown', court: 'ours' },
+      { text: 'KOL onboarding in progress', court: 'ours' },
+      { text: 'Translation of first brief underway', court: 'ours' },
+      { text: 'Korea GTM plan being developed', court: 'ours' },
     ]},
-    { name: 'Regional GTM', subtitle: 'Regional strategy mapped', status: 'upcoming', items: [
-      { text: 'Review GTM plan & provide regional context', court: 'yours' },
-      { text: 'Regional GTM plan development', court: 'ours' },
-      { text: 'Market-specific KOL & channel mapping', court: 'ours' },
+    { name: 'Korea GTM Plan Delivery', subtitle: 'Regional strategy confirmed', status: 'upcoming', items: [
+      { text: 'Review Korea GTM plan', court: 'yours' },
+      { text: 'Korea GTM plan in final review', court: 'ours' },
+      { text: 'Regional positioning & activation sequence confirmed', court: 'ours' },
+      { text: 'All week 1 deliverables being wrapped up', court: 'ours' },
     ]},
-    { name: 'Campaign activation', subtitle: 'First activations go live', status: 'upcoming', items: [
-      { text: 'Final approval on go-live content', court: 'yours' },
-      { text: 'First activations scheduled & published', court: 'ours' },
-      { text: 'Performance tracking & weekly reporting', court: 'ours' },
-      { text: 'Engagement monitoring & optimization', court: 'ours' },
+    { name: 'Content Goes Live', subtitle: 'Campaign activation underway', status: 'upcoming', items: [
+      { text: 'Track content via campaign tracker', court: 'yours' },
+      { text: 'All week 1 deliverables confirmed complete', court: 'ours' },
+      { text: 'Campaign activation underway — content being posted by KOLs', court: 'ours' },
+      { text: 'Full visibility confirmed before moving into week 2', court: 'ours' },
     ]},
   ];
 
   const seedMilestones = async (clientId: string) => {
     const existing = clientMilestones[clientId];
     if (existing && existing.length > 0) return;
+    // Auto-seed with default template
+    const defaultTemplate = milestoneTemplates.find(t => t.is_default);
+    if (defaultTemplate) {
+      await applyTemplate(clientId, defaultTemplate.milestones);
+    } else {
+      await applyTemplate(clientId, DEFAULT_MILESTONES.map(ms => ({ name: ms.name, subtitle: ms.subtitle, items: ms.items })));
+    }
+  };
+
+  const applyTemplate = async (clientId: string, templateMilestones: { name: string; subtitle: string; items: { text: string; court: string }[] }[]) => {
     try {
-      for (let i = 0; i < DEFAULT_MILESTONES.length; i++) {
-        const ms = DEFAULT_MILESTONES[i];
+      // Clear existing milestones and their action items
+      const existingMs = clientMilestones[clientId] || [];
+      for (const ms of existingMs) {
+        await supabase.from('client_action_items').delete().eq('milestone_id', ms.id);
+      }
+      if (existingMs.length > 0) {
+        await supabase.from('client_milestones').delete().eq('client_id', clientId);
+      }
+
+      for (let i = 0; i < templateMilestones.length; i++) {
+        const ms = templateMilestones[i];
         const { data: inserted } = await supabase.from('client_milestones').insert({
           client_id: clientId,
           name: ms.name,
           subtitle: ms.subtitle,
-          status: ms.status,
+          status: i === 0 ? 'active' : 'upcoming',
           display_order: i,
         }).select().single();
-        if (inserted) {
+        if (inserted && ms.items) {
           const rows = ms.items.map((item, j) => ({
             client_id: clientId,
             text: item.text,
@@ -602,8 +631,31 @@ export default function ClientsPage() {
       await refreshMilestones();
       await refreshActionItems();
     } catch (err) {
-      console.error('Error seeding milestones:', err);
+      console.error('Error applying template:', err);
     }
+  };
+
+  const saveAsTemplate = async (clientId: string, name: string) => {
+    const ms = clientMilestones[clientId] || [];
+    const allItems = clientActionItems[clientId] || [];
+    const templateData = ms.map(m => ({
+      name: m.name,
+      subtitle: m.subtitle,
+      items: allItems
+        .filter(i => i.milestone_id === m.id)
+        .sort((a, b) => a.display_order - b.display_order)
+        .map(i => ({ text: i.text, court: i.court })),
+    }));
+    const { error } = await supabase.from('milestone_templates').insert({
+      name,
+      milestones: templateData,
+      created_by: userProfile?.id || null,
+    });
+    if (!error) {
+      const { data } = await supabase.from('milestone_templates').select('*').order('is_default', { ascending: false }).order('name');
+      setMilestoneTemplates(data || []);
+    }
+    return !error;
   };
 
   const handleActionItemSubmit = async () => {
@@ -991,6 +1043,9 @@ export default function ClientsPage() {
       gtm_sync_url: (ctx as any)?.gtm_sync_url || '',
       onboarding_phase: (ctx as any)?.onboarding_phase || '',
     });
+    // Load client approved domains
+    setClientApprovedDomains((client as any).approved_domains || []);
+    setContextDomainInput('');
   };
 
   const handleContextSubmit = async () => {
@@ -1017,6 +1072,8 @@ export default function ClientsPage() {
         await supabase.from('client_context').insert(payload);
       }
       await refreshClientContexts();
+      // Save approved domains on client
+      await supabase.from('clients').update({ approved_domains: clientApprovedDomains.length > 0 ? clientApprovedDomains : null }).eq('id', contextModalClient.id);
       // Log resource changes
       const oldCtx = existing as any;
       const changes: string[] = [];
@@ -3099,10 +3156,53 @@ export default function ClientsPage() {
                       </div>
                     </div>
                   </div>
-                  {/* Portal Feature Toggles */}
-                  <div className="border rounded-lg p-3 bg-gray-50">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Portal Features</p>
-                    <div className="flex items-center justify-between">
+                  {/* Portal Access & Features */}
+                  <div className="border rounded-lg p-3 bg-gray-50 space-y-3">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Portal Access & Features</p>
+
+                    {/* Approved Domains */}
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 mb-1">Approved Domains</p>
+                      <p className="text-xs text-gray-500 mb-2">Users with these email domains can access the portal, campaigns, and reports</p>
+                      <div className="flex gap-2 mb-2">
+                        <Input
+                          value={contextDomainInput}
+                          onChange={(e) => setContextDomainInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const domain = contextDomainInput.replace(/^@/, '').trim().toLowerCase();
+                              if (domain && /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domain) && !clientApprovedDomains.includes(domain)) {
+                                setClientApprovedDomains([...clientApprovedDomains, domain]);
+                                setContextDomainInput('');
+                              }
+                            }
+                          }}
+                          placeholder="e.g. company.com"
+                          className="auth-input flex-1"
+                        />
+                        <Button size="sm" variant="outline" className="text-xs" onClick={() => {
+                          const domain = contextDomainInput.replace(/^@/, '').trim().toLowerCase();
+                          if (domain && /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domain) && !clientApprovedDomains.includes(domain)) {
+                            setClientApprovedDomains([...clientApprovedDomains, domain]);
+                            setContextDomainInput('');
+                          }
+                        }}>Add</Button>
+                      </div>
+                      {clientApprovedDomains.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {clientApprovedDomains.map((domain, i) => (
+                            <span key={i} className="inline-flex items-center gap-1 bg-blue-50 text-blue-800 text-xs px-2 py-0.5 rounded-full">
+                              @{domain}
+                              <button onClick={() => setClientApprovedDomains(clientApprovedDomains.filter((_, j) => j !== i))} className="text-blue-500 cursor-pointer">×</button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Mindshare Toggle */}
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                       <div>
                         <p className="text-sm font-medium text-gray-900">Korean Mindshare Tracker</p>
                         <p className="text-xs text-gray-500">Show mindshare analytics on the client portal</p>
@@ -3171,10 +3271,56 @@ export default function ClientsPage() {
                       {/* Progress summary */}
                       <div className="flex items-center justify-between text-sm text-gray-500 mb-1">
                         <span>{completedCount} of {milestones.length} milestones complete</span>
-                        <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => { setIsMilestoneFormOpen(true); setEditingMilestoneId(null); setMilestoneForm({ name: '', subtitle: '', status_message: '' }); }}>
-                          <Plus className="h-3 w-3 mr-1" /> Add Milestone
-                        </Button>
+                        <div className="flex items-center gap-1.5">
+                          {/* Apply template */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="sm" variant="outline" className="text-xs h-7">
+                                <FileText className="h-3 w-3 mr-1" /> Templates
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                              {milestoneTemplates.map(t => (
+                                <DropdownMenuItem key={t.id} onClick={() => {
+                                  if (contextModalClient) {
+                                    applyTemplate(contextModalClient.id, t.milestones);
+                                  }
+                                }}>
+                                  <span className="truncate">{t.name}</span>
+                                  {t.is_default && <span className="ml-auto text-[10px] text-gray-400">default</span>}
+                                </DropdownMenuItem>
+                              ))}
+                              {milestoneTemplates.length > 0 && <DropdownMenuSeparator />}
+                              <DropdownMenuItem onClick={() => setSaveTemplateOpen(true)}>
+                                <Plus className="h-3.5 w-3.5 mr-2" /> Save current as template
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => { setIsMilestoneFormOpen(true); setEditingMilestoneId(null); setMilestoneForm({ name: '', subtitle: '', status_message: '' }); }}>
+                            <Plus className="h-3 w-3 mr-1" /> Add Milestone
+                          </Button>
+                        </div>
                       </div>
+
+                      {/* Save as template dialog */}
+                      {saveTemplateOpen && (
+                        <div className="border rounded-lg p-3 space-y-2 bg-blue-50">
+                          <p className="text-xs font-medium text-gray-700">Save current milestones as a reusable template</p>
+                          <Input value={saveTemplateName} onChange={(e) => setSaveTemplateName(e.target.value)} placeholder="Template name..." className="auth-input" autoFocus />
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} disabled={!saveTemplateName.trim()} onClick={async () => {
+                              if (contextModalClient) {
+                                const ok = await saveAsTemplate(contextModalClient.id, saveTemplateName.trim());
+                                if (ok) {
+                                  setSaveTemplateOpen(false);
+                                  setSaveTemplateName('');
+                                }
+                              }
+                            }}>Save</Button>
+                            <Button size="sm" variant="outline" onClick={() => { setSaveTemplateOpen(false); setSaveTemplateName(''); }}>Cancel</Button>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Progress bar */}
                       {milestones.length > 0 && (

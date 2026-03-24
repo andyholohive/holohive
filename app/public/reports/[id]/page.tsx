@@ -107,6 +107,8 @@ export default function PublicReportPage({ params }: { params: { id: string } })
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [clientEmail, setClientEmail] = useState<string | null>(null);
+  const [approvedEmails, setApprovedEmails] = useState<string[]>([]);
+  const [approvedDomains, setApprovedDomains] = useState<string[]>([]);
   const [loadingClientEmail, setLoadingClientEmail] = useState(true);
 
   // Cache key for this specific campaign
@@ -172,8 +174,8 @@ export default function PublicReportPage({ params }: { params: { id: string } })
           const clientEmailLower = clientEmail.toLowerCase();
           const portalClientEmailLower = portalClientEmail?.toLowerCase();
 
-          // If portal was authenticated with the same client email, auto-authenticate
-          if (portalEmail && (portalEmailLower === clientEmailLower || portalClientEmailLower === clientEmailLower)) {
+          // If portal was authenticated with an authorized email, auto-authenticate
+          if (portalEmail && isEmailAuthorized(portalEmail)) {
             setEmail(portalEmail);
             setIsAuthenticated(true);
             return;
@@ -189,7 +191,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
         // Check if cache is still valid (within 24 hours)
         if (now - timestamp < CACHE_DURATION) {
           // Verify the cached email still matches the current client email
-          if (cachedEmail && cachedEmail.toLowerCase() === clientEmail.toLowerCase()) {
+          if (cachedEmail && isEmailAuthorized(cachedEmail)) {
             setEmail(cachedEmail);
             setIsAuthenticated(true);
             return;
@@ -227,7 +229,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
 
       const { data: campaignData, error: campaignError } = await supabasePublic
         .from('campaigns')
-        .select('client_id')
+        .select('client_id, approved_emails')
         .eq('id', campaignId)
         .single();
 
@@ -242,7 +244,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
 
       const { data: clientData, error: clientError } = await supabasePublic
         .from('clients')
-        .select('email')
+        .select('email, approved_domains')
         .eq('id', campaignData.client_id)
         .single();
 
@@ -256,6 +258,9 @@ export default function PublicReportPage({ params }: { params: { id: string } })
       }
 
       setClientEmail(clientData.email);
+      // Approved emails from campaign, approved domains from client
+      setApprovedEmails(campaignData.approved_emails || []);
+      setApprovedDomains(clientData.approved_domains || []);
     } catch (e: any) {
       console.error('Error fetching client email:', e);
       setError(e.message || 'Failed to load campaign access information');
@@ -265,29 +270,20 @@ export default function PublicReportPage({ params }: { params: { id: string } })
     }
   }
 
-  // Fetch client email directly (returns the email instead of only setting state)
-  async function getClientEmail(): Promise<string | null> {
-    if (!campaignId) return null;
-    try {
-      const { data: campaignData, error: campaignError } = await supabasePublic
-        .from('campaigns')
-        .select('client_id')
-        .eq('id', campaignId)
-        .single();
-      if (campaignError || !campaignData?.client_id) return null;
+  const isEmailAuthorized = (inputEmail: string): boolean => {
+    if (!clientEmail) return false;
+    const emailLower = inputEmail.toLowerCase();
+    const clientEmailLower = clientEmail.toLowerCase();
+    const inputDomain = emailLower.split('@')[1];
+    const clientDomain = clientEmailLower.split('@')[1];
 
-      const { data: clientData, error: clientError } = await supabasePublic
-        .from('clients')
-        .select('email')
-        .eq('id', campaignData.client_id)
-        .single();
-      if (clientError || !clientData?.email) return null;
+    const isClientEmail = emailLower === clientEmailLower;
+    const isApprovedEmail = approvedEmails.some(e => e.toLowerCase() === emailLower);
+    const isSameDomain = inputDomain === clientDomain;
+    const isApprovedDomain = approvedDomains.some(d => inputDomain === d.toLowerCase());
 
-      return clientData.email as string;
-    } catch {
-      return null;
-    }
-  }
+    return isClientEmail || isApprovedEmail || isSameDomain || isApprovedDomain;
+  };
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -300,20 +296,18 @@ export default function PublicReportPage({ params }: { params: { id: string } })
       return;
     }
 
-    // Ensure we have the authorized client email; fetch on demand if needed
-    const authorizedEmail = clientEmail || (await getClientEmail());
-    if (!authorizedEmail) {
-      setEmailError('Unable to verify authorized email right now. Please try again.');
+    if (!clientEmail) {
+      setEmailError('Unable to verify access. Please try again.');
       return;
     }
 
-    if (email.toLowerCase() !== authorizedEmail.toLowerCase()) {
+    if (!isEmailAuthorized(email)) {
       setEmailError('This email address is not authorized to access this report');
       return;
     }
 
     // Save authentication to cache and proceed
-    saveAuthToCache(email, authorizedEmail);
+    saveAuthToCache(email, clientEmail);
     setIsAuthenticated(true);
   };
 

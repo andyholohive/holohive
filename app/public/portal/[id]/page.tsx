@@ -200,6 +200,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   const [clientId, setClientId] = useState<string | null>(null);
   const [client, setClient] = useState<Client | null>(null);
   const [clientEmail, setClientEmail] = useState<string | null>(null);
+  const [approvedEmails, setApprovedEmails] = useState<string[]>([]);
+  const [approvedDomains, setApprovedDomains] = useState<string[]>([]);
   const [email, setEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -258,7 +260,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           // Fetch client email
           const { data, error } = await supabasePublic
             .from('clients')
-            .select('id, name, email, slug, logo_url')
+            .select('id, name, email, slug, logo_url, approved_emails, approved_domains')
             .eq('id', idOrSlug)
             .is('archived_at', null)
             .single();
@@ -270,11 +272,13 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           }
           setClient(data);
           setClientEmail(data.email);
+          setApprovedEmails(data.approved_emails || []);
+          setApprovedDomains(data.approved_domains || []);
         } else {
           // Fetch by slug
           const { data, error } = await supabasePublic
             .from('clients')
-            .select('id, name, email, slug, logo_url')
+            .select('id, name, email, slug, logo_url, approved_emails, approved_domains')
             .eq('slug', idOrSlug)
             .is('archived_at', null)
             .single();
@@ -287,6 +291,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           setClientId(data.id);
           setClient(data);
           setClientEmail(data.email);
+          setApprovedEmails(data.approved_emails || []);
+          setApprovedDomains(data.approved_domains || []);
         }
       } catch (err) {
         setError('Failed to load client');
@@ -323,6 +329,22 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
     }
   }, [clientId, isAuthenticated]);
 
+  // Shared email authorization check (matches campaign page pattern)
+  const isEmailAuthorized = (inputEmail: string): boolean => {
+    if (!clientEmail) return false;
+    const emailLower = inputEmail.toLowerCase();
+    const clientEmailLower = clientEmail.toLowerCase();
+    const inputDomain = emailLower.split('@')[1];
+    const clientDomain = clientEmailLower.split('@')[1];
+
+    const isClientEmail = emailLower === clientEmailLower;
+    const isApprovedEmail = approvedEmails.some(e => e.toLowerCase() === emailLower);
+    const isSameDomain = inputDomain === clientDomain;
+    const isApprovedDomain = approvedDomains.some(d => inputDomain === d.toLowerCase());
+
+    return isClientEmail || isApprovedEmail || isSameDomain || isApprovedDomain;
+  };
+
   // Check if user is already authenticated via cache
   const checkCachedAuth = () => {
     if (!clientEmail) return;
@@ -334,9 +356,9 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         const now = Date.now();
 
         if (now - timestamp < CACHE_DURATION) {
-          if (cachedEmail && cachedEmail.toLowerCase() === clientEmail.toLowerCase()) {
+          if (cachedEmail && isEmailAuthorized(cachedEmail)) {
             setEmail(cachedEmail);
-            setIsAuthenticated(true); // Start loading data immediately
+            setIsAuthenticated(true);
             setWelcomePhase('enter');
             setShowWelcome(true);
             requestAnimationFrame(() => {
@@ -390,13 +412,13 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       return;
     }
 
-    if (email.toLowerCase() !== clientEmail.toLowerCase()) {
+    if (!isEmailAuthorized(email)) {
       setEmailError('This email address is not authorized to access this portal');
       return;
     }
 
     saveAuthToCache(email);
-    setIsAuthenticated(true); // Start loading data immediately
+    setIsAuthenticated(true);
     setWelcomePhase('enter');
     setShowWelcome(true);
     // Animate in after a brief frame

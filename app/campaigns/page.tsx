@@ -244,15 +244,15 @@ export default function CampaignsPage() {
       );
       setCampaigns(fetchedCampaigns);
 
-      // Fetch content counts and paid content counts for each campaign
+      // Fetch content counts and fully-paid content counts for each campaign
       const counts: { [campaignId: string]: { total: number; posted: number } } = {};
       const paidCounts: { [campaignId: string]: number } = {};
       await Promise.all(
         fetchedCampaigns.map(async (campaign) => {
           try {
-            const [contentsRes, paymentsRes] = await Promise.all([
-              supabase.from('contents').select('id, status').eq('campaign_id', campaign.id),
-              supabase.from('payments').select('content_id').eq('campaign_id', campaign.id),
+            const [contentsRes, kolsRes] = await Promise.all([
+              supabase.from('contents').select('id, status, campaign_kols_id').eq('campaign_id', campaign.id),
+              supabase.from('campaign_kols').select('id, allocated_budget, paid').eq('campaign_id', campaign.id),
             ]);
 
             if (!contentsRes.error && contentsRes.data) {
@@ -264,21 +264,21 @@ export default function CampaignsPage() {
               ).length;
               counts[campaign.id] = { total, posted };
 
-              // Count paid contents, only counting IDs that exist in this campaign's contents
-              const contentIds = new Set(contentsRes.data.map(c => c.id));
-              const paidContentIds = new Set<string>();
-              if (!paymentsRes.error && paymentsRes.data) {
-                paymentsRes.data.forEach(payment => {
-                  if (Array.isArray(payment.content_id)) {
-                    payment.content_id.forEach((id: string) => {
-                      if (contentIds.has(id)) {
-                        paidContentIds.add(id);
-                      }
-                    });
+              // Count fully paid contents: content is fully paid when its KOL has paid >= allocated_budget
+              const fullyPaidKolIds = new Set<string>();
+              if (!kolsRes.error && kolsRes.data) {
+                kolsRes.data.forEach(kol => {
+                  const budget = Number(kol.allocated_budget) || 0;
+                  const paid = Number(kol.paid) || 0;
+                  if (budget > 0 && paid >= budget) {
+                    fullyPaidKolIds.add(kol.id);
                   }
                 });
               }
-              paidCounts[campaign.id] = paidContentIds.size;
+              const fullyPaidContentCount = contentsRes.data.filter(c =>
+                c.campaign_kols_id && fullyPaidKolIds.has(c.campaign_kols_id)
+              ).length;
+              paidCounts[campaign.id] = fullyPaidContentCount;
             }
           } catch (err) {
             console.error(`Error fetching counts for campaign ${campaign.id}:`, err);
