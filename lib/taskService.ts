@@ -227,6 +227,11 @@ export class TaskService {
         await this.cloneRecurringTask(updatedTask);
       }
 
+      // Auto-complete parent deliverable if all subtasks are done
+      if (updates.status === 'complete' && updatedTask.parent_task_id) {
+        this.checkDeliverableAutoComplete(updatedTask.parent_task_id).catch(() => {});
+      }
+
       return updatedTask;
     } catch (error) {
       console.error('Error updating task:', error);
@@ -282,10 +287,42 @@ export class TaskService {
         if (task?.recurring_config) {
           await this.cloneRecurringTask(task);
         }
+        // Auto-complete parent deliverable if all subtasks are done
+        if (task?.parent_task_id) {
+          this.checkDeliverableAutoComplete(task.parent_task_id).catch(() => {});
+        }
       }
     } catch (error) {
       console.error('Error updating task field:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Check if all subtasks of a parent task are complete, and if so,
+   * auto-complete the parent task and its linked deliverable.
+   */
+  static async checkDeliverableAutoComplete(parentTaskId: string): Promise<boolean> {
+    try {
+      const subtasks = await this.getSubtasks(parentTaskId);
+      if (subtasks.length === 0) return false;
+
+      const allComplete = subtasks.every(s => s.status === 'complete');
+      if (!allComplete) return false;
+
+      // Mark deliverable as complete
+      const { error: dErr } = await supabase
+        .from('deliverables')
+        .update({ status: 'complete', updated_at: new Date().toISOString() })
+        .eq('parent_task_id', parentTaskId);
+
+      // Mark parent task as complete (ignore dErr — parent may not be a deliverable)
+      await this.updateTask(parentTaskId, { status: 'complete' });
+
+      return true;
+    } catch (error) {
+      console.error('Error in deliverable auto-complete:', error);
+      return false;
     }
   }
 

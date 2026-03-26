@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { TaskService, Task } from '@/lib/taskService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { DeliverableService } from '@/lib/deliverableService';
 import {
   Plus,
   Trash2,
@@ -16,6 +17,7 @@ import {
   PlayCircle,
   MessageCircle,
   GitBranch,
+  Lock,
 } from 'lucide-react';
 
 interface SubtaskListProps {
@@ -38,6 +40,7 @@ export function SubtaskList({ parentTaskId, onSubtaskClick }: SubtaskListProps) 
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
+  const [blockingSteps, setBlockingSteps] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     loadSubtasks();
@@ -47,6 +50,14 @@ export function SubtaskList({ parentTaskId, onSubtaskClick }: SubtaskListProps) 
     try {
       const data = await TaskService.getSubtasks(parentTaskId);
       setSubtasks(data);
+      // Load blocking step info for deliverables
+      DeliverableService.getDeliverableByTaskId(parentTaskId).then(del => {
+        if (del) {
+          const blocking = new Set<number>();
+          del.steps.filter(s => s.is_blocking).forEach(s => blocking.add(s.step_order));
+          setBlockingSteps(blocking);
+        }
+      }).catch(() => {});
     } catch {
       // silent
     } finally {
@@ -74,11 +85,44 @@ export function SubtaskList({ parentTaskId, onSubtaskClick }: SubtaskListProps) 
     }
   };
 
+  // Check if a step is locked (previous blocking step not complete)
+  const isStepLocked = (subtask: Task): boolean => {
+    if (blockingSteps.size === 0) return false;
+    // Parse step order from task name (e.g. "2. Client Review" → 2)
+    const match = subtask.task_name.match(/^(\d+)\./);
+    if (!match) return false;
+    const stepOrder = parseInt(match[1]);
+
+    // Check if any blocking step before this one is incomplete
+    for (const blockOrder of blockingSteps) {
+      if (blockOrder < stepOrder) {
+        const blockingTask = subtasks.find(t => t.task_name.startsWith(`${blockOrder}.`));
+        if (blockingTask && blockingTask.status !== 'complete') return true;
+      }
+    }
+    return false;
+  };
+
   const handleStatusToggle = async (subtask: Task) => {
+    // Enforce blocking: prevent starting a step if a prior blocking step is incomplete
+    if (subtask.status !== 'complete' && isStepLocked(subtask)) {
+      toast({ title: 'Step locked', description: 'Complete the previous blocking step first.', variant: 'destructive' });
+      return;
+    }
+
     const newStatus = subtask.status === 'complete' ? 'to_do' : 'complete';
     setSubtasks(prev => prev.map(t => t.id === subtask.id ? { ...t, status: newStatus } : t));
     try {
       await TaskService.updateField(subtask.id, 'status', newStatus);
+
+      // Check if all subtasks are now complete → notify user
+      if (newStatus === 'complete') {
+        const updatedSubtasks = subtasks.map(t => t.id === subtask.id ? { ...t, status: newStatus } : t);
+        const allDone = updatedSubtasks.every(t => t.status === 'complete');
+        if (allDone) {
+          toast({ title: 'Deliverable complete', description: 'All steps are done — the parent task has been marked complete.' });
+        }
+      }
     } catch {
       await loadSubtasks();
     }
@@ -125,9 +169,9 @@ export function SubtaskList({ parentTaskId, onSubtaskClick }: SubtaskListProps) 
             const cfg = STATUS_CONFIG[subtask.status] || STATUS_CONFIG.to_do;
             const Icon = cfg.icon;
             return (
-              <div key={subtask.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-gray-50 group">
-                <button onClick={() => handleStatusToggle(subtask)} className="flex-shrink-0">
-                  <Icon className={`h-4 w-4 ${cfg.color}`} />
+              <div key={subtask.id} className={`flex items-center gap-2 py-1 px-1 rounded hover:bg-gray-50 group ${isStepLocked(subtask) ? 'opacity-50' : ''}`}>
+                <button onClick={() => handleStatusToggle(subtask)} className="flex-shrink-0" title={isStepLocked(subtask) ? 'Blocked by previous step' : undefined}>
+                  {isStepLocked(subtask) ? <Lock className="h-4 w-4 text-gray-300" /> : <Icon className={`h-4 w-4 ${cfg.color}`} />}
                 </button>
                 <span
                   className={`flex-1 text-xs cursor-pointer ${subtask.status === 'complete' ? 'line-through text-gray-400' : 'text-gray-700'}`}

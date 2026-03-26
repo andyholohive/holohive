@@ -20,6 +20,8 @@ import { TaskAttachments } from './TaskAttachments';
 import { TaskChecklist } from './TaskChecklist';
 import { SubtaskList } from './SubtaskList';
 import { RecurringConfigEditor } from './RecurringConfig';
+import { DeliverableProgressTracker } from './DeliverableProgressTracker';
+import { DeliverableService } from '@/lib/deliverableService';
 import {
   Calendar as CalendarIcon,
   Circle,
@@ -94,6 +96,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
   const [submitting, setSubmitting] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState('details');
+  const [hasDeliverable, setHasDeliverable] = useState(false);
 
   const [form, setForm] = useState({
     task_name: '',
@@ -126,6 +129,10 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
         client_id: task.client_id || '',
         recurring_config: task.recurring_config || null,
       });
+      // Check if this task has a linked deliverable
+      DeliverableService.getDeliverableByTaskId(task.id).then(d => {
+        setHasDeliverable(!!d);
+      }).catch(() => setHasDeliverable(false));
     } else {
       setForm({
         task_name: '',
@@ -142,6 +149,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
         recurring_config: null,
       });
       setActiveDetailTab('details');
+      setHasDeliverable(false);
     }
   }, [task, open]);
 
@@ -226,6 +234,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
           <Tabs value={activeDetailTab} onValueChange={setActiveDetailTab} className="flex-1 min-h-0 flex flex-col">
             <TabsList className="bg-gray-100 w-full justify-start flex-wrap">
               <TabsTrigger value="details" className="text-xs">Details</TabsTrigger>
+              {hasDeliverable && <TabsTrigger value="workflow" className="text-xs">Workflow</TabsTrigger>}
               <TabsTrigger value="checklist" className="text-xs">Checklist</TabsTrigger>
               <TabsTrigger value="subtasks" className="text-xs">Subtasks</TabsTrigger>
               <TabsTrigger value="comments" className="text-xs">Comments</TabsTrigger>
@@ -235,6 +244,12 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
             <TabsContent value="details" className="flex-1 overflow-y-auto mt-3 px-1 pb-4">
               {renderFormFields()}
             </TabsContent>
+
+            {hasDeliverable && (
+              <TabsContent value="workflow" className="flex-1 overflow-y-auto mt-3 px-1 pb-4">
+                {task && <DeliverableProgressTracker parentTaskId={task.id} />}
+              </TabsContent>
+            )}
 
             <TabsContent value="checklist" className="flex-1 overflow-y-auto mt-3 px-1 pb-4">
               {task && <TaskChecklist taskId={task.id} />}

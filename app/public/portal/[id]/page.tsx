@@ -241,6 +241,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   const [showCompleted, setShowCompleted] = useState(false);
   const [mindshareEnabled, setMindshareEnabled] = useState(false);
   const [mindshareWeekly, setMindshareWeekly] = useState<{ week_number: number; week_start: string; mention_count: number; mindshare_pct: number }[]>([]);
+  const [clientDeliverables, setClientDeliverables] = useState<{ id: string; title: string; status: string; completedSteps: number; totalSteps: number; templateName: string; templateColor: string; templateIcon: string; startDate: string | null; targetCompletion: string | null }[]>([]);
 
   // UI states
   const [activeTab, setActiveTab] = useState<'all' | 'active' | 'completed'>('all');
@@ -326,6 +327,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       checkOnboardingStatus();
       fetchKolRoster();
       fetchFormSubmissions();
+      fetchClientDeliverables();
     }
   }, [clientId, isAuthenticated]);
 
@@ -903,6 +905,55 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       setFormSubmissions(submissions);
     } catch (err) {
       console.error('Error fetching form submissions:', err);
+    }
+  }
+
+  async function fetchClientDeliverables() {
+    if (!clientId) return;
+    try {
+      const { data: dels } = await supabasePublic
+        .from('deliverables')
+        .select('id, title, status, start_date, target_completion, template_id, parent_task_id')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false });
+
+      if (!dels || dels.length === 0) return;
+
+      const templateIds = [...new Set(dels.map((d: any) => d.template_id))];
+      const { data: tmpls } = await supabasePublic
+        .from('deliverable_templates')
+        .select('id, name, color, icon')
+        .in('id', templateIds);
+
+      const tmplMap = new Map((tmpls || []).map((t: any) => [t.id, t]));
+
+      const results = [];
+      for (const d of dels) {
+        const tmpl = tmplMap.get(d.template_id) || { name: 'Workflow', color: '#3e8692', icon: 'ClipboardList' };
+        const { data: subtasks } = await supabasePublic
+          .from('tasks')
+          .select('status')
+          .eq('parent_task_id', d.parent_task_id);
+
+        const total = subtasks?.length || 0;
+        const done = subtasks?.filter((s: any) => s.status === 'complete').length || 0;
+
+        results.push({
+          id: d.id,
+          title: d.title,
+          status: d.status,
+          completedSteps: done,
+          totalSteps: total,
+          templateName: tmpl.name,
+          templateColor: tmpl.color,
+          templateIcon: tmpl.icon,
+          startDate: d.start_date,
+          targetCompletion: d.target_completion,
+        });
+      }
+      setClientDeliverables(results);
+    } catch (err) {
+      console.error('Error fetching client deliverables:', err);
     }
   }
 
@@ -2150,6 +2201,62 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Deliverables Progress — visible when client has deliverables */}
+        {clientDeliverables.length > 0 && (
+          <Card id="section-deliverables" className="border-0 shadow-lg rounded-xl overflow-hidden mt-10">
+            <CardContent className="p-6 sm:p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                  <ClipboardList className="h-5 w-5 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900">Active Workflows</h3>
+              </div>
+
+              <div className="space-y-4">
+                {clientDeliverables.map(d => {
+                  const progressPct = d.totalSteps > 0 ? (d.completedSteps / d.totalSteps) * 100 : 0;
+                  return (
+                    <div key={d.id} className="bg-gray-50 rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <div className="text-sm font-semibold text-gray-900">{d.title}</div>
+                          <div className="text-xs text-gray-500">{d.templateName}</div>
+                        </div>
+                        <Badge className={`border-0 text-[10px] ${
+                          d.status === 'complete' ? 'bg-green-50 text-green-600' :
+                          d.status === 'cancelled' ? 'bg-gray-50 text-gray-500' :
+                          'bg-blue-50 text-blue-600'
+                        }`}>
+                          {d.status === 'complete' ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <Circle className="h-3 w-3 mr-1" />}
+                          {d.status === 'complete' ? 'Complete' : d.status === 'cancelled' ? 'Cancelled' : 'In Progress'}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+                        <span>{d.completedSteps} of {d.totalSteps} steps complete</span>
+                        <span>{Math.round(progressPct)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${progressPct}%`, backgroundColor: d.templateColor || '#3e8692' }}
+                        />
+                      </div>
+
+                      {(d.startDate || d.targetCompletion) && (
+                        <div className="flex items-center justify-between mt-2 text-[10px] text-gray-400">
+                          {d.startDate && <span>Started {new Date(d.startDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                          {d.targetCompletion && <span>Target {new Date(d.targetCompletion + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Campaigns Section — discovery & tracker only */}
         {portalPhase !== 'kickoff' && <Card id="section-campaigns" className="border-0 shadow-lg rounded-xl overflow-hidden mt-10">

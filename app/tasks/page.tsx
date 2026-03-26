@@ -11,15 +11,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserService } from '@/lib/userService';
 import { TaskService, Task } from '@/lib/taskService';
 import { ClientService } from '@/lib/clientService';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
+import { DeliverableWizard } from '@/components/tasks/DeliverableWizard';
+import { DeliverableService } from '@/lib/deliverableService';
 import { useToast } from '@/hooks/use-toast';
 import {
   Plus,
   ListTodo,
+  Package,
   Search,
   Trash2,
   ChevronUp,
@@ -232,6 +236,8 @@ export default function TasksPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [deliverableProgress, setDeliverableProgress] = useState<Record<string, { done: number; total: number }>>({}); // taskId -> progress
 
   useEffect(() => {
     fetchTasks();
@@ -257,6 +263,14 @@ export default function TasksPage() {
         const counts = await TaskService.getCommentCounts(data.map(t => t.id));
         setCommentCounts(counts);
       }
+      // Load deliverable progress for parent tasks
+      DeliverableService.getDeliverables().then(dels => {
+        const progress: Record<string, { done: number; total: number }> = {};
+        dels.forEach(d => {
+          progress[d.parent_task_id] = { done: d.completedSteps, total: d.totalSteps };
+        });
+        setDeliverableProgress(progress);
+      }).catch(() => {});
     } catch (error) {
       console.error('Error fetching tasks:', error);
     }
@@ -587,6 +601,11 @@ export default function TasksPage() {
                       onDoubleClick={() => startEditing(task.id, 'task_name', task.task_name)}
                     >
                       {task.task_name}
+                      {deliverableProgress[task.id] && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#3e8692]/10 text-[#3e8692] flex-shrink-0">
+                          {deliverableProgress[task.id].done}/{deliverableProgress[task.id].total}
+                        </span>
+                      )}
                       {isTaskStale(task) && (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 flex-shrink-0">
                           <Clock className="h-2.5 w-2.5" /> Stale
@@ -608,6 +627,11 @@ export default function TasksPage() {
                 title="Double-click to edit"
               >
                 {task.task_name}
+                {deliverableProgress[task.id] && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#3e8692]/10 text-[#3e8692] flex-shrink-0">
+                    {deliverableProgress[task.id].done}/{deliverableProgress[task.id].total}
+                  </span>
+                )}
                 {isTaskStale(task) && (
                   <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 flex-shrink-0">
                     <Clock className="h-2.5 w-2.5" /> Stale
@@ -945,14 +969,28 @@ export default function TasksPage() {
                   <p className="text-sm text-gray-500">Manage team tasks, SOPs, and recurring work</p>
                 </div>
               </div>
-              <Button
-                className="hover:opacity-90"
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-                onClick={() => openForm()}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Task
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    className="hover:opacity-90"
+                    style={{ backgroundColor: '#3e8692', color: 'white' }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Task
+                    <ChevronDown className="h-3 w-3 ml-1.5 opacity-70" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => openForm()}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Task
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setWizardOpen(true)}>
+                    <Package className="h-4 w-4 mr-2" />
+                    New Deliverable
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {/* Tabs */}
@@ -1136,6 +1174,14 @@ export default function TasksPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DeliverableWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        teamMembers={teamMembers}
+        clients={clients}
+        onCreated={fetchTasks}
+      />
     </div>
   );
 }

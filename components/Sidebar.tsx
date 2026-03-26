@@ -468,6 +468,18 @@ export default function Sidebar({ children }: SidebarProps) {
                             </span>
                           </Button>
                         </Link>
+                        <Link href="/tasks/deliverables" legacyBehavior>
+                          <Button
+                            asChild
+                            variant={pathname.startsWith('/tasks/deliverables') ? 'secondary' : 'ghost'}
+                            className="w-full justify-start h-7 text-xs"
+                          >
+                            <span>
+                              <Target className="h-3.5 w-3.5 mr-2" />
+                              Deliverables
+                            </span>
+                          </Button>
+                        </Link>
                         {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                           <>
                             <Link href="/tasks/admin" legacyBehavior>
@@ -503,6 +515,18 @@ export default function Sidebar({ children }: SidebarProps) {
                                 <span>
                                   <FileText className="h-3.5 w-3.5 mr-2" />
                                   Templates
+                                </span>
+                              </Button>
+                            </Link>
+                            <Link href="/tasks/deliverables/templates" legacyBehavior>
+                              <Button
+                                asChild
+                                variant={pathname === '/tasks/deliverables/templates' ? 'secondary' : 'ghost'}
+                                className="w-full justify-start h-7 text-xs"
+                              >
+                                <span>
+                                  <Sliders className="h-3.5 w-3.5 mr-2" />
+                                  Deliverable Templates
                                 </span>
                               </Button>
                             </Link>
