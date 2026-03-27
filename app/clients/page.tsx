@@ -1365,12 +1365,22 @@ export default function ClientsPage() {
           newClient.whitelist_partner_id
         );
 
+        // Save approved_domains after client is created
+        if (client && newClient.approved_domains.length > 0) {
+          await ClientService.updateClient(client.id, { approved_domains: newClient.approved_domains } as any);
+        }
+
         // Upload logo after client is created
         if (logoFile && client) {
           const logoUrl = await uploadLogo(client.id);
           if (logoUrl) {
             await ClientService.updateClient(client.id, { logo_url: logoUrl });
           }
+        }
+
+        // Auto-seed action board milestones for new client
+        if (client) {
+          await seedMilestones(client.id);
         }
       }
       handleCloseClientModal();

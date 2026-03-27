@@ -55,6 +55,7 @@ export interface CRMOpportunity {
   last_reply_at: string | null;          // When our bot last messaged in TG group
   last_team_message_at: string | null;   // When a team member last messaged in TG group
   owner_id: string | null;
+  co_owner_ids: string[];
   source: OpportunitySource | null;
   referrer: string | null;
   gc: string | null;               // Telegram group chat ID

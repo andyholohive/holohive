@@ -756,6 +756,15 @@ export default function SalesPipelinePage() {
       const updateData: any = { stage: newStage as OpportunityStage };
       // Mark last_contacted_at so the past-meeting check knows the outcome was handled
       updateData.last_contacted_at = new Date().toISOString();
+      // Auto-add Jdot as co-owner when call is booked
+      if (newStage === 'booked') {
+        const JDOT_ID = '3dcaa757-1f34-4945-8a7e-3853177864a5';
+        const opp = opportunities.find(o => o.id === oppId);
+        const existingCoOwners = opp?.co_owner_ids || [];
+        if (opp?.owner_id !== JDOT_ID && !existingCoOwners.includes(JDOT_ID)) {
+          updateData.co_owner_ids = [...existingCoOwners, JDOT_ID];
+        }
+      }
       await SalesPipelineService.update(oppId, updateData);
       await fetchData();
       if (activeTab === 'outreach') await fetchOutreach();
@@ -1083,6 +1092,7 @@ export default function SalesPipelinePage() {
       poc_platform: opp.poc_platform || undefined,
       poc_handle: opp.poc_handle || undefined,
       owner_id: opp.owner_id || undefined,
+      co_owner_ids: opp.co_owner_ids || [],
       referrer: opp.referrer || undefined,
       affiliate_id: opp.affiliate_id || undefined,
       deal_value: opp.deal_value || undefined,
@@ -1360,7 +1370,7 @@ export default function SalesPipelinePage() {
 
   const actionItems = useMemo(() => {
     return allActionItems.filter(({ opp, action }) => {
-      if (actionFilter === 'mine') return opp.owner_id === user?.id;
+      if (actionFilter === 'mine') return opp.owner_id === user?.id || (opp.co_owner_ids || []).includes(user?.id || '');
       if (actionFilter === 'urgent') return action.priority === 'urgent';
       return true;
     });
@@ -1598,6 +1608,27 @@ export default function SalesPipelinePage() {
     if (!userId) return '—';
     const u = users.find(u => u.id === userId);
     return u?.name || u?.email || '—';
+  };
+
+  const getCoOwnerNames = (coOwnerIds: string[] | undefined | null) => {
+    if (!coOwnerIds || coOwnerIds.length === 0) return null;
+    return coOwnerIds.map(id => {
+      const u = users.find(u => u.id === id);
+      return u?.name || u?.email || '—';
+    });
+  };
+
+  const renderOwnerCell = (opp: SalesPipelineOpportunity) => {
+    const ownerName = getUserName(opp.owner_id);
+    const coNames = getCoOwnerNames(opp.co_owner_ids);
+    return (
+      <div>
+        <span>{ownerName}</span>
+        {coNames && coNames.length > 0 && (
+          <span className="text-[10px] text-gray-400 block">+{coNames.join(', ')}</span>
+        )}
+      </div>
+    );
   };
 
   const cleanPocHandle = (handle: string): string => {
@@ -2023,7 +2054,7 @@ export default function SalesPipelinePage() {
                                   </div>
                                 )}
                               </TableCell>
-                              <TableCell>{getUserName(opp.owner_id)}</TableCell>
+                              <TableCell>{renderOwnerCell(opp)}</TableCell>
                               <TableCell className="text-gray-500">{opp.tg_handle || '—'}</TableCell>
                               {stage === 'cold_dm' && (
                                 <TableCell>
@@ -2421,7 +2452,7 @@ export default function SalesPipelinePage() {
                     </TableCell>
                     <TableCell className="text-gray-500 whitespace-nowrap">{opp.tg_handle || '—'}</TableCell>
                     <TableCell className="text-gray-500 text-xs capitalize">{opp.source?.replace('_', ' ') || '—'}</TableCell>
-                    <TableCell>{getUserName(opp.owner_id)}</TableCell>
+                    <TableCell>{renderOwnerCell(opp)}</TableCell>
                     <TableCell className="text-gray-500 text-xs">
                       {opp.created_at ? format(new Date(opp.created_at), 'MMM d') : '—'}
                     </TableCell>
@@ -2888,7 +2919,7 @@ export default function SalesPipelinePage() {
                         <span className="text-xs text-gray-400">{opp.temperature_score}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{getUserName(opp.owner_id)}</TableCell>
+                    <TableCell>{renderOwnerCell(opp)}</TableCell>
                     <TableCell onClick={e => e.stopPropagation()}>
                       {(() => {
                         const quickAlt = action.alternatives.find(a => a.quick);
@@ -3065,7 +3096,7 @@ export default function SalesPipelinePage() {
                             <span className="text-gray-400">-</span>
                           )}
                         </TableCell>
-                        <TableCell>{getUserName(opp.owner_id)}</TableCell>
+                        <TableCell>{renderOwnerCell(opp)}</TableCell>
                         <TableCell className="text-gray-500">{opp.updated_at ? formatDistanceToNow(new Date(opp.updated_at)) : '—'}</TableCell>
                         <TableCell className="text-gray-500">{opp.last_contacted_at ? formatDistanceToNow(new Date(opp.last_contacted_at), { addSuffix: true }) : '—'}</TableCell>
                         <TableCell>
@@ -3264,6 +3295,28 @@ export default function SalesPipelinePage() {
                   <div className="grid gap-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Referrer</Label>
                     <Input value={form.referrer || ''} onChange={e => setForm(f => ({ ...f, referrer: e.target.value }))} placeholder="Who referred?" className="auth-input" />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Co-Owners</Label>
+                  <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 border rounded-md bg-white">
+                    {(form.co_owner_ids || []).map(id => {
+                      const u = users.find(u => u.id === id);
+                      return (
+                        <span key={id} className="inline-flex items-center gap-1 bg-[#3e8692]/10 text-[#3e8692] text-xs px-2 py-0.5 rounded-full">
+                          {u?.name || u?.email || id}
+                          <button type="button" onClick={() => setForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-red-500 ml-0.5">&times;</button>
+                        </span>
+                      );
+                    })}
+                    <Select value="" onValueChange={v => { if (v && !(form.co_owner_ids || []).includes(v) && v !== form.owner_id) setForm(f => ({ ...f, co_owner_ids: [...(f.co_owner_ids || []), v] })); }}>
+                      <SelectTrigger className="border-none shadow-none bg-transparent h-6 w-auto px-1 text-xs text-gray-400 focus:ring-0"><SelectValue placeholder="+ Add" /></SelectTrigger>
+                      <SelectContent>
+                        {users.filter(u => u.id !== form.owner_id && !(form.co_owner_ids || []).includes(u.id)).map(u => (
+                          <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="grid gap-2">
@@ -3482,6 +3535,13 @@ export default function SalesPipelinePage() {
                 <div>
                   <span className="text-xs text-gray-500">Owner</span>
                   <p className="font-medium mt-0.5">{getUserName(opp.owner_id)}</p>
+                  {opp.co_owner_ids && opp.co_owner_ids.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {opp.co_owner_ids.map(id => (
+                        <span key={id} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{getUserName(id)}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <span className="text-xs text-gray-500">POC</span>
@@ -3996,6 +4056,29 @@ export default function SalesPipelinePage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Co-Owners</Label>
+                <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 border rounded-md bg-white">
+                  {(form.co_owner_ids || []).map(id => {
+                    const u = users.find(u => u.id === id);
+                    return (
+                      <span key={id} className="inline-flex items-center gap-1 bg-[#3e8692]/10 text-[#3e8692] text-xs px-2 py-0.5 rounded-full">
+                        {u?.name || u?.email || id}
+                        <button type="button" onClick={() => setForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-red-500 ml-0.5">&times;</button>
+                      </span>
+                    );
+                  })}
+                  <Select value="" onValueChange={v => { if (v && !(form.co_owner_ids || []).includes(v) && v !== form.owner_id) setForm(f => ({ ...f, co_owner_ids: [...(f.co_owner_ids || []), v] })); }}>
+                    <SelectTrigger className="border-none shadow-none bg-transparent h-6 w-auto px-1 text-xs text-gray-400 focus:ring-0"><SelectValue placeholder="+ Add" /></SelectTrigger>
+                    <SelectContent>
+                      {users.filter(u => u.id !== form.owner_id && !(form.co_owner_ids || []).includes(u.id)).map(u => (
+                        <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="grid gap-2">

@@ -175,6 +175,7 @@ export interface CreateSalesPipelineOpportunityData {
   source?: string;
   tg_handle?: string;
   owner_id?: string;
+  co_owner_ids?: string[];
   referrer?: string;
   affiliate_id?: string;
   deal_value?: number;
