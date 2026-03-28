@@ -401,8 +401,8 @@ export default function Sidebar({ children }: SidebarProps) {
               </div>
               </>}
 
-              {/* Workspace Section - only visible to Andy (testing) */}
-              {userProfile?.email === 'andy@holohive.io' && (
+              {/* Workspace Section */}
+              {!guestHideSection(['/daily-standup', '/tasks']) && (
                 <>
                   {!isSidebarCollapsed && (
                     <div className="flex items-center space-x-2">
