@@ -126,6 +126,13 @@ export interface CreateSalesDmTemplateData {
 // Extended Interfaces
 // ============================================
 
+export type ActionTier = 'REACH_OUT_NOW' | 'PRE_TOKEN_PRIORITY' | 'RESEARCH_FIRST' | 'WATCH_FOR_TRIGGER' | 'NURTURE' | 'SKIP';
+export type KoreaPresence = 'NONE' | 'MINIMAL' | 'ACTIVE';
+export type TokenStatus = 'PRE_TOKEN' | 'PRE_TGE' | 'POST_LAUNCH' | 'NO_TOKEN';
+export type ProductStatus = 'WHITEPAPER' | 'TESTNET' | 'MAINNET' | 'LIVE_WITH_USERS';
+export type NarrativeFit = 'HOT' | 'NEUTRAL' | 'COLD';
+export type ProspectCategory = 'DeFi' | 'Gaming' | 'AI' | 'DePIN' | 'RWA' | 'L1/L2' | 'Infrastructure' | 'Other';
+
 export interface SalesPipelineOpportunity extends CRMOpportunity {
   bucket: Bucket | null;
   temperature_score: number;
@@ -149,6 +156,31 @@ export interface SalesPipelineOpportunity extends CRMOpportunity {
   proposal_sent_at: string | null;
   poc_platform: PocPlatform | null;
   poc_handle: string | null;
+
+  // AI Scoring Fields (from ATLAS agent)
+  icp_fit_score: number;
+  signal_strength_score: number;
+  timing_score: number;
+  composite_score: number;
+  action_tier: ActionTier | null;
+  last_scored_at: string | null;
+
+  // Prospect Enrichment Fields
+  funding_stage: string | null;
+  funding_amount: string | null;
+  lead_investors: string | null;
+  korea_presence: KoreaPresence | null;
+  personality_type: string | null;
+  website_url: string | null;
+  category: ProspectCategory | null;
+  token_status: TokenStatus | null;
+  tge_date: string | null;
+  product_status: ProductStatus | null;
+  team_doxxed: boolean | null;
+  narrative_fit: NarrativeFit | null;
+  twitter_handle: string | null;
+  twitter_followers: number | null;
+  last_signal_at: string | null;
 }
 
 export interface CRMActivity {

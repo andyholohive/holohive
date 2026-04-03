@@ -2055,11 +2055,14 @@ const CampaignDetailsPage = () => {
   // Payment inline editing functions
   const handlePaymentCellSave = async (payment: any, field: string, newValue: any) => {
     try {
+      // Coerce amount to number before saving
+      const saveValue = field === 'amount' ? (Number(newValue) || 0) : newValue;
+
       // Update database
-      await supabase.from('payments').update({ [field]: newValue }).eq('id', payment.id);
+      await supabase.from('payments').update({ [field]: saveValue }).eq('id', payment.id);
 
       // Update local state
-      setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, [field]: newValue } : p));
+      setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, [field]: saveValue } : p));
 
       setEditingPaymentCell(null);
       setEditingPaymentValue(null);
@@ -2248,7 +2251,13 @@ const CampaignDetailsPage = () => {
           type={numberFields.includes(field) ? 'number' : 'text'}
           value={editingPaymentValue ?? ''}
           onChange={e => setEditingPaymentValue(e.target.value)}
-          onBlur={() => handlePaymentCellSave(payment, field, editingPaymentValue)}
+          onBlur={(e) => {
+            // Only save on blur if we haven't already saved (e.g. via Enter key)
+            // Check if editing state is still active for this cell
+            if (editingPaymentCell?.paymentId === payment.id && editingPaymentCell?.field === field) {
+              handlePaymentCellSave(payment, field, editingPaymentValue);
+            }
+          }}
           onKeyDown={e => {
             if (e.key === 'Enter') handlePaymentCellSave(payment, field, editingPaymentValue);
             if (e.key === 'Escape') { setEditingPaymentCell(null); setEditingPaymentValue(null); }
@@ -8431,7 +8440,7 @@ const CampaignDetailsPage = () => {
                                 />
                                 <span className="font-medium flex-1">
                                   {kol.master_kol.name}
-                                  {latestCostMap.get(kol.master_kol?.id) && (
+                                  {latestCostMap.get(kol.master_kol?.id) != null && latestCostMap.get(kol.master_kol?.id)! > 0 && (
                                     <span className="ml-2 text-xs text-gray-500">
                                       (Latest: ${latestCostMap.get(kol.master_kol?.id)?.toLocaleString()})
                                     </span>

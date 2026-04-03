@@ -23,7 +23,7 @@ import {
   Plus, Minus, Search, Trash2, X, LayoutGrid, TableIcon, GripVertical, Loader2,
   Target, AlertTriangle, ArrowRight, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronUp,
   Phone, MessageSquare, Calendar, FileText, StickyNote, Zap, RotateCcw, Clock, Edit, Copy, Check, ChevronsUpDown,
-  Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown, Paperclip, Eye, Image
+  Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown, Paperclip, Eye, Image, Bot
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -76,6 +76,7 @@ import {
 import { UserService } from '@/lib/userService';
 import { BookingService } from '@/lib/bookingService';
 import { useToast } from '@/hooks/use-toast';
+import AgentDashboard from '@/components/agents/AgentDashboard';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow, format } from 'date-fns';
 
@@ -285,6 +286,7 @@ export default function SalesPipelinePage() {
     next_step_date?: string;
     meeting_date?: string;
     meeting_time?: string;
+    co_owner_ids?: string[];
   }>({ title: '', description: '', outcome: '', next_step: '' });
   const [isActivityLogSubmitting, setIsActivityLogSubmitting] = useState(false);
   const [templatePopoverOpen, setTemplatePopoverOpen] = useState(false);
@@ -303,6 +305,37 @@ export default function SalesPipelinePage() {
   // ============================================
   // Dashboard Metrics (computed from opportunities)
   // ============================================
+
+  // Single-pass alert metrics — always from ALL opportunities (unfiltered)
+  const alertMetrics = useMemo(() => {
+    const nowMs = Date.now();
+    const nowIso = new Date().toISOString();
+    const nowDate = new Date();
+    const todayStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+    const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+    const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const pipelineSet = new Set(PIPELINE_STAGES as string[]);
+
+    let overdueFollowups = 0, staleDeals = 0, dealsAtRisk = 0, meetingsThisWeek = 0, meetingsToday = 0;
+    const closingStages = new Set(['discovery_done', 'proposal_call', 'v2_contract']);
+
+    for (const o of opportunities) {
+      const isPipeline = pipelineSet.has(o.stage);
+      if (isPipeline && o.next_meeting_at) {
+        if (o.next_meeting_at < nowIso) overdueFollowups++;
+        const mt = new Date(o.next_meeting_at);
+        if (mt >= todayStart && mt < weekEnd) meetingsThisWeek++;
+        if (mt >= todayStart && mt < tomorrowStart) meetingsToday++;
+      }
+      if (isPipeline) {
+        const lastDate = o.last_contacted_at || o.last_bump_date || o.created_at;
+        if (!lastDate || Math.floor((nowMs - new Date(lastDate).getTime()) / 86400000) >= 7) staleDeals++;
+      }
+      if (closingStages.has(o.stage) && o.temperature_score < 40) dealsAtRisk++;
+    }
+
+    return { bamfamViolations: metrics.bamfamViolations, overdueFollowups, staleDeals, dealsAtRisk, meetingsThisWeek, meetingsToday };
+  }, [opportunities, metrics.bamfamViolations]);
 
   const dashboardMetrics = useMemo(() => {
     // Filter opportunities by selected time period
@@ -332,107 +365,96 @@ export default function SalesPipelinePage() {
         return true;
       });
     }
-    const pipelineActive = all.filter(o => PIPELINE_STAGES.includes(o.stage as SalesPipelineStage));
-    const closedWon = all.filter(o => o.stage === 'v2_closed_won');
-    const closedLost = all.filter(o => o.stage === 'v2_closed_lost');
-    const inOrbit = all.filter(o => o.stage === 'orbit');
 
-    // Stages past cold_dm = responded
-    const pastColdDm = all.filter(o => o.stage !== 'cold_dm');
-    const coldDmCount = outreachTotal > 0 ? outreachTotal : all.filter(o => o.stage === 'cold_dm').length;
-    const totalDmsSent = all.length; // every opp started as a DM
-    const responseRate = totalDmsSent > 0 ? (pastColdDm.length / totalDmsSent) * 100 : 0;
-
-    // Meetings booked = in booked or any stage after it
-    const bookedAndBeyond = ['booked', 'discovery_done', 'proposal_call', 'v2_contract', 'v2_closed_won'];
-    const meetingsBooked = all.filter(o => bookedAndBeyond.includes(o.stage)).length;
-
-    // Discovery calls = in discovery_done or later
-    const discoveryAndBeyond = ['discovery_done', 'proposal_call', 'v2_contract', 'v2_closed_won'];
-    const discoveryCalls = all.filter(o => discoveryAndBeyond.includes(o.stage)).length;
-
-    // Close rate = won / (won + lost)
-    const totalClosed = closedWon.length + closedLost.length;
-    const closeRate = totalClosed > 0 ? (closedWon.length / totalClosed) * 100 : 0;
-
-    // Avg deal size (closed won)
-    const wonValues = closedWon.map(o => o.deal_value || 0).filter(v => v > 0);
-    const avgDealSize = wonValues.length > 0 ? wonValues.reduce((a, b) => a + b, 0) / wonValues.length : 0;
-
-    // Avg close time (days from created_at to closed_at for won deals)
-    const closeTimes = closedWon
-      .filter(o => o.created_at && o.closed_at)
-      .map(o => (new Date(o.closed_at!).getTime() - new Date(o.created_at).getTime()) / (1000 * 60 * 60 * 24));
-    const avgCloseTime = closeTimes.length > 0 ? closeTimes.reduce((a, b) => a + b, 0) / closeTimes.length : 0;
-
-    // Qualified % = bucket A + B / total
-    const qualifiedCount = all.filter(o => o.bucket === 'A' || o.bucket === 'B').length;
-    const qualifiedPct = all.length > 0 ? (qualifiedCount / all.length) * 100 : 0;
-
-    // Bucket A %
-    const bucketAPct = all.length > 0 ? (all.filter(o => o.bucket === 'A').length / all.length) * 100 : 0;
-
-    // Pipeline value (active)
-    const pipelineValue = pipelineActive.reduce((sum, o) => sum + (o.deal_value || 0), 0);
-
-    // Overdue follow-ups
-    const now = new Date().toISOString();
-    const overdueFollowups = pipelineActive.filter(o =>
-      o.next_meeting_at && o.next_meeting_at < now
-    ).length;
-
-    // Proposals sent
-    const proposalsSent = all.filter(o =>
-      ['proposal_call', 'v2_contract', 'v2_closed_won'].includes(o.stage)
-    ).length;
-
-    // Alert metrics for manager cards
-    const nowDate = new Date();
-    const todayStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
-    const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const meetingsThisWeek = pipelineActive.filter(o =>
-      o.next_meeting_at && new Date(o.next_meeting_at) >= todayStart && new Date(o.next_meeting_at) < weekEnd
-    ).length;
-    const meetingsToday = pipelineActive.filter(o =>
-      o.next_meeting_at && new Date(o.next_meeting_at) >= todayStart && new Date(o.next_meeting_at) < new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
-    ).length;
-
-    // Stale deals: active pipeline deals with no contact in 7+ days
-    const staleDeals = pipelineActive.filter(o => {
-      const lastDate = o.last_contacted_at || o.last_bump_date || o.created_at;
-      if (!lastDate) return true;
-      const daysSince = Math.floor((Date.now() - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24));
-      return daysSince >= 7;
-    }).length;
-
-    // Deals at risk: closing-stage deals (post-discovery) with temp < 40
-    const dealsAtRisk = all.filter(o =>
-      ['discovery_done', 'proposal_call', 'v2_contract'].includes(o.stage) && o.temperature_score < 40
-    ).length;
-
-    // Total revenue (closed won value)
-    const totalRevenue = closedWon.reduce((sum, o) => sum + (o.deal_value || 0), 0);
-
-    // Weighted pipeline = sum of (deal_value * stage_probability)
+    // Single pass to bucket opportunities by stage and accumulate metrics
+    const pipelineSet = new Set(PIPELINE_STAGES as string[]);
+    const bookedSet = new Set(['booked', 'discovery_done', 'proposal_call', 'v2_contract', 'v2_closed_won']);
+    const discoverySet = new Set(['discovery_done', 'proposal_call', 'v2_contract', 'v2_closed_won']);
+    const proposalSet = new Set(['proposal_call', 'v2_contract', 'v2_closed_won']);
+    const closingSet = new Set(['discovery_done', 'proposal_call', 'v2_contract']);
     const stageProbability: Record<string, number> = {
       cold_dm: 0.05, warm: 0.1, tg_intro: 0.15, booked: 0.25,
       discovery_done: 0.4, proposal_call: 0.7, v2_contract: 0.9,
     };
-    const weightedPipeline = pipelineActive.reduce((sum, o) => sum + (o.deal_value || 0) * (stageProbability[o.stage] || 0.1), 0);
 
-    // Bottleneck analysis
+    let coldDmCount = 0, pastColdDm = 0, meetingsBooked = 0, discoveryCalls = 0, proposalsSent = 0;
+    let closedWonCount = 0, closedLostCount = 0, orbitCount = 0;
+    let pipelineValue = 0, weightedPipeline = 0;
+    let wonValueSum = 0, wonValueCount = 0, closeTimeSum = 0, closeTimeCount = 0;
+    let qualifiedCount = 0, bucketACount = 0;
+    let overdueFollowups = 0, staleDeals = 0, dealsAtRisk = 0;
+    let meetingsThisWeek = 0, meetingsToday = 0;
+    const closedWonOpps: typeof all = [];
+    const pipelineActiveOpps: typeof all = [];
+
+    const nowMs = Date.now();
+    const nowIso = new Date().toISOString();
+    const nowDate = new Date();
+    const todayStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+    const tomorrowStart = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+    const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    for (const o of all) {
+      const stage = o.stage;
+      const isPipeline = pipelineSet.has(stage);
+
+      // Stage buckets
+      if (stage === 'cold_dm') coldDmCount++;
+      else pastColdDm++;
+      if (bookedSet.has(stage)) meetingsBooked++;
+      if (discoverySet.has(stage)) discoveryCalls++;
+      if (proposalSet.has(stage)) proposalsSent++;
+      if (stage === 'v2_closed_won') { closedWonCount++; closedWonOpps.push(o); }
+      if (stage === 'v2_closed_lost') closedLostCount++;
+      if (stage === 'orbit') orbitCount++;
+
+      // Pipeline active metrics
+      if (isPipeline) {
+        pipelineActiveOpps.push(o);
+        pipelineValue += o.deal_value || 0;
+        weightedPipeline += (o.deal_value || 0) * (stageProbability[stage] || 0.1);
+        if (o.next_meeting_at) {
+          if (o.next_meeting_at < nowIso) overdueFollowups++;
+          const mt = new Date(o.next_meeting_at);
+          if (mt >= todayStart && mt < weekEnd) meetingsThisWeek++;
+          if (mt >= todayStart && mt < tomorrowStart) meetingsToday++;
+        }
+        const lastDate = o.last_contacted_at || o.last_bump_date || o.created_at;
+        if (!lastDate || Math.floor((nowMs - new Date(lastDate).getTime()) / 86400000) >= 7) staleDeals++;
+      }
+
+      // Deals at risk
+      if (closingSet.has(stage) && o.temperature_score < 40) dealsAtRisk++;
+
+      // Bucket counts
+      if (o.bucket === 'A' || o.bucket === 'B') qualifiedCount++;
+      if (o.bucket === 'A') bucketACount++;
+
+      // Won deal value + close time
+      if (stage === 'v2_closed_won') {
+        const val = o.deal_value || 0;
+        if (val > 0) { wonValueSum += val; wonValueCount++; }
+        if (o.created_at && o.closed_at) {
+          closeTimeSum += (new Date(o.closed_at).getTime() - new Date(o.created_at).getTime()) / 86400000;
+          closeTimeCount++;
+        }
+      }
+    }
+
+    const totalDmsSent = all.length;
+    const totalClosed = closedWonCount + closedLostCount;
+    const totalRevenue = closedWonOpps.reduce((sum, o) => sum + (o.deal_value || 0), 0);
+
+    // Bottleneck analysis (kept as multi-pass — runs on period-filtered data which is smaller)
     const funnelStages: SalesPipelineStage[] = ['cold_dm', 'warm', 'tg_intro', 'booked', 'discovery_done', 'proposal_call', 'v2_contract', 'v2_closed_won'];
     const stageOrder: Record<string, number> = {};
     funnelStages.forEach((s, i) => { stageOrder[s] = i; });
 
-    // Count how many opps ever reached each stage (current stage or beyond)
     const reachedStage = funnelStages.map(stage => {
       const idx = stageOrder[stage];
-      // Opps currently at this stage or later (including orbit/lost which came from somewhere)
       return all.filter(o => {
         const oIdx = stageOrder[o.stage];
         if (oIdx !== undefined) return oIdx >= idx;
-        // Orbit/lost — estimate their furthest stage from timestamps
         if (o.stage === 'orbit' || o.stage === 'v2_closed_lost') {
           if (o.proposal_sent_at && idx <= stageOrder['proposal_call']) return true;
           if (o.discovery_call_at && idx <= stageOrder['discovery_done']) return true;
@@ -445,57 +467,43 @@ export default function SalesPipelinePage() {
       }).length;
     });
 
-    // Stage conversion rates (from one stage to the next)
     const stageConversions = funnelStages.slice(0, -1).map((stage, i) => {
       const from = reachedStage[i];
       const to = reachedStage[i + 1];
-      const rate = from > 0 ? (to / from) * 100 : 0;
-      const dropoff = from - to;
-      return { stage, nextStage: funnelStages[i + 1], from, to, rate, dropoff };
+      return { stage, nextStage: funnelStages[i + 1], from, to, rate: from > 0 ? (to / from) * 100 : 0, dropoff: from - to };
     });
 
-    // Avg days in current stage (for active pipeline deals)
     const avgDaysInStage = funnelStages.slice(0, -1).map(stage => {
-      const oppsInStage = pipelineActive.filter(o => o.stage === stage);
+      const oppsInStage = pipelineActiveOpps.filter(o => o.stage === stage);
       if (oppsInStage.length === 0) return { stage, avgDays: 0, count: 0 };
-      const totalDays = oppsInStage.reduce((sum, o) => {
-        const days = Math.floor((Date.now() - new Date(o.updated_at).getTime()) / (1000 * 60 * 60 * 24));
-        return sum + days;
-      }, 0);
+      const totalDays = oppsInStage.reduce((sum, o) => sum + Math.floor((nowMs - new Date(o.updated_at).getTime()) / 86400000), 0);
       return { stage, avgDays: Math.round(totalDays / oppsInStage.length), count: oppsInStage.length };
     });
 
-    // Identify the biggest bottleneck: stage with lowest conversion rate (min 3 opps entering)
     const significantConversions = stageConversions.filter(c => c.from >= 3);
-    const worstConversion = significantConversions.length > 0
-      ? significantConversions.reduce((worst, c) => c.rate < worst.rate ? c : worst)
-      : null;
-
-    // Identify the slowest stage: where deals sit the longest
+    const worstConversion = significantConversions.length > 0 ? significantConversions.reduce((w, c) => c.rate < w.rate ? c : w) : null;
     const significantStages = avgDaysInStage.filter(s => s.count >= 2);
-    const slowestStage = significantStages.length > 0
-      ? significantStages.reduce((slowest, s) => s.avgDays > slowest.avgDays ? s : slowest)
-      : null;
+    const slowestStage = significantStages.length > 0 ? significantStages.reduce((s, c) => c.avgDays > s.avgDays ? c : s) : null;
 
     return {
       totalDmsSent,
-      responseRate,
+      responseRate: totalDmsSent > 0 ? (pastColdDm / totalDmsSent) * 100 : 0,
       meetingsBooked,
       discoveryCalls,
-      closeRate,
-      avgDealSize,
-      avgCloseTime,
-      qualifiedPct,
-      bucketAPct,
+      closeRate: totalClosed > 0 ? (closedWonCount / totalClosed) * 100 : 0,
+      avgDealSize: wonValueCount > 0 ? wonValueSum / wonValueCount : 0,
+      avgCloseTime: closeTimeCount > 0 ? closeTimeSum / closeTimeCount : 0,
+      qualifiedPct: all.length > 0 ? (qualifiedCount / all.length) * 100 : 0,
+      bucketAPct: all.length > 0 ? (bucketACount / all.length) * 100 : 0,
       pipelineValue,
-      activeDeals: pipelineActive.length,
+      activeDeals: pipelineActiveOpps.length,
       overdueFollowups,
       bamfamViolations: metrics.bamfamViolations,
-      closedWon: closedWon.length,
-      closedLost: closedLost.length,
-      inOrbit: inOrbit.length,
+      closedWon: closedWonCount,
+      closedLost: closedLostCount,
+      inOrbit: orbitCount,
       proposalsSent,
-      coldDmCount,
+      coldDmCount: outreachTotal > 0 ? outreachTotal : coldDmCount,
       meetingsThisWeek,
       meetingsToday,
       staleDeals,
@@ -508,43 +516,6 @@ export default function SalesPipelinePage() {
       slowestStage,
     };
   }, [opportunities, metrics.bamfamViolations, outreachTotal, dashboardPeriod, dashboardCustomFrom, dashboardCustomTo]);
-
-  // Alert metrics — always computed from ALL opportunities (unfiltered)
-  const alertMetrics = useMemo(() => {
-    const all = opportunities;
-    const pipelineActive = all.filter(o => PIPELINE_STAGES.includes(o.stage as SalesPipelineStage));
-
-    const nowDate = new Date();
-    const todayStart = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
-    const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-    const bamfamViolations = metrics.bamfamViolations;
-
-    const now = new Date().toISOString();
-    const overdueFollowups = pipelineActive.filter(o =>
-      o.next_meeting_at && o.next_meeting_at < now
-    ).length;
-
-    const staleDeals = pipelineActive.filter(o => {
-      const lastDate = o.last_contacted_at || o.last_bump_date || o.created_at;
-      if (!lastDate) return true;
-      const daysSince = Math.floor((Date.now() - new Date(lastDate).getTime()) / (1000 * 60 * 60 * 24));
-      return daysSince >= 7;
-    }).length;
-
-    const dealsAtRisk = all.filter(o =>
-      ['discovery_done', 'proposal_call', 'v2_contract'].includes(o.stage) && o.temperature_score < 40
-    ).length;
-
-    const meetingsThisWeek = pipelineActive.filter(o =>
-      o.next_meeting_at && new Date(o.next_meeting_at) >= todayStart && new Date(o.next_meeting_at) < weekEnd
-    ).length;
-    const meetingsToday = pipelineActive.filter(o =>
-      o.next_meeting_at && new Date(o.next_meeting_at) >= todayStart && new Date(o.next_meeting_at) < new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
-    ).length;
-
-    return { bamfamViolations, overdueFollowups, staleDeals, dealsAtRisk, meetingsThisWeek, meetingsToday };
-  }, [opportunities, metrics.bamfamViolations]);
 
   // ============================================
   // Data Fetching
@@ -636,8 +607,18 @@ export default function SalesPipelinePage() {
     return true;
   }), [opportunities, pipelineSearch, pathFilter]);
 
-  const getStageOpps = (stage: SalesPipelineStage) =>
-    filteredOpportunities.filter(o => o.stage === stage).sort((a, b) => a.position - b.position);
+  const oppsByStage = useMemo(() => {
+    const map = new Map<SalesPipelineStage, SalesPipelineOpportunity[]>();
+    for (const o of filteredOpportunities) {
+      const stage = o.stage as SalesPipelineStage;
+      if (!map.has(stage)) map.set(stage, []);
+      map.get(stage)!.push(o);
+    }
+    map.forEach(arr => arr.sort((a, b) => (a.position ?? 0) - (b.position ?? 0)));
+    return map;
+  }, [filteredOpportunities]);
+
+  const getStageOpps = (stage: SalesPipelineStage) => oppsByStage.get(stage) || [];
 
   const visiblePipelineStages = (pathFilter === 'closer' ? PATH_A_STAGES : PIPELINE_STAGES).filter(s => s !== 'cold_dm');
 
@@ -647,6 +628,14 @@ export default function SalesPipelinePage() {
     ...r,
     opps: orbitOpps.filter(o => o.orbit_reason === r.value),
   })), [orbitOpps]);
+
+  // Memoized outreach grouping — sort by name and count POCs per project
+  const { sortedOutreach, outreachNameCounts } = useMemo(() => {
+    const sorted = [...outreachOpps].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const counts = new Map<string, number>();
+    sorted.forEach(o => counts.set(o.name || '', (counts.get(o.name || '') || 0) + 1));
+    return { sortedOutreach: sorted, outreachNameCounts: counts };
+  }, [outreachOpps]);
 
   // ============================================
   // CRUD Handlers
@@ -756,15 +745,7 @@ export default function SalesPipelinePage() {
       const updateData: any = { stage: newStage as OpportunityStage };
       // Mark last_contacted_at so the past-meeting check knows the outcome was handled
       updateData.last_contacted_at = new Date().toISOString();
-      // Auto-add Jdot as co-owner when call is booked
-      if (newStage === 'booked') {
-        const JDOT_ID = '3dcaa757-1f34-4945-8a7e-3853177864a5';
-        const opp = opportunities.find(o => o.id === oppId);
-        const existingCoOwners = opp?.co_owner_ids || [];
-        if (opp?.owner_id !== JDOT_ID && !existingCoOwners.includes(JDOT_ID)) {
-          updateData.co_owner_ids = [...existingCoOwners, JDOT_ID];
-        }
-      }
+      // Note: co-owners are now assigned in the activity log popup when booking a meeting
       await SalesPipelineService.update(oppId, updateData);
       await fetchData();
       if (activeTab === 'outreach') await fetchOutreach();
@@ -1514,7 +1495,20 @@ export default function SalesPipelinePage() {
         }
       }
     }
-    setActivityLogForm({ title, description: defaultDescription, outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined });
+    // Pre-populate co-owners when booking a meeting (showMeetingPicker = true)
+    let defaultCoOwners: string[] | undefined;
+    if (showMeetingPicker) {
+      const JDOT_ID = '3dcaa757-1f34-4945-8a7e-3853177864a5';
+      const opp = opportunities.find(o => o.id === oppId);
+      const existing = opp?.co_owner_ids || [];
+      // Add Jdot as default co-owner if not already present and not the owner
+      if (opp?.owner_id !== JDOT_ID && !existing.includes(JDOT_ID)) {
+        defaultCoOwners = [...existing, JDOT_ID];
+      } else {
+        defaultCoOwners = [...existing];
+      }
+    }
+    setActivityLogForm({ title, description: defaultDescription, outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined, co_owner_ids: defaultCoOwners });
   };
 
   const handleActionExecute = async (oppId: string, action: ReturnType<typeof getNextAction>, opp: SalesPipelineOpportunity) => {
@@ -1588,9 +1582,13 @@ export default function SalesPipelinePage() {
         }
         activityUpdate.next_meeting_at = meetingDate.toISOString();
       }
+      // Update co-owners if changed
+      if (activityLogPrompt.showMeetingPicker && activityLogForm.co_owner_ids) {
+        activityUpdate.co_owner_ids = activityLogForm.co_owner_ids;
+      }
       await SalesPipelineService.update(activityLogPrompt.oppId, activityUpdate);
       setActivityLogPrompt(null);
-      setActivityLogForm({ title: '', description: '', outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined });
+      setActivityLogForm({ title: '', description: '', outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined, co_owner_ids: undefined });
       await fetchData();
       if (activeTab === 'outreach') await fetchOutreach();
     } catch (err) {
@@ -2377,8 +2375,8 @@ export default function SalesPipelinePage() {
             <TableHeader>
               <TableRow className="bg-gray-50/50">
                 <TableHead className="w-10"></TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead className="w-[150px]">POC</TableHead>
+                <TableHead className="min-w-[160px]">Name</TableHead>
+                <TableHead className="w-[200px] max-w-[200px]">POC</TableHead>
                 <TableHead className="w-[80px]">Bumps</TableHead>
                 <TableHead className="w-[150px]">TG Handle</TableHead>
                 <TableHead className="w-[80px]">Source</TableHead>
@@ -2395,13 +2393,18 @@ export default function SalesPipelinePage() {
                     No opportunities in this stage
                   </TableCell>
                 </TableRow>
-              ) : outreachOpps.map((opp, index) => {
+              ) : sortedOutreach.map((opp, index) => {
                 const isChecked = selectedOutreach.includes(opp.id);
                 const rowNum = outreachStart + index;
+                const prevName = index > 0 ? sortedOutreach[index - 1].name : null;
+                const isFirstInGroup = opp.name !== prevName;
+                const groupCount = outreachNameCounts.get(opp.name || '') || 1;
+                const nextName = index < sortedOutreach.length - 1 ? sortedOutreach[index + 1].name : null;
+                const isLastInGroup = opp.name !== nextName;
                 return (
                   <TableRow
                     key={opp.id}
-                    className="group hover:bg-gray-50 cursor-pointer"
+                    className={`group hover:bg-gray-50 cursor-pointer ${!isFirstInGroup ? 'border-t-0' : ''} ${isLastInGroup && groupCount > 1 ? 'border-b-2 border-b-gray-200' : ''}`}
                     onClick={() => openSlideOver(opp)}
                   >
                     <TableCell className="text-gray-500 text-sm w-10" onClick={e => e.stopPropagation()}>
@@ -2424,17 +2427,45 @@ export default function SalesPipelinePage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 rounded px-2 py-1 -mx-2 -my-1">
-                        <Building2 className="h-4 w-4 text-gray-400" />
-                        <span className="font-medium">{opp.name}</span>
-                      </div>
+                    <TableCell className={`${!isFirstInGroup ? 'pt-0' : ''}`}>
+                      {isFirstInGroup ? (
+                        <div className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-100 rounded px-2 py-1 -mx-2 -my-1 whitespace-nowrap overflow-hidden">
+                          <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
+                          <span className="font-medium truncate">{opp.name}</span>
+                          {groupCount > 1 && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium shrink-0 whitespace-nowrap">{groupCount} POCs</span>
+                          )}
+                          <button
+                            className="shrink-0 ml-auto opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400 hover:text-[#3e8692]"
+                            title="Add another POC for this project"
+                            onClick={e => {
+                              e.stopPropagation();
+                              setForm({
+                                name: opp.name,
+                                stage: 'cold_dm' as OpportunityStage,
+                                dm_account: opp.dm_account,
+                                bucket: opp.bucket || undefined,
+                                source: opp.source || undefined,
+                                owner_id: opp.owner_id || undefined,
+                                co_owner_ids: opp.co_owner_ids || undefined,
+                                referrer: opp.referrer || undefined,
+                                affiliate_id: opp.affiliate_id || undefined,
+                              });
+                              setIsCreateOpen(true);
+                            }}
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="pl-8 text-gray-300 text-xs">└</div>
+                      )}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap">
+                    <TableCell className="whitespace-nowrap max-w-[200px] overflow-hidden">
                       {opp.poc_handle ? (
-                        <div className="flex items-center gap-1.5">
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">{opp.poc_platform || 'other'}</Badge>
-                          <span className="text-xs text-gray-600">{cleanPocHandle(opp.poc_handle)}</span>
+                        <div className="flex items-center gap-1.5 overflow-hidden">
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize shrink-0">{opp.poc_platform || 'other'}</Badge>
+                          <span className="text-xs text-gray-600 truncate">{cleanPocHandle(opp.poc_handle)}</span>
                         </div>
                       ) : (
                         <span className="text-gray-400">—</span>
@@ -4379,7 +4410,7 @@ export default function SalesPipelinePage() {
     };
 
     return (
-      <Dialog open={!!activityLogPrompt} onOpenChange={open => { if (!open) { setActivityLogPrompt(null); setActivityLogForm({ title: '', description: '', outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined }); } }}>
+      <Dialog open={!!activityLogPrompt} onOpenChange={open => { if (!open) { setActivityLogPrompt(null); setActivityLogForm({ title: '', description: '', outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined, co_owner_ids: undefined }); } }}>
         <DialogContent className="sm:max-w-md z-[80] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Log Activity — {activityLogPrompt?.oppName}</DialogTitle>
@@ -4612,6 +4643,36 @@ export default function SalesPipelinePage() {
               </div>
             )}
 
+            {/* Co-Owners — shown when booking a meeting */}
+            {activityLogPrompt?.showMeetingPicker && (
+              <div className="grid gap-1.5">
+                <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Co-Owners for this Meeting</Label>
+                <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 border rounded-md bg-white">
+                  {(activityLogForm.co_owner_ids || []).map(id => {
+                    const u = users.find(u => u.id === id);
+                    return (
+                      <span key={id} className="inline-flex items-center gap-1 bg-[#3e8692]/10 text-[#3e8692] text-xs px-2 py-0.5 rounded-full">
+                        {u?.name || u?.email || id}
+                        <button type="button" onClick={() => setActivityLogForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-red-500 ml-0.5">&times;</button>
+                      </span>
+                    );
+                  })}
+                  <Select value="" onValueChange={v => {
+                    if (v && !(activityLogForm.co_owner_ids || []).includes(v)) {
+                      setActivityLogForm(f => ({ ...f, co_owner_ids: [...(f.co_owner_ids || []), v] }));
+                    }
+                  }}>
+                    <SelectTrigger className="border-none shadow-none bg-transparent h-6 w-auto px-1 text-xs text-gray-400 focus:ring-0"><SelectValue placeholder="+ Add" /></SelectTrigger>
+                    <SelectContent>
+                      {users.filter(u => !(activityLogForm.co_owner_ids || []).includes(u.id)).map(u => (
+                        <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
             {/* Description */}
             <div className="grid gap-1.5">
               <div className="flex items-center justify-between">
@@ -4693,7 +4754,7 @@ export default function SalesPipelinePage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setActivityLogPrompt(null); setActivityLogForm({ title: '', description: '', outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined }); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setActivityLogPrompt(null); setActivityLogForm({ title: '', description: '', outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined, co_owner_ids: undefined }); }}>Cancel</Button>
             <Button
               onClick={confirmActivityLog}
               disabled={isActivityLogSubmitting}
@@ -5419,7 +5480,7 @@ export default function SalesPipelinePage() {
       </Card>
 
       {/* Tabs + Controls */}
-      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates')}>
+      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'agents')}>
         <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <TabsList>
             <TabsTrigger value="overview" className="flex items-center gap-2">
@@ -5463,6 +5524,10 @@ export default function SalesPipelinePage() {
             <TabsTrigger value="templates" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               Templates
+            </TabsTrigger>
+            <TabsTrigger value="agents" className="flex items-center gap-2">
+              <Bot className="h-4 w-4" />
+              AI Agents
             </TabsTrigger>
           </TabsList>
 
@@ -6100,6 +6165,10 @@ export default function SalesPipelinePage() {
               </div>
             );
           })()}
+        </TabsContent>
+
+        <TabsContent value="agents" className="mt-0">
+          <AgentDashboard />
         </TabsContent>
       </Tabs>
 
