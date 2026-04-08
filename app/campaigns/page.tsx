@@ -250,9 +250,9 @@ export default function CampaignsPage() {
       await Promise.all(
         fetchedCampaigns.map(async (campaign) => {
           try {
-            const [contentsRes, kolsRes] = await Promise.all([
+            const [contentsRes, paymentsRes] = await Promise.all([
               supabase.from('contents').select('id, status, campaign_kols_id').eq('campaign_id', campaign.id),
-              supabase.from('campaign_kols').select('id, allocated_budget, paid').eq('campaign_id', campaign.id),
+              supabase.from('payments').select('content_id, amount, payment_date, campaign_kol_id').eq('campaign_id', campaign.id),
             ]);
 
             if (!contentsRes.error && contentsRes.data) {
@@ -264,19 +264,21 @@ export default function CampaignsPage() {
               ).length;
               counts[campaign.id] = { total, posted };
 
-              // Count fully paid contents: content is fully paid when its KOL has paid >= allocated_budget
-              const fullyPaidKolIds = new Set<string>();
-              if (!kolsRes.error && kolsRes.data) {
-                kolsRes.data.forEach(kol => {
-                  const budget = Number(kol.allocated_budget) || 0;
-                  const paid = Number(kol.paid) || 0;
-                  if (budget > 0 && paid >= budget) {
-                    fullyPaidKolIds.add(kol.id);
-                  }
-                });
-              }
+              // Content is paid only if it is directly linked to a payment
+              // that has both amount > 0 and payment_date set
+              const payments = paymentsRes.data || [];
+              const paidContentIds = new Set<string>();
+
+              payments.forEach(p => {
+                if (Number(p.amount) > 0 && p.payment_date && p.content_id) {
+                  // content_id can be a single id or JSON array
+                  const ids = Array.isArray(p.content_id) ? p.content_id : [p.content_id];
+                  ids.forEach((id: string) => { if (id && id !== 'none') paidContentIds.add(id); });
+                }
+              });
+
               const fullyPaidContentCount = contentsRes.data.filter(c =>
-                c.campaign_kols_id && fullyPaidKolIds.has(c.campaign_kols_id)
+                paidContentIds.has(c.id)
               ).length;
               paidCounts[campaign.id] = fullyPaidContentCount;
             }
