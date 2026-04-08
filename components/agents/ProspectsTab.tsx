@@ -467,6 +467,26 @@ export default function ProspectsTab() {
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setSelected([])}>Deselect</Button>
           <div className="flex-1" />
           <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+            onClick={async () => {
+              setBulkActing(true);
+              try {
+                await fetch('/api/prospects/promote', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ ids: selected, status: 'reviewed' }),
+                });
+                setSelected([]);
+                fetchProspects();
+              } finally { setBulkActing(false); }
+            }}
+            disabled={bulkActing}
+          >
+            <Eye className="h-3 w-3 mr-1" /> Mark Potential
+          </Button>
+          <Button
             size="sm"
             className="h-7 text-xs text-white"
             style={{ backgroundColor: '#3e8692' }}

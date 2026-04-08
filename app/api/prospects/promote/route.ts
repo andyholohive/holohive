@@ -49,13 +49,22 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const status = body.status;
 
-    if (body.ids && Array.isArray(body.ids) && status === 'dismissed') {
-      await ProspectsService.bulkDismiss(body.ids);
-      return NextResponse.json({ success: true });
+    if (body.ids && Array.isArray(body.ids) && status) {
+      // Bulk status update — works for any status (dismissed, reviewed, needs_review, new)
+      const { error } = await supabase
+        .from('prospects')
+        .update({ status, updated_at: new Date().toISOString() })
+        .in('id', body.ids);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ success: true, updated: body.ids.length });
     }
 
     if (body.id && status) {
-      await ProspectsService.updateStatus(body.id, status);
+      const { error } = await supabase
+        .from('prospects')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', body.id);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ success: true });
     }
 
