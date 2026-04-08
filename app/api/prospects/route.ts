@@ -29,7 +29,15 @@ export async function GET(request: Request) {
       .from('prospects')
       .select('*', { count: 'exact' });
 
-    if (status && status !== 'all') query = query.eq('status', status);
+    if (status && status !== 'all') {
+      if (status === 'new') {
+        query = query.or('status.eq.new,status.is.null');
+      } else if (status === 'needs_review') {
+        query = query.eq('status', 'needs_review');
+      } else {
+        query = query.eq('status', status);
+      }
+    }
     if (category) query = query.eq('category', category);
     if (search) query = query.ilike('name', `%${search}%`);
 
@@ -38,14 +46,19 @@ export async function GET(request: Request) {
     const { data, error, count } = await query;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Also fetch categories for filter dropdown
-    const { data: catData } = await supabase
-      .from('prospects')
-      .select('category')
-      .not('category', 'is', null);
-    const categories = [...new Set((catData || []).map(d => d.category).filter(Boolean))].sort();
+    // Also fetch categories and status counts
+    const [catRes, statusRes] = await Promise.all([
+      supabase.from('prospects').select('category').not('category', 'is', null),
+      supabase.from('prospects').select('status'),
+    ]);
+    const categories = [...new Set((catRes.data || []).map(d => d.category).filter(Boolean))].sort();
+    const statusCounts: Record<string, number> = {};
+    (statusRes.data || []).forEach(d => {
+      const s = d.status || 'new'; // Treat null as 'new'
+      statusCounts[s] = (statusCounts[s] || 0) + 1;
+    });
 
-    return NextResponse.json({ data: data || [], count: count || 0, categories });
+    return NextResponse.json({ data: data || [], count: count || 0, categories, statusCounts });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

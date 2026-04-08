@@ -12,9 +12,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import ICPSettingsDialog from './ICPSettingsDialog';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import {
   Search, Globe, ExternalLink, ArrowRight, XCircle, MoreHorizontal,
-  Loader2, ChevronLeft, ChevronRight, CheckCircle, Eye, Download, Trash2,
+  Loader2, ChevronLeft, ChevronRight, CheckCircle, Eye, Download, Trash2, Settings,
 } from 'lucide-react';
 
 interface Prospect {
@@ -33,16 +35,18 @@ interface Prospect {
   source_url: string | null;
   source: string;
   status: string;
+  icp_score: number;
   scraped_at: string;
 }
 
 const PAGE_SIZE = 50;
 
-const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
-  new: { bg: 'bg-blue-50', text: 'text-blue-700' },
-  reviewed: { bg: 'bg-amber-50', text: 'text-amber-700' },
-  promoted: { bg: 'bg-emerald-50', text: 'text-emerald-700' },
-  dismissed: { bg: 'bg-gray-50', text: 'text-gray-500' },
+const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  new: { bg: 'bg-gray-50', text: 'text-gray-600', label: 'Not Checked' },
+  needs_review: { bg: 'bg-blue-50', text: 'text-blue-700', label: 'Needs Review' },
+  reviewed: { bg: 'bg-emerald-50', text: 'text-emerald-700', label: 'Potential' },
+  promoted: { bg: 'bg-teal-50', text: 'text-teal-700', label: 'Promoted' },
+  dismissed: { bg: 'bg-gray-50', text: 'text-gray-400', label: 'Dismissed' },
 };
 
 export default function ProspectsTab() {
@@ -56,9 +60,10 @@ export default function ProspectsTab() {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('new');
+  const [statusFilter, setStatusFilter] = useState('reviewed');
   const [categoryFilter, setCategoryFilter] = useState('');
-  const [sortBy, setSortBy] = useState('scraped_at');
+  const [sortBy, setSortBy] = useState('icp_score');
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
 
   // Action loading
   const [promoting, setPromoting] = useState<string | null>(null);
@@ -74,6 +79,7 @@ export default function ProspectsTab() {
   const [scraperResult, setScraperResult] = useState<{ scraped: number; inserted: number; errors: number } | null>(null);
   const [scraperError, setScraperError] = useState<string | null>(null);
   const [scraperCategory, setScraperCategory] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const SOURCES = [
     { value: 'coingecko' as const, label: 'CoinGecko', description: 'Up to 10,000+ coins, works on Vercel', maxPerRequest: 250 },
@@ -140,6 +146,7 @@ export default function ProspectsTab() {
         setProspects(data.data || []);
         setTotal(data.count || 0);
         if (data.categories) setCategories(data.categories);
+        if (data.statusCounts) setStatusCounts(data.statusCounts);
       }
     } catch (err) {
       console.error('Error fetching prospects:', err);
@@ -280,6 +287,30 @@ export default function ProspectsTab() {
     return `$${p.toPrecision(3)}`;
   };
 
+  const getScoreReason = (p: Prospect) => {
+    const reasons: string[] = [];
+    if (p.icp_score === 0) {
+      reasons.push('No score — may be disqualified or missing data');
+      return reasons;
+    }
+    if (p.category) reasons.push(`Category: ${p.category}`);
+    else reasons.push('No category data');
+    if (p.market_cap) {
+      const mc = Number(p.market_cap);
+      if (mc >= 1e9) reasons.push(`Market cap: $${(mc/1e9).toFixed(1)}B`);
+      else if (mc >= 1e6) reasons.push(`Market cap: $${(mc/1e6).toFixed(0)}M`);
+      else reasons.push(`Market cap: $${mc.toLocaleString()}`);
+    } else reasons.push('No market cap data');
+    const links = [p.website_url && 'Website', p.twitter_url && 'Twitter', p.telegram_url && 'Telegram'].filter(Boolean);
+    if (links.length > 0) reasons.push(`Links: ${links.join(', ')}`);
+    else reasons.push('No links available');
+
+    if (p.icp_score >= 70) reasons.push('→ Potential (score 70+)');
+    else if (p.icp_score >= 40) reasons.push('→ Needs Review (score 40-69)');
+    else reasons.push('→ Dismissed (score < 40)');
+    return reasons;
+  };
+
   const LinkIcon = ({ url, icon: Icon, label }: { url: string | null; icon: any; label: string }) => {
     if (!url) return null;
     return (
@@ -344,7 +375,43 @@ export default function ProspectsTab() {
   };
 
   return (
+    <TooltipProvider>
     <div className="pb-8">
+      {/* Status Sub-tabs */}
+      <div className="flex items-center gap-1 mb-4">
+        {[
+          { value: 'reviewed', label: 'Potential' },
+          { value: 'needs_review', label: 'Needs Review' },
+          { value: 'new', label: 'Not Checked' },
+          { value: 'promoted', label: 'Promoted' },
+          { value: 'dismissed', label: 'Dismissed' },
+          { value: 'all', label: 'All' },
+        ].map(tab => (
+          <button
+            key={tab.value}
+            onClick={() => { setStatusFilter(tab.value); setPage(1); setSelected([]); }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              statusFilter === tab.value
+                ? 'text-white'
+                : 'text-gray-600 hover:bg-gray-100 border border-transparent'
+            }`}
+            style={statusFilter === tab.value ? { backgroundColor: '#3e8692' } : {}}
+          >
+            {tab.label}
+            {statusCounts[tab.value] != null && tab.value !== 'all' && (
+              <span className={`ml-1.5 text-[10px] font-semibold ${statusFilter === tab.value ? 'opacity-80' : 'opacity-60'}`}>
+                {statusCounts[tab.value] || 0}
+              </span>
+            )}
+            {tab.value === 'all' && (
+              <span className={`ml-1.5 text-[10px] font-semibold ${statusFilter === 'all' ? 'opacity-80' : 'opacity-60'}`}>
+                {Object.values(statusCounts).reduce((a, b) => a + b, 0)}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
       {/* Filters + Scraper Button */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-xs">
@@ -355,16 +422,6 @@ export default function ProspectsTab() {
             className="pl-9 h-9 text-sm auth-input"
           />
         </div>
-        <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(1); setSelected([]); }}>
-          <SelectTrigger className="h-9 w-auto text-sm auth-input [&>span]:truncate-none [&>span]:line-clamp-none"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="new">New</SelectItem>
-            <SelectItem value="reviewed">Reviewed</SelectItem>
-            <SelectItem value="promoted">Promoted</SelectItem>
-            <SelectItem value="dismissed">Dismissed</SelectItem>
-          </SelectContent>
-        </Select>
         <Select value={categoryFilter || 'all'} onValueChange={v => { setCategoryFilter(v === 'all' ? '' : v); setPage(1); setSelected([]); }}>
           <SelectTrigger className="h-9 w-auto text-sm auth-input [&>span]:truncate-none [&>span]:line-clamp-none"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -375,12 +432,22 @@ export default function ProspectsTab() {
         <Select value={sortBy} onValueChange={v => { setSortBy(v); setPage(1); }}>
           <SelectTrigger className="h-9 w-auto text-sm auth-input [&>span]:truncate-none [&>span]:line-clamp-none"><SelectValue /></SelectTrigger>
           <SelectContent>
+            <SelectItem value="icp_score">ICP Score</SelectItem>
             <SelectItem value="scraped_at">Latest Scraped</SelectItem>
             <SelectItem value="market_cap">Market Cap</SelectItem>
             <SelectItem value="name">Name</SelectItem>
           </SelectContent>
         </Select>
         <div className="flex-1" />
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9"
+          onClick={() => setSettingsOpen(true)}
+        >
+          <Settings className="w-4 h-4 mr-1.5" />
+          ICP Settings
+        </Button>
         <Button
           size="sm"
           onClick={() => { setScraperResult(null); setScraperError(null); setScraperOpen(true); }}
@@ -458,6 +525,7 @@ export default function ProspectsTab() {
                 <TableHead className="whitespace-nowrap">Market Cap</TableHead>
                 <TableHead className="w-[80px]">Price</TableHead>
                 <TableHead className="w-[80px]">Links</TableHead>
+                <TableHead className="w-[60px]">ICP</TableHead>
                 <TableHead className="w-[80px]">Status</TableHead>
                 <TableHead className="w-[90px]">Scraped</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -466,7 +534,7 @@ export default function ProspectsTab() {
             <TableBody>
               {prospects.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-16">
+                  <TableCell colSpan={10} className="text-center py-16">
                     <Globe className="w-10 h-10 mx-auto mb-3 text-gray-300" />
                     <p className="text-sm font-medium text-gray-700 mb-1">No prospects yet</p>
                     <p className="text-xs text-gray-400 mb-4">Import projects from DropsTab to start discovering new prospects.</p>
@@ -531,8 +599,30 @@ export default function ProspectsTab() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize ${statusStyle.bg} ${statusStyle.text}`}>
-                        {p.status}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className={`text-xs font-bold px-1.5 py-0.5 rounded cursor-help ${
+                            p.icp_score >= 70 ? 'bg-emerald-100 text-emerald-700' :
+                            p.icp_score >= 40 ? 'bg-amber-100 text-amber-700' :
+                            p.icp_score > 0 ? 'bg-gray-100 text-gray-500' :
+                            'bg-gray-50 text-gray-300'
+                          }`}>
+                            {p.icp_score || '—'}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="max-w-[220px]">
+                          <div className="text-xs space-y-0.5">
+                            <div className="font-semibold mb-1">ICP Score: {p.icp_score}/100</div>
+                            {getScoreReason(p).map((r, i) => (
+                              <div key={i} className={r.startsWith('→') ? 'font-medium mt-1' : 'text-gray-300'}>{r}</div>
+                            ))}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusStyle.bg} ${statusStyle.text}`}>
+                        {statusStyle.label}
                       </span>
                     </TableCell>
                     <TableCell className="text-xs text-gray-500">
@@ -560,7 +650,7 @@ export default function ProspectsTab() {
                               body: JSON.stringify({ id: p.id, status: 'reviewed' }),
                             }).then(() => fetchProspects());
                           }}>
-                            <Eye className="h-4 w-4 mr-2" /> Mark Reviewed
+                            <Eye className="h-4 w-4 mr-2" /> Mark as Potential
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => handleDismiss(p.id)} className="text-gray-500">
@@ -607,6 +697,13 @@ export default function ProspectsTab() {
           </div>
         </div>
       )}
+
+      {/* ICP Settings Dialog */}
+      <ICPSettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        onScoresUpdated={() => fetchProspects()}
+      />
 
       {/* Scraper Dialog */}
       <Dialog open={scraperOpen} onOpenChange={setScraperOpen}>
@@ -776,5 +873,6 @@ export default function ProspectsTab() {
         </DialogContent>
       </Dialog>
     </div>
+    </TooltipProvider>
   );
 }
