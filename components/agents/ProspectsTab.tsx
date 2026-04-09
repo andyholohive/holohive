@@ -13,10 +13,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import ICPSettingsDialog from './ICPSettingsDialog';
+import KoreaSignalsPanel from './KoreaSignalsPanel';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import {
   Search, Globe, ExternalLink, ArrowRight, XCircle, MoreHorizontal,
-  Loader2, ChevronLeft, ChevronRight, CheckCircle, Eye, Download, Trash2, Settings,
+  Loader2, ChevronLeft, ChevronRight, CheckCircle, Eye, Download, Trash2, Settings, Radar,
 } from 'lucide-react';
 
 interface Prospect {
@@ -36,6 +37,8 @@ interface Prospect {
   source: string;
   status: string;
   icp_score: number;
+  korea_relevancy_score: number;
+  korea_signal_count: number;
   scraped_at: string;
 }
 
@@ -80,6 +83,7 @@ export default function ProspectsTab() {
   const [scraperError, setScraperError] = useState<string | null>(null);
   const [scraperCategory, setScraperCategory] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'prospects' | 'korea_signals'>('prospects');
 
   const SOURCES = [
     { value: 'coingecko' as const, label: 'CoinGecko', description: 'Up to 10,000+ coins, works on Vercel', maxPerRequest: 250 },
@@ -377,8 +381,9 @@ export default function ProspectsTab() {
   return (
     <TooltipProvider>
     <div className="pb-8">
-      {/* Status Sub-tabs */}
+      {/* View Mode Toggle + Status Sub-tabs */}
       <div className="flex items-center gap-1 mb-4">
+        {/* Prospects view tabs */}
         {[
           { value: 'reviewed', label: 'Potential' },
           { value: 'needs_review', label: 'Needs Review' },
@@ -389,29 +394,53 @@ export default function ProspectsTab() {
         ].map(tab => (
           <button
             key={tab.value}
-            onClick={() => { setStatusFilter(tab.value); setPage(1); setSelected([]); }}
+            onClick={() => { setViewMode('prospects'); setStatusFilter(tab.value); setPage(1); setSelected([]); }}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              statusFilter === tab.value
+              viewMode === 'prospects' && statusFilter === tab.value
                 ? 'text-white'
                 : 'text-gray-600 hover:bg-gray-100 border border-transparent'
             }`}
-            style={statusFilter === tab.value ? { backgroundColor: '#3e8692' } : {}}
+            style={viewMode === 'prospects' && statusFilter === tab.value ? { backgroundColor: '#3e8692' } : {}}
           >
             {tab.label}
             {statusCounts[tab.value] != null && tab.value !== 'all' && (
-              <span className={`ml-1.5 text-[10px] font-semibold ${statusFilter === tab.value ? 'opacity-80' : 'opacity-60'}`}>
+              <span className={`ml-1.5 text-[10px] font-semibold ${(viewMode === 'prospects' && statusFilter === tab.value) ? 'opacity-80' : 'opacity-60'}`}>
                 {statusCounts[tab.value] || 0}
               </span>
             )}
             {tab.value === 'all' && (
-              <span className={`ml-1.5 text-[10px] font-semibold ${statusFilter === 'all' ? 'opacity-80' : 'opacity-60'}`}>
+              <span className={`ml-1.5 text-[10px] font-semibold ${(viewMode === 'prospects' && statusFilter === 'all') ? 'opacity-80' : 'opacity-60'}`}>
                 {Object.values(statusCounts).reduce((a, b) => a + b, 0)}
               </span>
             )}
           </button>
         ))}
+
+        {/* Divider */}
+        <div className="w-px h-5 bg-gray-200 mx-1" />
+
+        {/* Korea Signals tab */}
+        <button
+          onClick={() => setViewMode('korea_signals')}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
+            viewMode === 'korea_signals'
+              ? 'text-white'
+              : 'text-gray-600 hover:bg-gray-100 border border-transparent'
+          }`}
+          style={viewMode === 'korea_signals' ? { backgroundColor: '#3e8692' } : {}}
+        >
+          <Radar className="w-3.5 h-3.5" />
+          Korea Signals
+        </button>
       </div>
 
+      {/* Korea Signals View */}
+      {viewMode === 'korea_signals' && (
+        <KoreaSignalsPanel />
+      )}
+
+      {/* Prospects Table View */}
+      {viewMode === 'prospects' && (<>
       {/* Filters + Scraper Button */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-xs">
@@ -433,6 +462,7 @@ export default function ProspectsTab() {
           <SelectTrigger className="h-9 w-auto text-sm auth-input [&>span]:truncate-none [&>span]:line-clamp-none"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="icp_score">ICP Score</SelectItem>
+            <SelectItem value="korea_relevancy_score">Korea Relevancy</SelectItem>
             <SelectItem value="scraped_at">Latest Scraped</SelectItem>
             <SelectItem value="market_cap">Market Cap</SelectItem>
             <SelectItem value="name">Name</SelectItem>
@@ -546,6 +576,7 @@ export default function ProspectsTab() {
                 <TableHead className="w-[80px]">Price</TableHead>
                 <TableHead className="w-[80px]">Links</TableHead>
                 <TableHead className="w-[60px]">ICP</TableHead>
+                <TableHead className="w-[50px]">KR</TableHead>
                 <TableHead className="w-[80px]">Status</TableHead>
                 <TableHead className="w-[90px]">Scraped</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -554,7 +585,7 @@ export default function ProspectsTab() {
             <TableBody>
               {prospects.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-16">
+                  <TableCell colSpan={11} className="text-center py-16">
                     <Globe className="w-10 h-10 mx-auto mb-3 text-gray-300" />
                     <p className="text-sm font-medium text-gray-700 mb-1">No prospects yet</p>
                     <p className="text-xs text-gray-400 mb-4">Import projects from DropsTab to start discovering new prospects.</p>
@@ -641,6 +672,30 @@ export default function ProspectsTab() {
                       </Tooltip>
                     </TableCell>
                     <TableCell>
+                      {p.korea_relevancy_score > 0 ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded cursor-help ${
+                              p.korea_relevancy_score >= 70 ? 'bg-red-100 text-red-700' :
+                              p.korea_relevancy_score >= 40 ? 'bg-orange-100 text-orange-700' :
+                              'bg-amber-100 text-amber-700'
+                            }`}>
+                              {p.korea_relevancy_score >= 70 ? '🔴' : p.korea_relevancy_score >= 40 ? '🟠' : '🟡'} {p.korea_relevancy_score}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="left">
+                            <div className="text-xs">
+                              <div className="font-semibold">Korea Relevancy: {p.korea_relevancy_score}/100</div>
+                              <div className="text-gray-300 mt-0.5">{p.korea_signal_count} signal{p.korea_signal_count !== 1 ? 's' : ''} detected</div>
+                              <div className="mt-1 text-gray-300">Click Korea Signals tab for details</div>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusStyle.bg} ${statusStyle.text}`}>
                         {statusStyle.label}
                       </span>
@@ -717,6 +772,8 @@ export default function ProspectsTab() {
           </div>
         </div>
       )}
+
+      </>)}
 
       {/* ICP Settings Dialog */}
       <ICPSettingsDialog
