@@ -29,10 +29,20 @@ import {
   BarChart3,
   ClipboardList,
   CheckCircle2,
+  Circle,
+  PlayCircle,
+  PauseCircle,
+  MessageCircle,
   Clock,
   XCircle,
   Copy,
   Timer,
+  ChevronDown,
+  ChevronRight,
+  User,
+  Lock,
+  Building2,
+  Briefcase,
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, any> = {
@@ -43,6 +53,14 @@ const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string; b
   active: { label: 'Active', icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
   complete: { label: 'Complete', icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
   cancelled: { label: 'Cancelled', icon: XCircle, color: 'text-gray-500', bg: 'bg-gray-50' },
+};
+
+const SUBTASK_STATUS: Record<string, { icon: any; color: string }> = {
+  to_do: { icon: Circle, color: 'text-gray-400' },
+  in_progress: { icon: PlayCircle, color: 'text-blue-500' },
+  paused: { icon: PauseCircle, color: 'text-amber-500' },
+  ready_for_feedback: { icon: MessageCircle, color: 'text-purple-500' },
+  complete: { icon: CheckCircle2, color: 'text-green-500' },
 };
 
 type TeamMember = { id: string; name: string; email: string; role: string };
@@ -73,6 +91,18 @@ export default function DeliverablesPage() {
   // Task detail modal
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskModalOpen, setTaskModalOpen] = useState(false);
+
+  // Expanded cards (show subtasks inline)
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const toggleExpand = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedCards(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Filters
   const [filterStatus, setFilterStatus] = useState('all');
@@ -208,11 +238,11 @@ export default function DeliverablesPage() {
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content — grouped by client */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => (
-            <Skeleton key={i} className="h-48 rounded-lg" />
+        <div className="space-y-4">
+          {[1, 2].map(i => (
+            <Skeleton key={i} className="h-64 rounded-lg" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
@@ -228,105 +258,232 @@ export default function DeliverablesPage() {
             Create your first deliverable
           </Button>
         </div>
-      ) : (
-        <TooltipProvider>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map(d => {
-              const Icon = ICON_MAP[d.template.icon] || ClipboardList;
-              const statusCfg = STATUS_CONFIG[d.status] || STATUS_CONFIG.active;
-              const StatusIcon = statusCfg.icon;
-              const progressPct = d.totalSteps > 0 ? (d.completedSteps / d.totalSteps) * 100 : 0;
-              const clientName = d.client_id ? clients.find(c => c.id === d.client_id)?.name : null;
-              const cycleTime = getCycleTimeDays(d.start_date, d.parentTask?.completed_at || null, d.status);
+      ) : (() => {
+        // Group deliverables by client
+        const grouped: Record<string, { name: string; deliverables: typeof filtered }> = {};
+        for (const d of filtered) {
+          const key = d.client_id || '__none__';
+          if (!grouped[key]) {
+            grouped[key] = {
+              name: d.client_id ? clients.find(c => c.id === d.client_id)?.name || 'Unknown Client' : 'Internal / No Client',
+              deliverables: [],
+            };
+          }
+          grouped[key].deliverables.push(d);
+        }
+        // Sort: client groups first (alphabetical), then "no client" last
+        const sortedGroups = Object.entries(grouped).sort(([aKey, aVal], [bKey, bVal]) => {
+          if (aKey === '__none__') return 1;
+          if (bKey === '__none__') return -1;
+          return aVal.name.localeCompare(bVal.name);
+        });
 
-              return (
-                <div
-                  key={d.id}
-                  onClick={() => handleCardClick(d)}
-                  className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer group"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-md" style={{ backgroundColor: d.template.color + '15' }}>
-                        <Icon className="h-4 w-4" style={{ color: d.template.color }} />
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 line-clamp-1">{d.title}</div>
-                        <div className="text-[10px] text-gray-400">{d.template.name}</div>
-                      </div>
+        return (
+          <TooltipProvider>
+            <div className="space-y-6">
+              {sortedGroups.map(([groupKey, group]) => (
+                <div key={groupKey} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                  {/* Client header */}
+                  <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      {groupKey === '__none__'
+                        ? <Briefcase className="h-4 w-4 text-gray-400" />
+                        : <Building2 className="h-4 w-4" style={{ color: '#3e8692' }} />}
+                      <span className="text-sm font-semibold text-gray-900">{group.name}</span>
+                      <Badge variant="outline" className="text-[10px]">{group.deliverables.length}</Badge>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100"
-                            onClick={(e) => handleDuplicate(d, e)}
+                  </div>
+
+                  {/* Deliverable cards within this client */}
+                  <div className="divide-y divide-gray-100">
+                    {group.deliverables.map(d => {
+                      const Icon = ICON_MAP[d.template.icon] || ClipboardList;
+                      const statusCfg = STATUS_CONFIG[d.status] || STATUS_CONFIG.active;
+                      const StatusIcon = statusCfg.icon;
+                      const progressPct = d.totalSteps > 0 ? (d.completedSteps / d.totalSteps) * 100 : 0;
+                      const cycleTime = getCycleTimeDays(d.start_date, d.parentTask?.completed_at || null, d.status);
+                      const isExpanded = expandedCards.has(d.id);
+
+                      return (
+                        <div key={d.id} className="group">
+                          {/* Deliverable header row */}
+                          <div
+                            className="px-5 py-3 flex items-center gap-3 cursor-pointer hover:bg-gray-50/50 transition-colors"
+                            onClick={() => handleCardClick(d)}
                           >
-                            <Copy className="h-3 w-3 text-gray-400" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Duplicate this deliverable</TooltipContent>
-                      </Tooltip>
-                      <Badge className={`${statusCfg.bg} ${statusCfg.color} border-0 text-[10px]`}>
-                        <StatusIcon className="h-3 w-3 mr-1" />
-                        {statusCfg.label}
-                      </Badge>
-                    </div>
-                  </div>
+                            {/* Expand toggle */}
+                            <button
+                              className="shrink-0 p-0.5 rounded hover:bg-gray-200 transition-colors"
+                              onClick={(e) => toggleExpand(d.id, e)}
+                            >
+                              {isExpanded
+                                ? <ChevronDown className="h-4 w-4 text-gray-400" />
+                                : <ChevronRight className="h-4 w-4 text-gray-400" />}
+                            </button>
 
-                  {clientName && (
-                    <div className="text-xs text-gray-500 mb-2">{clientName}</div>
-                  )}
+                            {/* Icon */}
+                            <div className="p-1.5 rounded-md shrink-0" style={{ backgroundColor: d.template.color + '15' }}>
+                              <Icon className="h-4 w-4" style={{ color: d.template.color }} />
+                            </div>
 
-                  {/* Progress bar */}
-                  <div className="mt-3">
-                    <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
-                      <span>{d.completedSteps}/{d.totalSteps} steps</span>
-                      <span>{Math.round(progressPct)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-1.5">
-                      <div
-                        className="h-1.5 rounded-full transition-all"
-                        style={{
-                          width: `${progressPct}%`,
-                          backgroundColor: d.template.color || '#3e8692',
-                        }}
-                      />
-                    </div>
-                  </div>
+                            {/* Title + template */}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium text-gray-900 truncate">{d.title}</div>
+                              <div className="text-[10px] text-gray-400">{d.template.name}</div>
+                            </div>
 
-                  {/* Dates + cycle time */}
-                  <div className="flex items-center justify-between mt-3 text-[10px] text-gray-400">
-                    <div className="flex items-center gap-2">
-                      {d.start_date && (
-                        <span>Started {new Date(d.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                      )}
-                      {d.target_completion && (
-                        <span>Due {new Date(d.target_completion + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                      )}
-                    </div>
-                    {cycleTime !== null && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="flex items-center gap-0.5">
-                            <Timer className="h-3 w-3" />
-                            {cycleTime}d
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {d.status === 'complete' ? `Completed in ${cycleTime} days` : `${cycleTime} days elapsed`}
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
+                            {/* Progress bar (compact) */}
+                            <div className="w-24 shrink-0">
+                              <div className="flex items-center justify-between text-[10px] text-gray-400 mb-0.5">
+                                <span>{d.completedSteps}/{d.totalSteps}</span>
+                                <span>{Math.round(progressPct)}%</span>
+                              </div>
+                              <div className="w-full bg-gray-100 rounded-full h-1">
+                                <div
+                                  className="h-1 rounded-full transition-all"
+                                  style={{ width: `${progressPct}%`, backgroundColor: d.template.color || '#3e8692' }}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Cycle time */}
+                            {cycleTime !== null && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="text-[10px] text-gray-400 shrink-0 flex items-center gap-0.5">
+                                    <Timer className="h-3 w-3" />
+                                    {cycleTime}d
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {d.status === 'complete' ? `Completed in ${cycleTime} days` : `${cycleTime} days elapsed`}
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+
+                            {/* Status badge */}
+                            <Badge className={`${statusCfg.bg} ${statusCfg.color} border-0 text-[10px] shrink-0`}>
+                              <StatusIcon className="h-3 w-3 mr-1" />
+                              {statusCfg.label}
+                            </Badge>
+
+                            {/* Duplicate */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 shrink-0"
+                                  onClick={(e) => handleDuplicate(d, e)}
+                                >
+                                  <Copy className="h-3 w-3 text-gray-400" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Duplicate</TooltipContent>
+                            </Tooltip>
+                          </div>
+
+                          {/* Expanded subtask flow */}
+                          {isExpanded && d.subtasks.length > 0 && (
+                            <div className="px-5 pb-4 pt-1 ml-[52px]">
+                              <div className="relative">
+                                {/* Vertical connector line */}
+                                <div className="absolute left-[7px] top-2 bottom-2 w-px bg-gray-200" />
+
+                                <div className="space-y-0.5">
+                                  {d.subtasks.map((sub, idx) => {
+                                    const sCfg = SUBTASK_STATUS[sub.status] || SUBTASK_STATUS.to_do;
+                                    const SIcon = sCfg.icon;
+                                    // Check if previous blocking step is incomplete
+                                    const prevIncomplete = idx > 0 && d.subtasks[idx - 1].status !== 'complete';
+                                    const isBlocked = prevIncomplete && sub.status === 'to_do';
+
+                                    return (
+                                      <div
+                                        key={sub.id}
+                                        className={`flex items-center gap-3 py-1.5 px-2 rounded-md cursor-pointer transition-colors ${
+                                          isBlocked ? 'opacity-50' : 'hover:bg-gray-50'
+                                        }`}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSelectedTask(sub);
+                                          setTaskModalOpen(true);
+                                        }}
+                                      >
+                                        {/* Status icon (overlays the connector line) */}
+                                        <div className="relative z-10 bg-white rounded-full shrink-0">
+                                          <SIcon className={`h-4 w-4 ${sCfg.color}`} />
+                                        </div>
+
+                                        {/* Step name */}
+                                        <span className={`flex-1 text-xs truncate ${
+                                          sub.status === 'complete'
+                                            ? 'line-through text-gray-400'
+                                            : isBlocked ? 'text-gray-400' : 'text-gray-700 font-medium'
+                                        }`}>
+                                          {sub.task_name}
+                                        </span>
+
+                                        {/* Blocked indicator */}
+                                        {isBlocked && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Lock className="h-3 w-3 text-gray-300 shrink-0" />
+                                            </TooltipTrigger>
+                                            <TooltipContent>Blocked by previous step</TooltipContent>
+                                          </Tooltip>
+                                        )}
+
+                                        {/* Assignee */}
+                                        {sub.assigned_to_name && (
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <span className="text-[10px] text-gray-400 shrink-0 flex items-center gap-0.5 bg-gray-100 px-1.5 py-0.5 rounded">
+                                                <User className="h-2.5 w-2.5" />
+                                                {sub.assigned_to_name.split(' ')[0]}
+                                              </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>{sub.assigned_to_name}</TooltipContent>
+                                          </Tooltip>
+                                        )}
+
+                                        {/* Due date */}
+                                        {sub.due_date && (
+                                          <span className={`text-[10px] shrink-0 ${
+                                            new Date(sub.due_date + 'T23:59:59') < new Date() && sub.status !== 'complete'
+                                              ? 'text-red-500 font-semibold'
+                                              : 'text-gray-400'
+                                          }`}>
+                                            {new Date(sub.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Dates footer */}
+                              <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-100 text-[10px] text-gray-400">
+                                {d.start_date && (
+                                  <span>Started {new Date(d.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                )}
+                                {d.target_completion && (
+                                  <span>Target {new Date(d.target_completion + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </TooltipProvider>
-      )}
+              ))}
+            </div>
+          </TooltipProvider>
+        );
+      })()}
 
       <DeliverableWizard
         open={wizardOpen}

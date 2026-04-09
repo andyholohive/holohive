@@ -49,6 +49,20 @@ function isTaskStale(task: Task): boolean {
   return diff > STALE_DAYS * 24 * 60 * 60 * 1000;
 }
 
+/** Compute priority automatically based on how close the due date is */
+function getComputedPriority(dueDate: string | null, status?: string): { level: string; label: string; color: string; bg: string } {
+  if (status === 'complete') return { level: 'complete', label: 'Done', color: 'text-green-600', bg: 'bg-green-50' };
+  if (!dueDate) return { level: 'low', label: 'Low', color: 'text-gray-400', bg: 'bg-gray-50' };
+  const now = new Date();
+  const due = new Date(dueDate + 'T23:59:59');
+  const hoursLeft = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
+  if (hoursLeft < 0) return { level: 'overdue', label: 'Overdue', color: 'text-red-700', bg: 'bg-red-50' };
+  if (hoursLeft <= 24) return { level: 'urgent', label: 'Urgent', color: 'text-red-600', bg: 'bg-red-50' };
+  if (hoursLeft <= 48) return { level: 'high', label: 'High', color: 'text-orange-600', bg: 'bg-orange-50' };
+  if (hoursLeft <= 72) return { level: 'medium', label: 'Medium', color: 'text-blue-600', bg: 'bg-blue-50' };
+  return { level: 'low', label: 'Low', color: 'text-gray-400', bg: 'bg-gray-50' };
+}
+
 type TeamMember = {
   id: string;
   name: string;
@@ -73,7 +87,6 @@ const TASK_TYPES = [
   'General',
   'Tech & Tools',
   'Marketing & Sales',
-  'Client SOP',
   'Client Delivery',
   'Performance Review',
   'Research & Analytics',
@@ -106,7 +119,6 @@ const typeBadge = (type: string) => {
     case 'General': return 'bg-gray-100 text-gray-700';
     case 'Tech & Tools': return 'bg-blue-100 text-blue-800';
     case 'Marketing & Sales': return 'bg-pink-100 text-pink-800';
-    case 'Client SOP': return 'bg-amber-100 text-amber-800';
     case 'Client Delivery': return 'bg-cyan-100 text-cyan-800';
     case 'Performance Review': return 'bg-violet-100 text-violet-800';
     case 'Research & Analytics': return 'bg-indigo-100 text-indigo-800';
@@ -138,6 +150,7 @@ const COL: Record<string, string> = {
   reorder: 'w-[50px]',
   status: 'w-[36px]',
   taskName: 'w-[20%] min-w-[180px]',
+  priority: 'w-[90px]',
   client: 'w-[110px]',
   dueDate: 'w-[110px]',
   comment: 'w-[12%] min-w-[100px]',
@@ -149,10 +162,11 @@ const COL: Record<string, string> = {
   actions: 'w-[80px]',
 };
 
-type ColumnKey = 'taskName' | 'client' | 'dueDate' | 'comment' | 'frequency' | 'type' | 'link' | 'createdBy' | 'created';
+type ColumnKey = 'taskName' | 'priority' | 'client' | 'dueDate' | 'comment' | 'frequency' | 'type' | 'link' | 'createdBy' | 'created';
 
 const COLUMN_DEFS: { key: ColumnKey; label: string }[] = [
   { key: 'taskName', label: 'Task Name' },
+  { key: 'priority', label: 'Priority' },
   { key: 'client', label: 'Client' },
   { key: 'dueDate', label: 'Due Date' },
   { key: 'comment', label: 'Comment' },
@@ -286,15 +300,11 @@ export default function TasksPage() {
 
   // Tab counts
   const oneTimeCount = useMemo(() =>
-    tasks.filter(t => t.frequency === 'one-time' && t.task_type !== 'Client SOP').length,
+    tasks.filter(t => t.frequency === 'one-time').length,
     [tasks]
   );
   const recurringCount = useMemo(() =>
-    tasks.filter(t => t.frequency !== 'one-time' && t.task_type !== 'Client SOP').length,
-    [tasks]
-  );
-  const clientSopCount = useMemo(() =>
-    tasks.filter(t => t.task_type === 'Client SOP').length,
+    tasks.filter(t => t.frequency !== 'one-time').length,
     [tasks]
   );
 
@@ -302,11 +312,9 @@ export default function TasksPage() {
   const filtered = useMemo(() => {
     let tabFiltered: Task[];
     if (activeTab === 'one-time') {
-      tabFiltered = tasks.filter(t => t.frequency === 'one-time' && t.task_type !== 'Client SOP');
-    } else if (activeTab === 'recurring') {
-      tabFiltered = tasks.filter(t => t.frequency !== 'one-time' && t.task_type !== 'Client SOP');
+      tabFiltered = tasks.filter(t => t.frequency === 'one-time');
     } else {
-      tabFiltered = tasks.filter(t => t.task_type === 'Client SOP');
+      tabFiltered = tasks.filter(t => t.frequency !== 'one-time');
     }
 
     if (!searchTerm) return tabFiltered.sort((a, b) => a.sort_order - b.sort_order);
@@ -496,7 +504,7 @@ export default function TasksPage() {
       const assignedTo = groupKey === '_unassigned' ? null : groupKey;
       const assignedMember = assignedTo ? teamMembers.find(m => m.id === assignedTo) : null;
       const defaultFrequency = activeTab === 'one-time' ? 'one-time' : activeTab === 'recurring' ? 'daily' : 'one-time';
-      const defaultType = activeTab === 'client-sop' ? 'Client SOP' : 'General';
+      const defaultType = 'General';
 
       await TaskService.createTask({
         task_name: name,
@@ -545,7 +553,7 @@ export default function TasksPage() {
   }, [clients]);
 
   const colLabel: Record<ColumnKey, string> = {
-    taskName: 'Task Name', client: 'Client', dueDate: 'Due Date', comment: 'Comment',
+    taskName: 'Task Name', priority: 'Priority', client: 'Client', dueDate: 'Due Date', comment: 'Comment',
     frequency: 'Frequency', type: 'Type', link: 'Link',
     createdBy: 'Created By', created: 'Created',
   };
@@ -641,6 +649,16 @@ export default function TasksPage() {
             )}
           </td>
         );
+      case 'priority': {
+        const p = getComputedPriority(task.due_date, task.status);
+        return (
+          <td key={col} className={`py-3 px-3 ${COL.priority}`}>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${p.color} ${p.bg}`}>
+              {p.label}
+            </span>
+          </td>
+        );
+      }
       case 'client':
         return (
           <td key={col} className={`py-3 px-3 ${COL.client}`}>
@@ -1015,13 +1033,6 @@ export default function TasksPage() {
                     >
                       Recurring
                       <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{recurringCount}</span>
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="client-sop"
-                      className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-sm px-4 py-2"
-                    >
-                      Client SOP
-                      <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{clientSopCount}</span>
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>

@@ -65,7 +65,7 @@ const FREQUENCY_LABELS: Record<string, string> = {
 };
 const TASK_TYPES = [
   'Admin & Operations', 'Finance & Invoicing', 'General', 'Tech & Tools',
-  'Marketing & Sales', 'Client SOP', 'Client Delivery', 'Performance Review', 'Research & Analytics',
+  'Marketing & Sales', 'Client Delivery', 'Performance Review', 'Research & Analytics',
 ] as const;
 const STATUSES = ['to_do', 'in_progress', 'paused', 'ready_for_feedback', 'complete'] as const;
 const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color: string }> = {
@@ -75,13 +75,29 @@ const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color:
   ready_for_feedback: { label: 'Ready for Feedback', icon: MessageCircle, color: 'text-purple-500' },
   complete: { label: 'Complete', icon: CheckCircle2, color: 'text-green-500' },
 };
-const PRIORITIES = ['low', 'medium', 'high', 'urgent'] as const;
-const PRIORITY_CONFIG: Record<string, { label: string; icon: typeof Minus; color: string }> = {
-  low: { label: 'Low', icon: ArrowDown, color: 'text-gray-400' },
-  medium: { label: 'Medium', icon: Minus, color: 'text-blue-500' },
-  high: { label: 'High', icon: ArrowUp, color: 'text-orange-500' },
-  urgent: { label: 'Urgent', icon: AlertCircle, color: 'text-red-500' },
+const PRIORITY_CONFIG: Record<string, { label: string; icon: typeof Minus; color: string; bg: string }> = {
+  low: { label: 'Low', icon: ArrowDown, color: 'text-gray-400', bg: 'bg-gray-50' },
+  medium: { label: 'Medium', icon: Minus, color: 'text-blue-600', bg: 'bg-blue-50' },
+  high: { label: 'High', icon: ArrowUp, color: 'text-orange-600', bg: 'bg-orange-50' },
+  urgent: { label: 'Urgent', icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
+  overdue: { label: 'Overdue', icon: AlertCircle, color: 'text-red-700', bg: 'bg-red-50' },
+  complete: { label: 'Done', icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
 };
+
+/** Compute priority automatically based on due date proximity */
+function getComputedPriority(dueDate: Date | undefined, status?: string): string {
+  if (status === 'complete') return 'complete';
+  if (!dueDate) return 'low';
+  const now = new Date();
+  const due = new Date(dueDate);
+  due.setHours(23, 59, 59);
+  const hoursLeft = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
+  if (hoursLeft < 0) return 'overdue';
+  if (hoursLeft <= 24) return 'urgent';
+  if (hoursLeft <= 48) return 'high';
+  if (hoursLeft <= 72) return 'medium';
+  return 'low';
+}
 
 const toLocalDateString = (date: Date) => {
   const year = date.getFullYear();
@@ -171,7 +187,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
         latest_comment: form.latest_comment.trim() || null,
         description: form.description.trim() || null,
         status: form.status,
-        priority: form.priority,
+        priority: getComputedPriority(form.due_date, form.status),
         client_id: form.client_id || null,
         recurring_config: form.recurring_config || null,
       };
@@ -451,26 +467,21 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
             </Select>
           </div>
 
-          {/* Priority */}
+          {/* Priority (auto-computed from due date) */}
           <div className="grid gap-2">
-            <Label>Priority</Label>
-            <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
-              <SelectTrigger className="auth-input"><SelectValue placeholder="Select priority" /></SelectTrigger>
-              <SelectContent>
-                {PRIORITIES.map((p) => {
-                  const cfg = PRIORITY_CONFIG[p];
-                  const Icon = cfg.icon;
-                  return (
-                    <SelectItem key={p} value={p}>
-                      <div className="flex items-center gap-2">
-                        <Icon className={`h-3.5 w-3.5 ${cfg.color}`} />
-                        {cfg.label}
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+            <Label className="flex items-center gap-1.5">Priority <span className="text-[10px] text-gray-400 font-normal">(auto)</span></Label>
+            {(() => {
+              const level = getComputedPriority(form.due_date, form.status);
+              const cfg = PRIORITY_CONFIG[level] || PRIORITY_CONFIG.low;
+              const Icon = cfg.icon;
+              return (
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-md border border-gray-200 ${cfg.bg}`}>
+                  <Icon className={`h-4 w-4 ${cfg.color}`} />
+                  <span className={`text-sm font-medium ${cfg.color}`}>{cfg.label}</span>
+                  {!form.due_date && <span className="text-[10px] text-gray-400 ml-auto">Set due date to auto-prioritize</span>}
+                </div>
+              );
+            })()}
           </div>
         </div>
 

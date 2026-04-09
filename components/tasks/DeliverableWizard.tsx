@@ -114,6 +114,19 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
     }
   }, [open]);
 
+  // Auto-compute priority from start date
+  useEffect(() => {
+    const now = new Date();
+    const due = new Date(startDate);
+    due.setHours(23, 59, 59);
+    const hoursLeft = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
+    if (hoursLeft < 0) setPriority('urgent');
+    else if (hoursLeft <= 24) setPriority('urgent');
+    else if (hoursLeft <= 48) setPriority('high');
+    else if (hoursLeft <= 72) setPriority('medium');
+    else setPriority('low');
+  }, [startDate]);
+
   const loadTemplates = async () => {
     setLoadingTemplates(true);
     try {
@@ -351,18 +364,15 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
               </div>
 
               <div className="space-y-2">
-                <Label>Priority</Label>
-                <Select value={priority} onValueChange={setPriority}>
-                  <SelectTrigger className="auth-input">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label className="flex items-center gap-1.5">Priority <span className="text-[10px] text-gray-400 font-normal">(auto)</span></Label>
+                <div className={`flex items-center gap-2 px-3 py-2 rounded-md border border-gray-200 text-sm font-medium capitalize ${
+                  priority === 'urgent' ? 'text-red-600 bg-red-50' :
+                  priority === 'high' ? 'text-orange-600 bg-orange-50' :
+                  priority === 'medium' ? 'text-blue-600 bg-blue-50' :
+                  'text-gray-400 bg-gray-50'
+                }`}>
+                  {priority}
+                </div>
               </div>
 
               {selectedTemplate && (

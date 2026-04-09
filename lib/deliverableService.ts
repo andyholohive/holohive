@@ -54,6 +54,7 @@ export type DeliverableWithProgress = Deliverable & {
   completedSteps: number;
   totalSteps: number;
   parentTask: Task | null;
+  subtasks: Task[];
 };
 
 export type CreateDeliverableConfig = {
@@ -305,6 +306,7 @@ export class DeliverableService {
           completedSteps,
           totalSteps: subtasks.length,
           parentTask,
+          subtasks,
         });
       }
 
