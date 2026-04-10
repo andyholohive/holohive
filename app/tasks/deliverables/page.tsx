@@ -299,6 +299,13 @@ export default function DeliverablesPage() {
                     {group.deliverables.map(d => {
                       const Icon = ICON_MAP[d.template.icon] || ClipboardList;
                       const statusCfg = STATUS_CONFIG[d.status] || STATUS_CONFIG.active;
+                      // Sort subtasks by step number prefix (e.g. "1. Research", "2. Draft")
+                      const sortedSubtasks = [...d.subtasks].sort((a, b) => {
+                        const numA = parseInt(a.task_name.match(/^(\d+)\./)?.[1] || '999');
+                        const numB = parseInt(b.task_name.match(/^(\d+)\./)?.[1] || '999');
+                        if (numA !== numB) return numA - numB;
+                        return a.sort_order - b.sort_order;
+                      });
                       const StatusIcon = statusCfg.icon;
                       const progressPct = d.totalSteps > 0 ? (d.completedSteps / d.totalSteps) * 100 : 0;
                       const cycleTime = getCycleTimeDays(d.start_date, d.parentTask?.completed_at || null, d.status);
@@ -384,18 +391,18 @@ export default function DeliverablesPage() {
                           </div>
 
                           {/* Expanded subtask flow */}
-                          {isExpanded && d.subtasks.length > 0 && (
+                          {isExpanded && sortedSubtasks.length > 0 && (
                             <div className="px-5 pb-4 pt-1 ml-[52px]">
                               <div className="relative">
                                 {/* Vertical connector line */}
                                 <div className="absolute left-[7px] top-2 bottom-2 w-px bg-gray-200" />
 
                                 <div className="space-y-0.5">
-                                  {d.subtasks.map((sub, idx) => {
+                                  {sortedSubtasks.map((sub, idx) => {
                                     const sCfg = SUBTASK_STATUS[sub.status] || SUBTASK_STATUS.to_do;
                                     const SIcon = sCfg.icon;
                                     // Check if previous blocking step is incomplete
-                                    const prevIncomplete = idx > 0 && d.subtasks[idx - 1].status !== 'complete';
+                                    const prevIncomplete = idx > 0 && sortedSubtasks[idx - 1].status !== 'complete';
                                     const isBlocked = prevIncomplete && sub.status === 'to_do';
 
                                     return (

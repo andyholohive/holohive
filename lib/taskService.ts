@@ -223,7 +223,7 @@ export class TaskService {
       const updatedTask = data as Task;
 
       // Auto-clone if completing a recurring task
-      if (updates.status === 'complete' && updatedTask.recurring_config) {
+      if (updates.status === 'complete' && this.isRecurringTask(updatedTask)) {
         await this.cloneRecurringTask(updatedTask);
       }
 
@@ -284,7 +284,7 @@ export class TaskService {
       // Auto-clone if completing a recurring task
       if (field === 'status' && value === 'complete') {
         const task = await this.getTaskById(id);
-        if (task?.recurring_config) {
+        if (task && this.isRecurringTask(task)) {
           await this.cloneRecurringTask(task);
         }
         // Auto-complete parent deliverable if all subtasks are done
@@ -1017,10 +1017,31 @@ export class TaskService {
   /**
    * Clone a recurring task with the next due date
    */
+  /** Check if a task should recur based on recurring_config or frequency field */
+  static isRecurringTask(task: Task): boolean {
+    if (task.recurring_config && (task.recurring_config as RecurringConfig).frequency) return true;
+    return ['daily', 'weekly', 'monthly', 'recurring'].includes(task.frequency);
+  }
+
+  /** Build a RecurringConfig from the frequency field when recurring_config is null */
+  private static buildConfigFromFrequency(task: Task): RecurringConfig {
+    const freqMap: Record<string, 'daily' | 'weekly' | 'monthly'> = {
+      daily: 'daily',
+      weekly: 'weekly',
+      monthly: 'monthly',
+      recurring: 'weekly', // default "recurring" to weekly
+    };
+    return { frequency: freqMap[task.frequency] || 'weekly' };
+  }
+
   static async cloneRecurringTask(task: Task): Promise<Task | null> {
     try {
-      const config = task.recurring_config as RecurringConfig;
-      if (!config || !config.frequency) return null;
+      let config = task.recurring_config as RecurringConfig;
+      // If recurring_config is null but frequency indicates recurring, auto-generate config
+      if (!config || !config.frequency) {
+        if (!this.isRecurringTask(task)) return null;
+        config = this.buildConfigFromFrequency(task);
+      }
 
       const nextDueDate = this.calculateNextDueDate(task.due_date, config);
 
@@ -1040,10 +1061,15 @@ export class TaskService {
         priority: task.priority,
         client_id: task.client_id,
         parent_task_id: task.parent_task_id,
-        recurring_config: task.recurring_config,
+        recurring_config: task.recurring_config || config,
         created_by: task.created_by,
         created_by_name: task.created_by_name,
       });
+
+      // Backfill recurring_config on original task if it was null
+      if (!task.recurring_config) {
+        await supabase.from('tasks').update({ recurring_config: config }).eq('id', task.id);
+      }
 
       return newTask;
     } catch (error) {
@@ -1057,19 +1083,22 @@ export class TaskService {
    */
   static async generateMissedRecurring(): Promise<number> {
     try {
+      // Fetch completed tasks that are recurring (either via recurring_config or frequency field)
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
         .eq('status', 'complete')
-        .not('recurring_config', 'is', null);
+        .in('frequency', ['daily', 'weekly', 'monthly', 'recurring']);
 
       if (error) throw error;
       const completedRecurring = (data as Task[]) || [];
 
       let generated = 0;
       for (const task of completedRecurring) {
-        const config = task.recurring_config as RecurringConfig;
-        if (!config?.frequency) continue;
+        let config = task.recurring_config as RecurringConfig;
+        if (!config?.frequency) {
+          config = this.buildConfigFromFrequency(task);
+        }
 
         // Check if a next instance already exists
         const nextDueDate = this.calculateNextDueDate(task.due_date, config);
@@ -1085,13 +1114,13 @@ export class TaskService {
 
         if (existing && existing.length > 0) continue;
 
-        // Also check if there's any non-complete instance at all
+        // Also check if there's any non-complete instance at all (by name + recurring frequency)
         const { data: anyPending } = await supabase
           .from('tasks')
           .select('id')
           .eq('task_name', task.task_name)
           .neq('status', 'complete')
-          .not('recurring_config', 'is', null)
+          .in('frequency', ['daily', 'weekly', 'monthly', 'recurring'])
           .limit(1);
 
         if (anyPending && anyPending.length > 0) continue;
