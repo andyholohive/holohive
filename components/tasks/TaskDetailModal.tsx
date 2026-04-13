@@ -176,7 +176,8 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
     setSubmitting(true);
     try {
       const assignedMember = teamMembers.find(m => m.id === form.assigned_to);
-      const payload = {
+      const canEditClient = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+      const payload: Record<string, any> = {
         task_name: form.task_name.trim(),
         assigned_to: form.assigned_to || null,
         assigned_to_name: assignedMember?.name || null,
@@ -188,9 +189,12 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
         description: form.description.trim() || null,
         status: form.status,
         priority: getComputedPriority(form.due_date, form.status),
-        client_id: form.client_id || null,
         recurring_config: form.recurring_config || null,
       };
+      // Only admins can change client assignment
+      if (canEditClient) {
+        payload.client_id = form.client_id || null;
+      }
 
       if (task) {
         await TaskService.updateTask(task.id, payload);
@@ -489,13 +493,19 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
           {/* Client */}
           <div className="grid gap-2">
             <Label>Client</Label>
-            <Select value={form.client_id} onValueChange={(v) => setForm({ ...form, client_id: v === '_none' ? '' : v })}>
-              <SelectTrigger className="auth-input"><SelectValue placeholder="Select client" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_none">No client</SelectItem>
-                {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            {userProfile?.role === 'admin' || userProfile?.role === 'super_admin' ? (
+              <Select value={form.client_id} onValueChange={(v) => setForm({ ...form, client_id: v === '_none' ? '' : v })}>
+                <SelectTrigger className="auth-input"><SelectValue placeholder="Select client" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">No client</SelectItem>
+                  {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="auth-input flex items-center text-sm text-gray-700 bg-gray-50 cursor-not-allowed">
+                {form.client_id && clients.find(c => c.id === form.client_id)?.name || 'No client'}
+              </div>
+            )}
           </div>
 
           {/* Link */}

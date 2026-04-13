@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { TaskService, Task, DashboardStats } from '@/lib/taskService';
+import { ClientService } from '@/lib/clientService';
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -14,6 +16,7 @@ import {
   Circle,
   PauseCircle,
   MessageCircle,
+  Building2,
 } from 'lucide-react';
 
 const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color: string }> = {
@@ -28,6 +31,8 @@ export default function MyDashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [clientFilter, setClientFilter] = useState('all');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,12 +43,14 @@ export default function MyDashboardPage() {
   const loadData = async () => {
     if (!user?.id) return;
     try {
-      const [statsData, tasksData] = await Promise.all([
+      const [statsData, tasksData, clientsData] = await Promise.all([
         TaskService.getDashboardStats(user.id),
         TaskService.getTasksForUser(user.id),
+        ClientService.getAllClients(),
       ]);
       setStats(statsData);
       setTasks(tasksData);
+      setClients(clientsData.map((c: any) => ({ id: c.id, name: c.name })));
     } catch (err) {
       console.error('Error loading dashboard:', err);
     } finally {
@@ -51,15 +58,31 @@ export default function MyDashboardPage() {
     }
   };
 
+  // Build client name map
+  const clientMap: Record<string, string> = {};
+  clients.forEach(c => { clientMap[c.id] = c.name; });
+
+  // Get unique clients from user's tasks
+  const taskClients = Array.from(new Set(tasks.filter(t => t.client_id).map(t => t.client_id!)))
+    .map(id => ({ id, name: clientMap[id] || 'Unknown' }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   const today = new Date().toISOString().split('T')[0];
   const weekEnd = new Date();
   weekEnd.setDate(weekEnd.getDate() + 7);
   const weekEndStr = weekEnd.toISOString().split('T')[0];
 
-  const overdueTasks = tasks.filter(t => t.due_date && t.due_date < today && t.status !== 'complete');
-  const dueThisWeek = tasks.filter(t => t.due_date && t.due_date >= today && t.due_date <= weekEndStr && t.status !== 'complete');
-  const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
-  const recentlyCompleted = tasks.filter(t => t.status === 'complete').slice(0, 10);
+  // Apply client filter
+  const filteredTasks = clientFilter === 'all'
+    ? tasks
+    : clientFilter === '_internal'
+      ? tasks.filter(t => !t.client_id)
+      : tasks.filter(t => t.client_id === clientFilter);
+
+  const overdueTasks = filteredTasks.filter(t => t.due_date && t.due_date < today && t.status !== 'complete');
+  const dueThisWeek = filteredTasks.filter(t => t.due_date && t.due_date >= today && t.due_date <= weekEndStr && t.status !== 'complete');
+  const inProgressTasks = filteredTasks.filter(t => t.status === 'in_progress');
+  const recentlyCompleted = filteredTasks.filter(t => t.status === 'complete').slice(0, 10);
 
   const getDueDateColor = (dueDate: string | null) => {
     if (!dueDate) return 'text-gray-500';
@@ -100,6 +123,35 @@ export default function MyDashboardPage() {
             </div>
           </div>
 
+          {/* Client Filter Tabs */}
+          {taskClients.length > 0 && (
+            <div className="px-0">
+              <Tabs value={clientFilter} onValueChange={setClientFilter}>
+                <TabsList className="bg-gray-100 p-1 h-auto flex-wrap">
+                  <TabsTrigger value="all" className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-xs px-3 py-1.5">
+                    All
+                    <span className="ml-1.5 text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{tasks.filter(t => t.status !== 'complete').length}</span>
+                  </TabsTrigger>
+                  {taskClients.map(c => (
+                    <TabsTrigger key={c.id} value={c.id} className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-xs px-3 py-1.5">
+                      <Building2 className="h-3 w-3 mr-1" />
+                      {c.name}
+                      <span className="ml-1.5 text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
+                        {tasks.filter(t => t.client_id === c.id && t.status !== 'complete').length}
+                      </span>
+                    </TabsTrigger>
+                  ))}
+                  <TabsTrigger value="_internal" className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-xs px-3 py-1.5">
+                    Internal
+                    <span className="ml-1.5 text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
+                      {tasks.filter(t => !t.client_id && t.status !== 'complete').length}
+                    </span>
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          )}
+
           {/* Stat Cards */}
           {stats && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-0">
@@ -112,22 +164,22 @@ export default function MyDashboardPage() {
 
           {/* Overdue Tasks */}
           {overdueTasks.length > 0 && (
-            <TaskSection title="Overdue" icon={AlertTriangle} color="text-red-600" tasks={overdueTasks} getDueDateColor={getDueDateColor} />
+            <TaskSection title="Overdue" icon={AlertTriangle} color="text-red-600" tasks={overdueTasks} getDueDateColor={getDueDateColor} clientMap={clientMap} />
           )}
 
           {/* Due This Week */}
           {dueThisWeek.length > 0 && (
-            <TaskSection title="Due This Week" icon={Clock} color="text-amber-600" tasks={dueThisWeek} getDueDateColor={getDueDateColor} />
+            <TaskSection title="Due This Week" icon={Clock} color="text-amber-600" tasks={dueThisWeek} getDueDateColor={getDueDateColor} clientMap={clientMap} />
           )}
 
           {/* In Progress */}
           {inProgressTasks.length > 0 && (
-            <TaskSection title="In Progress" icon={PlayCircle} color="text-blue-600" tasks={inProgressTasks} getDueDateColor={getDueDateColor} />
+            <TaskSection title="In Progress" icon={PlayCircle} color="text-blue-600" tasks={inProgressTasks} getDueDateColor={getDueDateColor} clientMap={clientMap} />
           )}
 
           {/* Recently Completed */}
           {recentlyCompleted.length > 0 && (
-            <TaskSection title="Recently Completed" icon={CheckCircle2} color="text-green-600" tasks={recentlyCompleted} getDueDateColor={getDueDateColor} />
+            <TaskSection title="Recently Completed" icon={CheckCircle2} color="text-green-600" tasks={recentlyCompleted} getDueDateColor={getDueDateColor} clientMap={clientMap} />
           )}
 
           {tasks.length === 0 && (
@@ -158,12 +210,13 @@ function StatCard({ icon: Icon, label, value, color, bg }: { icon: any; label: s
   );
 }
 
-function TaskSection({ title, icon: Icon, color, tasks, getDueDateColor }: {
+function TaskSection({ title, icon: Icon, color, tasks, getDueDateColor, clientMap }: {
   title: string;
   icon: any;
   color: string;
   tasks: Task[];
   getDueDateColor: (d: string | null) => string;
+  clientMap?: Record<string, string>;
 }) {
   return (
     <div className="bg-white border border-gray-200 shadow-sm rounded-lg">
@@ -182,6 +235,9 @@ function TaskSection({ title, icon: Icon, color, tasks, getDueDateColor }: {
               <span className={`flex-1 text-sm ${task.status === 'complete' ? 'line-through text-gray-400' : 'text-gray-900'}`}>
                 {task.task_name}
               </span>
+              {clientMap && task.client_id && clientMap[task.client_id] && (
+                <span className="text-[10px] bg-[#3e8692]/10 text-[#3e8692] px-1.5 py-0.5 rounded font-medium">{clientMap[task.client_id]}</span>
+              )}
               {task.due_date && (
                 <span className={`text-xs ${getDueDateColor(task.due_date)}`}>
                   {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}

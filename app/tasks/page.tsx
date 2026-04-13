@@ -147,26 +147,28 @@ const toLocalDateString = (date: Date) => {
 
 // Fixed column widths for consistency across all tables
 const COL: Record<string, string> = {
-  reorder: 'w-[50px]',
-  status: 'w-[36px]',
-  taskName: 'w-[20%] min-w-[180px]',
-  priority: 'w-[90px]',
-  client: 'w-[110px]',
-  dueDate: 'w-[110px]',
-  comment: 'w-[12%] min-w-[100px]',
-  frequency: 'w-[100px]',
-  type: 'w-[140px]',
-  link: 'w-[80px]',
-  createdBy: 'w-[100px]',
-  created: 'w-[80px]',
-  actions: 'w-[80px]',
+  reorder: 'w-[40px]',
+  status: 'w-[32px]',
+  taskName: 'min-w-[160px]',
+  priority: 'w-[80px]',
+  assignee: 'w-[100px]',
+  client: 'w-[100px]',
+  dueDate: 'w-[90px]',
+  comment: 'w-[100px]',
+  frequency: 'w-[90px]',
+  type: 'w-[110px]',
+  link: 'w-[60px]',
+  createdBy: 'w-[90px]',
+  created: 'w-[70px]',
+  actions: 'w-[60px]',
 };
 
-type ColumnKey = 'taskName' | 'priority' | 'client' | 'dueDate' | 'comment' | 'frequency' | 'type' | 'link' | 'createdBy' | 'created';
+type ColumnKey = 'taskName' | 'priority' | 'assignee' | 'client' | 'dueDate' | 'comment' | 'frequency' | 'type' | 'link' | 'createdBy' | 'created';
 
 const COLUMN_DEFS: { key: ColumnKey; label: string }[] = [
   { key: 'taskName', label: 'Task Name' },
   { key: 'priority', label: 'Priority' },
+  { key: 'assignee', label: 'Assignee' },
   { key: 'client', label: 'Client' },
   { key: 'dueDate', label: 'Due Date' },
   { key: 'comment', label: 'Comment' },
@@ -299,22 +301,29 @@ export default function TasksPage() {
   }, [teamMembers]);
 
   // Tab counts
+  const deliverableTaskIds = useMemo(() => new Set(Object.keys(deliverableProgress)), [deliverableProgress]);
   const oneTimeCount = useMemo(() =>
-    tasks.filter(t => t.frequency === 'one-time').length,
-    [tasks]
+    tasks.filter(t => t.frequency === 'one-time' && !deliverableTaskIds.has(t.id) && !t.parent_task_id).length,
+    [tasks, deliverableTaskIds]
   );
   const recurringCount = useMemo(() =>
-    tasks.filter(t => t.frequency !== 'one-time').length,
-    [tasks]
+    tasks.filter(t => t.frequency !== 'one-time' && !deliverableTaskIds.has(t.id) && !t.parent_task_id).length,
+    [tasks, deliverableTaskIds]
+  );
+  const deliverableCount = useMemo(() =>
+    tasks.filter(t => deliverableTaskIds.has(t.id)).length,
+    [tasks, deliverableTaskIds]
   );
 
-  // Filter tasks by tab + search
+  // Filter tasks by tab + search (exclude subtasks from one-time/recurring — they belong in Deliverables)
   const filtered = useMemo(() => {
     let tabFiltered: Task[];
     if (activeTab === 'one-time') {
-      tabFiltered = tasks.filter(t => t.frequency === 'one-time');
+      tabFiltered = tasks.filter(t => t.frequency === 'one-time' && !deliverableTaskIds.has(t.id) && !t.parent_task_id);
+    } else if (activeTab === 'recurring') {
+      tabFiltered = tasks.filter(t => t.frequency !== 'one-time' && !deliverableTaskIds.has(t.id) && !t.parent_task_id);
     } else {
-      tabFiltered = tasks.filter(t => t.frequency !== 'one-time');
+      tabFiltered = tasks.filter(t => deliverableTaskIds.has(t.id));
     }
 
     if (!searchTerm) return tabFiltered.sort((a, b) => a.sort_order - b.sort_order);
@@ -340,22 +349,26 @@ export default function TasksPage() {
       map.get(key)!.push(task);
     }
 
+    // Resolve group label from teamMembers by ID (not from first task's name)
+    const getLabel = (key: string) => {
+      if (key === '_unassigned') return 'Unassigned';
+      const member = teamMembers.find(m => m.id === key);
+      return member?.name || 'Unknown';
+    };
+
     const sortedKeys = Array.from(map.keys()).sort((a, b) => {
       if (a === '_unassigned') return 1;
       if (b === '_unassigned') return -1;
-      const nameA = map.get(a)![0].assigned_to_name || '';
-      const nameB = map.get(b)![0].assigned_to_name || '';
-      return nameA.localeCompare(nameB);
+      return getLabel(a).localeCompare(getLabel(b));
     });
 
     for (const key of sortedKeys) {
       const tasks = map.get(key)!;
-      const label = key === '_unassigned' ? 'Unassigned' : (tasks[0].assigned_to_name || 'Unknown');
-      groups.push({ key, label, tasks });
+      groups.push({ key, label: getLabel(key), tasks });
     }
 
     return groups;
-  }, [filtered]);
+  }, [filtered, teamMembers]);
 
   const toggleUserCollapse = (key: string) => {
     setCollapsedUsers(prev => {
@@ -553,7 +566,7 @@ export default function TasksPage() {
   }, [clients]);
 
   const colLabel: Record<ColumnKey, string> = {
-    taskName: 'Task Name', priority: 'Priority', client: 'Client', dueDate: 'Due Date', comment: 'Comment',
+    taskName: 'Task Name', priority: 'Priority', assignee: 'Assignee', client: 'Client', dueDate: 'Due Date', comment: 'Comment',
     frequency: 'Frequency', type: 'Type', link: 'Link',
     createdBy: 'Created By', created: 'Created',
   };
@@ -659,32 +672,78 @@ export default function TasksPage() {
           </td>
         );
       }
-      case 'client':
+      case 'assignee':
         return (
-          <td key={col} className={`py-3 px-3 ${COL.client}`}>
+          <td key={col} className={`py-3 px-3 ${COL.assignee}`}>
             <Select
-              value={task.client_id || '_none'}
-              onValueChange={(v) => saveSelectField(task.id, 'client_id', v === '_none' ? '' : v)}
+              value={task.assigned_to || '_unassigned'}
+              onValueChange={(v) => {
+                const member = teamMembers.find(m => m.id === v);
+                saveSelectField(task.id, 'assigned_to', v === '_unassigned' ? '' : v, {
+                  assigned_to_name: member?.name || null,
+                });
+              }}
             >
               <SelectTrigger
-                className="border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 truncate max-w-[100px]"
+                className="border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 truncate max-w-[110px]"
                 style={{ outline: 'none', boxShadow: 'none' }}
               >
                 <SelectValue>
-                  {task.client_id && clientMap[task.client_id] ? (
-                    <span className="text-gray-700">{clientMap[task.client_id]}</span>
+                  {task.assigned_to_name ? (
+                    <span className="text-gray-700 flex items-center gap-1">
+                      {userPhotoMap[task.assigned_to || ''] ? (
+                        <img src={userPhotoMap[task.assigned_to || '']!} className="h-4 w-4 rounded-full" />
+                      ) : (
+                        <User className="h-3 w-3 text-gray-400" />
+                      )}
+                      {task.assigned_to_name.split(' ')[0]}
+                    </span>
                   ) : (
                     <span className="text-gray-400">—</span>
                   )}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="_none">No client</SelectItem>
-                {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                <SelectItem value="_unassigned">Unassigned</SelectItem>
+                {teamMembers.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </td>
         );
+      case 'client': {
+        const canEditClient = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+        return (
+          <td key={col} className={`py-3 px-3 ${COL.client}`}>
+            {canEditClient ? (
+              <Select
+                value={task.client_id || '_none'}
+                onValueChange={(v) => saveSelectField(task.id, 'client_id', v === '_none' ? '' : v)}
+              >
+                <SelectTrigger
+                  className="border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 truncate max-w-[100px]"
+                  style={{ outline: 'none', boxShadow: 'none' }}
+                >
+                  <SelectValue>
+                    {task.client_id && clientMap[task.client_id] ? (
+                      <span className="text-gray-700">{clientMap[task.client_id]}</span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">No client</SelectItem>
+                  {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            ) : (
+              <span className="px-2 py-1 text-xs font-medium text-gray-700 truncate max-w-[100px] inline-block">
+                {task.client_id && clientMap[task.client_id] ? clientMap[task.client_id] : <span className="text-gray-400">—</span>}
+              </span>
+            )}
+          </td>
+        );
+      }
       case 'dueDate':
         return (
           <td key={col} className={`py-3 px-3 ${COL.dueDate}`}>
@@ -942,7 +1001,7 @@ export default function TasksPage() {
   const renderTaskTable = (groupTasks: Task[], groupKey: string) => {
     const sorted = [...groupTasks].sort((a, b) => a.sort_order - b.sort_order);
     return (
-      <table className="w-full text-sm table-fixed">
+      <table className="w-full text-sm">
         {tableHeader}
         <tbody>
           {sorted.map((task) => renderTaskRow(task))}
@@ -1033,6 +1092,13 @@ export default function TasksPage() {
                     >
                       Recurring
                       <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{recurringCount}</span>
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="deliverables"
+                      className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-sm px-4 py-2"
+                    >
+                      Deliverables
+                      <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{deliverableCount}</span>
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>

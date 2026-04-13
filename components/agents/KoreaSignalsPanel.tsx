@@ -133,6 +133,9 @@ const AUTO_SCAN_OPTIONS = [
   { value: 'biweekly', label: 'Every 2 weeks' },
 ];
 
+// Major tokens to filter from prospect list — too large to be actionable BD targets
+const MAJOR_TOKENS = new Set(['BTC', 'ETH', 'USDT', 'USDC', 'XRP', 'SOL', 'BNB', 'ADA', 'DOGE', 'DOT', 'MATIC', 'SHIB', 'TRX', 'AVAX', 'LINK', 'UNI', 'LTC', 'BCH', 'ATOM', 'FIL', 'NEAR', 'APT']);
+
 // ─── Component ───
 
 interface KoreaSignalsPanelProps {
@@ -165,6 +168,9 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
 
   // Signal type filter for Recent Signals
   const [signalTypeFilter, setSignalTypeFilter] = useState<string>('all');
+
+  // Prospect filter for Top Prospects
+  const [prospectFilter, setProspectFilter] = useState('all');
 
   // Cumulative scan stats (across all scans in this session)
   const [totalScans, setTotalScans] = useState(0);
@@ -362,6 +368,17 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
   const filteredSignals = signalTypeFilter === 'all'
     ? recentSignals
     : recentSignals.filter(s => s.signal_type === signalTypeFilter);
+
+  // Computed: filtered top prospects
+  const filteredProspects = topProspects.filter(p => {
+    // Always filter out major tokens — they aren't actionable BD prospects
+    if (p.symbol && MAJOR_TOKENS.has(p.symbol.toUpperCase())) return false;
+    if (prospectFilter === 'discovered') return p.source === 'signal_discovery';
+    if (prospectFilter === 'promoted') return p.status === 'promoted';
+    return true;
+  });
+  const discoveredCount = topProspects.filter(p => p.source === 'signal_discovery' && !(p.symbol && MAJOR_TOKENS.has(p.symbol.toUpperCase()))).length;
+  const promotedCount = topProspects.filter(p => p.status === 'promoted' && !(p.symbol && MAJOR_TOKENS.has(p.symbol.toUpperCase()))).length;
 
   // Get active signal types (ones that have data)
   const activeSignalTypes = ALL_SIGNAL_TYPES.filter(t => byType[t] && byType[t] > 0);
@@ -564,207 +581,227 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           </div>
         )}
 
+        {/* ─── Scan Controls Bar ─── */}
+        <div className="flex items-center justify-between flex-wrap gap-2 bg-white rounded-lg border border-gray-200 px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
+              <Clock className="w-3 h-3" />
+              {lastScanTime
+                ? <>Last scanned {timeAgo(lastScanTime)}</>
+                : recentSignals.length > 0
+                  ? <>Latest signal {timeAgo(recentSignals[0].detected_at)}</>
+                  : <>No scans yet</>
+              }
+            </div>
+            {/* Session cost tracker */}
+            {totalScans > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-[10px] text-gray-400 flex items-center gap-1 cursor-help">
+                    <DollarSign className="w-3 h-3" />
+                    Session: ${totalClaudeCost.toFixed(4)}
+                    {totalClaudeTokens > 0 && <span className="text-gray-300">·</span>}
+                    {totalClaudeTokens > 0 && `${(totalClaudeTokens / 1000).toFixed(1)}k tok`}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <div className="text-xs space-y-0.5">
+                    <div>{totalScans} scan{totalScans !== 1 ? 's' : ''} this session</div>
+                    <div>Total Claude cost: ${totalClaudeCost.toFixed(4)}</div>
+                    {totalClaudeTokens > 0 && <div>Total tokens: {totalClaudeTokens.toLocaleString()}</div>}
+                    {lastScanTime && <div>Last scan: {timeAgo(lastScanTime)}</div>}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Auto-scan schedule dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  disabled={autoScanLoading}
+                  className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-1 focus:ring-[#3e8692]"
+                >
+                  <CalendarClock className="w-3 h-3 text-gray-400" />
+                  {AUTO_SCAN_OPTIONS.find(o => o.value === autoScanFrequency)?.label || 'Off'}
+                  <ChevronDown className="w-3 h-3 text-gray-400" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">
+                  Auto-Scan Schedule
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup value={autoScanFrequency} onValueChange={handleAutoScanChange}>
+                  {AUTO_SCAN_OPTIONS.map(opt => (
+                    <DropdownMenuRadioItem key={opt.value} value={opt.value} className="text-xs cursor-pointer">
+                      {opt.label}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {/* Recency filter dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-1 focus:ring-[#3e8692]">
+                  <Clock className="w-3 h-3 text-gray-400" />
+                  {recencyMonths === 1 ? '1 mo' : `${recencyMonths} mo`}
+                  <ChevronDown className="w-3 h-3 text-gray-400" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">
+                  Recency Filter
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup value={String(recencyMonths)} onValueChange={(v) => setRecencyMonths(parseInt(v))}>
+                  <DropdownMenuRadioItem value="1" className="text-xs cursor-pointer">Last 1 month</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="2" className="text-xs cursor-pointer">Last 2 months</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="3" className="text-xs cursor-pointer">Last 3 months</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="6" className="text-xs cursor-pointer">Last 6 months</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="12" className="text-xs cursor-pointer">Last 12 months</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {/* Scan button with mode dropdown */}
+            <div className="relative">
+              <div className="flex items-center">
+                <Button
+                  onClick={() => scanMenuOpen ? handleScan() : setScanMenuOpen(true)}
+                  disabled={scanning}
+                  size="sm"
+                  style={{ backgroundColor: '#3e8692', color: 'white' }}
+                  className="hover:opacity-90 h-8 text-xs rounded-r-none px-4"
+                >
+                  {scanning ? (
+                    <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Scanning{modeClaude ? ' (AI)' : ''}...</>
+                  ) : scanMenuOpen ? (
+                    <><Radar className="w-3.5 h-3.5 mr-1.5" /> Run Scan</>
+                  ) : (
+                    <><Radar className="w-3.5 h-3.5 mr-1.5" /> Scan for Signals</>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-1.5 rounded-l-none border-l-0"
+                  style={scanMenuOpen ? { backgroundColor: '#3e8692', color: 'white', borderColor: '#3e8692' } : {}}
+                  onClick={() => setScanMenuOpen(!scanMenuOpen)}
+                  disabled={scanning}
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                </Button>
+              </div>
+              {scanMenuOpen && !scanning && (
+                <div className="absolute right-0 top-10 z-[80] w-72 bg-white rounded-lg border border-gray-200 shadow-lg p-3 space-y-2">
+                  <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Scan Modes</div>
+
+                  <label className="flex items-start gap-2.5 p-2 rounded-md hover:bg-gray-50 cursor-pointer">
+                    <Checkbox checked={modeApi} onCheckedChange={(v) => setModeApi(v === true)}
+                      className="mt-0.5 data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <Building2 className="w-3.5 h-3.5 text-gray-500" />
+                        <span className="text-sm font-medium text-gray-900">API Scan</span>
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-0.5">Upbit/Bithumb tokens + RSS headlines. Fast, regex-based.</p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 p-2 rounded-md hover:bg-gray-50 cursor-pointer">
+                    <Checkbox checked={modeWeb} onCheckedChange={(v) => setModeWeb(v === true)}
+                      className="mt-0.5 data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <Search className="w-3.5 h-3.5 text-gray-500" />
+                        <span className="text-sm font-medium text-gray-900">Web Scraping</span>
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-0.5">DuckDuckGo search + full article scraping. Deeper coverage.</p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 p-2 rounded-md hover:bg-gray-50 cursor-pointer">
+                    <Checkbox checked={modeClaude} onCheckedChange={(v) => setModeClaude(v === true)}
+                      className="mt-0.5 data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <Bot className="w-3.5 h-3.5 text-gray-500" />
+                        <span className="text-sm font-medium text-gray-900">Claude AI Analysis</span>
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-0.5">AI reads articles + researches Korea-expansion signals. ~$0.02/scan.</p>
+                    </div>
+                  </label>
+
+                  <div className="border-t border-gray-100 pt-2 flex items-center justify-between">
+                    <span className="text-[10px] text-gray-400">
+                      {[modeApi && 'API', modeWeb && 'Web', modeClaude && 'Claude'].filter(Boolean).join(' + ') || 'None selected'}
+                      {' · '}{recencyMonths === 1 ? '1 month' : `${recencyMonths} months`}
+                    </span>
+                    <Button size="sm" className="h-7 text-xs" style={{ backgroundColor: '#3e8692', color: 'white' }}
+                      onClick={handleScan} disabled={!modeApi && !modeWeb && !modeClaude}>
+                      <Radar className="w-3 h-3 mr-1" /> Run
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Two Column Layout: Top Prospects + Recent Signals */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Top Korea-Relevant Prospects */}
           <Card className="border border-gray-200">
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" style={{ color: '#3e8692' }} />
-                <span className="text-sm font-semibold text-gray-900">Top Korea-Relevant Prospects</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-xs font-medium">{topProspects.length}</Badge>
-                {/* Scan Button */}
-                <div className="relative">
-                  <div className="flex items-center">
-                    <Button
-                      onClick={() => scanMenuOpen ? handleScan() : setScanMenuOpen(true)}
-                      disabled={scanning}
-                      size="sm"
-                      style={{ backgroundColor: '#3e8692', color: 'white' }}
-                      className="hover:opacity-90 h-7 text-xs rounded-r-none"
-                    >
-                      {scanning ? (
-                        <><Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> Scanning{modeClaude ? ' (AI)' : ''}...</>
-                      ) : scanMenuOpen ? (
-                        <><Radar className="w-3.5 h-3.5 mr-1" /> Run Scan</>
-                      ) : (
-                        <><RefreshCw className="w-3.5 h-3.5 mr-1" /> Scan Now</>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-1.5 rounded-l-none border-l-0"
-                      style={scanMenuOpen ? { backgroundColor: '#3e8692', color: 'white', borderColor: '#3e8692' } : {}}
-                      onClick={() => setScanMenuOpen(!scanMenuOpen)}
-                      disabled={scanning}
-                    >
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </Button>
-                  </div>
-                  {scanMenuOpen && !scanning && (
-                    <div className="absolute right-0 top-9 z-[80] w-72 bg-white rounded-lg border border-gray-200 shadow-md p-3 space-y-2">
-                      <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Scan Modes</div>
-
-                      <label className="flex items-start gap-2.5 p-2 rounded-md hover:bg-gray-50 cursor-pointer">
-                        <Checkbox checked={modeApi} onCheckedChange={(v) => setModeApi(v === true)}
-                          className="mt-0.5 data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <Building2 className="w-3.5 h-3.5 text-gray-500" />
-                            <span className="text-sm font-medium text-gray-900">API Scan</span>
-                          </div>
-                          <p className="text-[10px] text-gray-400 mt-0.5">Upbit/Bithumb tokens + RSS headlines. Fast, regex-based.</p>
-                        </div>
-                      </label>
-
-                      <label className="flex items-start gap-2.5 p-2 rounded-md hover:bg-gray-50 cursor-pointer">
-                        <Checkbox checked={modeWeb} onCheckedChange={(v) => setModeWeb(v === true)}
-                          className="mt-0.5 data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <Search className="w-3.5 h-3.5 text-gray-500" />
-                            <span className="text-sm font-medium text-gray-900">Web Scraping</span>
-                          </div>
-                          <p className="text-[10px] text-gray-400 mt-0.5">DuckDuckGo search + full article scraping. Deeper coverage.</p>
-                        </div>
-                      </label>
-
-                      <label className="flex items-start gap-2.5 p-2 rounded-md hover:bg-gray-50 cursor-pointer">
-                        <Checkbox checked={modeClaude} onCheckedChange={(v) => setModeClaude(v === true)}
-                          className="mt-0.5 data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <Bot className="w-3.5 h-3.5 text-gray-500" />
-                            <span className="text-sm font-medium text-gray-900">Claude AI Analysis</span>
-                          </div>
-                          <p className="text-[10px] text-gray-400 mt-0.5">AI reads articles + researches Korea-expansion signals (partnerships, hiring, events). ~$0.02/scan.</p>
-                        </div>
-                      </label>
-
-                      {/* Recency Filter */}
-                      <div className="border-t border-gray-100 pt-2">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-1.5">
-                            <Clock className="w-3.5 h-3.5 text-gray-400" />
-                            <span className="text-[11px] font-medium text-gray-500">Recency Filter</span>
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-1 focus:ring-[#3e8692]">
-                                <Clock className="w-3 h-3 text-gray-400" />
-                                {recencyMonths === 1 ? 'Last 1 month' : `Last ${recencyMonths} months`}
-                                <ChevronDown className="w-3 h-3 text-gray-400" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
-                              <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">
-                                Articles from
-                              </DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuRadioGroup value={String(recencyMonths)} onValueChange={(v) => setRecencyMonths(parseInt(v))}>
-                                <DropdownMenuRadioItem value="1" className="text-xs cursor-pointer">Last 1 month</DropdownMenuRadioItem>
-                                <DropdownMenuRadioItem value="2" className="text-xs cursor-pointer">Last 2 months</DropdownMenuRadioItem>
-                                <DropdownMenuRadioItem value="3" className="text-xs cursor-pointer">Last 3 months</DropdownMenuRadioItem>
-                                <DropdownMenuRadioItem value="6" className="text-xs cursor-pointer">Last 6 months</DropdownMenuRadioItem>
-                                <DropdownMenuRadioItem value="12" className="text-xs cursor-pointer">Last 12 months</DropdownMenuRadioItem>
-                              </DropdownMenuRadioGroup>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <p className="text-[10px] text-gray-400 mb-2">Only include news articles published within this period.</p>
-                      </div>
-
-                      {/* ─── Improvement #4: Auto-scan Schedule ─── */}
-                      <div className="border-t border-gray-100 pt-2">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-1.5">
-                            <CalendarClock className="w-3.5 h-3.5 text-gray-400" />
-                            <span className="text-[11px] font-medium text-gray-500">Auto-Scan</span>
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button
-                                disabled={autoScanLoading}
-                                className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-1 focus:ring-[#3e8692]"
-                              >
-                                <CalendarClock className="w-3 h-3 text-gray-400" />
-                                {AUTO_SCAN_OPTIONS.find(o => o.value === autoScanFrequency)?.label || 'Off'}
-                                <ChevronDown className="w-3 h-3 text-gray-400" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
-                              <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider font-medium">
-                                Schedule
-                              </DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuRadioGroup value={autoScanFrequency} onValueChange={handleAutoScanChange}>
-                                {AUTO_SCAN_OPTIONS.map(opt => (
-                                  <DropdownMenuRadioItem key={opt.value} value={opt.value} className="text-xs cursor-pointer">
-                                    {opt.label}
-                                  </DropdownMenuRadioItem>
-                                ))}
-                              </DropdownMenuRadioGroup>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <p className="text-[10px] text-gray-400 mb-2">
-                          {autoScanFrequency === 'off'
-                            ? 'Scans run manually only.'
-                            : `Runs API + Claude scan ${autoScanFrequency} automatically.`}
-                        </p>
-                      </div>
-
-                      <div className="border-t border-gray-100 pt-2 flex items-center justify-between">
-                        <span className="text-[10px] text-gray-400">
-                          {[modeApi && 'API', modeWeb && 'Web', modeClaude && 'Claude'].filter(Boolean).join(' + ') || 'None selected'}
-                          {' · '}{recencyMonths === 1 ? '1 month' : `${recencyMonths} months`}
-                        </span>
-                        <Button size="sm" className="h-7 text-xs" style={{ backgroundColor: '#3e8692', color: 'white' }}
-                          onClick={handleScan} disabled={!modeApi && !modeWeb && !modeClaude}>
-                          <Radar className="w-3 h-3 mr-1" /> Run
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+            <div className="px-4 py-3 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" style={{ color: '#3e8692' }} />
+                  <span className="text-sm font-semibold text-gray-900">Top Prospects</span>
+                  <Badge variant="secondary" className="text-xs font-medium">{filteredProspects.length}</Badge>
+                </div>
+                {/* Prospect filter tabs */}
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setProspectFilter('all')}
+                    className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                      prospectFilter === 'all' ? 'bg-[#3e8692]/10 text-[#3e8692]' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >All</button>
+                  <button
+                    onClick={() => setProspectFilter('discovered')}
+                    className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                      prospectFilter === 'discovered' ? 'bg-[#3e8692]/10 text-[#3e8692]' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >Discovered <span className="ml-0.5 text-[10px] opacity-70">{discoveredCount}</span></button>
+                  <button
+                    onClick={() => setProspectFilter('promoted')}
+                    className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                      prospectFilter === 'promoted' ? 'bg-[#3e8692]/10 text-[#3e8692]' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >In Pipeline <span className="ml-0.5 text-[10px] opacity-70">{promotedCount}</span></button>
                 </div>
               </div>
-              {/* Session cost tracker */}
-              {totalScans > 0 && (
-                <div className="flex items-center gap-2 ml-1">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="text-[10px] text-gray-400 flex items-center gap-1 cursor-help">
-                        <DollarSign className="w-3 h-3" />
-                        Session: ${totalClaudeCost.toFixed(4)}
-                        {totalClaudeTokens > 0 && <span className="text-gray-300">·</span>}
-                        {totalClaudeTokens > 0 && `${(totalClaudeTokens / 1000).toFixed(1)}k tok`}
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom">
-                      <div className="text-xs space-y-0.5">
-                        <div>{totalScans} scan{totalScans !== 1 ? 's' : ''} this session</div>
-                        <div>Total Claude cost: ${totalClaudeCost.toFixed(4)}</div>
-                        {totalClaudeTokens > 0 && <div>Total tokens: {totalClaudeTokens.toLocaleString()}</div>}
-                        {lastScanTime && <div>Last scan: {timeAgo(lastScanTime)}</div>}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              )}
             </div>
             <ScrollArea className="h-[400px]">
               <div className="divide-y divide-gray-100">
-                {topProspects.length === 0 ? (
+                {filteredProspects.length === 0 ? (
                   <div className="p-8 text-center">
                     <Radar className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                    <p className="text-sm text-gray-500">No signals found yet</p>
-                    <p className="text-xs text-gray-400 mt-1">Click &quot;Scan Now&quot; to check Korean exchanges and news</p>
+                    <p className="text-sm text-gray-500">
+                      {prospectFilter === 'discovered' ? 'No discovered prospects yet' :
+                       prospectFilter === 'promoted' ? 'No prospects in pipeline yet' :
+                       'No signals found yet'}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {prospectFilter !== 'all'
+                        ? <button onClick={() => setProspectFilter('all')} className="text-[#3e8692] hover:underline">Show all prospects</button>
+                        : 'Click "Scan Now" to check Korean exchanges and news'}
+                    </p>
                   </div>
                 ) : (
-                  topProspects.map((p, i) => (
+                  filteredProspects.map((p, i) => (
                     <div
                       key={p.id}
                       className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left group"
