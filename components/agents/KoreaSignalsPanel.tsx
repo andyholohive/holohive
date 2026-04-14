@@ -111,6 +111,16 @@ const SIGNAL_TYPE_CONFIG: Record<string, { icon: React.ElementType; label: strin
 
 const ALL_SIGNAL_TYPES = Object.keys(SIGNAL_TYPE_CONFIG);
 
+const DEFAULT_SIGNAL_CONFIG = { icon: Zap, label: 'Custom Signal', color: 'text-gray-700', bg: 'bg-gray-50 border-gray-200' };
+
+/** Get config for a signal type, with fallback for custom/unknown types */
+function getSignalConfig(type: string) {
+  if (SIGNAL_TYPE_CONFIG[type]) return SIGNAL_TYPE_CONFIG[type];
+  // Format custom type: "korea_regulatory" → "Korea Regulatory"
+  const label = type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return { ...DEFAULT_SIGNAL_CONFIG, label };
+}
+
 const SOURCE_LABELS: Record<string, string> = {
   upbit: 'Upbit',
   bithumb: 'Bithumb',
@@ -251,6 +261,22 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           title: 'Scan Complete',
           description: `Found ${data.signals_found} signals across ${data.prospects_with_signals} prospects${data.claude ? ` (AI: $${data.claude.cost_usd.toFixed(4)})` : ''}`,
         });
+        // Show individual alerts for high-value signals
+        if (data.alerts && data.alerts.length > 0) {
+          const alertLabels: Record<string, string> = {
+            exchange_listing: '🏦 Exchange Listing',
+            korea_partnership: '🤝 Partnership',
+            korea_hiring: '👥 Korea Hiring',
+          };
+          data.alerts.slice(0, 3).forEach((alert: any, i: number) => {
+            setTimeout(() => {
+              toast({
+                title: alertLabels[alert.type] || '⚡ High-Value Signal',
+                description: `${alert.project}: ${alert.headline}`,
+              });
+            }, (i + 1) * 800);
+          });
+        }
         fetchDashboard();
       } else {
         toast({ title: 'Scan Failed', description: data.error, variant: 'destructive' });
@@ -303,7 +329,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           title: frequency === 'off' ? 'Auto-scan disabled' : 'Auto-scan scheduled',
           description: frequency === 'off'
             ? 'Automatic scans have been turned off.'
-            : `Signals will be scanned ${frequency}. Modes: API${modeClaude ? ' + Claude' : ''}.`,
+            : `Signals will be scanned ${frequency}. Modes: API + Web + Claude.`,
         });
       }
     } catch {
@@ -886,7 +912,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                       <Filter className="w-3 h-3 text-gray-400" />
                       {signalTypeFilter === 'all'
                         ? 'All types'
-                        : SIGNAL_TYPE_CONFIG[signalTypeFilter]?.label || signalTypeFilter}
+                        : getSignalConfig(signalTypeFilter).label}
                       <ChevronDown className="w-3 h-3 text-gray-400" />
                     </button>
                   </DropdownMenuTrigger>
@@ -901,8 +927,9 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                         <span className="ml-auto text-[10px] text-gray-400">{recentSignals.length}</span>
                       </DropdownMenuRadioItem>
                       <DropdownMenuSeparator />
-                      {ALL_SIGNAL_TYPES.map(type => {
-                        const config = SIGNAL_TYPE_CONFIG[type];
+                      {/* Known + custom signal types that appear in data */}
+                      {Array.from(new Set([...ALL_SIGNAL_TYPES, ...recentSignals.map(s => s.signal_type)])).map(type => {
+                        const config = getSignalConfig(type);
                         const count = recentSignals.filter(s => s.signal_type === type).length;
                         if (count === 0) return null;
                         const Icon = config.icon;
@@ -928,7 +955,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                   <div className="p-8 text-center">
                     <Radar className="w-8 h-8 mx-auto mb-2 text-gray-300" />
                     <p className="text-sm text-gray-500">
-                      {signalTypeFilter !== 'all' ? `No ${SIGNAL_TYPE_CONFIG[signalTypeFilter]?.label || signalTypeFilter} signals` : 'No signals detected yet'}
+                      {signalTypeFilter !== 'all' ? `No ${getSignalConfig(signalTypeFilter).label} signals` : 'No signals detected yet'}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
                       {signalTypeFilter !== 'all'
@@ -938,7 +965,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                   </div>
                 ) : (
                   filteredSignals.map(signal => {
-                    const config = SIGNAL_TYPE_CONFIG[signal.signal_type] || SIGNAL_TYPE_CONFIG.news_mention;
+                    const config = getSignalConfig(signal.signal_type);
                     const Icon = config.icon;
                     return (
                       <div key={signal.id} className="px-4 py-2.5 hover:bg-gray-50 transition-colors">
@@ -1042,7 +1069,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
             ) : (
               <div className="space-y-3 py-2">
                 {detailSignals.map(signal => {
-                  const config = SIGNAL_TYPE_CONFIG[signal.signal_type] || SIGNAL_TYPE_CONFIG.news_mention;
+                  const config = getSignalConfig(signal.signal_type);
                   const Icon = config.icon;
                   return (
                     <div key={signal.id} className={`rounded-lg border p-3 ${config.bg}`}>

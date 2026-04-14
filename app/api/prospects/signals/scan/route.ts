@@ -152,12 +152,29 @@ interface CoinGeckoResult {
   source_url: string;
 }
 
+/** Fetch with retry + exponential backoff for rate-limited APIs */
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 2): Promise<Response> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, { ...options, signal: AbortSignal.timeout(10000) });
+    if (res.status === 429 && attempt < maxRetries) {
+      // Rate limited — wait with exponential backoff (2s, 4s)
+      const delay = 2000 * Math.pow(2, attempt);
+      console.log(`CoinGecko rate limited, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+      await new Promise(r => setTimeout(r, delay));
+      continue;
+    }
+    return res;
+  }
+  // Should never reach here, but TypeScript wants a return
+  return fetch(url, options);
+}
+
 async function searchCoinGecko(query: string): Promise<CoinGeckoResult | null> {
   try {
     // Step 1: Search for the coin
-    const searchRes = await fetch(
+    const searchRes = await fetchWithRetry(
       `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(query)}`,
-      { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) }
+      { headers: { Accept: 'application/json' } }
     );
     if (!searchRes.ok) return null;
     const searchData = await searchRes.json();
@@ -166,9 +183,9 @@ async function searchCoinGecko(query: string): Promise<CoinGeckoResult | null> {
     if (!coin) return null;
 
     // Step 2: Get market data for the top result
-    const marketRes = await fetch(
+    const marketRes = await fetchWithRetry(
       `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coin.id}&order=market_cap_desc&per_page=1&page=1`,
-      { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) }
+      { headers: { Accept: 'application/json' } }
     );
     if (!marketRes.ok) {
       // Return basic info without market data
@@ -580,7 +597,7 @@ export async function POST(request: Request) {
       }
 
       // Add unmatched news mentions (lower priority, cap to avoid too many API calls)
-      const newsDiscoveryCap = 10; // Max new prospects to discover from news per scan
+      const newsDiscoveryCap = 15; // Max new prospects to discover from news per scan
       let newsDiscoveryCount = 0;
       for (const { name, article, source } of unmatchedNewsNames) {
         if (newsDiscoveryCount >= newsDiscoveryCap) break;
@@ -603,9 +620,9 @@ export async function POST(request: Request) {
         }
       }
 
-      // Process discovery queue — cap at 20 to avoid long scan times
+      // Process discovery queue — cap at 30 (retry logic handles CoinGecko rate limits)
       // Exchange tokens already have name/symbol from the API, so CoinGecko is optional enrichment
-      const DISCOVERY_CAP = 20;
+      const DISCOVERY_CAP = 30;
       const queueToProcess = discoveryQueue.slice(0, DISCOVERY_CAP);
 
       for (const candidate of queueToProcess) {
@@ -680,7 +697,7 @@ export async function POST(request: Request) {
     let webSearchResults = 0;
     let webArticlesScraped = 0;
     const webDiscoveredProjects: string[] = [];
-    const WEB_DISCOVERY_CAP = 10; // Cap web-discovered prospects to avoid CoinGecko timeout
+    const WEB_DISCOVERY_CAP = 15; // Cap web-discovered prospects (retry logic handles rate limits)
     let webDiscoveryCount = 0;
 
     // Shared article cache — reused by Claude mode if both are enabled
@@ -834,7 +851,7 @@ export async function POST(request: Request) {
     let claudeSignalsFound = 0;
     let claudeCost = 0;
     let claudeTokensUsed = 0;
-    const CLAUDE_DISCOVERY_CAP = 10;
+    const CLAUDE_DISCOVERY_CAP = 15;
     let claudeDiscoveryCount = 0;
 
     if (useClaude) {
@@ -1043,32 +1060,54 @@ export async function POST(request: Request) {
     }
 
     // 9. Recalculate korea_relevancy_score for all affected prospects
+    //    Enhanced scoring: diversity bonus + recency weighting
     const affectedIds = [...prospectScoreMap.keys()];
     if (affectedIds.length > 0) {
+      const now = Date.now();
       for (const prospectId of affectedIds) {
         const { data: allSignals } = await supabase
           .from('prospect_signals')
-          .select('signal_type, relevancy_weight, is_active')
+          .select('signal_type, relevancy_weight, is_active, detected_at')
           .eq('prospect_id', prospectId)
           .eq('is_active', true);
 
         let totalScore = 0;
-        const signalsByType = new Map<string, number[]>();
+        const signalsByType = new Map<string, Array<{ weight: number; detected_at: string | null }>>();
 
         for (const s of allSignals || []) {
           const existing = signalsByType.get(s.signal_type) || [];
-          existing.push(s.relevancy_weight);
+          existing.push({ weight: s.relevancy_weight as number, detected_at: s.detected_at as string | null });
           signalsByType.set(s.signal_type, existing);
         }
 
-        for (const [, weights] of signalsByType) {
-          weights.sort((a, b) => b - a);
-          weights.forEach((w, i) => {
-            totalScore += i === 0 ? w : Math.max(5, Math.floor(w * (0.5 ** i)));
+        // Apply diminishing returns + recency decay per signal type
+        Array.from(signalsByType.entries()).forEach(([, signals]) => {
+          // Sort by weight descending
+          signals.sort((a: { weight: number }, b: { weight: number }) => b.weight - a.weight);
+          signals.forEach((s: { weight: number; detected_at: string | null }, i: number) => {
+            // Recency multiplier: 1.0 for signals in last 30 days, decays to 0.5 at 180 days
+            let recencyMultiplier = 1.0;
+            if (s.detected_at) {
+              const ageDays = (now - new Date(s.detected_at).getTime()) / (1000 * 60 * 60 * 24);
+              if (ageDays > 30) {
+                // Linear decay from 1.0 at 30 days to 0.5 at 180 days
+                recencyMultiplier = Math.max(0.5, 1.0 - ((ageDays - 30) / 300));
+              }
+            }
+            const baseScore = i === 0 ? s.weight : Math.max(5, Math.floor(s.weight * (0.5 ** i)));
+            totalScore += Math.round(baseScore * recencyMultiplier);
           });
-        }
+        });
 
-        const finalScore = Math.min(100, totalScore);
+        // Diversity bonus: reward having multiple distinct signal types
+        // 2 types = +5%, 3 types = +12%, 4+ types = +20%
+        const uniqueTypes = signalsByType.size;
+        let diversityMultiplier = 1.0;
+        if (uniqueTypes >= 4) diversityMultiplier = 1.20;
+        else if (uniqueTypes === 3) diversityMultiplier = 1.12;
+        else if (uniqueTypes === 2) diversityMultiplier = 1.05;
+
+        const finalScore = Math.min(100, Math.round(totalScore * diversityMultiplier));
         const signalCount = (allSignals || []).length;
 
         await supabase
@@ -1090,12 +1129,23 @@ export async function POST(request: Request) {
 
     const scanDurationMs = Date.now() - scanStartTime;
 
+    // 11. Identify high-value signals for alerts
+    const HIGH_VALUE_TYPES = ['exchange_listing', 'korea_partnership', 'korea_hiring'];
+    const highValueSignals = newSignals
+      .filter((s: any) => HIGH_VALUE_TYPES.includes(s.signal_type))
+      .map((s: any) => ({
+        project: s.project_name,
+        type: s.signal_type,
+        headline: s.headline,
+      }));
+
     return NextResponse.json({
       success: true,
       modes,
       recency_months: recencyMonths,
       scan_duration_ms: scanDurationMs,
       scan_duration_seconds: Math.round(scanDurationMs / 1000),
+      alerts: highValueSignals.length > 0 ? highValueSignals : undefined,
       scanned: {
         prospects: prospects.length,
         upbit_tokens: upbitTokens.length,

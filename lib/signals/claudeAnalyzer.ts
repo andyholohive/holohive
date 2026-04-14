@@ -10,7 +10,7 @@ import type { ArticleContent } from './webScraper';
 
 export interface ClaudeSignal {
   project_name: string;
-  signal_type: 'exchange_listing' | 'news_mention' | 'korea_community' | 'korea_partnership' | 'korea_event' | 'korea_localization' | 'korea_hiring' | 'social_presence';
+  signal_type: 'exchange_listing' | 'news_mention' | 'korea_community' | 'korea_partnership' | 'korea_event' | 'korea_localization' | 'korea_hiring' | 'social_presence' | string;
   headline: string;
   evidence: string;
   urgency: 'high' | 'medium' | 'low';
@@ -46,12 +46,18 @@ URGENCY LEVELS:
 - medium: Plans or indications of Korea interest
 - low: General mention in Korean media without specific Korea activity
 
+CUSTOM SIGNAL TYPES:
+If you discover a Korea-relevant signal that doesn't fit the types above, you may use a custom signal_type in snake_case.
+Examples of valid custom types: korea_regulatory, korea_staking_launch, korea_airdrop, korea_exchange_delisting, korea_fund_raising, korea_media_campaign
+Custom types should always start with "korea_" and describe the specific activity.
+
 RULES:
 - Only identify SPECIFIC project names (not "Bitcoin" or "Ethereum" unless they have Korea-specific news)
 - Skip general market commentary (price analysis, macro trends)
 - Each signal must have concrete evidence from the article
 - The korea_relevance_reason should explain WHY this matters for a Korean marketing agency
 - If no Korea-relevant signals are found, return an empty array
+- Prefer the standard signal types above when applicable; only use custom types for genuinely new categories
 
 Respond ONLY with valid JSON in this exact format:
 {

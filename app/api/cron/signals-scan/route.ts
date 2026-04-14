@@ -77,7 +77,7 @@ export async function GET(request: Request) {
     }
 
     // Trigger the scan internally
-    const modes = settings.modes || ['api', 'claude'];
+    const modes = settings.modes || ['api', 'web', 'claude'];
     const recencyMonths = settings.recency_months || 1;
 
     // Call the scan endpoint internally
