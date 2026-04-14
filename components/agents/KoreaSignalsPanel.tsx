@@ -107,6 +107,13 @@ const SIGNAL_TYPE_CONFIG: Record<string, { icon: React.ElementType; label: strin
   korea_localization: { icon: Globe, label: 'Korea Localization', color: 'text-cyan-700', bg: 'bg-cyan-50 border-cyan-200' },
   social_presence: { icon: Activity, label: 'Social Presence', color: 'text-pink-700', bg: 'bg-pink-50 border-pink-200' },
   news_mention: { icon: Newspaper, label: 'News Mention', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
+  // Pre-Korea intent signals
+  korea_intent_apac: { icon: Globe, label: 'APAC Expansion', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
+  korea_intent_vc: { icon: TrendingUp, label: 'Korean VC Backed', color: 'text-violet-700', bg: 'bg-violet-50 border-violet-200' },
+  korea_intent_conference: { icon: Activity, label: 'Korea Conference', color: 'text-teal-700', bg: 'bg-teal-50 border-teal-200' },
+  korea_intent_hiring: { icon: Search, label: 'Asia Hiring', color: 'text-sky-700', bg: 'bg-sky-50 border-sky-200' },
+  korea_intent_competitor: { icon: TrendingUp, label: 'Competitor in Korea', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
+  korea_intent_exchange: { icon: Building2, label: 'Asian Exchange (Not KR)', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
   // Negative signals
   korea_exchange_delisting: { icon: AlertCircle, label: 'Exchange Delisting', color: 'text-red-700', bg: 'bg-red-50 border-red-300' },
   korea_regulatory_warning: { icon: AlertCircle, label: 'Regulatory Warning', color: 'text-red-700', bg: 'bg-red-50 border-red-300' },
@@ -271,6 +278,9 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
             exchange_listing: '🏦 Exchange Listing',
             korea_partnership: '🤝 Partnership',
             korea_hiring: '👥 Korea Hiring',
+            korea_intent_vc: '💰 Korean VC Backed',
+            korea_intent_apac: '🌏 APAC Expansion',
+            korea_intent_exchange: '📊 Ready for Korea Listing',
           };
           data.alerts.slice(0, 3).forEach((alert: any, i: number) => {
             setTimeout(() => {
@@ -409,15 +419,17 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
     : recentSignals.filter(s => s.signal_type === signalTypeFilter);
 
   // Computed: filtered top prospects
-  const filteredProspects = topProspects.filter(p => {
+  const filteredProspects = topProspects.filter((p: any) => {
     // Always filter out major tokens — they aren't actionable BD prospects
     if (p.symbol && MAJOR_TOKENS.has(p.symbol.toUpperCase())) return false;
     if (prospectFilter === 'discovered') return p.source === 'signal_discovery';
     if (prospectFilter === 'promoted') return p.status === 'promoted';
+    if (prospectFilter === 'intent') return p.has_intent_signals === true;
     return true;
   });
-  const discoveredCount = topProspects.filter(p => p.source === 'signal_discovery' && !(p.symbol && MAJOR_TOKENS.has(p.symbol.toUpperCase()))).length;
-  const promotedCount = topProspects.filter(p => p.status === 'promoted' && !(p.symbol && MAJOR_TOKENS.has(p.symbol.toUpperCase()))).length;
+  const discoveredCount = topProspects.filter((p: any) => p.source === 'signal_discovery' && !(p.symbol && MAJOR_TOKENS.has(p.symbol.toUpperCase()))).length;
+  const promotedCount = topProspects.filter((p: any) => p.status === 'promoted' && !(p.symbol && MAJOR_TOKENS.has(p.symbol.toUpperCase()))).length;
+  const intentCount = topProspects.filter((p: any) => p.has_intent_signals && !(p.symbol && MAJOR_TOKENS.has(p.symbol.toUpperCase()))).length;
 
   // Get active signal types (ones that have data)
   const activeSignalTypes = ALL_SIGNAL_TYPES.filter(t => byType[t] && byType[t] > 0);
@@ -820,6 +832,12 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                       prospectFilter === 'promoted' ? 'bg-[#3e8692]/10 text-[#3e8692]' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
                     }`}
                   >In Pipeline <span className="ml-0.5 text-[10px] opacity-70">{promotedCount}</span></button>
+                  <button
+                    onClick={() => setProspectFilter('intent')}
+                    className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                      prospectFilter === 'intent' ? 'bg-amber-100 text-amber-700' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >Pre-Korea <span className="ml-0.5 text-[10px] opacity-70">{intentCount}</span></button>
                 </div>
               </div>
             </div>
@@ -831,6 +849,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                     <p className="text-sm text-gray-500">
                       {prospectFilter === 'discovered' ? 'No discovered prospects yet' :
                        prospectFilter === 'promoted' ? 'No prospects in pipeline yet' :
+                       prospectFilter === 'intent' ? 'No pre-Korea intent signals yet' :
                        'No signals found yet'}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">

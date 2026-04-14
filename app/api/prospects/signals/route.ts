@@ -64,13 +64,39 @@ export async function GET(request: Request) {
       .select('id, name, symbol, category, market_cap, korea_relevancy_score, korea_signal_count, logo_url, source, status')
       .gt('korea_relevancy_score', 0)
       .order('korea_relevancy_score', { ascending: false })
-      .limit(20);
+      .limit(30);
+
+    // Enrich each prospect with its signal types for frontend filtering
+    const prospectIds = (topProspects || []).map((p: any) => p.id);
+    let prospectSignalTypes: Record<string, string[]> = {};
+    if (prospectIds.length > 0) {
+      const { data: signalTypeData } = await supabase
+        .from('prospect_signals')
+        .select('prospect_id, signal_type')
+        .in('prospect_id', prospectIds)
+        .eq('is_active', true);
+
+      for (const s of signalTypeData || []) {
+        const pid = s.prospect_id as string;
+        if (!pid) continue;
+        if (!prospectSignalTypes[pid]) prospectSignalTypes[pid] = [];
+        if (!prospectSignalTypes[pid].includes(s.signal_type)) {
+          prospectSignalTypes[pid].push(s.signal_type);
+        }
+      }
+    }
+
+    const enrichedProspects = (topProspects || []).map((p: any) => ({
+      ...p,
+      signal_types: prospectSignalTypes[p.id] || [],
+      has_intent_signals: (prospectSignalTypes[p.id] || []).some((t: string) => t.startsWith('korea_intent_')),
+    }));
 
     return NextResponse.json({
       total_signals: (stats || []).length,
       by_type: byType,
       by_source: bySource,
-      top_prospects: topProspects || [],
+      top_prospects: enrichedProspects,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

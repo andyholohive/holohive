@@ -23,6 +23,7 @@ export interface ArticleContent {
 // ─── DuckDuckGo Search ───
 
 const KOREA_SEARCH_QUERIES = [
+  // Active Korea signals
   'crypto Korea launch 2026',
   'blockchain project Korean market expansion',
   '"Upbit listing" new token',
@@ -33,6 +34,17 @@ const KOREA_SEARCH_QUERIES = [
   'crypto Korea office opening',
   '"Korea Blockchain Week" 2026',
   'Korean exchange new listing crypto',
+  // Pre-Korea intent signals
+  'crypto project "Asia expansion" 2026',
+  'blockchain "APAC expansion" launch',
+  'crypto project "entering Asian market"',
+  '"Hashed" investment crypto 2026',
+  '"Dunamu" investment portfolio crypto',
+  'crypto hiring "Asia community manager"',
+  'blockchain "Japan launch" "Korea" 2026',
+  'crypto "Southeast Asia" expansion Korea next',
+  '"ETH Seoul" "Korea Blockchain Week" speaker sponsor 2026',
+  'crypto "Asia Pacific" marketing expansion',
 ];
 
 /**

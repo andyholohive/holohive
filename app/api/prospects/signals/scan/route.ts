@@ -18,6 +18,13 @@ const SIGNAL_WEIGHTS: Record<string, number> = {
   news_mention: 25,              // Mentioned in Korean crypto news
   news_mention_2: 15,            // Second mention (diminishing)
   news_mention_3: 10,            // Third+ mention
+  // Pre-Korea intent signals
+  korea_intent_apac: 30,         // Expanding to APAC/Asia (Korea likely next)
+  korea_intent_vc: 35,           // Backed by Korean VCs (Hashed, Dunamu, etc.)
+  korea_intent_conference: 25,   // Registered for Korean conferences
+  korea_intent_hiring: 30,       // Hiring Asia/APAC roles (pre-Korea BD signal)
+  korea_intent_competitor: 20,   // Competitor already in Korea
+  korea_intent_exchange: 30,     // On Asian exchanges but not Korean ones yet
   // Negative signals — suppress score
   korea_exchange_delisting: -30, // Delisted from Korean exchange
   korea_regulatory_warning: -20, // FSC/FIU regulatory warning
@@ -1331,7 +1338,7 @@ export async function POST(request: Request) {
     const scanDurationMs = Date.now() - scanStartTime;
 
     // 11. Identify high-value signals for alerts
-    const HIGH_VALUE_TYPES = ['exchange_listing', 'korea_partnership', 'korea_hiring'];
+    const HIGH_VALUE_TYPES = ['exchange_listing', 'korea_partnership', 'korea_hiring', 'korea_intent_vc', 'korea_intent_apac', 'korea_intent_exchange'];
     const highValueSignals = newSignals
       .filter((s: any) => HIGH_VALUE_TYPES.includes(s.signal_type))
       .map((s: any) => ({
