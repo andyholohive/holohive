@@ -6,18 +6,22 @@ import { analyzeArticles, analyzeSearchResults } from '@/lib/signals/claudeAnaly
 export const dynamic = 'force-dynamic';
 export const maxDuration = 180; // Allow up to 3 minutes for full scan with all modes
 
-// ─── Signal weights ───
+// ─── Signal weights (negative weights suppress score) ───
 const SIGNAL_WEIGHTS: Record<string, number> = {
-  exchange_listing: 40,    // Listed on Korean exchange
-  korea_partnership: 35,   // Partnership with Korean company
-  korea_hiring: 30,        // Hiring for Korean market roles
-  korea_community: 30,     // Launching Korean community
-  korea_event: 25,         // Participating in Korean events
-  korea_localization: 25,  // Adding Korean language support
-  social_presence: 20,     // Korean social media activity
-  news_mention: 25,        // Mentioned in Korean crypto news
-  news_mention_2: 15,      // Second mention (diminishing)
-  news_mention_3: 10,      // Third+ mention
+  exchange_listing: 40,          // Listed on Korean exchange
+  korea_partnership: 35,         // Partnership with Korean company
+  korea_hiring: 30,              // Hiring for Korean market roles
+  korea_community: 30,           // Launching Korean community
+  korea_event: 25,               // Participating in Korean events
+  korea_localization: 25,        // Adding Korean language support
+  social_presence: 20,           // Korean social media activity
+  news_mention: 25,              // Mentioned in Korean crypto news
+  news_mention_2: 15,            // Second mention (diminishing)
+  news_mention_3: 10,            // Third+ mention
+  // Negative signals — suppress score
+  korea_exchange_delisting: -30, // Delisted from Korean exchange
+  korea_regulatory_warning: -20, // FSC/FIU regulatory warning
+  korea_scam_alert: -25,         // Scam/fraud warning in Korean media
 };
 
 // ─── Blacklist: major/common tokens to skip during discovery ───
@@ -40,6 +44,51 @@ const SKIP_WORDS = new Set([
   'analysis', 'update', 'news', 'the', 'for', 'and', 'from', 'china',
   'trump', 'iran', 'usa', 'japan',
 ]);
+
+// ─── Quality filters for discovered prospects ───
+const MIN_MARKET_CAP = 5_000_000; // $5M minimum — skip micro-caps
+const SPAM_PATTERNS = [
+  /^safe/i, /moon$/i, /elon/i, /doge(?!coin)/i, /shib(?!a)/i,
+  /baby/i, /floki/i, /pepe(?!coin)/i, /inu$/i, /cum/i, /ass$/i,
+  /rocket/i, /1000x/i, /gem$/i,
+];
+
+/** Check if a prospect name looks like spam/meme noise */
+function isSpamName(name: string): boolean {
+  return SPAM_PATTERNS.some(p => p.test(name));
+}
+
+/** Check if a CoinGecko result passes quality filters */
+function passesQualityFilter(name: string, coinData: CoinGeckoResult | null): boolean {
+  // Always filter spam names
+  if (isSpamName(name)) return false;
+  // If we have market data, enforce minimum market cap
+  if (coinData?.market_cap && coinData.market_cap < MIN_MARKET_CAP) return false;
+  return true;
+}
+
+// ─── Korean-English project name mapping ───
+// Common Korean names for crypto projects that appear in Korean articles
+const KOREAN_NAME_MAP: Record<string, string> = {
+  '비트코인': 'Bitcoin', '이더리움': 'Ethereum', '리플': 'XRP',
+  '에이다': 'Cardano', '솔라나': 'Solana', '폴카닷': 'Polkadot',
+  '아발란체': 'Avalanche', '체인링크': 'Chainlink', '유니스왑': 'Uniswap',
+  '아비트럼': 'Arbitrum', '옵티미즘': 'Optimism', '폴리곤': 'Polygon',
+  '코스모스': 'Cosmos', '니어': 'NEAR', '앱토스': 'Aptos',
+  '수이': 'Sui', '셀레스티아': 'Celestia', '스택스': 'Stacks',
+  '헬리움': 'Helium', '더그래프': 'The Graph', '렌더': 'Render',
+  '페치': 'Fetch.ai', '아카시': 'Akash', '인젝티브': 'Injective',
+  '세이': 'Sei', '주피터': 'Jupiter', '레이디움': 'Raydium',
+  '오르카': 'Orca', '매직에덴': 'Magic Eden', '텐서': 'Tensor',
+  '웜홀': 'Wormhole', '파이쓰': 'Pyth', '지토': 'Jito',
+  '이오스': 'EOS', '트론': 'TRON', '에이브': 'Aave',
+  '메이커': 'Maker', '컴파운드': 'Compound', '커브': 'Curve',
+  '팬케이크스왑': 'PancakeSwap', '스시스왑': 'SushiSwap',
+  '디와이디엑스': 'dYdX', '질리카': 'Zilliqa', '카이버': 'Kyber',
+  '밴드': 'Band Protocol', '온톨로지': 'Ontology', '알고랜드': 'Algorand',
+  '하모니': 'Harmony', '엘론드': 'MultiversX', '카르다노': 'Cardano',
+  '테조스': 'Tezos', '아이오타': 'IOTA',
+};
 
 // ─── Korean exchange token fetchers ───
 
@@ -149,6 +198,8 @@ interface CoinGeckoResult {
   price: number | null;
   volume_24h: number | null;
   logo_url: string | null;
+  telegram_users: number | null;
+  twitter_followers: number | null;
   source_url: string;
 }
 
@@ -182,13 +233,30 @@ async function searchCoinGecko(query: string): Promise<CoinGeckoResult | null> {
     const coin = searchData.coins?.[0];
     if (!coin) return null;
 
-    // Step 2: Get market data for the top result
-    const marketRes = await fetchWithRetry(
-      `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coin.id}&order=market_cap_desc&per_page=1&page=1`,
-      { headers: { Accept: 'application/json' } }
-    );
+    // Step 2: Get market data + community data in parallel
+    const [marketRes, communityRes] = await Promise.all([
+      fetchWithRetry(
+        `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coin.id}&order=market_cap_desc&per_page=1&page=1`,
+        { headers: { Accept: 'application/json' } }
+      ),
+      fetchWithRetry(
+        `https://api.coingecko.com/api/v3/coins/${coin.id}?localization=false&tickers=false&market_data=false&community_data=true&developer_data=false`,
+        { headers: { Accept: 'application/json' } }
+      ).catch(() => null),
+    ]);
+
+    // Parse community data (best-effort)
+    let telegramUsers: number | null = null;
+    let twitterFollowers: number | null = null;
+    if (communityRes && communityRes.ok) {
+      try {
+        const cd = await communityRes.json();
+        telegramUsers = cd?.community_data?.telegram_channel_user_count || null;
+        twitterFollowers = cd?.community_data?.twitter_followers || null;
+      } catch {}
+    }
+
     if (!marketRes.ok) {
-      // Return basic info without market data
       return {
         name: coin.name,
         symbol: (coin.symbol || '').toUpperCase(),
@@ -198,6 +266,8 @@ async function searchCoinGecko(query: string): Promise<CoinGeckoResult | null> {
         volume_24h: null,
         logo_url: coin.large || coin.thumb || null,
         source_url: `https://www.coingecko.com/en/coins/${coin.id}`,
+        telegram_users: telegramUsers,
+        twitter_followers: twitterFollowers,
       };
     }
 
@@ -213,6 +283,8 @@ async function searchCoinGecko(query: string): Promise<CoinGeckoResult | null> {
         volume_24h: null,
         logo_url: coin.large || coin.thumb || null,
         source_url: `https://www.coingecko.com/en/coins/${coin.id}`,
+        telegram_users: telegramUsers,
+        twitter_followers: twitterFollowers,
       };
     }
 
@@ -225,6 +297,8 @@ async function searchCoinGecko(query: string): Promise<CoinGeckoResult | null> {
       volume_24h: m.total_volume || null,
       logo_url: m.image || coin.large || coin.thumb || null,
       source_url: `https://www.coingecko.com/en/coins/${coin.id}`,
+      telegram_users: telegramUsers,
+      twitter_followers: twitterFollowers,
     };
   } catch (err) {
     console.error(`CoinGecko search error for "${query}":`, err);
@@ -246,6 +320,14 @@ function extractProjectNames(title: string, description: string): string[] {
   const text = `${title} ${description}`;
   const names: string[] = [];
   const seen = new Set<string>();
+
+  // Pattern 0: Korean name → English mapping (e.g. "아비트럼" → "Arbitrum")
+  for (const [koreanName, englishName] of Object.entries(KOREAN_NAME_MAP)) {
+    if (text.includes(koreanName) && !seen.has(englishName.toLowerCase())) {
+      seen.add(englishName.toLowerCase());
+      names.push(englishName);
+    }
+  }
 
   // Pattern 1: English names in parentheses — 한글(EnglishName)
   const parenRegex = /[가-힣]+\(([A-Z][A-Za-z0-9\s]{1,25})\)/g;
@@ -298,6 +380,36 @@ function normalizeForMatch(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+/** Simple Levenshtein distance for fuzzy matching */
+function levenshtein(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const matrix: number[][] = [];
+  for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      matrix[i][j] = a[j - 1] === b[i - 1]
+        ? matrix[i - 1][j - 1]
+        : Math.min(matrix[i - 1][j - 1] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j] + 1);
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+// Common name variations/aliases
+const NAME_ALIASES: Record<string, string[]> = {
+  'polygon': ['matic'],
+  'matic': ['polygon'],
+  'multiversx': ['elrond'],
+  'elrond': ['multiversx'],
+  'arbitrum': ['arbitrumone', 'arbitrumnova'],
+  'avalanche': ['avax'],
+  'avax': ['avalanche'],
+  'chainlink': ['link'],
+  'polkadot': ['dot'],
+};
+
 function findProspectMatch(
   projectName: string,
   projectSymbol: string,
@@ -306,14 +418,36 @@ function findProspectMatch(
   const normName = normalizeForMatch(projectName);
   const normSymbol = normalizeForMatch(projectSymbol);
 
+  // Also check Korean name mapping
+  const koreanMapped = Object.entries(KOREAN_NAME_MAP).find(
+    ([, eng]) => normalizeForMatch(eng) === normName
+  );
+
   for (const p of prospects) {
     const pName = normalizeForMatch(p.name);
     const pSymbol = normalizeForMatch(p.symbol || '');
 
+    // Exact match
     if (pName === normName && normName.length > 0) return { id: p.id, name: p.name };
     if (pSymbol === normSymbol && normSymbol.length >= 2) return { id: p.id, name: p.name };
+
+    // Substring match (existing)
     if (normName.length >= 4 && (pName.includes(normName) || normName.includes(pName))) {
       return { id: p.id, name: p.name };
+    }
+
+    // Alias match (e.g. "Polygon" ↔ "MATIC")
+    const aliases = NAME_ALIASES[normName];
+    if (aliases && (aliases.includes(pName) || aliases.includes(pSymbol))) {
+      return { id: p.id, name: p.name };
+    }
+
+    // Fuzzy match — allow 1-2 character typos for names >= 5 chars
+    if (normName.length >= 5 && pName.length >= 5) {
+      const maxDist = normName.length >= 8 ? 2 : 1;
+      if (levenshtein(normName, pName) <= maxDist) {
+        return { id: p.id, name: p.name };
+      }
     }
   }
   return null;
@@ -341,6 +475,20 @@ function findNewsMatches(
     }
   }
   return matches;
+}
+
+// ─── Semantic deduplication ───
+
+/** Extract core words from a headline for semantic matching (source-independent) */
+function headlineFingerprint(headline: string): string {
+  return (headline || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣\s]/g, '')  // Keep Korean + alphanumeric
+    .split(/\s+/)
+    .filter(w => w.length > 2)           // Skip short words
+    .sort()                               // Order-independent
+    .slice(0, 8)                          // Cap to 8 key words
+    .join('|');
 }
 
 // ─── Main scanner ───
@@ -430,10 +578,20 @@ export async function POST(request: Request) {
     const newSignals: any[] = [];
     const prospectScoreMap = new Map<string, { signals: number; maxWeight: number; totalWeight: number }>();
 
+    // Semantic dedup: cluster signals by prospect + type + headline essence (ignoring source)
+    const semanticDedupSet = new Set<string>();
+
     const addSignal = (signal: any) => {
+      // Source-specific dedup (existing: exact match per source)
       const key = `${signal.prospect_id}|${signal.signal_type}|${signal.source_name}|${signal.headline?.substring(0, 100)}`;
       if (existingSet.has(key)) return;
+
+      // Semantic dedup: same prospect + type + similar headline across ANY source
+      const semanticKey = `${signal.prospect_id}|${signal.signal_type}|${headlineFingerprint(signal.headline)}`;
+      if (semanticDedupSet.has(semanticKey)) return;
+
       existingSet.add(key);
+      semanticDedupSet.add(semanticKey);
       newSignals.push(signal);
 
       if (signal.prospect_id) {
@@ -636,6 +794,11 @@ export async function POST(request: Request) {
             await new Promise(r => setTimeout(r, 1200)); // Rate limit
           }
 
+          // Quality filter: skip spam names and micro-caps (exchange listings bypass market cap check)
+          if (candidate.signalType !== 'exchange_listing' && !passesQualityFilter(candidate.name, finalData)) {
+            continue;
+          }
+
           // Create the prospect (works even without CoinGecko data)
           const prospectData: any = {
             name: finalData?.name || candidate.name,
@@ -677,6 +840,21 @@ export async function POST(request: Request) {
               signal_type: candidate.signalType,
               ...candidate.signalData,
             });
+
+            // Auto-add community signal if Telegram community is sizable (1K+)
+            if (finalData?.telegram_users && finalData.telegram_users >= 1000) {
+              addSignal({
+                prospect_id: insertedProspect.id,
+                project_name: insertedProspect.name,
+                signal_type: 'social_presence',
+                headline: `Telegram community: ${finalData.telegram_users.toLocaleString()} members`,
+                snippet: `${insertedProspect.name} has a Telegram community of ${finalData.telegram_users.toLocaleString()} members${finalData.twitter_followers ? ` and ${finalData.twitter_followers.toLocaleString()} Twitter followers` : ''}. Active community indicates potential for Korean expansion.`,
+                source_url: finalData.source_url || null,
+                source_name: 'coingecko_community',
+                relevancy_weight: SIGNAL_WEIGHTS.social_presence,
+                expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+              });
+            }
 
             discovered++;
           }
@@ -801,11 +979,11 @@ export async function POST(request: Request) {
               expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
             });
           } else if (discover && webDiscoveryCount < WEB_DISCOVERY_CAP && !existingNames.has(normName) && !discoveredNames.has(normName)) {
-            // Discover new prospect (capped to avoid CoinGecko timeout)
+            // Discover new prospect (capped, quality-filtered)
             discoveredNames.add(normName);
             try {
               const coinData = await searchCoinGecko(name);
-              if (coinData) {
+              if (coinData && passesQualityFilter(name, coinData)) {
                 const { data: inserted } = await supabase
                   .from('prospects')
                   .upsert({
@@ -900,11 +1078,12 @@ export async function POST(request: Request) {
             expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           });
         } else if (discover && claudeDiscoveryCount < CLAUDE_DISCOVERY_CAP && !existingNames.has(normName) && !discoveredNames.has(normName)) {
-          // Discover new prospect via Claude analysis (capped)
+          // Discover new prospect via Claude analysis (capped, quality-filtered)
           discoveredNames.add(normName);
           try {
             const coinData = await searchCoinGecko(signal.project_name);
             const prospectName = coinData?.name || signal.project_name;
+            if (!passesQualityFilter(prospectName, coinData)) continue;
             const { data: inserted } = await supabase
               .from('prospects')
               .upsert({
@@ -1010,6 +1189,7 @@ export async function POST(request: Request) {
             try {
               const coinData = await searchCoinGecko(signal.project_name);
               const prospectName = coinData?.name || signal.project_name;
+              if (!passesQualityFilter(prospectName, coinData)) continue;
               const { data: ins } = await supabase
                 .from('prospects')
                 .upsert({
@@ -1060,7 +1240,8 @@ export async function POST(request: Request) {
     }
 
     // 9. Recalculate korea_relevancy_score for all affected prospects
-    //    Enhanced scoring: diversity bonus + recency weighting
+    //    Enhanced scoring: diversity bonus + recency weighting + velocity
+    const trendingProspects: string[] = [];
     const affectedIds = [...prospectScoreMap.keys()];
     if (affectedIds.length > 0) {
       const now = Date.now();
@@ -1082,9 +1263,14 @@ export async function POST(request: Request) {
 
         // Apply diminishing returns + recency decay per signal type
         Array.from(signalsByType.entries()).forEach(([, signals]) => {
-          // Sort by weight descending
-          signals.sort((a: { weight: number }, b: { weight: number }) => b.weight - a.weight);
+          // Sort by absolute weight descending
+          signals.sort((a: { weight: number }, b: { weight: number }) => Math.abs(b.weight) - Math.abs(a.weight));
           signals.forEach((s: { weight: number; detected_at: string | null }, i: number) => {
+            // Negative signals (delistings, warnings) — apply directly, no diminishing returns
+            if (s.weight < 0) {
+              totalScore += s.weight; // Subtract from score
+              return;
+            }
             // Recency multiplier: 1.0 for signals in last 30 days, decays to 0.5 at 180 days
             let recencyMultiplier = 1.0;
             if (s.detected_at) {
@@ -1107,8 +1293,23 @@ export async function POST(request: Request) {
         else if (uniqueTypes === 3) diversityMultiplier = 1.12;
         else if (uniqueTypes === 2) diversityMultiplier = 1.05;
 
-        const finalScore = Math.min(100, Math.round(totalScore * diversityMultiplier));
+        // Velocity bonus: recent signal clusters indicate trending/active expansion
+        const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+        const recentSignalCount = (allSignals || []).filter(
+          (s: any) => s.detected_at && (now - new Date(s.detected_at).getTime()) < sevenDaysMs
+        ).length;
+        let velocityMultiplier = 1.0;
+        if (recentSignalCount >= 5) velocityMultiplier = 1.25;
+        else if (recentSignalCount >= 3) velocityMultiplier = 1.15;
+
+        const finalScore = Math.max(0, Math.min(100, Math.round(totalScore * diversityMultiplier * velocityMultiplier)));
         const signalCount = (allSignals || []).length;
+        const isTrending = recentSignalCount >= 3;
+
+        if (isTrending) {
+          const prospectEntry = prospects.find(p => p.id === prospectId);
+          if (prospectEntry) trendingProspects.push(prospectEntry.name);
+        }
 
         await supabase
           .from('prospects')
@@ -1146,6 +1347,7 @@ export async function POST(request: Request) {
       scan_duration_ms: scanDurationMs,
       scan_duration_seconds: Math.round(scanDurationMs / 1000),
       alerts: highValueSignals.length > 0 ? highValueSignals : undefined,
+      trending: trendingProspects.length > 0 ? trendingProspects : undefined,
       scanned: {
         prospects: prospects.length,
         upbit_tokens: upbitTokens.length,

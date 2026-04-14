@@ -107,6 +107,10 @@ const SIGNAL_TYPE_CONFIG: Record<string, { icon: React.ElementType; label: strin
   korea_localization: { icon: Globe, label: 'Korea Localization', color: 'text-cyan-700', bg: 'bg-cyan-50 border-cyan-200' },
   social_presence: { icon: Activity, label: 'Social Presence', color: 'text-pink-700', bg: 'bg-pink-50 border-pink-200' },
   news_mention: { icon: Newspaper, label: 'News Mention', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
+  // Negative signals
+  korea_exchange_delisting: { icon: AlertCircle, label: 'Exchange Delisting', color: 'text-red-700', bg: 'bg-red-50 border-red-300' },
+  korea_regulatory_warning: { icon: AlertCircle, label: 'Regulatory Warning', color: 'text-red-700', bg: 'bg-red-50 border-red-300' },
+  korea_scam_alert: { icon: AlertCircle, label: 'Scam Alert', color: 'text-red-700', bg: 'bg-red-50 border-red-300' },
 };
 
 const ALL_SIGNAL_TYPES = Object.keys(SIGNAL_TYPE_CONFIG);
@@ -276,6 +280,15 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
               });
             }, (i + 1) * 800);
           });
+        }
+        // Show trending prospects
+        if (data.trending && data.trending.length > 0) {
+          setTimeout(() => {
+            toast({
+              title: '🔥 Trending Prospects',
+              description: `${data.trending.slice(0, 5).join(', ')} — 3+ signals in the last 7 days`,
+            });
+          }, (data.alerts?.length || 0) * 800 + 800);
         }
         fetchDashboard();
       } else {

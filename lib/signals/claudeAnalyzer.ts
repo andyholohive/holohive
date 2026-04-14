@@ -41,6 +41,11 @@ SIGNAL TYPES (from most to least valuable):
 - news_mention: General coverage in Korean media indicating market awareness
 - social_presence: Korean social media activity, Korean influencer mentions
 
+NEGATIVE SIGNAL TYPES (these SUPPRESS a project's score):
+- korea_exchange_delisting: Project delisted or about to be delisted from Korean exchanges
+- korea_regulatory_warning: FSC/FIU regulatory warning, investigation, or ban related to the project
+- korea_scam_alert: Scam/fraud warnings about the project in Korean media
+
 URGENCY LEVELS:
 - high: Active Korea expansion right now (listing, launch, partnership announced)
 - medium: Plans or indications of Korea interest
