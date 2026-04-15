@@ -14,11 +14,179 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import ICPSettingsDialog from './ICPSettingsDialog';
 import KoreaSignalsPanel from './KoreaSignalsPanel';
+import FundingRadarPanel from './FundingRadarPanel';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import * as HoverCardPrimitive from '@radix-ui/react-hover-card';
 import {
   Search, Globe, ExternalLink, ArrowRight, XCircle, MoreHorizontal,
-  Loader2, ChevronLeft, ChevronRight, CheckCircle, Eye, Download, Trash2, Settings, Radar,
+  Loader2, ChevronLeft, ChevronRight, CheckCircle, Eye, Download, Trash2, Settings, Radar, DollarSign,
 } from 'lucide-react';
+
+// ─── Signal type labels for KR score breakdown ───
+const SIGNAL_LABELS: Record<string, string> = {
+  // Tier 1
+  tge_within_60d: 'TGE / Token Launch',
+  mainnet_launch: 'Mainnet Launch',
+  funding_round_5m: 'Funding ($5M+)',
+  airdrop_announcement: 'Airdrop',
+  korea_expansion_announce: 'Korea Expansion',
+  dao_asia_governance: 'DAO Asia Vote',
+  korea_job_posting: 'Korea Job',
+  korea_exchange_no_community: 'KR Exchange No Community',
+  korea_collab: 'Korea Collab',
+  // Tier 2
+  ecosystem_asia_initiative: 'Asia Initiative',
+  staking_defi_launch: 'Staking/DeFi Launch',
+  leadership_change: 'Leadership Change',
+  vc_portfolio_cascade: 'VC Cascade',
+  korea_partnership: 'Partnership',
+  korea_intent_competitor: 'Competitor in Korea',
+  multi_chain_expansion: 'Multi-Chain',
+  apac_conference: 'APAC Conference',
+  team_expansion: 'Team Expansion',
+  korea_event: 'Korea Event',
+  korea_kol_organic: 'KOL Coverage',
+  korea_retail_volume_spike: 'KR Volume Spike',
+  korea_regulatory_tailwind: 'Regulatory Tailwind',
+  // Tier 3
+  testnet_compound: 'Testnet',
+  ecosystem_grant_asia: 'Asia Grant',
+  token_unlock: 'Token Unlock',
+  news_mention: 'News Mention',
+  web2_to_web3: 'Web2 to Web3',
+  accelerator_graduation: 'Accelerator Grad',
+  community_growth_spike: 'Community Spike',
+  dead_korean_presence: 'Dead KR Channel',
+  korea_community_mention: 'KR Community',
+  korean_vc_cap_table: 'Korean VC',
+  // Tier 4
+  warm_intro_available: 'Warm Intro',
+  decision_maker_identified: 'Decision Maker',
+  previous_contact_positive: 'Previous Contact (+)',
+  previous_contact_cold: 'Previous Contact (-)',
+  // Negative
+  korea_exchange_delisting: 'Delisting',
+  korea_regulatory_warning: 'Regulatory Warning',
+  korea_scam_alert: 'Scam Alert',
+  korea_agency_present: 'Has Korea Agency',
+  // Legacy
+  korea_hiring: 'Korea Hiring',
+  korea_community: 'Korean Community',
+  korea_localization: 'Localization',
+  social_presence: 'Social Presence',
+  korea_intent_apac: 'APAC Expansion',
+  korea_intent_vc: 'Korean VC Backed',
+  korea_intent_conference: 'Korea Conference',
+  korea_intent_hiring: 'Asia Hiring',
+  korea_intent_exchange: 'Asian Exchange',
+};
+
+const ACTION_TIER_BADGE: Record<string, { label: string; color: string }> = {
+  REACH_OUT_NOW: { label: 'Reach Out', color: 'bg-red-100 text-red-700' },
+  PRE_TOKEN_PRIORITY: { label: 'Pre-Token', color: 'bg-orange-100 text-orange-700' },
+  WATCH: { label: 'Watch', color: 'bg-yellow-100 text-yellow-700' },
+  RESEARCH: { label: 'Research', color: 'bg-blue-100 text-blue-700' },
+  NURTURE: { label: 'Nurture', color: 'bg-gray-100 text-gray-600' },
+  SKIP: { label: 'Skip', color: 'bg-gray-50 text-gray-400' },
+};
+
+// ─── Lazy-loading Korea score popover ───
+function KoreaScoreCard({ prospectId, score, signalCount }: { prospectId: string; score: number; signalCount: number }) {
+  const [signals, setSignals] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const loadSignals = async () => {
+    if (signals !== null) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/prospects/signals?prospect_id=${prospectId}`);
+      const data = await res.json();
+      setSignals(data.signals || []);
+    } catch {
+      setSignals([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <HoverCardPrimitive.Root openDelay={200} closeDelay={100}>
+      <HoverCardPrimitive.Trigger asChild>
+        <span
+          className={`text-xs font-bold px-1.5 py-0.5 rounded cursor-help ${
+            score >= 70 ? 'bg-red-100 text-red-700' :
+            score >= 40 ? 'bg-orange-100 text-orange-700' :
+            'bg-amber-100 text-amber-700'
+          }`}
+          onMouseEnter={loadSignals}
+        >
+          {score >= 70 ? '🔴' : score >= 40 ? '🟠' : '🟡'} {score}
+        </span>
+      </HoverCardPrimitive.Trigger>
+      <HoverCardPrimitive.Portal>
+        <HoverCardPrimitive.Content
+          side="left"
+          align="start"
+          sideOffset={8}
+          className="z-50 w-[340px] max-h-[400px] overflow-y-auto rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
+        >
+          <div className="text-xs">
+            <div className="font-semibold text-gray-900 mb-1">Korea Relevancy: {score}/100</div>
+            <div className="text-gray-500 mb-2">{signalCount} signal{signalCount !== 1 ? 's' : ''} detected</div>
+            {loading && (
+              <div className="flex items-center gap-1.5 text-gray-400 py-2">
+                <Loader2 className="w-3 h-3 animate-spin" /> Loading signals...
+              </div>
+            )}
+            {signals && signals.length > 0 && (
+              <div className="space-y-1.5 border-t border-gray-100 pt-2">
+                {signals.filter((s: any) => s.is_active).slice(0, 8).map((s: any, i: number) => {
+                  const isNegative = s.relevancy_weight < 0;
+                  return (
+                    <div key={i} className={`rounded px-2 py-1.5 ${isNegative ? 'bg-red-50' : 'bg-gray-50'}`}>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className={`font-medium ${isNegative ? 'text-red-700' : 'text-gray-800'}`}>
+                          {SIGNAL_LABELS[s.signal_type] || s.signal_type}
+                        </span>
+                        <span className={`text-[10px] font-bold ${isNegative ? 'text-red-600' : 'text-emerald-600'}`}>
+                          {isNegative ? '' : '+'}{s.relevancy_weight}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-gray-600 line-clamp-1 mt-0.5">{s.headline}</p>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="text-[10px] text-gray-400">{s.source_name}</span>
+                        {s.source_url && (
+                          <a
+                            href={s.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-[#3e8692] hover:underline flex items-center gap-0.5"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            Source <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {signals.filter((s: any) => s.is_active).length > 8 && (
+                  <div className="text-[10px] text-gray-400 text-center pt-1">
+                    +{signals.filter((s: any) => s.is_active).length - 8} more — see Korea Signals tab
+                  </div>
+                )}
+              </div>
+            )}
+            {signals && signals.length === 0 && (
+              <div className="text-gray-400 py-1">No signal details available</div>
+            )}
+          </div>
+          <HoverCardPrimitive.Arrow className="fill-white" />
+        </HoverCardPrimitive.Content>
+      </HoverCardPrimitive.Portal>
+    </HoverCardPrimitive.Root>
+  );
+}
 
 interface Prospect {
   id: string;
@@ -39,6 +207,8 @@ interface Prospect {
   icp_score: number;
   korea_relevancy_score: number;
   korea_signal_count: number;
+  action_tier: string | null;
+  is_disqualified: boolean | null;
   scraped_at: string;
 }
 
@@ -83,7 +253,7 @@ export default function ProspectsTab() {
   const [scraperError, setScraperError] = useState<string | null>(null);
   const [scraperCategory, setScraperCategory] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'prospects' | 'korea_signals'>('prospects');
+  const [viewMode, setViewMode] = useState<'prospects' | 'korea_signals' | 'funding_radar'>('prospects');
 
   const SOURCES = [
     { value: 'coingecko' as const, label: 'CoinGecko', description: 'Up to 10,000+ coins, works on Vercel', maxPerRequest: 250 },
@@ -432,11 +602,30 @@ export default function ProspectsTab() {
           <Radar className="w-3.5 h-3.5" />
           Korea Signals
         </button>
+
+        {/* Funding Radar tab */}
+        <button
+          onClick={() => setViewMode('funding_radar')}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
+            viewMode === 'funding_radar'
+              ? 'text-white'
+              : 'text-gray-600 hover:bg-gray-100 border border-transparent'
+          }`}
+          style={viewMode === 'funding_radar' ? { backgroundColor: '#3e8692' } : {}}
+        >
+          <DollarSign className="w-3.5 h-3.5" />
+          Funding Radar
+        </button>
       </div>
 
       {/* Korea Signals View */}
       {viewMode === 'korea_signals' && (
         <KoreaSignalsPanel />
+      )}
+
+      {/* Funding Radar View */}
+      {viewMode === 'funding_radar' && (
+        <FundingRadarPanel />
       )}
 
       {/* Prospects Table View */}
@@ -672,28 +861,25 @@ export default function ProspectsTab() {
                       </Tooltip>
                     </TableCell>
                     <TableCell>
-                      {p.korea_relevancy_score > 0 ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded cursor-help ${
-                              p.korea_relevancy_score >= 70 ? 'bg-red-100 text-red-700' :
-                              p.korea_relevancy_score >= 40 ? 'bg-orange-100 text-orange-700' :
-                              'bg-amber-100 text-amber-700'
-                            }`}>
-                              {p.korea_relevancy_score >= 70 ? '🔴' : p.korea_relevancy_score >= 40 ? '🟠' : '🟡'} {p.korea_relevancy_score}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="left">
-                            <div className="text-xs">
-                              <div className="font-semibold">Korea Relevancy: {p.korea_relevancy_score}/100</div>
-                              <div className="text-gray-300 mt-0.5">{p.korea_signal_count} signal{p.korea_signal_count !== 1 ? 's' : ''} detected</div>
-                              <div className="mt-1 text-gray-300">Click Korea Signals tab for details</div>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        <span className="text-gray-300 text-xs">—</span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        {p.korea_relevancy_score > 0 ? (
+                          <KoreaScoreCard
+                            prospectId={p.id}
+                            score={p.korea_relevancy_score}
+                            signalCount={p.korea_signal_count}
+                          />
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
+                        {p.action_tier && p.action_tier !== 'SKIP' && (
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${ACTION_TIER_BADGE[p.action_tier]?.color || 'bg-gray-100 text-gray-500'}`}>
+                            {ACTION_TIER_BADGE[p.action_tier]?.label || p.action_tier}
+                          </span>
+                        )}
+                        {p.is_disqualified && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700">DQ</span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusStyle.bg} ${statusStyle.text}`}>

@@ -102,3 +102,81 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+/**
+ * POST /api/prospects/signals — Manually add a signal for a prospect
+ * Body: { prospect_id, signal_type, headline, source_url?, confidence? }
+ */
+export async function POST(request: Request) {
+  try {
+    const supabase = await createServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const body = await request.json();
+    const { prospect_id, signal_type, headline, source_url, confidence } = body;
+
+    if (!prospect_id || !signal_type || !headline) {
+      return NextResponse.json({ error: 'prospect_id, signal_type, and headline are required' }, { status: 400 });
+    }
+
+    // Look up prospect name
+    const { data: prospect } = await supabase
+      .from('prospects')
+      .select('id, name')
+      .eq('id', prospect_id)
+      .single();
+
+    if (!prospect) {
+      return NextResponse.json({ error: 'Prospect not found' }, { status: 404 });
+    }
+
+    // Get signal weight from Bible v3 config
+    const SIGNAL_WEIGHTS: Record<string, { weight: number; tier: number; shelf_life_days: number }> = {
+      tge_within_60d: { weight: 25, tier: 1, shelf_life_days: 56 },
+      mainnet_launch: { weight: 20, tier: 1, shelf_life_days: 30 },
+      funding_round_5m: { weight: 20, tier: 1, shelf_life_days: 30 },
+      airdrop_announcement: { weight: 20, tier: 1, shelf_life_days: 30 },
+      korea_expansion_announce: { weight: 15, tier: 1, shelf_life_days: 14 },
+      dao_asia_governance: { weight: 20, tier: 1, shelf_life_days: 14 },
+      korea_job_posting: { weight: 15, tier: 1, shelf_life_days: 14 },
+      korea_exchange_no_community: { weight: 15, tier: 1, shelf_life_days: 30 },
+      korea_collab: { weight: 15, tier: 1, shelf_life_days: 14 },
+      korea_partnership: { weight: 15, tier: 2, shelf_life_days: 14 },
+      korea_event: { weight: 10, tier: 2, shelf_life_days: 14 },
+      leadership_change: { weight: 15, tier: 2, shelf_life_days: 14 },
+      news_mention: { weight: 10, tier: 3, shelf_life_days: 7 },
+      warm_intro_available: { weight: 10, tier: 4, shelf_life_days: 90 },
+      decision_maker_identified: { weight: 5, tier: 4, shelf_life_days: 90 },
+    };
+
+    const config = SIGNAL_WEIGHTS[signal_type] || { weight: 10, tier: 3, shelf_life_days: 30 };
+
+    const signalData = {
+      prospect_id,
+      project_name: prospect.name,
+      signal_type,
+      headline: headline.substring(0, 300),
+      snippet: body.snippet?.substring(0, 500) || null,
+      source_url: source_url || '',
+      source_name: 'manual',
+      relevancy_weight: config.weight,
+      tier: config.tier,
+      shelf_life_days: config.shelf_life_days,
+      confidence: confidence || 'confirmed',
+      expires_at: new Date(Date.now() + config.shelf_life_days * 24 * 60 * 60 * 1000).toISOString(),
+    };
+
+    const { data: inserted, error } = await supabase
+      .from('prospect_signals')
+      .insert(signalData)
+      .select()
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    return NextResponse.json({ success: true, signal: inserted });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

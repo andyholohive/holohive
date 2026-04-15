@@ -98,36 +98,76 @@ interface TopProspect {
 
 // ─── Constants ───
 
-const SIGNAL_TYPE_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string; bg: string }> = {
-  exchange_listing: { icon: Building2, label: 'Exchange Listing', color: 'text-red-700', bg: 'bg-red-50 border-red-200' },
-  korea_partnership: { icon: Zap, label: 'Korea Partnership', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200' },
-  korea_community: { icon: Globe, label: 'Korean Community', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
-  korea_hiring: { icon: Search, label: 'Korea Hiring', color: 'text-indigo-700', bg: 'bg-indigo-50 border-indigo-200' },
-  korea_event: { icon: TrendingUp, label: 'Korea Event', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
-  korea_localization: { icon: Globe, label: 'Korea Localization', color: 'text-cyan-700', bg: 'bg-cyan-50 border-cyan-200' },
-  social_presence: { icon: Activity, label: 'Social Presence', color: 'text-pink-700', bg: 'bg-pink-50 border-pink-200' },
-  news_mention: { icon: Newspaper, label: 'News Mention', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
-  // Pre-Korea intent signals
-  korea_intent_apac: { icon: Globe, label: 'APAC Expansion', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
-  korea_intent_vc: { icon: TrendingUp, label: 'Korean VC Backed', color: 'text-violet-700', bg: 'bg-violet-50 border-violet-200' },
-  korea_intent_conference: { icon: Activity, label: 'Korea Conference', color: 'text-teal-700', bg: 'bg-teal-50 border-teal-200' },
-  korea_intent_hiring: { icon: Search, label: 'Asia Hiring', color: 'text-sky-700', bg: 'bg-sky-50 border-sky-200' },
-  korea_intent_competitor: { icon: TrendingUp, label: 'Competitor in Korea', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200' },
-  korea_intent_exchange: { icon: Building2, label: 'Asian Exchange (Not KR)', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200' },
-  // Negative signals
+const SIGNAL_TYPE_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string; bg: string; tier?: number }> = {
+  // ═══ Tier 1 — Act Immediately ═══
+  tge_within_60d: { icon: Zap, label: 'TGE / Token Launch', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
+  mainnet_launch: { icon: Zap, label: 'Mainnet Launch', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
+  funding_round_5m: { icon: DollarSign, label: 'Funding Round ($5M+)', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
+  airdrop_announcement: { icon: Zap, label: 'Airdrop Announced', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
+  korea_expansion_announce: { icon: Globe, label: 'Korea Expansion', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
+  dao_asia_governance: { icon: Activity, label: 'DAO Asia Governance', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
+  korea_job_posting: { icon: Search, label: 'Korea Job Posting', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
+  korea_exchange_no_community: { icon: Building2, label: 'KR Exchange No Community', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
+  korea_collab: { icon: Zap, label: 'Korea Collaboration', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
+
+  // ═══ Tier 2 — Act This Week ═══
+  ecosystem_asia_initiative: { icon: Globe, label: 'Asia Ecosystem Initiative', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', tier: 2 },
+  staking_defi_launch: { icon: TrendingUp, label: 'Staking/DeFi Launch', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', tier: 2 },
+  leadership_change: { icon: Search, label: 'Leadership Change', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', tier: 2 },
+  vc_portfolio_cascade: { icon: TrendingUp, label: 'VC Portfolio Cascade', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', tier: 2 },
+  korea_partnership: { icon: Zap, label: 'Korea Partnership', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', tier: 2 },
+  korea_intent_competitor: { icon: TrendingUp, label: 'Competitor in Korea', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', tier: 2 },
+  multi_chain_expansion: { icon: Globe, label: 'Multi-Chain Expansion', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', tier: 2 },
+  apac_conference: { icon: Activity, label: 'APAC Conference', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', tier: 2 },
+  team_expansion: { icon: Search, label: 'Team Expansion', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', tier: 2 },
+  korea_event: { icon: TrendingUp, label: 'Korea Event', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', tier: 2 },
+  korea_kol_organic: { icon: Activity, label: 'KOL Organic Coverage', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', tier: 2 },
+  korea_retail_volume_spike: { icon: TrendingUp, label: 'KR Retail Volume Spike', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', tier: 2 },
+  korea_regulatory_tailwind: { icon: Activity, label: 'Regulatory Tailwind', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', tier: 2 },
+
+  // ═══ Tier 3 — Monitor/Nurture ═══
+  testnet_compound: { icon: Activity, label: 'Testnet (Compound)', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 3 },
+  ecosystem_grant_asia: { icon: Globe, label: 'Asia Grant Program', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 3 },
+  token_unlock: { icon: Zap, label: 'Token Unlock', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 3 },
+  news_mention: { icon: Newspaper, label: 'News Mention', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200', tier: 3 },
+  web2_to_web3: { icon: Globe, label: 'Web2 to Web3', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 3 },
+  accelerator_graduation: { icon: TrendingUp, label: 'Accelerator Grad', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 3 },
+  community_growth_spike: { icon: Activity, label: 'Community Spike', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 3 },
+  dead_korean_presence: { icon: AlertCircle, label: 'Dead Korean Channel', color: 'text-red-700', bg: 'bg-red-50 border-red-300', tier: 3 },
+  korea_community_mention: { icon: Activity, label: 'KR Community Mention', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 3 },
+  korean_vc_cap_table: { icon: TrendingUp, label: 'Korean VC in Cap Table', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 3 },
+
+  // ═══ Tier 4 — Enrichment ═══
+  warm_intro_available: { icon: Zap, label: 'Warm Intro Available', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', tier: 4 },
+  decision_maker_identified: { icon: Search, label: 'Decision Maker Found', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', tier: 4 },
+  previous_contact_positive: { icon: Activity, label: 'Previous Contact (+)', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', tier: 4 },
+  previous_contact_cold: { icon: AlertCircle, label: 'Previous Contact (-)', color: 'text-red-700', bg: 'bg-red-50 border-red-300', tier: 4 },
+
+  // ═══ Negative signals ═══
   korea_exchange_delisting: { icon: AlertCircle, label: 'Exchange Delisting', color: 'text-red-700', bg: 'bg-red-50 border-red-300' },
   korea_regulatory_warning: { icon: AlertCircle, label: 'Regulatory Warning', color: 'text-red-700', bg: 'bg-red-50 border-red-300' },
   korea_scam_alert: { icon: AlertCircle, label: 'Scam Alert', color: 'text-red-700', bg: 'bg-red-50 border-red-300' },
+  korea_agency_present: { icon: AlertCircle, label: 'Has Korea Agency', color: 'text-red-700', bg: 'bg-red-50 border-red-300' },
+
+  // ═══ Legacy (backward compat) ═══
+  korea_community: { icon: Globe, label: 'Korean Community', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 1 },
+  korea_hiring: { icon: Search, label: 'Korea Hiring', color: 'text-indigo-700', bg: 'bg-indigo-50 border-indigo-200', tier: 1 },
+  korea_localization: { icon: Globe, label: 'Korea Localization', color: 'text-cyan-700', bg: 'bg-cyan-50 border-cyan-200', tier: 1 },
+  social_presence: { icon: Activity, label: 'Social Presence', color: 'text-pink-700', bg: 'bg-pink-50 border-pink-200', tier: 3 },
+  korea_intent_apac: { icon: Globe, label: 'APAC Expansion', color: 'text-amber-700', bg: 'bg-amber-50 border-amber-200', tier: 2 },
+  korea_intent_vc: { icon: TrendingUp, label: 'Korean VC Backed', color: 'text-violet-700', bg: 'bg-violet-50 border-violet-200', tier: 3 },
+  korea_intent_conference: { icon: Activity, label: 'Korea Conference', color: 'text-teal-700', bg: 'bg-teal-50 border-teal-200', tier: 2 },
+  korea_intent_hiring: { icon: Search, label: 'Asia Hiring', color: 'text-sky-700', bg: 'bg-sky-50 border-sky-200', tier: 2 },
+  korea_intent_exchange: { icon: Building2, label: 'Asian Exchange (Not KR)', color: 'text-orange-700', bg: 'bg-orange-50 border-orange-200', tier: 1 },
 };
 
 const ALL_SIGNAL_TYPES = Object.keys(SIGNAL_TYPE_CONFIG);
 
-const DEFAULT_SIGNAL_CONFIG = { icon: Zap, label: 'Custom Signal', color: 'text-gray-700', bg: 'bg-gray-50 border-gray-200' };
+const DEFAULT_SIGNAL_CONFIG: { icon: React.ElementType; label: string; color: string; bg: string; tier?: number } = { icon: Zap, label: 'Custom Signal', color: 'text-gray-700', bg: 'bg-gray-50 border-gray-200' };
 
 /** Get config for a signal type, with fallback for custom/unknown types */
-function getSignalConfig(type: string) {
+function getSignalConfig(type: string): { icon: React.ElementType; label: string; color: string; bg: string; tier?: number } {
   if (SIGNAL_TYPE_CONFIG[type]) return SIGNAL_TYPE_CONFIG[type];
-  // Format custom type: "korea_regulatory" → "Korea Regulatory"
   const label = type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   return { ...DEFAULT_SIGNAL_CONFIG, label };
 }
@@ -144,8 +184,38 @@ const SOURCE_LABELS: Record<string, string> = {
   web_search: 'Web Search',
   web_search_claude: 'Web Search (AI)',
   claude_research: 'AI Research',
+  coingecko: 'CoinGecko',
+  coingecko_community: 'CoinGecko Community',
+  defillama: 'DeFiLlama',
+  snapshot: 'Snapshot.org',
+  cryptojobslist: 'CryptoJobsList',
+  web3career: 'Web3.career',
+  telegram: 'Telegram',
+  exchange_analysis: 'Exchange Analysis',
+  crm: 'CRM',
   system: 'System',
 };
+
+const ACTION_TIER_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  REACH_OUT_NOW: { label: 'Reach Out Now', color: 'text-red-700', bg: 'bg-red-100' },
+  PRE_TOKEN_PRIORITY: { label: 'Pre-Token Priority', color: 'text-orange-700', bg: 'bg-orange-100' },
+  WATCH: { label: 'Watch', color: 'text-yellow-700', bg: 'bg-yellow-100' },
+  RESEARCH: { label: 'Research', color: 'text-blue-700', bg: 'bg-blue-100' },
+  NURTURE: { label: 'Nurture', color: 'text-gray-600', bg: 'bg-gray-100' },
+  SKIP: { label: 'Skip', color: 'text-gray-400', bg: 'bg-gray-50' },
+};
+
+function TierBadge({ tier }: { tier?: number }) {
+  if (!tier) return null;
+  const config: Record<number, { label: string; color: string }> = {
+    1: { label: 'T1', color: 'bg-red-100 text-red-700' },
+    2: { label: 'T2', color: 'bg-purple-100 text-purple-700' },
+    3: { label: 'T3', color: 'bg-blue-100 text-blue-700' },
+    4: { label: 'T4', color: 'bg-emerald-100 text-emerald-700' },
+  };
+  const c = config[tier] || config[3];
+  return <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${c.color}`}>{c.label}</span>;
+}
 
 const AUTO_SCAN_OPTIONS = [
   { value: 'off', label: 'Off' },
@@ -173,6 +243,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
   const [modeApi, setModeApi] = useState(true);
   const [modeWeb, setModeWeb] = useState(false);
   const [modeClaude, setModeClaude] = useState(false);
+  const [scanCadence, setScanCadence] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [recencyMonths, setRecencyMonths] = useState(1);
   const [scanMenuOpen, setScanMenuOpen] = useState(false);
 
@@ -207,6 +278,17 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
   const [detailProspectId, setDetailProspectId] = useState<string | null>(null);
   const [detailSignals, setDetailSignals] = useState<Signal[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  // Manual signal entry
+  const [manualSignalOpen, setManualSignalOpen] = useState(false);
+  const [manualSignalData, setManualSignalData] = useState({
+    prospect_name: '',
+    signal_type: 'news_mention',
+    headline: '',
+    source_url: '',
+    confidence: 'likely' as 'confirmed' | 'likely' | 'rumor',
+  });
+  const [manualSignalSubmitting, setManualSignalSubmitting] = useState(false);
   const [detailName, setDetailName] = useState('');
   const [detailStatus, setDetailStatus] = useState('');
 
@@ -245,19 +327,25 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
     if (modeApi) modes.push('api');
     if (modeWeb) modes.push('web');
     if (modeClaude) modes.push('claude');
-    if (modes.length === 0) {
-      toast({ title: 'Select at least one scan mode', variant: 'destructive' });
-      return;
-    }
 
     setScanning(true);
     setScanResult(null);
     setScanMenuOpen(false);
     try {
+      const body: any = { recency_months: recencyMonths };
+      // Use cadence-based scanning by default, fall back to modes
+      if (scanCadence) {
+        body.cadence = scanCadence;
+      } else if (modes.length > 0) {
+        body.modes = modes;
+      } else {
+        body.modes = ['api'];
+      }
+
       const res = await fetch('/api/prospects/signals/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ modes, recency_months: recencyMonths }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (res.ok) {
@@ -275,12 +363,19 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
         // Show individual alerts for high-value signals
         if (data.alerts && data.alerts.length > 0) {
           const alertLabels: Record<string, string> = {
-            exchange_listing: '🏦 Exchange Listing',
-            korea_partnership: '🤝 Partnership',
-            korea_hiring: '👥 Korea Hiring',
-            korea_intent_vc: '💰 Korean VC Backed',
-            korea_intent_apac: '🌏 APAC Expansion',
-            korea_intent_exchange: '📊 Ready for Korea Listing',
+            tge_within_60d: 'Token Launch Detected',
+            mainnet_launch: 'Mainnet Launch',
+            funding_round_5m: 'Funding Round ($5M+)',
+            airdrop_announcement: 'Airdrop Announced',
+            korea_expansion_announce: 'Korea Expansion',
+            dao_asia_governance: 'DAO Asia Vote',
+            korea_job_posting: 'Korea Job Posting',
+            korea_exchange_no_community: 'KR Exchange No Community',
+            warm_intro_available: 'Warm Intro Available',
+            korea_partnership: 'Partnership',
+            korea_hiring: 'Korea Hiring',
+            korea_intent_vc: 'Korean VC Backed',
+            korea_intent_apac: 'APAC Expansion',
           };
           data.alerts.slice(0, 3).forEach((alert: any, i: number) => {
             setTimeout(() => {
@@ -375,6 +470,46 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
       setDetailSignals([]);
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const handleManualSignalSubmit = async () => {
+    if (!manualSignalData.prospect_name || !manualSignalData.headline) {
+      toast({ title: 'Prospect and headline are required', variant: 'destructive' });
+      return;
+    }
+    // Find prospect by name
+    const match = topProspects.find(p => p.name.toLowerCase() === manualSignalData.prospect_name.toLowerCase());
+    if (!match) {
+      toast({ title: 'Prospect not found — enter exact name from the list', variant: 'destructive' });
+      return;
+    }
+    setManualSignalSubmitting(true);
+    try {
+      const res = await fetch('/api/prospects/signals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prospect_id: match.id,
+          signal_type: manualSignalData.signal_type,
+          headline: manualSignalData.headline,
+          source_url: manualSignalData.source_url,
+          confidence: manualSignalData.confidence,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({ title: 'Signal added', description: `${manualSignalData.signal_type} for ${match.name}` });
+        setManualSignalOpen(false);
+        setManualSignalData({ prospect_name: '', signal_type: 'news_mention', headline: '', source_url: '', confidence: 'likely' });
+        fetchDashboard();
+      } else {
+        toast({ title: 'Error', description: data.error, variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'Failed to add signal', variant: 'destructive' });
+    } finally {
+      setManualSignalSubmitting(false);
     }
   };
 
@@ -581,12 +716,12 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           <Card className="border border-gray-200">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <Building2 className="w-4 h-4" style={{ color: '#3e8692' }} />
-                Exchange Presence
+                <Zap className="w-4 h-4" style={{ color: '#3e8692' }} />
+                Partnerships
               </div>
-              <div className="text-2xl font-bold text-gray-900">{byType.exchange_listing || 0}</div>
+              <div className="text-2xl font-bold text-gray-900">{(byType.korea_partnership || 0) + (byType.korea_community || 0)}</div>
               <div className="text-xs text-gray-400 mt-0.5">
-                {[bySource.upbit && `${bySource.upbit} Upbit`, bySource.bithumb && `${bySource.bithumb} Bithumb`].filter(Boolean).join(', ') || 'Upbit + Bithumb'}
+                Partnerships + Community signals
               </div>
             </CardContent>
           </Card>
@@ -667,6 +802,14 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
             )}
           </div>
           <div className="flex items-center gap-2">
+            {/* Manual signal entry */}
+            <button
+              onClick={() => setManualSignalOpen(true)}
+              className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-1 focus:ring-[#3e8692]"
+            >
+              <Plus className="w-3 h-3 text-gray-400" />
+              Signal
+            </button>
             {/* Auto-scan schedule dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -746,52 +889,65 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                 </Button>
               </div>
               {scanMenuOpen && !scanning && (
-                <div className="absolute right-0 top-10 z-[80] w-72 bg-white rounded-lg border border-gray-200 shadow-lg p-3 space-y-2">
-                  <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Scan Modes</div>
-
-                  <label className="flex items-start gap-2.5 p-2 rounded-md hover:bg-gray-50 cursor-pointer">
-                    <Checkbox checked={modeApi} onCheckedChange={(v) => setModeApi(v === true)}
-                      className="mt-0.5 data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <Building2 className="w-3.5 h-3.5 text-gray-500" />
-                        <span className="text-sm font-medium text-gray-900">API Scan</span>
-                      </div>
-                      <p className="text-[10px] text-gray-400 mt-0.5">Upbit/Bithumb tokens + RSS headlines. Fast, regex-based.</p>
+                <div className="absolute right-0 top-10 z-[80] w-80 bg-white rounded-lg border border-gray-200 shadow-lg p-3 space-y-3">
+                  {/* Cadence selector */}
+                  <div>
+                    <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Scan Cadence</div>
+                    <div className="flex gap-1">
+                      {[
+                        { value: 'daily', label: 'Daily', desc: '~5 min', scanners: '6 scanners' },
+                        { value: 'weekly', label: 'Weekly', desc: '~20 min', scanners: '12 scanners' },
+                        { value: 'monthly', label: 'Monthly', desc: '~45 min', scanners: 'All scanners' },
+                      ].map(opt => (
+                        <button key={opt.value}
+                          onClick={() => setScanCadence(opt.value as any)}
+                          className={`flex-1 text-center px-2 py-1.5 rounded-md text-xs border transition-colors ${
+                            scanCadence === opt.value
+                              ? 'border-[#3e8692] bg-[#3e8692]/10 text-[#3e8692] font-medium'
+                              : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="font-medium">{opt.label}</div>
+                          <div className="text-[9px] text-gray-400 mt-0.5">{opt.desc}</div>
+                        </button>
+                      ))}
                     </div>
-                  </label>
+                  </div>
 
-                  <label className="flex items-start gap-2.5 p-2 rounded-md hover:bg-gray-50 cursor-pointer">
-                    <Checkbox checked={modeWeb} onCheckedChange={(v) => setModeWeb(v === true)}
-                      className="mt-0.5 data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <Search className="w-3.5 h-3.5 text-gray-500" />
-                        <span className="text-sm font-medium text-gray-900">Web Scraping</span>
-                      </div>
-                      <p className="text-[10px] text-gray-400 mt-0.5">DuckDuckGo search + full article scraping. Deeper coverage.</p>
+                  {/* Legacy mode checkboxes (collapsed) */}
+                  <details className="group">
+                    <summary className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider cursor-pointer select-none">
+                      Advanced Modes <ChevronDown className="w-3 h-3 inline-block ml-0.5 group-open:rotate-180 transition-transform" />
+                    </summary>
+                    <div className="mt-1.5 space-y-1">
+                      <label className="flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 cursor-pointer">
+                        <Checkbox checked={modeApi} onCheckedChange={(v) => setModeApi(v === true)}
+                          className="data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
+                        <Building2 className="w-3 h-3 text-gray-400" />
+                        <span className="text-xs text-gray-700">API (exchanges + RSS)</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 cursor-pointer">
+                        <Checkbox checked={modeWeb} onCheckedChange={(v) => setModeWeb(v === true)}
+                          className="data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
+                        <Search className="w-3 h-3 text-gray-400" />
+                        <span className="text-xs text-gray-700">Web Scraping</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 cursor-pointer">
+                        <Checkbox checked={modeClaude} onCheckedChange={(v) => setModeClaude(v === true)}
+                          className="data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
+                        <Bot className="w-3 h-3 text-gray-400" />
+                        <span className="text-xs text-gray-700">Claude AI (~$0.02/scan)</span>
+                      </label>
                     </div>
-                  </label>
-
-                  <label className="flex items-start gap-2.5 p-2 rounded-md hover:bg-gray-50 cursor-pointer">
-                    <Checkbox checked={modeClaude} onCheckedChange={(v) => setModeClaude(v === true)}
-                      className="mt-0.5 data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <Bot className="w-3.5 h-3.5 text-gray-500" />
-                        <span className="text-sm font-medium text-gray-900">Claude AI Analysis</span>
-                      </div>
-                      <p className="text-[10px] text-gray-400 mt-0.5">AI reads articles + researches Korea-expansion signals. ~$0.02/scan.</p>
-                    </div>
-                  </label>
+                  </details>
 
                   <div className="border-t border-gray-100 pt-2 flex items-center justify-between">
                     <span className="text-[10px] text-gray-400">
-                      {[modeApi && 'API', modeWeb && 'Web', modeClaude && 'Claude'].filter(Boolean).join(' + ') || 'None selected'}
+                      {scanCadence ? `${scanCadence} cadence` : [modeApi && 'API', modeWeb && 'Web', modeClaude && 'Claude'].filter(Boolean).join(' + ') || 'None'}
                       {' · '}{recencyMonths === 1 ? '1 month' : `${recencyMonths} months`}
                     </span>
                     <Button size="sm" className="h-7 text-xs" style={{ backgroundColor: '#3e8692', color: 'white' }}
-                      onClick={handleScan} disabled={!modeApi && !modeWeb && !modeClaude}>
+                      onClick={handleScan}>
                       <Radar className="w-3 h-3 mr-1" /> Run
                     </Button>
                   </div>
@@ -1006,10 +1162,11 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                             <Icon className={`w-3.5 h-3.5 ${config.color}`} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
+                            <div className="flex items-center gap-1.5 mb-0.5">
                               <span className="font-medium text-sm truncate">
                                 {signal.prospects?.name || signal.project_name}
                               </span>
+                              <TierBadge tier={config.tier} />
                               <Badge variant="outline" className="text-[9px] shrink-0 bg-white">
                                 {SOURCE_LABELS[signal.source_name] || signal.source_name}
                               </Badge>
@@ -1192,6 +1349,116 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Manual Signal Entry Dialog */}
+      <Dialog open={manualSignalOpen} onOpenChange={setManualSignalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">Add Manual Signal</DialogTitle>
+            <DialogDescription className="text-xs text-gray-500">
+              Add a signal that was found outside of automated scanning.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Prospect Name</label>
+              <input
+                type="text"
+                value={manualSignalData.prospect_name}
+                onChange={e => setManualSignalData(d => ({ ...d, prospect_name: e.target.value }))}
+                placeholder="Enter exact prospect name..."
+                list="prospect-names-list"
+                className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#3e8692]"
+              />
+              <datalist id="prospect-names-list">
+                {topProspects.map(p => <option key={p.id} value={p.name} />)}
+              </datalist>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Signal Type</label>
+              <select
+                value={manualSignalData.signal_type}
+                onChange={e => setManualSignalData(d => ({ ...d, signal_type: e.target.value }))}
+                className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#3e8692]"
+              >
+                <optgroup label="Tier 1 — Act Immediately">
+                  <option value="tge_within_60d">TGE / Token Launch (+25)</option>
+                  <option value="mainnet_launch">Mainnet Launch (+20)</option>
+                  <option value="funding_round_5m">Funding Round $5M+ (+20)</option>
+                  <option value="airdrop_announcement">Airdrop Announced (+20)</option>
+                  <option value="korea_expansion_announce">Korea Expansion (+15)</option>
+                  <option value="dao_asia_governance">DAO Asia Governance (+20)</option>
+                  <option value="korea_job_posting">Korea Job Posting (+15)</option>
+                  <option value="korea_collab">Korea Collaboration (+15)</option>
+                </optgroup>
+                <optgroup label="Tier 2 — Act This Week">
+                  <option value="korea_partnership">Korea Partnership (+15)</option>
+                  <option value="leadership_change">Leadership Change (+15)</option>
+                  <option value="korea_event">Korea Event (+10)</option>
+                  <option value="vc_portfolio_cascade">VC Portfolio Cascade (+15)</option>
+                </optgroup>
+                <optgroup label="Tier 3 — Monitor">
+                  <option value="news_mention">News Mention (+10)</option>
+                  <option value="korea_community_mention">KR Community Mention (+5)</option>
+                  <option value="korean_vc_cap_table">Korean VC in Cap Table (+5)</option>
+                </optgroup>
+                <optgroup label="Tier 4 — Enrichment">
+                  <option value="warm_intro_available">Warm Intro Available (+10)</option>
+                  <option value="decision_maker_identified">Decision Maker Found (+5)</option>
+                </optgroup>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Headline</label>
+              <input
+                type="text"
+                value={manualSignalData.headline}
+                onChange={e => setManualSignalData(d => ({ ...d, headline: e.target.value }))}
+                placeholder="Brief description of the signal..."
+                className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#3e8692]"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Source URL (optional)</label>
+              <input
+                type="url"
+                value={manualSignalData.source_url}
+                onChange={e => setManualSignalData(d => ({ ...d, source_url: e.target.value }))}
+                placeholder="https://..."
+                className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#3e8692]"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-700 mb-1 block">Confidence</label>
+              <div className="flex gap-2">
+                {(['confirmed', 'likely', 'rumor'] as const).map(level => (
+                  <button
+                    key={level}
+                    onClick={() => setManualSignalData(d => ({ ...d, confidence: level }))}
+                    className={`flex-1 text-xs py-1.5 rounded-md border transition-colors ${
+                      manualSignalData.confidence === level
+                        ? 'border-[#3e8692] bg-[#3e8692]/10 text-[#3e8692] font-medium'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {level.charAt(0).toUpperCase() + level.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" size="sm" onClick={() => setManualSignalOpen(false)}>Cancel</Button>
+            <Button
+              size="sm"
+              style={{ backgroundColor: '#3e8692', color: 'white' }}
+              onClick={handleManualSignalSubmit}
+              disabled={manualSignalSubmitting || !manualSignalData.prospect_name || !manualSignalData.headline}
+            >
+              {manualSignalSubmitting ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Adding...</> : 'Add Signal'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }
