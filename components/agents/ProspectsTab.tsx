@@ -549,7 +549,7 @@ export default function ProspectsTab() {
     <TooltipProvider>
     <div className="pb-8">
       {/* Status Filter Tabs */}
-      <div className="flex items-center gap-1 mb-4">
+      <div className="flex items-center gap-1.5 mb-4">
         {[
           { value: 'reviewed', label: 'Potential' },
           { value: 'needs_review', label: 'Needs Review' },

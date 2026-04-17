@@ -38,19 +38,19 @@ export default function IntelligencePage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="prospects" className="mt-0">
+        <TabsContent value="prospects" className="mt-4">
           <ProspectsTab />
         </TabsContent>
 
-        <TabsContent value="korea_signals" className="mt-0">
+        <TabsContent value="korea_signals" className="mt-4">
           <KoreaSignalsPanel />
         </TabsContent>
 
-        <TabsContent value="funding_radar" className="mt-0">
+        <TabsContent value="funding_radar" className="mt-4">
           <FundingRadarPanel />
         </TabsContent>
 
-        <TabsContent value="agents" className="mt-0">
+        <TabsContent value="agents" className="mt-4">
           <AgentDashboard />
         </TabsContent>
       </Tabs>
