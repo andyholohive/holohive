@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChangelog } from '@/contexts/ChangelogContext';
 import { useGuestPermissions } from '@/hooks/useGuestPermissions';
@@ -298,7 +298,7 @@ export default function Sidebar({ children }: SidebarProps) {
               </>}
 
               {/* CRM Section */}
-              {!guestHideSection(['/crm/sales-pipeline', '/crm/network', '/crm/contacts', '/crm/submissions', '/crm/meetings']) && <>
+              {!guestHideSection(['/crm/sales-pipeline', '/intelligence', '/crm/network', '/crm/contacts', '/crm/submissions', '/crm/meetings']) && <>
               {!isSidebarCollapsed && (
                 <div className="flex items-center space-x-2">
                   <DollarSign className="h-4 w-4 text-gray-400" />
@@ -318,6 +318,21 @@ export default function Sidebar({ children }: SidebarProps) {
                     <span>
                       <Target className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
                       {!isSidebarCollapsed && 'Sales'}
+                    </span>
+                  </Button>
+                </Link>)}
+                {/* Intelligence tab */}
+                {!guestHide('/intelligence') && (<Link href="/intelligence" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/intelligence') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/intelligence') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Intelligence' : undefined}
+                  >
+                    <span>
+                      <Radar className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Intelligence'}
                     </span>
                   </Button>
                 </Link>)}
@@ -534,6 +549,21 @@ export default function Sidebar({ children }: SidebarProps) {
                         )}
                       </div>
                     )}
+                    {/* Reminders tab */}
+                    <Link href="/reminders" legacyBehavior>
+                      <Button
+                        asChild
+                        variant={pathname.startsWith('/reminders') ? 'default' : 'ghost'}
+                        className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                        style={pathname.startsWith('/reminders') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                        title={isSidebarCollapsed ? 'Reminders' : undefined}
+                      >
+                        <span>
+                          <Bell className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                          {!isSidebarCollapsed && 'Reminders'}
+                        </span>
+                      </Button>
+                    </Link>
                   </div>
                 </>
               )}

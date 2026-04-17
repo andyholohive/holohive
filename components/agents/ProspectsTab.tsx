@@ -13,13 +13,11 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import ICPSettingsDialog from './ICPSettingsDialog';
-import KoreaSignalsPanel from './KoreaSignalsPanel';
-import FundingRadarPanel from './FundingRadarPanel';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import * as HoverCardPrimitive from '@radix-ui/react-hover-card';
 import {
   Search, Globe, ExternalLink, ArrowRight, XCircle, MoreHorizontal,
-  Loader2, ChevronLeft, ChevronRight, CheckCircle, Eye, Download, Trash2, Settings, Radar, DollarSign,
+  Loader2, ChevronLeft, ChevronRight, CheckCircle, Eye, Download, Trash2, Settings,
 } from 'lucide-react';
 
 // ─── Signal type labels for KR score breakdown ───
@@ -253,7 +251,6 @@ export default function ProspectsTab() {
   const [scraperError, setScraperError] = useState<string | null>(null);
   const [scraperCategory, setScraperCategory] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'prospects' | 'korea_signals' | 'funding_radar'>('prospects');
 
   const SOURCES = [
     { value: 'coingecko' as const, label: 'CoinGecko', description: 'Up to 10,000+ coins, works on Vercel', maxPerRequest: 250 },
@@ -551,9 +548,8 @@ export default function ProspectsTab() {
   return (
     <TooltipProvider>
     <div className="pb-8">
-      {/* View Mode Toggle + Status Sub-tabs */}
+      {/* Status Filter Tabs */}
       <div className="flex items-center gap-1 mb-4">
-        {/* Prospects view tabs */}
         {[
           { value: 'reviewed', label: 'Potential' },
           { value: 'needs_review', label: 'Needs Review' },
@@ -564,72 +560,31 @@ export default function ProspectsTab() {
         ].map(tab => (
           <button
             key={tab.value}
-            onClick={() => { setViewMode('prospects'); setStatusFilter(tab.value); setPage(1); setSelected([]); }}
+            onClick={() => { setStatusFilter(tab.value); setPage(1); setSelected([]); }}
             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              viewMode === 'prospects' && statusFilter === tab.value
+              statusFilter === tab.value
                 ? 'text-white'
                 : 'text-gray-600 hover:bg-gray-100 border border-transparent'
             }`}
-            style={viewMode === 'prospects' && statusFilter === tab.value ? { backgroundColor: '#3e8692' } : {}}
+            style={statusFilter === tab.value ? { backgroundColor: '#3e8692' } : {}}
           >
             {tab.label}
             {statusCounts[tab.value] != null && tab.value !== 'all' && (
-              <span className={`ml-1.5 text-[10px] font-semibold ${(viewMode === 'prospects' && statusFilter === tab.value) ? 'opacity-80' : 'opacity-60'}`}>
+              <span className={`ml-1.5 text-[10px] font-semibold ${statusFilter === tab.value ? 'opacity-80' : 'opacity-60'}`}>
                 {statusCounts[tab.value] || 0}
               </span>
             )}
             {tab.value === 'all' && (
-              <span className={`ml-1.5 text-[10px] font-semibold ${(viewMode === 'prospects' && statusFilter === 'all') ? 'opacity-80' : 'opacity-60'}`}>
+              <span className={`ml-1.5 text-[10px] font-semibold ${statusFilter === 'all' ? 'opacity-80' : 'opacity-60'}`}>
                 {Object.values(statusCounts).reduce((a, b) => a + b, 0)}
               </span>
             )}
           </button>
         ))}
-
-        {/* Divider */}
-        <div className="w-px h-5 bg-gray-200 mx-1" />
-
-        {/* Korea Signals tab */}
-        <button
-          onClick={() => setViewMode('korea_signals')}
-          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
-            viewMode === 'korea_signals'
-              ? 'text-white'
-              : 'text-gray-600 hover:bg-gray-100 border border-transparent'
-          }`}
-          style={viewMode === 'korea_signals' ? { backgroundColor: '#3e8692' } : {}}
-        >
-          <Radar className="w-3.5 h-3.5" />
-          Korea Signals
-        </button>
-
-        {/* Funding Radar tab */}
-        <button
-          onClick={() => setViewMode('funding_radar')}
-          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 ${
-            viewMode === 'funding_radar'
-              ? 'text-white'
-              : 'text-gray-600 hover:bg-gray-100 border border-transparent'
-          }`}
-          style={viewMode === 'funding_radar' ? { backgroundColor: '#3e8692' } : {}}
-        >
-          <DollarSign className="w-3.5 h-3.5" />
-          Funding Radar
-        </button>
       </div>
 
-      {/* Korea Signals View */}
-      {viewMode === 'korea_signals' && (
-        <KoreaSignalsPanel />
-      )}
-
-      {/* Funding Radar View */}
-      {viewMode === 'funding_radar' && (
-        <FundingRadarPanel />
-      )}
-
       {/* Prospects Table View */}
-      {viewMode === 'prospects' && (<>
+      <>
       {/* Filters + Scraper Button */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-xs">
@@ -959,7 +914,7 @@ export default function ProspectsTab() {
         </div>
       )}
 
-      </>)}
+      </>
 
       {/* ICP Settings Dialog */}
       <ICPSettingsDialog

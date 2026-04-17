@@ -232,7 +232,8 @@ export class TelegramService {
   static async sendToChat(
     chatId: string,
     text: string,
-    parseMode: 'HTML' | 'Markdown' = 'HTML'
+    parseMode: 'HTML' | 'Markdown' = 'HTML',
+    threadId?: number
   ): Promise<boolean> {
     if (!this.botToken) {
       console.error('[Telegram] Bot token not configured');
@@ -240,16 +241,22 @@ export class TelegramService {
     }
 
     try {
+      const body: TelegramMessage = {
+        chat_id: chatId,
+        text,
+        parse_mode: parseMode,
+      };
+
+      if (threadId) {
+        body.message_thread_id = threadId;
+      }
+
       const response = await fetch(
         `https://api.telegram.org/bot${this.botToken}/sendMessage`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: chatId,
-            text,
-            parse_mode: parseMode
-          })
+          body: JSON.stringify(body)
         }
       );
 

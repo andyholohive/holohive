@@ -23,7 +23,7 @@ import {
   Plus, Minus, Search, Trash2, X, LayoutGrid, TableIcon, GripVertical, Loader2,
   Target, AlertTriangle, ArrowRight, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronUp,
   Phone, MessageSquare, Calendar, FileText, StickyNote, Zap, RotateCcw, Clock, Edit, Copy, Check, ChevronsUpDown,
-  Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown, Paperclip, Eye, Image, Bot, Globe
+  Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown, Paperclip, Eye, Image
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -76,8 +76,6 @@ import {
 import { UserService } from '@/lib/userService';
 import { BookingService } from '@/lib/bookingService';
 import { useToast } from '@/hooks/use-toast';
-import AgentDashboard from '@/components/agents/AgentDashboard';
-import ProspectsTab from '@/components/agents/ProspectsTab';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow, format } from 'date-fns';
 
@@ -5526,14 +5524,6 @@ export default function SalesPipelinePage() {
               <FileText className="h-4 w-4" />
               Templates
             </TabsTrigger>
-            <TabsTrigger value="agents" className="flex items-center gap-2">
-              <Bot className="h-4 w-4" />
-              AI Agents
-            </TabsTrigger>
-            <TabsTrigger value="prospects" className="flex items-center gap-2">
-              <Globe className="h-4 w-4" />
-              Prospects
-            </TabsTrigger>
           </TabsList>
 
           <div className="flex items-center gap-3">
@@ -6172,13 +6162,6 @@ export default function SalesPipelinePage() {
           })()}
         </TabsContent>
 
-        <TabsContent value="agents" className="mt-0">
-          <AgentDashboard />
-        </TabsContent>
-
-        <TabsContent value="prospects" className="mt-0">
-          <ProspectsTab />
-        </TabsContent>
       </Tabs>
 
       {/* Dialogs */}

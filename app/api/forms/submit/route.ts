@@ -74,15 +74,44 @@ export async function POST(request: NextRequest) {
 
     // Send Telegram notification (wait for it but don't fail if it errors)
     try {
-      const telegramSuccess = await TelegramService.sendFormSubmissionNotification(
-        form?.name || 'Unknown Form',
-        form_id,
-        {
-          name: submitted_by_name,
-          email: submitted_by_email,
-        },
-        response_data
-      );
+      // Check if there's a form_submission reminder rule with a specific chatroom
+      const { data: formRule } = await supabaseAdmin
+        .from('reminder_rules' as any)
+        .select('telegram_chat_id, telegram_thread_id')
+        .eq('rule_type', 'form_submission')
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+
+      let telegramSuccess = false;
+
+      if (formRule && (formRule as any).telegram_chat_id && (formRule as any).telegram_chat_id !== 'PLACEHOLDER_CHAT_ID') {
+        // Route to the configured chatroom
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+          ? (process.env.NEXT_PUBLIC_BASE_URL.startsWith('http')
+              ? process.env.NEXT_PUBLIC_BASE_URL
+              : `https://${process.env.NEXT_PUBLIC_BASE_URL}`)
+          : (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+        const formUrl = `${baseUrl}/forms/${form_id}`;
+        const message = `\u{1F4E9} <b>${form?.name || 'Unknown Form'}</b> has been submitted.\n<a href="${formUrl}">View Form</a>`;
+        telegramSuccess = await TelegramService.sendToChat(
+          (formRule as any).telegram_chat_id,
+          message,
+          'HTML',
+          (formRule as any).telegram_thread_id || undefined
+        );
+      } else {
+        // Fallback to default notification
+        telegramSuccess = await TelegramService.sendFormSubmissionNotification(
+          form?.name || 'Unknown Form',
+          form_id,
+          {
+            name: submitted_by_name,
+            email: submitted_by_email,
+          },
+          response_data
+        );
+      }
 
       if (telegramSuccess) {
         console.log('[Form Submit] Telegram notification sent successfully');
