@@ -3192,6 +3192,7 @@ const CampaignDetailsPage = () => {
 
   // Add at the top of the component, after other useState declarations:
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+  const [showBulkDeletePaymentsDialog, setShowBulkDeletePaymentsDialog] = useState(false);
   const [contentToDelete, setContentToDelete] = useState<any | null>(null);
   const [showPaymentDeleteDialog, setShowPaymentDeleteDialog] = useState(false);
   const [paymentToDelete, setPaymentToDelete] = useState<any | null>(null);
@@ -9041,7 +9042,7 @@ const CampaignDetailsPage = () => {
                           size="sm"
                           className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm whitespace-nowrap"
                           disabled={selectedPayments.length === 0}
-                          onClick={handleBulkDeletePayments}
+                          onClick={() => setShowBulkDeletePaymentsDialog(true)}
                         >
                           Delete
                         </Button>
@@ -10336,6 +10337,46 @@ const CampaignDetailsPage = () => {
               }
               setSelectedContents([]);
             }}>Delete Content</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Payments Confirmation Dialog */}
+      <Dialog open={showBulkDeletePaymentsDialog} onOpenChange={setShowBulkDeletePaymentsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {selectedPayments.length} payment{selectedPayments.length !== 1 ? 's' : ''}?</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. The selected payment record{selectedPayments.length !== 1 ? 's' : ''} will be permanently deleted
+              and the linked KOL paid totals will be recalculated.
+            </DialogDescription>
+          </DialogHeader>
+          {(() => {
+            const selected = payments.filter(p => selectedPayments.includes(p.id));
+            const total = selected.reduce((sum, p) => sum + (p.amount || 0), 0);
+            if (total <= 0) return null;
+            return (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                <p className="font-medium text-amber-800 flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4" />
+                  Total amount to be deleted: ${total.toLocaleString()}
+                </p>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkDeletePaymentsDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                setShowBulkDeletePaymentsDialog(false);
+                await handleBulkDeletePayments();
+              }}
+            >
+              Delete {selectedPayments.length} payment{selectedPayments.length !== 1 ? 's' : ''}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
