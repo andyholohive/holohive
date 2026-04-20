@@ -6,6 +6,12 @@
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
+
+  /* HoloHive brand palette — prefer these over hardcoded hex.
+     Use via: style={{ backgroundColor: 'var(--brand)' }} or Tailwind bg-brand. */
+  --brand: #3e8692;
+  --brand-hover: #2d6b75;
+  --brand-light: #e8f4f5;
 }
 
 @media (prefers-color-scheme: dark) {

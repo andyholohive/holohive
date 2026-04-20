@@ -20,6 +20,18 @@ const config: Config = {
         sm: 'calc(var(--radius) - 4px)',
       },
       colors: {
+        // Brand palette (HoloHive teal).
+        // Prefer using these tokens over hardcoded hex values:
+        //   bg-brand / text-brand / border-brand    → primary teal
+        //   bg-brand-hover                           → darker hover variant
+        //   bg-brand-light / text-brand              → subtle tint background
+        // Existing `#3e8692` / `#2d6b75` / `#e8f4f5` hex usages remain valid
+        // and can be swapped to these tokens incrementally.
+        brand: {
+          DEFAULT: '#3e8692',
+          hover: '#2d6b75',
+          light: '#e8f4f5',
+        },
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
         card: {

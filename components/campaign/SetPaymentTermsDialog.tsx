@@ -257,7 +257,7 @@ export default function SetPaymentTermsDialog({
             onClick={handleSave}
             disabled={saving || parsedAmount === null}
             className="hover:opacity-90"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
+            style={{ backgroundColor: 'var(--brand)', color: 'white' }}
           >
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Save terms
