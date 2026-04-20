@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import {
   Bot, Radar, Database, MessageSquare, Shield, Eye, Search, Pen, Hammer,
   RefreshCw, Clock, CheckCircle, XCircle, Loader2, DollarSign, Zap,
-  ArrowRight, Activity, TrendingUp, AlertTriangle, Plus,
+  ArrowRight, Activity, TrendingUp, AlertTriangle, Plus, Satellite,
 } from 'lucide-react';
 import ScoutQualifyDialog from './ScoutQualifyDialog';
 import { supabase } from '@/lib/supabase';
@@ -142,6 +142,14 @@ const AGENT_INFO: Record<string, {
     icon: Hammer,
     color: 'text-orange-600',
     schedule: 'Tue/Thu 10:00 AM KST',
+    type: 'scheduled',
+  },
+  HERMES: {
+    label: 'HERMES',
+    description: 'External Monitor — watches Korean Telegram groups and exchange volumes 24/7 from a self-hosted VPS',
+    icon: Satellite,
+    color: 'text-indigo-600',
+    schedule: 'Continuous (external)',
     type: 'scheduled',
   },
 };

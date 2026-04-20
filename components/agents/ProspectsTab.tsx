@@ -77,6 +77,13 @@ const SIGNAL_LABELS: Record<string, string> = {
   korea_intent_conference: 'Korea Conference',
   korea_intent_hiring: 'Asia Hiring',
   korea_intent_exchange: 'Asian Exchange',
+  // Hermes-reported signals (external monitor)
+  telegram_kr_mention: 'KR Telegram Mention',
+  telegram_kr_community: 'KR TG Community Activity',
+  volume_spike_upbit: 'Upbit Volume Spike',
+  volume_spike_bithumb: 'Bithumb Volume Spike',
+  volume_spike_korean: 'KR Exchange Volume Spike',
+  hermes_custom: 'Hermes Observation',
 };
 
 const ACTION_TIER_BADGE: Record<string, { label: string; color: string }> = {
