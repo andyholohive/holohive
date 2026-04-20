@@ -247,6 +247,26 @@ const CampaignDetailsPage = () => {
   // After the current dialog closes, the next item in the queue opens.
   const [paymentTermsQueue, setPaymentTermsQueue] = useState<string[]>([]);
 
+  // Budget tab: "Show overdue only" quick filter toggle
+  const [showOverdueOnly, setShowOverdueOnly] = useState(false);
+
+  // Payment status classification. Mirrors the payment_reminder rule's intent:
+  //   paid    → payment_date is set
+  //   overdue → unpaid AND any linked content is already posted (= reminder would fire)
+  //   pending → unpaid but content not yet live (= nothing to chase yet)
+  const getPaymentStatus = (payment: any): 'paid' | 'overdue' | 'pending' => {
+    if (payment.payment_date) return 'paid';
+    const contentIds: string[] = Array.isArray(payment.content_id)
+      ? payment.content_id
+      : (payment.content_id ? [payment.content_id] : []);
+    if (contentIds.length === 0) return 'pending';
+    const hasPostedLinkedContent = contentIds.some(cid => {
+      const c = contents.find((co: any) => co.id === cid);
+      return c && typeof c.status === 'string' && c.status.toLowerCase() === 'posted';
+    });
+    return hasPostedLinkedContent ? 'overdue' : 'pending';
+  };
+
   // Helper function to filter payments
   const getFilteredPayments = () => {
     return payments.filter(payment => {
@@ -287,9 +307,15 @@ const CampaignDetailsPage = () => {
         }
       })();
 
-      return matchesSearch && matchesKOL && matchesMethod && matchesContent && matchesAmount;
+      // Overdue-only quick filter (applied on top of everything else)
+      const matchesOverdue = !showOverdueOnly || getPaymentStatus(payment) === 'overdue';
+
+      return matchesSearch && matchesKOL && matchesMethod && matchesContent && matchesAmount && matchesOverdue;
     });
   };
+
+  // Count of overdue payments (for the toggle button badge)
+  const overdueCount = payments.filter(p => getPaymentStatus(p) === 'overdue').length;
 
   // Column resize state for KOLs table
   // Remove columnWidths, isResizing, resizingColumn
@@ -8959,7 +8985,7 @@ const CampaignDetailsPage = () => {
                 {/* Table View */}
                 {paymentViewMode === 'table' && (
                   <>
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3 mb-2">
                       <div className="relative flex-1 max-w-sm">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <Input
@@ -8969,6 +8995,20 @@ const CampaignDetailsPage = () => {
                           onChange={e => setPaymentsSearchTerm(e.target.value)}
                         />
                       </div>
+                      {/* Overdue quick filter — content is posted but payment isn't recorded */}
+                      <Button
+                        variant={showOverdueOnly ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setShowOverdueOnly(v => !v)}
+                        className={showOverdueOnly ? 'bg-red-600 hover:bg-red-700 text-white border-0' : 'text-red-600 border-red-200 hover:bg-red-50'}
+                        title={showOverdueOnly ? 'Showing overdue only — click to clear' : 'Show only payments where content is posted but payment is missing'}
+                      >
+                        <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
+                        {showOverdueOnly ? 'Overdue only' : 'Overdue'}
+                        <span className={`ml-1.5 text-[10px] font-bold ${showOverdueOnly ? 'opacity-90' : ''}`}>
+                          {overdueCount}
+                        </span>
+                      </Button>
                     </div>
                 {selectedPayments.length > 0 && (
                 <div className="mb-6 mt-6">
@@ -9343,17 +9383,39 @@ const CampaignDetailsPage = () => {
                                     handleCellSelect('payments', payment.id, 'kol_name', displayName);
                                   }}
                                 >
-                                  <div className="flex items-center w-full h-full gap-2">
+                                  <div className="flex items-center w-full h-full gap-2 flex-wrap">
                                     {payment.campaign_kol_id ? (
                                       campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.name || 'Unknown KOL'
                                     ) : (
                                       <>
                                         <span>{payment.recipient_name || 'Unknown'}</span>
-                                        <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
+                                        <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded pointer-events-none">
                                           Expense
                                         </span>
                                       </>
                                     )}
+                                    {(() => {
+                                      const status = getPaymentStatus(payment);
+                                      if (status === 'overdue') {
+                                        return (
+                                          <span
+                                            className="inline-flex items-center gap-1 text-[10px] font-semibold bg-red-100 text-red-700 px-1.5 py-0.5 rounded pointer-events-none"
+                                            title="Content is posted but payment hasn't been recorded"
+                                          >
+                                            <AlertTriangle className="h-2.5 w-2.5" />
+                                            Overdue
+                                          </span>
+                                        );
+                                      }
+                                      if (status === 'paid') {
+                                        return (
+                                          <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded pointer-events-none">
+                                            Paid
+                                          </span>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
                                   </div>
                                 </TableCell>
                                 <TableCell
