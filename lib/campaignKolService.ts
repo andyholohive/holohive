@@ -12,6 +12,7 @@ export interface CampaignKOL {
   paid?: number | null;
   wallet?: string | null;
   hidden?: boolean | null;
+  agreed_rate?: number | null;
   created_at?: string | null;
   updated_at?: string | null;
 }
@@ -29,6 +30,7 @@ export interface CampaignKOLWithDetails extends CampaignKOL {
     creator_type?: string[] | null;
     niche?: string[] | null;
     pricing?: string | null;
+    standard_rate?: number | null;
     tier?: string | null;
     rating?: number | null;
     group_chat?: boolean | null;

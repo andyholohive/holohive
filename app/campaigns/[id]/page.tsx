@@ -19,6 +19,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { UserService } from "@/lib/userService";
 import { KOLService } from "@/lib/kolService";
 import { CampaignKOLService, CampaignKOLWithDetails } from "@/lib/campaignKolService";
+import SetPaymentTermsDialog from "@/components/campaign/SetPaymentTermsDialog";
 import { ClientService } from "@/lib/clientService";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -230,6 +231,21 @@ const CampaignDetailsPage = () => {
     paymentIds?: string[];
     mode: 'payment-dialog' | 'content-created';
   } | null>(null);
+
+  // Payment terms dialog state — fires when a KOL is onboarded but has no agreed_rate yet
+  const [paymentTermsDialog, setPaymentTermsDialog] = useState<{
+    open: boolean;
+    campaignKolId: string;
+    masterKolId: string | null | undefined;
+    kolName: string;
+    latestPaymentAmount?: number | null;
+    masterStandardRate?: number | null;
+    currentAgreedRate?: number | null;
+  } | null>(null);
+
+  // Queue of KOLs waiting to have payment terms set (used for bulk onboarding).
+  // After the current dialog closes, the next item in the queue opens.
+  const [paymentTermsQueue, setPaymentTermsQueue] = useState<string[]>([]);
 
   // Helper function to filter payments
   const getFilteredPayments = () => {
@@ -902,11 +918,39 @@ const CampaignDetailsPage = () => {
     }
   };
 
+  // Open the payment terms dialog for a specific campaign_kol.
+  // Reads the latest KOL state from the current campaignKOLs list.
+  const openPaymentTermsForKol = (kolId: string, list?: CampaignKOLWithDetails[]) => {
+    const source = list || campaignKOLs;
+    const kol = source.find(k => k.id === kolId);
+    if (!kol) return false;
+    if ((kol.agreed_rate ?? null) !== null) return false; // already set
+    const masterKolId = kol.master_kol?.id ?? null;
+    const latest = masterKolId ? latestCostMap.get(masterKolId) ?? null : null;
+    setPaymentTermsDialog({
+      open: true,
+      campaignKolId: kol.id,
+      masterKolId,
+      kolName: kol.master_kol?.name || 'this KOL',
+      latestPaymentAmount: latest,
+      masterStandardRate: kol.master_kol?.standard_rate ?? null,
+      currentAgreedRate: kol.agreed_rate ?? null,
+    });
+    return true;
+  };
+
   const handleUpdateKOLStatus = async (kolId: string, status: 'Curated' | 'Contacted' | 'Interested' | 'Onboarded' | 'Concluded') => {
     try {
       await CampaignKOLService.updateCampaignKOL(kolId, { hh_status: status });
       const updatedKOLs = campaignKOLs.map(kol => kol.id === kolId ? { ...kol, hh_status: status } : kol);
       setCampaignKOLs(updatedKOLs);
+
+      // When a KOL is newly onboarded and we don't have a rate yet,
+      // prompt the user to set payment terms so future auto-created
+      // payment rows get the right amount instead of $0.
+      if (status === 'Onboarded') {
+        openPaymentTermsForKol(kolId, updatedKOLs);
+      }
 
       // Auto-update campaign status to Completed when all KOLs are concluded
       if (status === 'Concluded' && campaign?.status !== 'Completed') {
@@ -3054,6 +3098,11 @@ const CampaignDetailsPage = () => {
       }
     }
 
+    // Prompt for payment terms when a KOL is newly onboarded and has no agreed_rate yet
+    if (field === 'hh_status' && newValue === 'Onboarded') {
+      openPaymentTermsForKol(kol.id, updatedKOLs);
+    }
+
     setEditingKolCell(null);
     setEditingKolValue(null);
   };
@@ -5084,6 +5133,21 @@ const CampaignDetailsPage = () => {
                             setCampaignKOLs(updatedKOLs);
                             await Promise.all(selectedKOLs.map(kolId => CampaignKOLService.updateCampaignKOL(kolId, { hh_status: bulkStatus })));
 
+                            // If bulk-onboarding, queue up payment terms dialogs
+                            // for each KOL that doesn't already have an agreed_rate.
+                            // The first one opens immediately; the rest fire as each closes.
+                            if (bulkStatus === 'Onboarded') {
+                              const needsTerms = selectedKOLs.filter(id => {
+                                const k = updatedKOLs.find(x => x.id === id);
+                                return k && (k.agreed_rate ?? null) === null;
+                              });
+                              if (needsTerms.length > 0) {
+                                const [first, ...rest] = needsTerms;
+                                setPaymentTermsQueue(rest);
+                                openPaymentTermsForKol(first, updatedKOLs);
+                              }
+                            }
+
                             // Auto-update campaign status to Completed when all KOLs are concluded
                             if (bulkStatus === 'Concluded' && campaign?.status !== 'Completed') {
                               const allConcluded = updatedKOLs.every(k => k.hh_status === 'Concluded');
@@ -5951,13 +6015,25 @@ const CampaignDetailsPage = () => {
                                                     return;
                                                   }
 
-                                                  // Auto-create payments for each content
+                                                  // Auto-create payments for each content.
+                                                  // Amount priority:
+                                                  //   1. campaign_kol.agreed_rate (set at onboarding)
+                                                  //   2. master_kol.standard_rate (mastersheet)
+                                                  //   3. most recent payment amount for this KOL
+                                                  //   4. 0 (user will need to fill in manually)
+                                                  const defaultAmount =
+                                                    (campaignKOL.agreed_rate ?? null) !== null
+                                                      ? Number(campaignKOL.agreed_rate)
+                                                      : (campaignKOL.master_kol?.standard_rate ?? null) !== null
+                                                      ? Number(campaignKOL.master_kol?.standard_rate)
+                                                      : (campaignKOL.master_kol?.id && latestCostMap.get(campaignKOL.master_kol.id)) || 0;
+
                                                   if (data && data.length > 0) {
                                                     const paymentPayloads = data.map((content: any) => ({
                                                       campaign_id: campaign?.id,
                                                       campaign_kol_id: campaignKOL.id,
                                                       content_id: [content.id],
-                                                      amount: 0,
+                                                      amount: defaultAmount,
                                                       payment_date: null,
                                                       payment_method: 'Fiat',
                                                       notes: null
@@ -5978,10 +6054,13 @@ const CampaignDetailsPage = () => {
                                                     } else {
                                                       fetchPayments();
 
-                                                      // Check if KOL has latest pricing and show suggestion dialog
+                                                      // Only show the "use latest pricing?" suggestion if we couldn't
+                                                      // auto-fill — i.e. there's no agreed_rate and no master standard_rate.
+                                                      const hasStoredRate = (campaignKOL.agreed_rate ?? null) !== null
+                                                        || (campaignKOL.master_kol?.standard_rate ?? null) !== null;
                                                       const masterKolId = campaignKOL.master_kol?.id;
                                                       const latestCost = masterKolId ? latestCostMap.get(masterKolId) : undefined;
-                                                      if (latestCost && latestCost > 0 && paymentData && paymentData.length > 0) {
+                                                      if (!hasStoredRate && latestCost && latestCost > 0 && paymentData && paymentData.length > 0) {
                                                         const paymentIds = paymentData.map((p: any) => p.id);
                                                         setPricingSuggestionDialog({
                                                           open: true,
@@ -6751,11 +6830,19 @@ const CampaignDetailsPage = () => {
                                 const kol = campaignKOLs.find(k => k.id === newContent.campaign_kols_id);
 
                                 if (kol) {
+                                  // Amount priority: agreed_rate → standard_rate → latest payment → 0
+                                  const defaultAmount =
+                                    (kol.agreed_rate ?? null) !== null
+                                      ? Number(kol.agreed_rate)
+                                      : (kol.master_kol?.standard_rate ?? null) !== null
+                                      ? Number(kol.master_kol?.standard_rate)
+                                      : (kol.master_kol?.id && latestCostMap.get(kol.master_kol.id)) || 0;
+
                                   const paymentPayload = {
                                     campaign_id: campaign?.id,
                                     campaign_kol_id: kol.id,
                                     content_id: [newContent.id],
-                                    amount: 0,
+                                    amount: defaultAmount,
                                     payment_date: null,
                                     payment_method: 'Fiat',
                                     notes: null
@@ -6777,10 +6864,13 @@ const CampaignDetailsPage = () => {
                                     // Refetch payments to update the table
                                     fetchPayments();
 
-                                    // Check if KOL has latest pricing and show suggestion dialog
+                                    // Only show the "use latest pricing?" suggestion if we couldn't
+                                    // auto-fill — i.e. no agreed_rate and no master standard_rate.
+                                    const hasStoredRate = (kol.agreed_rate ?? null) !== null
+                                      || (kol.master_kol?.standard_rate ?? null) !== null;
                                     const masterKolId = kol.master_kol?.id;
                                     const latestCost = masterKolId ? latestCostMap.get(masterKolId) : undefined;
-                                    if (latestCost && latestCost > 0 && paymentData && paymentData.length > 0) {
+                                    if (!hasStoredRate && latestCost && latestCost > 0 && paymentData && paymentData.length > 0) {
                                       setPricingSuggestionDialog({
                                         open: true,
                                         kolId: kol.id,
@@ -10804,6 +10894,45 @@ const CampaignDetailsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Payment terms dialog — fires when a KOL is newly onboarded without an agreed rate */}
+      {paymentTermsDialog && (
+        <SetPaymentTermsDialog
+          open={paymentTermsDialog.open}
+          onOpenChange={(open) => {
+            if (!open) {
+              setPaymentTermsDialog(null);
+              // Advance queue if there are more KOLs waiting
+              if (paymentTermsQueue.length > 0) {
+                const [next, ...rest] = paymentTermsQueue;
+                setPaymentTermsQueue(rest);
+                // Defer so the dialog unmounts before remounting
+                setTimeout(() => openPaymentTermsForKol(next), 50);
+              }
+            }
+          }}
+          campaignKolId={paymentTermsDialog.campaignKolId}
+          masterKolId={paymentTermsDialog.masterKolId}
+          kolName={paymentTermsDialog.kolName}
+          latestPaymentAmount={paymentTermsDialog.latestPaymentAmount}
+          masterStandardRate={paymentTermsDialog.masterStandardRate}
+          currentAgreedRate={paymentTermsDialog.currentAgreedRate}
+          onSaved={(rate, updatedMaster) => {
+            // Reflect the new rate in local state so subsequent content adds
+            // use it without requiring a refetch.
+            setCampaignKOLs(prev => prev.map(k => {
+              if (k.id !== paymentTermsDialog.campaignKolId) return k;
+              return {
+                ...k,
+                agreed_rate: rate,
+                master_kol: updatedMaster && k.master_kol
+                  ? { ...k.master_kol, standard_rate: rate }
+                  : k.master_kol,
+              };
+            }));
+          }}
+        />
+      )}
 
     </div>
   );
