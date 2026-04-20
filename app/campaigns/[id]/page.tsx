@@ -12,7 +12,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 // import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -250,6 +250,22 @@ const CampaignDetailsPage = () => {
   // Budget tab: "Show overdue only" quick filter toggle
   const [showOverdueOnly, setShowOverdueOnly] = useState(false);
 
+  // Budget tab: column sort state. Click a sortable header to cycle
+  // through: none → asc → desc → none.
+  type PaymentSortField = 'kol' | 'amount' | 'date' | null;
+  const [paymentSort, setPaymentSort] = useState<{
+    field: PaymentSortField;
+    direction: 'asc' | 'desc';
+  }>({ field: null, direction: 'asc' });
+
+  const togglePaymentSort = (field: Exclude<PaymentSortField, null>) => {
+    setPaymentSort(prev => {
+      if (prev.field !== field) return { field, direction: 'asc' };
+      if (prev.direction === 'asc') return { field, direction: 'desc' };
+      return { field: null, direction: 'asc' }; // clear
+    });
+  };
+
   // Payment status classification. Mirrors the payment_reminder rule's intent:
   //   paid    → payment_date is set
   //   overdue → unpaid AND any linked content is already posted (= reminder would fire)
@@ -267,9 +283,9 @@ const CampaignDetailsPage = () => {
     return hasPostedLinkedContent ? 'overdue' : 'pending';
   };
 
-  // Helper function to filter payments
+  // Helper function to filter (and optionally sort) payments
   const getFilteredPayments = () => {
-    return payments.filter(payment => {
+    const filtered = payments.filter(payment => {
       const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
       const search = paymentsSearchTerm.toLowerCase();
 
@@ -312,6 +328,39 @@ const CampaignDetailsPage = () => {
 
       return matchesSearch && matchesKOL && matchesMethod && matchesContent && matchesAmount && matchesOverdue;
     });
+
+    if (!paymentSort.field) return filtered;
+
+    // Apply sort. We sort a copy so the underlying `payments` array stays
+    // in insert order (needed for the consistent row-index rendering).
+    const sorted = [...filtered];
+    const dir = paymentSort.direction === 'asc' ? 1 : -1;
+    sorted.sort((a, b) => {
+      let av: any, bv: any;
+      switch (paymentSort.field) {
+        case 'kol': {
+          const aKol = a.campaign_kol_id
+            ? campaignKOLs.find(k => k.id === a.campaign_kol_id)?.master_kol?.name || ''
+            : a.recipient_name || '';
+          const bKol = b.campaign_kol_id
+            ? campaignKOLs.find(k => k.id === b.campaign_kol_id)?.master_kol?.name || ''
+            : b.recipient_name || '';
+          return aKol.localeCompare(bKol) * dir;
+        }
+        case 'amount':
+          av = a.amount ?? 0;
+          bv = b.amount ?? 0;
+          return (av - bv) * dir;
+        case 'date':
+          // Null dates sort to the end regardless of direction
+          if (!a.payment_date && !b.payment_date) return 0;
+          if (!a.payment_date) return 1;
+          if (!b.payment_date) return -1;
+          return (new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()) * dir;
+      }
+      return 0;
+    });
+    return sorted;
   };
 
   // Count of overdue payments (for the toggle button badge)
@@ -9131,8 +9180,22 @@ const CampaignDetailsPage = () => {
                                 />
                               </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">
-                                <div className="flex items-center gap-1 cursor-pointer group">
-                                  <span>KOL</span>
+                                <div className="flex items-center gap-1 group">
+                                  <button
+                                    type="button"
+                                    onClick={() => togglePaymentSort('kol')}
+                                    className="flex items-center gap-1 hover:text-gray-900"
+                                    title="Sort by KOL name"
+                                  >
+                                    <span>KOL</span>
+                                    {paymentSort.field === 'kol' ? (
+                                      paymentSort.direction === 'asc'
+                                        ? <ArrowUp className="h-3 w-3" />
+                                        : <ArrowDown className="h-3 w-3" />
+                                    ) : (
+                                      <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />
+                                    )}
+                                  </button>
                                   <Popover>
                                     <PopoverTrigger asChild>
                                       <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -9183,8 +9246,22 @@ const CampaignDetailsPage = () => {
                                 <span>Wallet</span>
                               </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                                <div className="flex items-center gap-1 cursor-pointer group">
-                                  <span>Amount</span>
+                                <div className="flex items-center gap-1 group">
+                                  <button
+                                    type="button"
+                                    onClick={() => togglePaymentSort('amount')}
+                                    className="flex items-center gap-1 hover:text-gray-900"
+                                    title="Sort by amount"
+                                  >
+                                    <span>Amount</span>
+                                    {paymentSort.field === 'amount' ? (
+                                      paymentSort.direction === 'asc'
+                                        ? <ArrowUp className="h-3 w-3" />
+                                        : <ArrowDown className="h-3 w-3" />
+                                    ) : (
+                                      <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />
+                                    )}
+                                  </button>
                                   <Popover>
                                     <PopoverTrigger asChild>
                                       <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -9236,7 +9313,23 @@ const CampaignDetailsPage = () => {
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Payment Date</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <button
+                                  type="button"
+                                  onClick={() => togglePaymentSort('date')}
+                                  className="flex items-center gap-1 group hover:text-gray-900"
+                                  title="Sort by payment date (unpaid rows sort last)"
+                                >
+                                  <span>Payment Date</span>
+                                  {paymentSort.field === 'date' ? (
+                                    paymentSort.direction === 'asc'
+                                      ? <ArrowUp className="h-3 w-3" />
+                                      : <ArrowDown className="h-3 w-3" />
+                                  ) : (
+                                    <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />
+                                  )}
+                                </button>
+                              </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
                                 <div className="flex items-center gap-1 cursor-pointer group">
                                   <span>Method</span>
