@@ -2,11 +2,12 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Globe, Radar, DollarSign, Bot } from 'lucide-react';
+import { Globe, Radar, DollarSign, Bot, Sparkles } from 'lucide-react';
 import ProspectsTab from '@/components/agents/ProspectsTab';
 import KoreaSignalsPanel from '@/components/agents/KoreaSignalsPanel';
 import FundingRadarPanel from '@/components/agents/FundingRadarPanel';
 import AgentDashboard from '@/components/agents/AgentDashboard';
+import DiscoveryPanel from '@/components/agents/DiscoveryPanel';
 
 export default function IntelligencePage() {
   const [activeTab, setActiveTab] = useState('prospects');
@@ -20,6 +21,10 @@ export default function IntelligencePage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
+          <TabsTrigger value="discovery" className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4" />
+            Discovery
+          </TabsTrigger>
           <TabsTrigger value="prospects" className="flex items-center gap-2">
             <Globe className="h-4 w-4" />
             Prospects
@@ -37,6 +42,10 @@ export default function IntelligencePage() {
             AI Agents
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="discovery" className="mt-4">
+          <DiscoveryPanel />
+        </TabsContent>
 
         <TabsContent value="prospects" className="mt-4">
           <ProspectsTab />

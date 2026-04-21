@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import {
   Bot, Radar, Database, MessageSquare, Shield, Eye, Search, Pen, Hammer,
   RefreshCw, Clock, CheckCircle, XCircle, Loader2, DollarSign, Zap,
-  ArrowRight, Activity, TrendingUp, AlertTriangle, Plus, Satellite,
+  ArrowRight, Activity, TrendingUp, AlertTriangle, Plus, Satellite, Sparkles,
 } from 'lucide-react';
 import ScoutQualifyDialog from './ScoutQualifyDialog';
 import { supabase } from '@/lib/supabase';
@@ -151,6 +151,14 @@ const AGENT_INFO: Record<string, {
     color: 'text-indigo-600',
     schedule: 'Continuous (external)',
     type: 'scheduled',
+  },
+  DISCOVERY: {
+    label: 'DISCOVERY',
+    description: 'Lead Finder — searches DropsTab and the web for crypto projects with live outreach triggers',
+    icon: Sparkles,
+    color: 'text-violet-600',
+    schedule: 'On-demand',
+    type: 'on_demand',
   },
 };
 
