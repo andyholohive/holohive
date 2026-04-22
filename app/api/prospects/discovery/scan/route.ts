@@ -8,25 +8,36 @@ export const maxDuration = 300;
 /**
  * POST /api/prospects/discovery/scan
  *
- * Uses Claude + web_search to autonomously:
- *   1. Find crypto projects recently funded (primary: DropsTab, secondary: any web result)
- *   2. Identify OUTREACH TRIGGERS per project — signals telling us NOW is the time
- *      to reach out (recent raise, TGE soon, Korea expansion, team hiring, etc.)
- *   3. Extract public contacts (Twitter URL, Telegram URL) with a confidence rating
- *   4. Give a short fit-reasoning note per project
+ * Two-stage flow designed for cost and reliability:
  *
- * Writes to:
- *   - prospects (source='dropstab_discovery', status='needs_review')
- *   - prospect_signals (each trigger → a signal row)
+ *   Stage 1 (one cheap Claude call):
+ *     Find N candidate crypto projects on DropsTab matching the funding filter.
+ *     Output is a minimal list — name, symbol, category, funding amount, URL.
+ *
+ *   Stage 2 (parallel Claude calls, 3-4 candidates per batch):
+ *     Enrich each candidate with: ICP check (6 criteria), SCOUT scoring,
+ *     action tier, outreach triggers (X-first), and POC handles (Telegram > X).
+ *
+ * Why staged:
+ *   - Each call is smaller → less likely to hit pause_turn (which compounds cost)
+ *   - Parallel batches finish in the time of the slowest single batch
+ *   - Failed batches don't kill the whole scan (Promise.allSettled)
+ *   - System prompt is identical across all Stage 2 batches → prompt caching
+ *     means batches 2..N read the system block at 10% cost
  *
  * Body (all optional):
  *   {
  *     recency_days?: number,       // default 30
  *     min_raise_usd?: number,      // default 1_000_000
- *     max_projects?: number,       // default 20 (caps Claude output)
- *     categories?: string[],       // filter e.g. ['DeFi', 'Gaming']
+ *     max_projects?: number,       // default 20 (capped at 20)
+ *     categories?: string[],       // e.g. ['DeFi', 'Gaming']
+ *     model?: 'sonnet' | 'opus',   // default 'opus'
  *   }
  */
+
+// ────────────────────────────────────────────────────────────────────
+// Types
+// ────────────────────────────────────────────────────────────────────
 
 interface OutreachContact {
   name: string;
@@ -48,19 +59,22 @@ type ActionTier =
   | 'NURTURE'
   | 'SKIP';
 
-interface DiscoveredProject {
+interface CandidateBasics {
   name: string;
   symbol?: string | null;
   category?: string | null;
+  funding_amount_usd?: number | null;
+  funding_round?: string | null;
+  funding_date?: string | null;
+  investors?: string[];
+  dropstab_url?: string | null;
   website_url?: string | null;
+}
+
+interface DiscoveredProject extends CandidateBasics {
   project_twitter_url?: string | null;
   project_telegram_url?: string | null;
   discord_url?: string | null;
-  dropstab_url?: string | null;
-  funding_round?: string | null;
-  funding_amount_usd?: number | null;
-  funding_date?: string | null;
-  investors?: string[];
   icp_verdict: 'PASS' | 'FAIL' | 'BORDERLINE';
   icp_checks: {
     credible_funding: IcpCheck;
@@ -92,6 +106,559 @@ interface DiscoveredProject {
   fit_reasoning?: string | null;
 }
 
+// ────────────────────────────────────────────────────────────────────
+// Stage 1: Find candidates on DropsTab
+// ────────────────────────────────────────────────────────────────────
+
+const CANDIDATES_SYSTEM_PROMPT = `You are a crypto-funding research assistant for HoloHive BD. Your only job in this call is to PRODUCE A LIST of candidate projects from DropsTab that recently raised capital. Do not evaluate fit, do not find contacts, do not score — later calls do that.
+
+## SOURCE RULES
+- Primary: https://dropstab.com/tab/by-raised-funds (the raised-funds list)
+- Open individual DropsTab coin pages as needed to confirm funding details
+- DO NOT use general web search for candidate discovery. DropsTab is the source of truth for this list.
+
+## OUTPUT
+Call submit_candidates exactly once with the list. No text replies.
+
+Return AT MOST the requested count. Quality over quantity — if you can only find 6 qualifying projects, submit 6.`;
+
+const candidatesTool = {
+  name: 'submit_candidates',
+  description: 'Submit the list of candidate projects found on DropsTab.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      candidates: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            symbol: { type: 'string' },
+            category: { type: 'string' },
+            funding_amount_usd: { type: 'number', description: 'Total raise in USD for the most recent round' },
+            funding_round: { type: 'string', description: 'e.g. Seed, Series A, Strategic' },
+            funding_date: { type: 'string', description: 'ISO YYYY-MM-DD of announcement if known' },
+            investors: { type: 'array', items: { type: 'string' } },
+            dropstab_url: { type: 'string' },
+            website_url: { type: 'string' },
+          },
+          required: ['name'],
+        },
+      },
+    },
+    required: ['candidates'],
+  },
+};
+
+async function findCandidates(
+  anthropic: any,
+  model: string,
+  params: {
+    recencyDays: number;
+    minRaise: number;
+    maxCandidates: number;
+    categories: string[];
+  },
+): Promise<{
+  candidates: CandidateBasics[];
+  inputTokens: number;
+  outputTokens: number;
+  stopReason: string | null;
+}> {
+  const userPrompt = `List up to ${params.maxCandidates} crypto projects that appear on DropsTab's raised-funds page and meet these filters:
+
+- Raised at least $${params.minRaise.toLocaleString()} USD
+- Announced within the last ${params.recencyDays} days${params.categories.length > 0 ? `\n- Category is one of: ${params.categories.join(', ')}` : ''}
+
+For each, include name, symbol, category, funding amount, round type, date (if visible), lead investors, DropsTab URL, and website URL.
+
+Call submit_candidates when done.`;
+
+  const response = await anthropic.messages.create({
+    model,
+    max_tokens: 6000,
+    system: [
+      {
+        type: 'text',
+        text: CANDIDATES_SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    messages: [{ role: 'user', content: userPrompt }],
+    tools: [
+      { type: 'web_search_20250305', name: 'web_search', max_uses: 10 } as any,
+      candidatesTool as any,
+    ],
+  });
+
+  const submitBlock = response.content.find(
+    (b: any) => b.type === 'tool_use' && b.name === 'submit_candidates',
+  ) as any;
+
+  const candidates: CandidateBasics[] = submitBlock?.input?.candidates ?? [];
+
+  return {
+    candidates,
+    inputTokens: response.usage?.input_tokens ?? 0,
+    outputTokens: response.usage?.output_tokens ?? 0,
+    stopReason: response.stop_reason ?? null,
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Stage 2: Enrich a batch of candidates (triggers + POCs + ICP)
+// ────────────────────────────────────────────────────────────────────
+
+const ENRICHMENT_SYSTEM_PROMPT = `You are DISCOVERY, HoloHive's BD enrichment agent. You receive a small batch of candidate crypto projects and for each one: (1) verify fit against the HoloHive ICP, (2) hunt for outreach triggers from Twitter/X, (3) find individual decision-maker contacts (POCs), and (4) produce a SCOUT-compatible score and action tier.
+
+HoloHive is a Seoul-based KOL growth agency. Their 90-day Korea Growth Partnership ($48-61K) is sold to pre-token or recently-launched crypto projects entering the Korean market.
+
+## THE 6-CRITERIA ICP CHECK (binary, ALL must PASS)
+1. Credible funding — any amount with reputable backers
+2. Pre-token OR TGE within 6 months — verify via CoinGecko, roadmap, tokenomics
+3. No existing Korea community / marketing team — Korean TG <1K members = pass. A NEW Korea BD hire POST is a positive trigger, NOT a fail.
+4. End-user product — NOT B2B infra/VC/exchange (L1/L2 counts as end-user)
+5. Real product in development or launched — GitHub, app, testnet, TVL (not just whitepaper)
+6. Not with a competitor Korea agency
+
+For each, produce { pass: boolean, evidence: string }.
+\`icp_verdict\`: PASS (all 6 pass), FAIL (any fail OR instant disqualifier), BORDERLINE (unclear).
+
+## INSTANT DISQUALIFIERS → icp_verdict=FAIL, action_tier=SKIP, populate disqualification_reason
+- B2B service provider or infrastructure tool (unless L1/L2)
+- VC firm or fund; exchange, DEX, trading platform
+- Dormant >60 days; KR Telegram already 1K+ members
+- Already working with competitor Korea agency
+- Token launched 6+ months ago AND no Korea trigger
+- Team fully anon AND no credible backers
+- Rug pull or serious controversy history
+- "Global expansion" with ZERO Korea-specific signals
+
+Return FAIL projects in output with a clear disqualification_reason. Do not silently drop them.
+
+## GLOBAL-ONLY EDGE CASE
+If a project passes all other 5 criteria but has NO Korea signal:
+- verdict: BORDERLINE
+- action_tier: RESEARCH
+- consideration_reason: 1-2 sentences on why a human should still review (e.g., "Strong Series A with Asia-curious investors — worth a 5-min check").
+
+## TRIGGER HUNTING (X-FIRST)
+For each candidate, OPEN the project's X/Twitter account. Read the pinned tweet + last ~10 posts + key team members' recent posts. Triggers come primarily from X; only fall back to news if nothing useful on X.
+
+Trigger types (snake_case):
+- TIER 1 (within 7d): tge_within_60d, korea_exchange_listing, mainnet_launching_this_month, korea_bd_hire, team_relocation_seoul
+- TIER 2 (within 7d or ongoing): recent_raise, korea_bd_hiring, airdrop_announced, competitor_entered_korea, korean_media_partnership
+- TIER 3 (within 14d): accelerator_graduation, hackathon_win, ecosystem_grant_asia, mainnet_2_to_3_months_out
+
+Per trigger: signal_type, headline (<80 chars), detail (1-2 sentences, quote the tweet if applicable), source_url (specific tweet URL preferred), source_type ("tweet" | "article" | "other"), tier, weight (5-25).
+
+## SCORING (0-100)
+prospect_score.total = icp_fit (0-40) + signal_strength (0-35 HARD CAP) + timing (0-25)
+
+icp_fit (0-40):
+- credible_funding pass: +10
+- pre_token_or_tge_6mo pass: +10
+- no_korea_presence pass: +5
+- real_product pass: +5
+- team_credible_doxxed (founders public): +5
+- hot_narrative (AI/DePIN/RWA/Stablecoins/Restaking/selective Gaming): +5
+
+signal_strength (0-35):
+- HIGHEST trigger base (pick one, don't stack): TIER 1 = +15, TIER 2 = +10, TIER 3 = +5
+- Multiple triggers (2+): +5
+- Behavioral (engaged with HoloHive team / mentioned Asia): +5
+- Contextual (trending in Korean Telegram): +5
+
+timing (0-25, pick SINGLE highest):
+- TGE <8 weeks: 25
+- Post-funding <30d OR mainnet this month: 20
+- TGE 2-4 months OR Korea BD actively hired OR recent Asia/Korea interest: 15
+- Major Seoul event (ETH Seoul, KBW) coming: 10
+- No timing trigger: 0
+
+action_tier:
+- 80-100 → REACH_OUT_NOW
+- 60-79  → PRE_TOKEN_PRIORITY
+- 45-59  → RESEARCH
+- 30-44  → WATCH
+- 15-29  → NURTURE
+- 0-14 or disqualified → SKIP
+
+## KOREA CONTEXT (Apr 2026)
+- 2nd-largest crypto market globally. Corporate crypto ban lifted Feb 2026.
+- Upbit 72% share; Bithumb #2 (IPO planned).
+- Trending in Korean Telegram: AI, DePIN, RWA, Stablecoins, Restaking, selective Gaming.
+- KEY RULE: Korea = Telegram, NOT Twitter. Korean Twitter is noisy; retail discovery happens on Telegram. When checking Korea presence (ICP #3), check TELEGRAM size, not Twitter followers.
+
+## OUTREACH CONTACTS (POCs) — CRITICAL
+HoloHive does cold BD via Telegram DM. We want DECISION-MAKERS' personal handles. Prioritize in order:
+1. CEO / Founder (best)
+2. CMO / Head of Marketing / Head of Growth
+3. Head of BD / BD Lead
+4. Community lead (last resort)
+
+Within role priority, prefer contacts with a findable **Telegram handle > X handle**. Crypto founders often put "tg: @handle" in X bio specifically for cold DMs — search for that pattern.
+
+Per contact: name, role, twitter_handle, telegram_handle, source_url (where you found it), confidence (high/medium/low), optional notes.
+
+Confidence rules:
+- high: Telegram on verified X bio or project team page
+- medium: Telegram on crypto directory or second-hand
+- low: X-only or inferred (include only if no better lead)
+
+Return empty outreach_contacts if you can't find anything — better than fabricated.
+
+\`project_twitter_url\` and \`project_telegram_url\` are the project's COMMUNITY channels — useful for monitoring, not outreach.
+
+## OUTPUT
+Call submit_enrichments EXACTLY ONCE with the enriched batch. Do NOT reply with plain text.`;
+
+const enrichmentsTool = {
+  name: 'submit_enrichments',
+  description: 'Submit the enriched projects with full ICP + scoring + triggers + POCs.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      projects: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            symbol: { type: 'string' },
+            category: { type: 'string' },
+            website_url: { type: 'string' },
+            project_twitter_url: { type: 'string', description: "Project's official X URL (community, not outreach)" },
+            project_telegram_url: { type: 'string', description: "Project's community Telegram (not outreach)" },
+            discord_url: { type: 'string' },
+            dropstab_url: { type: 'string' },
+            funding_round: { type: 'string' },
+            funding_amount_usd: { type: 'number' },
+            funding_date: { type: 'string' },
+            investors: { type: 'array', items: { type: 'string' } },
+            icp_verdict: { type: 'string', enum: ['PASS', 'FAIL', 'BORDERLINE'] },
+            icp_checks: {
+              type: 'object',
+              properties: {
+                credible_funding:     { type: 'object', properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } }, required: ['pass', 'evidence'] },
+                pre_token_or_tge_6mo: { type: 'object', properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } }, required: ['pass', 'evidence'] },
+                no_korea_presence:    { type: 'object', properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } }, required: ['pass', 'evidence'] },
+                end_user_product:     { type: 'object', properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } }, required: ['pass', 'evidence'] },
+                real_product:         { type: 'object', properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } }, required: ['pass', 'evidence'] },
+                not_with_competitor:  { type: 'object', properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } }, required: ['pass', 'evidence'] },
+              },
+              required: ['credible_funding', 'pre_token_or_tge_6mo', 'no_korea_presence', 'end_user_product', 'real_product', 'not_with_competitor'],
+            },
+            disqualification_reason: { type: 'string' },
+            consideration_reason: { type: 'string' },
+            prospect_score: {
+              type: 'object',
+              properties: {
+                icp_fit: { type: 'number' },
+                signal_strength: { type: 'number' },
+                timing: { type: 'number' },
+                total: { type: 'number' },
+              },
+              required: ['icp_fit', 'signal_strength', 'timing', 'total'],
+            },
+            action_tier: {
+              type: 'string',
+              enum: ['REACH_OUT_NOW', 'PRE_TOKEN_PRIORITY', 'RESEARCH', 'WATCH', 'NURTURE', 'SKIP'],
+            },
+            outreach_contacts: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  role: { type: 'string' },
+                  twitter_handle: { type: 'string' },
+                  telegram_handle: { type: 'string' },
+                  source_url: { type: 'string' },
+                  confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+                  notes: { type: 'string' },
+                },
+                required: ['name', 'role', 'confidence'],
+              },
+            },
+            triggers: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  signal_type: { type: 'string' },
+                  headline: { type: 'string' },
+                  detail: { type: 'string' },
+                  source_url: { type: 'string' },
+                  source_type: { type: 'string', enum: ['tweet', 'article', 'other'] },
+                  tier: { type: 'string', enum: ['TIER_1', 'TIER_2', 'TIER_3'] },
+                  weight: { type: 'number' },
+                },
+                required: ['signal_type', 'headline'],
+              },
+            },
+            fit_reasoning: { type: 'string' },
+          },
+          required: ['name', 'icp_verdict', 'icp_checks', 'prospect_score', 'action_tier'],
+        },
+      },
+    },
+    required: ['projects'],
+  },
+};
+
+async function enrichBatch(
+  anthropic: any,
+  model: string,
+  candidates: CandidateBasics[],
+): Promise<{
+  projects: DiscoveredProject[];
+  inputTokens: number;
+  outputTokens: number;
+  stopReason: string | null;
+}> {
+  const candidateList = candidates.map((c, i) => {
+    const lines = [`${i + 1}. ${c.name}${c.symbol ? ` (${c.symbol})` : ''}`];
+    if (c.category) lines.push(`   Category: ${c.category}`);
+    if (c.funding_amount_usd) lines.push(`   Raised: $${c.funding_amount_usd.toLocaleString()}${c.funding_round ? ` · ${c.funding_round}` : ''}${c.funding_date ? ` · ${c.funding_date}` : ''}`);
+    if (c.investors?.length) lines.push(`   Investors: ${c.investors.join(', ')}`);
+    if (c.website_url) lines.push(`   Website: ${c.website_url}`);
+    if (c.dropstab_url) lines.push(`   DropsTab: ${c.dropstab_url}`);
+    return lines.join('\n');
+  }).join('\n\n');
+
+  const userPrompt = `Enrich these ${candidates.length} candidate projects from DropsTab. For each, run the ICP check, hunt triggers from X, find 1-3 outreach contacts (Telegram priority), and compute the prospect score.
+
+CANDIDATES:
+${candidateList}
+
+Call submit_enrichments when done.`;
+
+  const response = await anthropic.messages.create({
+    model,
+    max_tokens: 8000,
+    system: [
+      {
+        type: 'text',
+        text: ENRICHMENT_SYSTEM_PROMPT,
+        // Ephemeral cache (5 min TTL). Since all parallel batches use the same
+        // system block, the first batch writes the cache and the rest read at
+        // ~10% cost. Across a single scan this is a real saving.
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    messages: [{ role: 'user', content: userPrompt }],
+    tools: [
+      { type: 'web_search_20250305', name: 'web_search', max_uses: 10 } as any,
+      enrichmentsTool as any,
+    ],
+  });
+
+  const submitBlock = response.content.find(
+    (b: any) => b.type === 'tool_use' && b.name === 'submit_enrichments',
+  ) as any;
+
+  const projects: DiscoveredProject[] = submitBlock?.input?.projects ?? [];
+
+  return {
+    projects,
+    inputTokens: response.usage?.input_tokens ?? 0,
+    outputTokens: response.usage?.output_tokens ?? 0,
+    stopReason: response.stop_reason ?? null,
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────
+// DB writes
+// ────────────────────────────────────────────────────────────────────
+
+async function writeProject(
+  supabase: any,
+  p: DiscoveredProject,
+  runId: string | null,
+): Promise<'inserted' | 'updated' | { error: string }> {
+  if (!p.name) return { error: 'missing name' };
+
+  const { data: existing } = await supabase
+    .from('prospects')
+    .select('id, outreach_contacts')
+    .ilike('name', p.name)
+    .limit(1)
+    .maybeSingle();
+
+  const contacts = (p.outreach_contacts || [])
+    .filter(c => c && c.name && c.role)
+    .slice()
+    .sort((a, b) => {
+      const aTG = !!(a.telegram_handle && a.telegram_handle.trim());
+      const bTG = !!(b.telegram_handle && b.telegram_handle.trim());
+      if (aTG !== bTG) return aTG ? -1 : 1;
+      return 0;
+    });
+
+  const discoverySnapshot = {
+    icp_verdict: p.icp_verdict,
+    icp_checks: p.icp_checks,
+    prospect_score: p.prospect_score,
+    action_tier: p.action_tier,
+    disqualification_reason: p.disqualification_reason ?? null,
+    consideration_reason: p.consideration_reason ?? null,
+    fit_reasoning: p.fit_reasoning ?? null,
+    funding: {
+      round: p.funding_round ?? null,
+      amount_usd: p.funding_amount_usd ?? null,
+      date: p.funding_date ?? null,
+      investors: p.investors ?? [],
+    },
+    scanned_at: new Date().toISOString(),
+  };
+
+  const baseFields: Record<string, any> = {
+    name: p.name,
+    symbol: p.symbol ?? null,
+    category: p.category ?? null,
+    website_url: p.website_url ?? null,
+    twitter_url: p.project_twitter_url ?? null,
+    telegram_url: p.project_telegram_url ?? null,
+    discord_url: p.discord_url ?? null,
+    source_url: p.dropstab_url ?? null,
+    discovery_snapshot: discoverySnapshot,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (!existing?.id) {
+    const { error } = await supabase.from('prospects').insert({
+      ...baseFields,
+      outreach_contacts: contacts,
+      source: 'dropstab_discovery',
+      status: 'needs_review',
+      scraped_at: new Date().toISOString(),
+    });
+    return error ? { error: error.message } : 'inserted';
+  }
+
+  // Merge contacts with existing to preserve manual edits
+  const existingContacts: OutreachContact[] = existing.outreach_contacts || [];
+  const merged = [...existingContacts];
+  for (const newC of contacts) {
+    const match = merged.findIndex(
+      e => e.name?.toLowerCase() === newC.name.toLowerCase() && e.role === newC.role,
+    );
+    if (match >= 0) {
+      const cur = merged[match];
+      merged[match] = {
+        ...cur,
+        twitter_handle: cur.twitter_handle || newC.twitter_handle,
+        telegram_handle: cur.telegram_handle || newC.telegram_handle,
+        source_url: cur.source_url || newC.source_url,
+        notes: cur.notes || newC.notes,
+        confidence: newC.confidence === 'high' ? 'high' : cur.confidence,
+      };
+    } else {
+      merged.push(newC);
+    }
+  }
+  merged.sort((a, b) => {
+    const aTG = !!(a.telegram_handle && a.telegram_handle.trim());
+    const bTG = !!(b.telegram_handle && b.telegram_handle.trim());
+    if (aTG !== bTG) return aTG ? -1 : 1;
+    return 0;
+  });
+
+  const patch: Record<string, any> = { ...baseFields, outreach_contacts: merged };
+  // Don't clobber non-null with null
+  if (!p.project_twitter_url) delete patch.twitter_url;
+  if (!p.project_telegram_url) delete patch.telegram_url;
+  if (!p.category) delete patch.category;
+  if (!p.website_url) delete patch.website_url;
+  if (!p.dropstab_url) delete patch.source_url;
+
+  const { error } = await supabase.from('prospects').update(patch).eq('id', existing.id);
+  return error ? { error: error.message } : 'updated';
+}
+
+async function writeSignals(
+  supabase: any,
+  project: DiscoveredProject,
+  runId: string | null,
+): Promise<number> {
+  if (!project.triggers?.length) return 0;
+
+  const { data: prospect } = await supabase
+    .from('prospects')
+    .select('id')
+    .ilike('name', project.name)
+    .limit(1)
+    .maybeSingle();
+
+  let added = 0;
+  for (const trigger of project.triggers) {
+    if (!trigger.signal_type || !trigger.headline) continue;
+
+    const { data: dup } = await supabase
+      .from('prospect_signals')
+      .select('id')
+      .eq('project_name', project.name)
+      .eq('signal_type', trigger.signal_type)
+      .eq('headline', trigger.headline)
+      .gte('detected_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      .limit(1);
+    if (dup && dup.length > 0) continue;
+
+    const { error } = await supabase.from('prospect_signals').insert({
+      prospect_id: prospect?.id ?? null,
+      project_name: project.name,
+      signal_type: trigger.signal_type,
+      headline: trigger.headline,
+      snippet: trigger.detail ?? null,
+      source_url: trigger.source_url ?? null,
+      source_name: 'discovery_claude',
+      relevancy_weight: trigger.weight ?? 10,
+      tier: 2,
+      confidence: 'likely',
+      shelf_life_days: 30,
+      metadata: {
+        fit_reasoning: project.fit_reasoning ?? null,
+        prospect_score: project.prospect_score?.total ?? null,
+        action_tier: project.action_tier,
+        source_type: trigger.source_type ?? null,
+        tier: trigger.tier ?? null,
+        funding: {
+          round: project.funding_round ?? null,
+          amount_usd: project.funding_amount_usd ?? null,
+          date: project.funding_date ?? null,
+          investors: project.investors ?? [],
+        },
+        agent_run_id: runId,
+      },
+      detected_at: new Date().toISOString(),
+      is_active: true,
+    });
+    if (!error) added++;
+  }
+  return added;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Cost accounting
+// ────────────────────────────────────────────────────────────────────
+
+function estimateCost(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+): number {
+  const isOpus = model.includes('opus');
+  const inPrice = isOpus ? 15 : 3;   // per MTok
+  const outPrice = isOpus ? 75 : 15;
+  return (inputTokens / 1_000_000) * inPrice + (outputTokens / 1_000_000) * outPrice;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Handler
+// ────────────────────────────────────────────────────────────────────
+
 export async function POST(request: Request) {
   const startedAt = new Date();
 
@@ -102,7 +669,6 @@ export async function POST(request: Request) {
   }
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  // Log an agent run so this surfaces in the AI Agents dashboard.
   const { data: runRow } = await (supabase as any)
     .from('agent_runs')
     .insert({
@@ -139,721 +705,125 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const recencyDays = Math.max(1, Math.min(365, Number(body.recency_days) || 30));
     const minRaise = Math.max(0, Number(body.min_raise_usd) || 1_000_000);
-    const maxProjects = Math.max(1, Math.min(50, Number(body.max_projects) || 20));
+    const maxProjects = Math.max(1, Math.min(20, Number(body.max_projects) || 10));
     const categories: string[] = Array.isArray(body.categories) ? body.categories : [];
-
-    // Model selector — defaults to Opus (better judgment for BD research).
-    // Accepts the short alias "sonnet" / "opus" for UI convenience, or a full
-    // model string for power users.
     const modelAlias = String(body.model || 'opus').toLowerCase();
     const model =
       modelAlias === 'sonnet' ? 'claude-sonnet-4-5'
       : modelAlias === 'opus' ? 'claude-opus-4-7'
-      : body.model; // already a full model id
+      : body.model;
 
     const anthropic = getClaudeClient();
 
-    const systemPrompt = `You are DISCOVERY, the bulk-candidate finder for HoloHive — a Seoul-based KOL growth agency. Your output feeds into SCOUT (which does single-project deep-dives). You use the same ICP framework as SCOUT so rankings are consistent.
-
-HoloHive sells a 90-day Korea Growth Partnership ($48-61K). Clients: pre-token or recently-launched crypto projects looking to enter the Korean market.
-
-## THE 6-CRITERIA ICP CHECK (binary, ALL must PASS)
-
-| # | Criteria | Pass Condition |
-|---|----------|----------------|
-| 1 | Credible funding | Any amount with credible backers (Crunchbase/RootData/CryptoRank visible, real VCs — not rug-prone) |
-| 2 | Pre-token OR TGE within 6 months | Verify via CoinGecko, roadmap, tokenomics |
-| 3 | No existing Korea community / marketing team | Check Korean Telegram size (< 1K members = pass), Korean Twitter, LinkedIn for Korea BD hires — but note a NEW Korea BD hire post is a positive trigger, not a fail |
-| 4 | End-user product — NOT B2B service provider, VC, exchange, or infrastructure-only (L1/L2 counts as end-user) | Website must show consumer-facing product, app, or protocol. B2B data tools, VC funds, exchanges, trading platforms → FAIL |
-| 5 | Real product in development or launched | GitHub commits, app URL, testnet, TVL — not just a whitepaper |
-| 6 | Not already with a competitor Korea agency | Check Twitter, announcements for Korea agency partnerships |
-
-For each, record a boolean \`pass\` and a one-line \`evidence\` string.
-
-\`icp_verdict\`: PASS (all 6 pass), FAIL (any fail), BORDERLINE (one unclear).
-
-## INSTANT DISQUALIFIERS (kill switches)
-
-If any match → icp_verdict=FAIL, action_tier=SKIP, and populate disqualification_reason with a clear explanation:
-- B2B service provider or infrastructure tool (unless L1/L2)
-- VC firm or fund
-- Exchange, DEX, or trading platform
-- No activity in 60+ days (dead project)
-- Korean Telegram already has 1K+ members or active community
-- Already working with a competitor Korea marketing agency
-- Token launched 6+ months ago AND no Korea-specific trigger
-- Team fully anonymous AND no credible backers
-- Rug pull history or serious documented controversy
-- Pure "global expansion" with ZERO Korea-specific signals
-
-**IMPORTANT:** Even disqualified projects should be included in your submit_discoveries output (with verdict=FAIL + disqualification_reason). Do NOT silently skip them — we want to see your rejections to audit the logic.
-
-## GLOBAL-ONLY PROJECTS (edge case)
-
-If a project passes the other 5 ICP criteria but has ZERO Korea signal whatsoever (and Korea is not a stated/implied future plan), DO NOT set verdict to FAIL. Instead:
-- verdict: BORDERLINE
-- action_tier: RESEARCH
-- Populate \`consideration_reason\`: 1-2 sentences on why this might still be worth human review (e.g. "Strong Series A with Asia-curious investors; worth a 5-min check on founders' recent Asia mentions")
-
-This preserves optionality — the human team decides whether to pursue.
-
-## SIGNAL TAXONOMY (triggers)
-
-Pick the HIGHEST tier a project matches. Multiple triggers add bonus (see scoring).
-
-### TIER 1 — URGENT (within last 7 days)
-- "tge_within_60d" — TGE announced, date within 60 days
-- "korea_exchange_listing" — Upbit/Bithumb listing confirmed
-- "mainnet_launching_this_month" — mainnet going live <30 days
-- "korea_bd_hire" — Korea-specific BD hire announced
-- "team_relocation_seoul" — team (or exec) relocated to Seoul
-
-### TIER 2 — HIGH (within last 7 days / ongoing)
-- "recent_raise" — funding round closed in last 30 days
-- "korea_bd_hiring" — Korea BD role actively listed (job post)
-- "airdrop_announced" — airdrop planned (team or region-specific)
-- "competitor_entered_korea" — peer competitor just launched Korea play
-- "korean_media_partnership" — partnership with Korean media/influencer
-
-### TIER 3 — MEDIUM (within last 14 days)
-- "accelerator_graduation" — YC, Polkadot Substrate, Binance Labs, etc.
-- "hackathon_win"
-- "ecosystem_grant_asia"
-- "mainnet_2_to_3_months_out"
-
-Each trigger must have: signal_type, headline (<80 chars), detail (1-2 sentences), source_url (preferably a specific tweet), source_type ("tweet" | "article" | "other"), weight (5-25).
-
-**Freshness rules:** TIER 1/2 signals should be within 7 days; TIER 3 within 14 days. Older signals only count for ongoing things (active job posts, product stage).
-
-## SCORING FORMULA (0-100)
-
-**prospect_score.total = icp_fit (0-40) + signal_strength (0-35) + timing (0-25)**
-
-### icp_fit (0-40)
-- credible_funding: +10 if pass
-- pre_token_or_tge_6mo: +10 if pass
-- no_korea_presence: +5 if pass
-- real_product: +5 if pass
-- team_credible_doxxed: +5 if founders are public and have track record
-- hot_narrative: +5 if category is AI, DePIN, RWA, Stablecoins, Restaking, or selective Gaming (currently trending in Korean Telegram)
-
-### signal_strength (0-35, HARD CAP)
-Base (pick HIGHEST, don't stack):
-- TIER 1 (URGENT) trigger: +15 base
-- TIER 2 (HIGH) trigger: +10 base
-- TIER 3 (MEDIUM) trigger: +5 base
-Bonuses on top:
-- Multiple triggers (2+): +5
-- Behavioral signal (engaged with HoloHive team, mentioned Asia/Korea in thread): +5
-- Contextual signal (category trending in Korean Telegram): +5
-
-### timing (0-25, pick SINGLE highest)
-- TGE in <8 weeks: 25
-- Post-funding <30 days: 20
-- Mainnet launching this month: 20
-- TGE in 2-4 months: 15
-- Korea BD role actively hired: 15
-- Expressed interest in Asia/Korea recently: 15
-- Major Seoul event coming (ETH Seoul, KBW): 10
-- No timing trigger: 0
-
-## ACTION TIER MAPPING
-
-- 80-100 → "REACH_OUT_NOW"
-- 60-79  → "PRE_TOKEN_PRIORITY"
-- 45-59  → "RESEARCH"
-- 30-44  → "WATCH"
-- 15-29  → "NURTURE"
-- 0-14 OR disqualified → "SKIP"
-
-## KOREA MARKET CONTEXT (April 2026)
-
-- 2nd-largest crypto market globally ($663B YTD)
-- Corporate crypto ban lifted Feb 2026 → institutions can trade
-- Upbit: 72% market share. Bithumb: #2, IPO planned
-- **Trending in Korean Telegram:** AI, DePIN, RWA, Stablecoins, Restaking, selective Gaming
-- **Korea = Telegram, NOT Twitter.** Korean Twitter is noisy; retail discovery happens on Telegram. When checking Korea presence (ICP criterion #3), check TELEGRAM size, not Twitter follower counts.
-
-## TWO-PHASE RESEARCH FLOW
-
-This is a strict two-phase process. Do not skip or reorder.
-
-### PHASE 1 — Find candidates on DropsTab ONLY
-
-Start here and ONLY here: **https://dropstab.com/tab/by-raised-funds**
-
-That page lists projects by total raised. Work through the top entries:
-- Open each project's DropsTab coin profile page (e.g. https://dropstab.com/coins/<slug>)
-- Pull from DropsTab: name, symbol, category, funding history (rounds, amounts, dates, investors), token status (pre-token vs launched), market cap
-- Filter: raise within last ${recencyDays} days, $${minRaise.toLocaleString()}+ cumulative or latest-round
-
-Do NOT discover candidate projects from X, news articles, Crunchbase, RootData, or general web search. DropsTab is the only acceptable entry point for identifying new projects in this scan.
-
-Triggers evidence is allowed to come from anywhere (X, announcements, news) — but the candidate itself must come from DropsTab.
-
-### PHASE 2 — Hunt POCs on external sites
-
-Once you have a DropsTab-sourced candidate, LEAVE DropsTab and research individual points of contact. DropsTab doesn't list team handles, so you'll need external sources:
-
-- **Project's own website "Team" or "About" page** (often the best — names + socials listed)
-- **X/Twitter bios** of team members (founders and BD leads often put their Telegram in their X bio specifically for cold DMs)
-- **Crypto talent / team directories** (PitchBook, CryptoRank team sections, Messari team)
-- **LinkedIn** public previews (titles visible, handles sometimes listed)
-- **Conference speaker pages / podcast guest bios** (often lists TG)
-
-### POC PRIORITY (CRITICAL)
-
-HoloHive sends cold BD via Telegram DM. X DMs are a distant second (most crypto founders don't check them).
-
-For each project, identify 1-3 team members:
-- Role priority: CEO/Founder > CMO / Head of Growth > Head of BD > Community Lead (last resort)
-- Contact-channel priority: **Telegram handle > X handle**
-
-This means: if the CEO only has an X handle but the Head of BD has BOTH a Telegram and an X handle, surface the Head of BD FIRST — they're actually reachable. Sort the \`outreach_contacts\` array so contacts with a \`telegram_handle\` populated come first.
-
-When looking at an X bio, actively scan for patterns like "tg: @handle" or "telegram: @handle" or "@xxx on TG" — crypto BD people put this in their bio on purpose.
-
-Confidence:
-- "high" — Telegram handle visible on verified X bio, project team page, or conference page
-- "medium" — Telegram handle referenced in a second-hand source (crypto directory, podcast notes)
-- "low" — X handle only, no Telegram found, or guess from a similar-name pattern (don't return low-confidence contacts unless it's the only lead — mark them clearly)
-
-A contact with ONLY an X handle and no Telegram is still worth including (if no better option exists), but mark confidence honestly and note in \`notes\` that Telegram needs manual lookup.
-
-Empty \`outreach_contacts\` is FINE — better than fabricated. If you genuinely can't find any individual handles after checking the project's own team page + top 2-3 team members' X bios, return an empty array.
-
-The \`project_twitter_url\` and \`project_telegram_url\` fields are the project's community channels — useful for monitoring, NOT outreach.
-
-## TRIGGER EVIDENCE (where to source them)
-
-Triggers anchor to projects found in Phase 1, but the evidence can come from anywhere:
-- Recent raise → usually on DropsTab itself (funding row with date), or press release
-- TGE date → project's tokenomics page, pinned X tweet, roadmap
-- Korea BD hire → LinkedIn job post, Twitter hiring tweet, careers page
-- Mainnet launch → X announcement, GitHub releases
-- Korea partnership → press release, Korean crypto news (TokenPost, BlockMedia)
-
-Each trigger's source_url should be a specific URL — a tweet, announcement blog, press release, or DropsTab funding row. Not a generic homepage.
-
-## OUTPUT RULES
-
-- Return ALL projects you researched, including disqualified ones (with verdict=FAIL + disqualification_reason)
-- Sort by prospect_score descending
-- At most ${maxProjects} projects total
-- Use web_search for evidence — up to 30 searches
-- When done, call submit_discoveries EXACTLY ONCE. Do not reply with plain text.
-- Quality > quantity. If you can only find 8 qualifying candidates, return 8.${categories.length > 0 ? `\n- User-specified category filter: ${categories.join(', ')}` : ''}
-- User-specified funding filter: minimum $${minRaise.toLocaleString()} raised in the last ${recencyDays} days`;
-
-    const userPrompt = `Find the top ${maxProjects} crypto projects HoloHive should DM this week.
-
-Strict two-phase flow:
-
-**PHASE 1 — Candidate identification (DropsTab only)**
-  1. Open https://dropstab.com/tab/by-raised-funds
-  2. Work through the top entries. For each, open its DropsTab coin profile page to get funding rounds, investors, token status, market cap.
-  3. Filter: raise in last ${recencyDays} days, $${minRaise.toLocaleString()}+ minimum.
-  4. Do NOT discover candidates via X search, news search, or general web. DropsTab is the only acceptable entry point.
-
-**PHASE 2 — POC hunting (external sites)**
-For each DropsTab-sourced candidate, leave DropsTab and research:
-  1. Project's own website team/about page
-  2. X bios of team members (look for "tg: @handle" patterns — crypto BDs put their Telegram here on purpose)
-  3. Crypto directories, conference speaker pages, podcast guest bios
-
-Priority: **Telegram handle > X handle**. A Head of BD with findable Telegram beats a CEO with only X — Telegram is what you actually DM on. Sort outreach_contacts so contacts with a populated telegram_handle come first.
-
-**Triggers** can be sourced from anywhere (tweets, news, announcements, DropsTab itself) — but the candidate project itself must come from DropsTab.
-
-Run ICP check + scoring per the framework. Include disqualified projects with disqualification_reason. Call submit_discoveries when done.`;
-
-    // Structured output via a custom tool. Claude uses web_search to gather
-    // evidence, then calls submit_discoveries with the final structured list
-    // — this gives us guaranteed valid JSON without regex parsing.
-    const submitToolSchema = {
-      name: 'submit_discoveries',
-      description: 'Submit the final list of discovered projects with their outreach triggers, contacts, and fit reasoning. Call this ONCE when research is complete.',
-      input_schema: {
-        type: 'object',
-        properties: {
-          projects: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                name: { type: 'string' },
-                symbol: { type: 'string' },
-                category: { type: 'string' },
-                website_url: { type: 'string' },
-                project_twitter_url: { type: 'string', description: "Project's official X/Twitter URL — community channel, NOT for outreach" },
-                project_telegram_url: { type: 'string', description: "Project's public Telegram channel URL — for community, NOT for outreach" },
-                discord_url: { type: 'string' },
-                dropstab_url: { type: 'string' },
-                funding_round: { type: 'string' },
-                funding_amount_usd: { type: 'number' },
-                funding_date: { type: 'string', description: 'ISO YYYY-MM-DD if known' },
-                investors: { type: 'array', items: { type: 'string' } },
-
-                // ICP qualification (the 6 binary checks)
-                icp_verdict: {
-                  type: 'string',
-                  enum: ['PASS', 'FAIL', 'BORDERLINE'],
-                  description: 'PASS = all 6 criteria pass. FAIL = any criterion fails OR instant disqualifier triggered. BORDERLINE = one criterion unclear OR global-only project with no Korea signal.',
-                },
-                icp_checks: {
-                  type: 'object',
-                  description: 'Each criterion: { pass: boolean, evidence: string }',
-                  properties: {
-                    credible_funding: {
-                      type: 'object',
-                      properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } },
-                      required: ['pass', 'evidence'],
-                    },
-                    pre_token_or_tge_6mo: {
-                      type: 'object',
-                      properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } },
-                      required: ['pass', 'evidence'],
-                    },
-                    no_korea_presence: {
-                      type: 'object',
-                      properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } },
-                      required: ['pass', 'evidence'],
-                    },
-                    end_user_product: {
-                      type: 'object',
-                      properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } },
-                      required: ['pass', 'evidence'],
-                    },
-                    real_product: {
-                      type: 'object',
-                      properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } },
-                      required: ['pass', 'evidence'],
-                    },
-                    not_with_competitor: {
-                      type: 'object',
-                      properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } },
-                      required: ['pass', 'evidence'],
-                    },
-                  },
-                  required: [
-                    'credible_funding',
-                    'pre_token_or_tge_6mo',
-                    'no_korea_presence',
-                    'end_user_product',
-                    'real_product',
-                    'not_with_competitor',
-                  ],
-                },
-                disqualification_reason: {
-                  type: 'string',
-                  description: 'Required if icp_verdict=FAIL. Explains which criterion failed or which instant disqualifier triggered.',
-                },
-                consideration_reason: {
-                  type: 'string',
-                  description: 'For BORDERLINE projects (e.g. global-only, no Korea signal). Why this might still be worth human review.',
-                },
-
-                // Prospect score (0-100)
-                prospect_score: {
-                  type: 'object',
-                  properties: {
-                    icp_fit: { type: 'number', description: '0-40' },
-                    signal_strength: { type: 'number', description: '0-35 hard cap' },
-                    timing: { type: 'number', description: '0-25' },
-                    total: { type: 'number', description: '0-100 — must equal sum of the three subscores' },
-                  },
-                  required: ['icp_fit', 'signal_strength', 'timing', 'total'],
-                },
-                action_tier: {
-                  type: 'string',
-                  enum: ['REACH_OUT_NOW', 'PRE_TOKEN_PRIORITY', 'RESEARCH', 'WATCH', 'NURTURE', 'SKIP'],
-                  description: 'Derived from prospect_score. REACH_OUT_NOW=80-100, PRE_TOKEN_PRIORITY=60-79, RESEARCH=45-59, WATCH=30-44, NURTURE=15-29, SKIP=0-14 or disqualified.',
-                },
-
-                outreach_contacts: {
-                  type: 'array',
-                  description: 'Individual decision-makers at the project to DM directly. Prefer CEO/Founder > CMO > BD. Empty array is fine — better than fabricated.',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      name: { type: 'string', description: 'Person\'s full name' },
-                      role: { type: 'string', description: 'e.g. CEO, Founder, CMO, Head of BD, Head of Growth' },
-                      twitter_handle: { type: 'string', description: 'Their personal X handle, e.g. "@alice" or full URL' },
-                      telegram_handle: { type: 'string', description: 'Their personal Telegram handle for cold DM. Empty if not findable.' },
-                      source_url: { type: 'string', description: 'Where you found this info (X bio, team page, etc.)' },
-                      confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
-                      notes: { type: 'string', description: 'Optional: recent activity or why they\'re the right POC' },
-                    },
-                    required: ['name', 'role', 'confidence'],
-                  },
-                },
-                triggers: {
-                  type: 'array',
-                  description: 'Active outreach triggers. Empty allowed for disqualified projects; required for PASS/BORDERLINE.',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      signal_type: { type: 'string', description: 'e.g. recent_raise, tge_within_60d, korea_bd_hire' },
-                      headline: { type: 'string', description: 'Short summary, <80 chars' },
-                      detail: { type: 'string', description: '1-2 sentences of context. Quote the tweet if applicable.' },
-                      source_url: { type: 'string', description: 'Ideally a specific tweet URL (x.com / twitter.com) — fall back to article URL only if no tweet available' },
-                      source_type: { type: 'string', enum: ['tweet', 'article', 'other'], description: 'Where the trigger was found' },
-                      tier: { type: 'string', enum: ['TIER_1', 'TIER_2', 'TIER_3'], description: 'Urgency tier per the taxonomy' },
-                      weight: { type: 'number', description: '5-25, higher = stronger trigger' },
-                    },
-                    required: ['signal_type', 'headline'],
-                  },
-                },
-                fit_reasoning: {
-                  type: 'string',
-                  description: 'Why this is a good fit for HoloHive, 1-2 sentences. Required for PASS/BORDERLINE. Leave empty for FAIL projects (use disqualification_reason instead).',
-                },
-              },
-              required: ['name', 'icp_verdict', 'icp_checks', 'prospect_score', 'action_tier'],
-            },
-          },
-        },
-        required: ['projects'],
-      },
-    };
-
-    // COST GUARDRAILS (critical)
-    //
-    // Each pause_turn continuation resends the ENTIRE prior conversation
-    // (including bulky web_search tool results). On Opus at $15/MTok in,
-    // 4 continuation cycles with 20+ searches can run $30-50 per scan.
-    //
-    // Hard caps below prevent runaway spend. Tune these DOWN before UP.
-    const MAX_RESUME = 1;          // ONE continuation only (was 4 — too costly)
-    const MAX_INPUT_TOKENS = 800_000; // ~$12 on Opus / ~$2.40 on Sonnet
-    const MAX_WEB_SEARCHES = 12;   // per single Claude call (was 30 — too many)
-
-    const toolsConfig = [
-      { type: 'web_search_20250305', name: 'web_search', max_uses: MAX_WEB_SEARCHES } as any,
-      submitToolSchema as any,
-    ];
-    const messages: any[] = [{ role: 'user', content: userPrompt }];
-
-    let response = await anthropic.messages.create({
-      model,
-      max_tokens: 8000,
-      system: systemPrompt,
-      messages,
-      tools: toolsConfig,
+    // ── Stage 1 ──────────────────────────────────────────────────────
+    const stage1 = await findCandidates(anthropic, model, {
+      recencyDays,
+      minRaise,
+      maxCandidates: maxProjects,
+      categories,
     });
 
-    let resumeCount = 0;
-    let cumulativeInputTokens = response.usage?.input_tokens ?? 0;
-    let cumulativeOutputTokens = response.usage?.output_tokens ?? 0;
-    let abortedForCost = false;
-
-    while (
-      response.stop_reason === 'pause_turn' &&
-      resumeCount < MAX_RESUME &&
-      cumulativeInputTokens < MAX_INPUT_TOKENS
-    ) {
-      resumeCount++;
-      messages.push({ role: 'assistant', content: response.content });
-      response = await anthropic.messages.create({
-        model,
-        max_tokens: 8000,
-        system: systemPrompt,
-        messages,
-        tools: toolsConfig,
-      });
-      cumulativeInputTokens += response.usage?.input_tokens ?? 0;
-      cumulativeOutputTokens += response.usage?.output_tokens ?? 0;
-    }
-
-    // Circuit breaker: if we blew past the token cap, abort further continuations
-    // even if still pausing. Parse whatever Claude has returned so far.
-    if (response.stop_reason === 'pause_turn' && cumulativeInputTokens >= MAX_INPUT_TOKENS) {
-      abortedForCost = true;
-      console.warn(
-        `[discovery/scan] Aborted pause_turn continuation at ${cumulativeInputTokens} input tokens to prevent cost blowup.`,
+    if (stage1.candidates.length === 0) {
+      await finishRun(
+        'completed',
+        {
+          stage: 1,
+          candidates_found: 0,
+          stop_reason: stage1.stopReason,
+          input_tokens: stage1.inputTokens,
+          output_tokens: stage1.outputTokens,
+          cost_usd: Number(estimateCost(model, stage1.inputTokens, stage1.outputTokens).toFixed(4)),
+        },
+        'Stage 1 returned no candidates',
       );
+      return NextResponse.json({
+        success: true,
+        projects_found: 0,
+        inserted: 0,
+        updated: 0,
+        signals_added: 0,
+        errors: ['Stage 1 found no candidates matching filters'],
+        cost_usd: Number(estimateCost(model, stage1.inputTokens, stage1.outputTokens).toFixed(4)),
+        duration_ms: Date.now() - startedAt.getTime(),
+      });
     }
 
-    // Find the submit_discoveries tool call in the response
-    const submitBlock = response.content.find(
-      (b: any) => b.type === 'tool_use' && b.name === 'submit_discoveries',
-    ) as any;
+    // ── Stage 2: split candidates into batches of 4, enrich in parallel ──
+    const BATCH_SIZE = 4;
+    const batches: CandidateBasics[][] = [];
+    for (let i = 0; i < stage1.candidates.length; i += BATCH_SIZE) {
+      batches.push(stage1.candidates.slice(i, i + BATCH_SIZE));
+    }
 
-    let parsed: { projects: DiscoveredProject[] };
+    const batchResults = await Promise.allSettled(
+      batches.map(batch => enrichBatch(anthropic, model, batch)),
+    );
 
-    if (submitBlock?.input?.projects) {
-      // Happy path — structured tool call
-      parsed = submitBlock.input as { projects: DiscoveredProject[] };
-    } else {
-      // Fallback: Claude responded with plain text. Try to extract JSON
-      // from the last text block (not a concatenation — intermediate
-      // text blocks contain reasoning, not the final answer).
-      const textBlocks = response.content.filter((b: any) => b.type === 'text') as any[];
-      const lastText = textBlocks.length > 0 ? textBlocks[textBlocks.length - 1].text : '';
+    const allProjects: DiscoveredProject[] = [];
+    let stage2InputTokens = 0;
+    let stage2OutputTokens = 0;
+    const batchErrors: string[] = [];
 
-      const extractJson = (src: string): string | null => {
-        const fence = src.match(/```json\s*([\s\S]*?)```/) || src.match(/```\s*([\s\S]*?)```/);
-        if (fence) return fence[1];
-        const firstBrace = src.indexOf('{');
-        const lastBrace = src.lastIndexOf('}');
-        if (firstBrace >= 0 && lastBrace > firstBrace) return src.slice(firstBrace, lastBrace + 1);
-        return null;
-      };
-
-      const jsonStr = extractJson(lastText) || extractJson(textBlocks.map(b => b.text).join('\n')) || '';
-
-      try {
-        parsed = JSON.parse(jsonStr);
-      } catch {
-        const hintByStopReason: Record<string, string> = {
-          pause_turn: `Still paused after ${resumeCount} continuation attempts — the model wanted to keep researching. Try lowering max_projects to 10-15 or increasing MAX_RESUME.`,
-          max_tokens: 'Hit the max_tokens ceiling — try lowering max_projects or reduce research depth.',
-          refusal: 'Model refused to respond. Check system prompt for anything it might consider off-policy.',
-        };
-        const hint = hintByStopReason[response.stop_reason || ''] || 'Try a narrower scan (smaller max_projects or wider recency).';
-        await finishRun(
-          'failed',
-          {
-            stop_reason: response.stop_reason,
-            block_types: response.content.map((b: any) => b.type),
-            last_text_sample: lastText.slice(0, 500),
-            resume_attempts: resumeCount,
-          },
-          `Claude did not call submit_discoveries. stop_reason=${response.stop_reason}`,
-        );
-        return NextResponse.json(
-          {
-            error: `Claude did not return structured results (stop_reason: ${response.stop_reason}). ${hint}`,
-            stop_reason: response.stop_reason,
-            block_types: response.content.map((b: any) => b.type),
-            last_text_sample: lastText.slice(0, 500),
-            resume_attempts: resumeCount,
-          },
-          { status: 502 },
-        );
+    for (let i = 0; i < batchResults.length; i++) {
+      const r = batchResults[i];
+      if (r.status === 'fulfilled') {
+        allProjects.push(...r.value.projects);
+        stage2InputTokens += r.value.inputTokens;
+        stage2OutputTokens += r.value.outputTokens;
+      } else {
+        batchErrors.push(`Batch ${i + 1}: ${r.reason?.message ?? 'unknown error'}`);
+        console.error(`Enrichment batch ${i + 1} failed:`, r.reason);
       }
     }
 
-    const projects = parsed.projects || [];
-
-    // --- Upsert prospects and signals ---
+    // ── Write to DB ──────────────────────────────────────────────────
     let inserted = 0;
     let updated = 0;
     let signalsAdded = 0;
-    const errors: string[] = [];
+    const writeErrors: string[] = [];
 
-    for (const p of projects) {
+    for (const p of allProjects) {
       if (!p.name) continue;
+      const result = await writeProject(supabase, p, runId);
+      if (result === 'inserted') inserted++;
+      else if (result === 'updated') updated++;
+      else writeErrors.push(`${p.name}: ${(result as any).error}`);
 
-      // Match against existing prospects by name (any source) to avoid duplicates
-      const { data: existing } = await (supabase as any)
-        .from('prospects')
-        .select('id, source, status')
-        .ilike('name', p.name)
-        .limit(1)
-        .maybeSingle();
-
-      let prospectId: string | null = existing?.id ?? null;
-
-      // Filter out low-confidence contacts — keep high + medium.
-      // If nothing but low is available, keep low so we don't throw away leads,
-      // but the UI will flag them.
-      // ALSO sort so contacts with a Telegram handle come first — Telegram is
-      // the BD outreach channel; an X-only contact is a distant fallback.
-      const contacts = (p.outreach_contacts || [])
-        .filter(c => c && c.name && c.role)
-        .slice() // don't mutate the input
-        .sort((a, b) => {
-          const aHasTG = !!(a.telegram_handle && a.telegram_handle.trim());
-          const bHasTG = !!(b.telegram_handle && b.telegram_handle.trim());
-          if (aHasTG !== bHasTG) return aHasTG ? -1 : 1;
-          // Within same TG-availability, keep Claude's role-ordered ranking
-          return 0;
-        });
-
-      // Full Discovery qualification snapshot. We keep this separate from the
-      // Korea-Signals-driven action_tier field so the two systems don't overwrite
-      // each other.
-      const discoverySnapshot = {
-        icp_verdict: p.icp_verdict,
-        icp_checks: p.icp_checks,
-        prospect_score: p.prospect_score,
-        action_tier: p.action_tier,
-        disqualification_reason: p.disqualification_reason ?? null,
-        consideration_reason: p.consideration_reason ?? null,
-        fit_reasoning: p.fit_reasoning ?? null,
-        funding: {
-          round: p.funding_round ?? null,
-          amount_usd: p.funding_amount_usd ?? null,
-          date: p.funding_date ?? null,
-          investors: p.investors ?? [],
-        },
-        scanned_at: new Date().toISOString(),
-      };
-
-      const prospectFields: Record<string, any> = {
-        name: p.name,
-        symbol: p.symbol ?? null,
-        category: p.category ?? null,
-        website_url: p.website_url ?? null,
-        // Project-level channels (community, not outreach)
-        twitter_url: p.project_twitter_url ?? null,
-        telegram_url: p.project_telegram_url ?? null,
-        discord_url: p.discord_url ?? null,
-        source_url: p.dropstab_url ?? null,
-        outreach_contacts: contacts,
-        discovery_snapshot: discoverySnapshot,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (!prospectId) {
-        // New prospect — insert with discovery source
-        const { data: ins, error: insErr } = await (supabase as any)
-          .from('prospects')
-          .insert({
-            ...prospectFields,
-            source: 'dropstab_discovery',
-            status: 'needs_review',
-            scraped_at: new Date().toISOString(),
-          })
-          .select('id')
-          .single();
-        if (insErr) {
-          errors.push(`Insert ${p.name}: ${insErr.message}`);
-          continue;
-        }
-        prospectId = ins.id;
-        inserted++;
-      } else {
-        // Existing prospect — only update fields we learned (don't overwrite with nulls).
-        // For outreach_contacts, MERGE with existing (dedup by name+role) rather than replace,
-        // so manual edits aren't blown away.
-        const patch: Record<string, any> = {
-          updated_at: new Date().toISOString(),
-          // Discovery always overwrites its own snapshot with the latest qualification
-          discovery_snapshot: discoverySnapshot,
-        };
-        if (p.project_twitter_url) patch.twitter_url = p.project_twitter_url;
-        if (p.project_telegram_url) patch.telegram_url = p.project_telegram_url;
-        if (p.category) patch.category = p.category;
-        if (p.website_url) patch.website_url = p.website_url;
-
-        if (contacts.length > 0) {
-          const { data: currentProspect } = await (supabase as any)
-            .from('prospects')
-            .select('outreach_contacts')
-            .eq('id', prospectId)
-            .single();
-          const existingContacts: OutreachContact[] = currentProspect?.outreach_contacts || [];
-          const merged = [...existingContacts];
-          for (const newC of contacts) {
-            const match = merged.findIndex(e =>
-              e.name?.toLowerCase() === newC.name.toLowerCase() && e.role === newC.role,
-            );
-            if (match >= 0) {
-              // Update if new has higher confidence or fills missing fields
-              const cur = merged[match];
-              merged[match] = {
-                ...cur,
-                twitter_handle: cur.twitter_handle || newC.twitter_handle,
-                telegram_handle: cur.telegram_handle || newC.telegram_handle,
-                source_url: cur.source_url || newC.source_url,
-                notes: cur.notes || newC.notes,
-                confidence: newC.confidence === 'high' ? 'high' : cur.confidence,
-              };
-            } else {
-              merged.push(newC);
-            }
-          }
-          patch.outreach_contacts = merged;
-        }
-        await (supabase as any).from('prospects').update(patch).eq('id', prospectId);
-        updated++;
-      }
-
-      // Write triggers as prospect_signals rows (dedup by project+type+headline)
-      for (const trigger of p.triggers || []) {
-        if (!trigger.signal_type || !trigger.headline) continue;
-
-        const { data: dup } = await (supabase as any)
-          .from('prospect_signals')
-          .select('id')
-          .eq('project_name', p.name)
-          .eq('signal_type', trigger.signal_type)
-          .eq('headline', trigger.headline)
-          .gte('detected_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-          .limit(1);
-        if (dup && dup.length > 0) continue;
-
-        const { error: sigErr } = await (supabase as any)
-          .from('prospect_signals')
-          .insert({
-            prospect_id: prospectId,
-            project_name: p.name,
-            signal_type: trigger.signal_type,
-            headline: trigger.headline,
-            snippet: trigger.detail ?? null,
-            source_url: trigger.source_url ?? null,
-            source_name: 'discovery_claude',
-            relevancy_weight: trigger.weight ?? 10,
-            tier: 2,
-            confidence: 'likely',
-            shelf_life_days: 30,
-            metadata: {
-              fit_reasoning: p.fit_reasoning ?? null,
-              prospect_score: p.prospect_score?.total ?? null,
-              action_tier: p.action_tier,
-              source_type: trigger.source_type ?? null,
-              tier: trigger.tier ?? null,
-              funding: {
-                round: p.funding_round ?? null,
-                amount_usd: p.funding_amount_usd ?? null,
-                date: p.funding_date ?? null,
-                investors: p.investors ?? [],
-              },
-              agent_run_id: runId,
-            },
-            detected_at: new Date().toISOString(),
-            is_active: true,
-          });
-        if (sigErr) errors.push(`Signal ${p.name}: ${sigErr.message}`);
-        else signalsAdded++;
-      }
+      signalsAdded += await writeSignals(supabase, p, runId);
     }
 
-    // Use CUMULATIVE tokens across all pause_turn continuations —
-    // not just the last response — since each continuation charges input
-    // for the full prior conversation state.
-    const inputTokens = cumulativeInputTokens;
-    const outputTokens = cumulativeOutputTokens;
-    // Model-specific pricing (approximate, in USD per 1M tokens):
-    //   Sonnet 4.5: $3 in / $15 out
-    //   Opus 4.7:   $15 in / $75 out  (~5x Sonnet)
-    const isOpus = typeof model === 'string' && model.includes('opus');
-    const inPricePerM = isOpus ? 15 : 3;
-    const outPricePerM = isOpus ? 75 : 15;
-    const costUsd = (inputTokens / 1_000_000) * inPricePerM + (outputTokens / 1_000_000) * outPricePerM;
+    // ── Cost accounting ──────────────────────────────────────────────
+    const totalInputTokens = stage1.inputTokens + stage2InputTokens;
+    const totalOutputTokens = stage1.outputTokens + stage2OutputTokens;
+    const costUsd = estimateCost(model, totalInputTokens, totalOutputTokens);
 
     await finishRun('completed', {
-      projects_found: projects.length,
+      candidates_found: stage1.candidates.length,
+      batches_run: batches.length,
+      batches_failed: batchErrors.length,
+      projects_enriched: allProjects.length,
       inserted,
       updated,
       signals_added: signalsAdded,
-      errors: errors.length,
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      resume_count: resumeCount,
-      aborted_for_cost: abortedForCost,
+      stage1_input_tokens: stage1.inputTokens,
+      stage1_output_tokens: stage1.outputTokens,
+      stage2_input_tokens: stage2InputTokens,
+      stage2_output_tokens: stage2OutputTokens,
+      total_input_tokens: totalInputTokens,
+      total_output_tokens: totalOutputTokens,
       cost_usd: Number(costUsd.toFixed(4)),
     });
 
     return NextResponse.json({
       success: true,
-      projects_found: projects.length,
+      candidates_found: stage1.candidates.length,
+      projects_found: allProjects.length,
       inserted,
       updated,
       signals_added: signalsAdded,
-      errors,
+      batches_run: batches.length,
+      batches_failed: batchErrors.length,
+      errors: [...batchErrors, ...writeErrors],
       cost_usd: Number(costUsd.toFixed(4)),
       duration_ms: Date.now() - startedAt.getTime(),
     });
