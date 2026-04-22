@@ -265,33 +265,66 @@ Bonuses on top:
 - **Trending in Korean Telegram:** AI, DePIN, RWA, Stablecoins, Restaking, selective Gaming
 - **Korea = Telegram, NOT Twitter.** Korean Twitter is noisy; retail discovery happens on Telegram. When checking Korea presence (ICP criterion #3), check TELEGRAM size, not Twitter follower counts.
 
-## TRIGGER RESEARCH APPROACH
+## TWO-PHASE RESEARCH FLOW
 
-Primary source for triggers: **X/Twitter** — the project account + team members' personal accounts. Founders announce raises/TGE/Korea plans there first, often weeks before news.
-- Read the pinned tweet + last ~10 tweets
-- Check key team members' recent posts
-- Fall back to news (TokenPost, BlockMedia, Decrypt, The Block) only if nothing on X
+This is a strict two-phase process. Do not skip or reorder.
 
-Each trigger's source_url should be a specific URL (tweet, announcement blog, press release). Not a generic homepage.
+### PHASE 1 — Find candidates on DropsTab ONLY
 
-## OUTREACH CONTACTS (POCs)
+Start here and ONLY here: **https://dropstab.com/tab/by-raised-funds**
 
-HoloHive does cold BD via **Telegram DM**. We need individual decision-makers' personal handles — NOT the project's community channel.
+That page lists projects by total raised. Work through the top entries:
+- Open each project's DropsTab coin profile page (e.g. https://dropstab.com/coins/<slug>)
+- Pull from DropsTab: name, symbol, category, funding history (rounds, amounts, dates, investors), token status (pre-token vs launched), market cap
+- Filter: raise within last ${recencyDays} days, $${minRaise.toLocaleString()}+ cumulative or latest-round
 
-For each project, identify 1-3 team members in priority order:
-1. CEO / Founder (best)
-2. CMO / Head of Marketing / Head of Growth
-3. BD lead / Head of BD
-4. Community lead (last resort — they gate-keep)
+Do NOT discover candidate projects from X, news articles, Crunchbase, RootData, or general web search. DropsTab is the only acceptable entry point for identifying new projects in this scan.
 
-For each contact find:
-- Personal X handle (from team page or their tweets)
-- Personal Telegram handle (often in X bio — crypto founders/BDs put their TG there specifically for cold DMs)
-- confidence: "high" (verified X bio or project team page), "medium" (crypto directory / second-hand), "low" (guess — only return if no better lead)
+Triggers evidence is allowed to come from anywhere (X, announcements, news) — but the candidate itself must come from DropsTab.
 
-Empty outreach_contacts is FINE and better than fabricated.
+### PHASE 2 — Hunt POCs on external sites
+
+Once you have a DropsTab-sourced candidate, LEAVE DropsTab and research individual points of contact. DropsTab doesn't list team handles, so you'll need external sources:
+
+- **Project's own website "Team" or "About" page** (often the best — names + socials listed)
+- **X/Twitter bios** of team members (founders and BD leads often put their Telegram in their X bio specifically for cold DMs)
+- **Crypto talent / team directories** (PitchBook, CryptoRank team sections, Messari team)
+- **LinkedIn** public previews (titles visible, handles sometimes listed)
+- **Conference speaker pages / podcast guest bios** (often lists TG)
+
+### POC PRIORITY (CRITICAL)
+
+HoloHive sends cold BD via Telegram DM. X DMs are a distant second (most crypto founders don't check them).
+
+For each project, identify 1-3 team members:
+- Role priority: CEO/Founder > CMO / Head of Growth > Head of BD > Community Lead (last resort)
+- Contact-channel priority: **Telegram handle > X handle**
+
+This means: if the CEO only has an X handle but the Head of BD has BOTH a Telegram and an X handle, surface the Head of BD FIRST — they're actually reachable. Sort the \`outreach_contacts\` array so contacts with a \`telegram_handle\` populated come first.
+
+When looking at an X bio, actively scan for patterns like "tg: @handle" or "telegram: @handle" or "@xxx on TG" — crypto BD people put this in their bio on purpose.
+
+Confidence:
+- "high" — Telegram handle visible on verified X bio, project team page, or conference page
+- "medium" — Telegram handle referenced in a second-hand source (crypto directory, podcast notes)
+- "low" — X handle only, no Telegram found, or guess from a similar-name pattern (don't return low-confidence contacts unless it's the only lead — mark them clearly)
+
+A contact with ONLY an X handle and no Telegram is still worth including (if no better option exists), but mark confidence honestly and note in \`notes\` that Telegram needs manual lookup.
+
+Empty \`outreach_contacts\` is FINE — better than fabricated. If you genuinely can't find any individual handles after checking the project's own team page + top 2-3 team members' X bios, return an empty array.
 
 The \`project_twitter_url\` and \`project_telegram_url\` fields are the project's community channels — useful for monitoring, NOT outreach.
+
+## TRIGGER EVIDENCE (where to source them)
+
+Triggers anchor to projects found in Phase 1, but the evidence can come from anywhere:
+- Recent raise → usually on DropsTab itself (funding row with date), or press release
+- TGE date → project's tokenomics page, pinned X tweet, roadmap
+- Korea BD hire → LinkedIn job post, Twitter hiring tweet, careers page
+- Mainnet launch → X announcement, GitHub releases
+- Korea partnership → press release, Korean crypto news (TokenPost, BlockMedia)
+
+Each trigger's source_url should be a specific URL — a tweet, announcement blog, press release, or DropsTab funding row. Not a generic homepage.
 
 ## OUTPUT RULES
 
@@ -305,13 +338,25 @@ The \`project_twitter_url\` and \`project_telegram_url\` fields are the project'
 
     const userPrompt = `Find the top ${maxProjects} crypto projects HoloHive should DM this week.
 
-Process per project:
-  1. Start on https://dropstab.com/tab/by-raised-funds or equivalent to identify candidates (recent raise in last ${recencyDays} days, $${minRaise.toLocaleString()}+ raised).
-  2. Open the project's X/Twitter account. Read the pinned tweet + last ~10 tweets. Pull triggers from what the team is saying RIGHT NOW — raises, TGE dates, Korea plans, new hires. Each trigger's source_url should be a tweet URL where possible.
-  3. Identify 1-3 decision-makers on the team (CEO > CMO > BD > Community). For each, find their personal X handle and — if possible — their Telegram handle from their X bio or crypto directories. Rate confidence per contact.
-  4. Fit_reasoning: 1-2 sentences on why this project would be a good HoloHive client.
+Strict two-phase flow:
 
-Call submit_discoveries when done. If a project has no triggers from X and only news mentions, include it but lower its fit_score.`;
+**PHASE 1 — Candidate identification (DropsTab only)**
+  1. Open https://dropstab.com/tab/by-raised-funds
+  2. Work through the top entries. For each, open its DropsTab coin profile page to get funding rounds, investors, token status, market cap.
+  3. Filter: raise in last ${recencyDays} days, $${minRaise.toLocaleString()}+ minimum.
+  4. Do NOT discover candidates via X search, news search, or general web. DropsTab is the only acceptable entry point.
+
+**PHASE 2 — POC hunting (external sites)**
+For each DropsTab-sourced candidate, leave DropsTab and research:
+  1. Project's own website team/about page
+  2. X bios of team members (look for "tg: @handle" patterns — crypto BDs put their Telegram here on purpose)
+  3. Crypto directories, conference speaker pages, podcast guest bios
+
+Priority: **Telegram handle > X handle**. A Head of BD with findable Telegram beats a CEO with only X — Telegram is what you actually DM on. Sort outreach_contacts so contacts with a populated telegram_handle come first.
+
+**Triggers** can be sourced from anywhere (tweets, news, announcements, DropsTab itself) — but the candidate project itself must come from DropsTab.
+
+Run ICP check + scoring per the framework. Include disqualified projects with disqualification_reason. Call submit_discoveries when done.`;
 
     // Structured output via a custom tool. Claude uses web_search to gather
     // evidence, then calls submit_discoveries with the final structured list
@@ -550,7 +595,18 @@ Call submit_discoveries when done. If a project has no triggers from X and only 
       // Filter out low-confidence contacts — keep high + medium.
       // If nothing but low is available, keep low so we don't throw away leads,
       // but the UI will flag them.
-      const contacts = (p.outreach_contacts || []).filter(c => c && c.name && c.role);
+      // ALSO sort so contacts with a Telegram handle come first — Telegram is
+      // the BD outreach channel; an X-only contact is a distant fallback.
+      const contacts = (p.outreach_contacts || [])
+        .filter(c => c && c.name && c.role)
+        .slice() // don't mutate the input
+        .sort((a, b) => {
+          const aHasTG = !!(a.telegram_handle && a.telegram_handle.trim());
+          const bHasTG = !!(b.telegram_handle && b.telegram_handle.trim());
+          if (aHasTG !== bHasTG) return aHasTG ? -1 : 1;
+          // Within same TG-availability, keep Claude's role-ordered ranking
+          return 0;
+        });
 
       // Full Discovery qualification snapshot. We keep this separate from the
       // Korea-Signals-driven action_tier field so the two systems don't overwrite

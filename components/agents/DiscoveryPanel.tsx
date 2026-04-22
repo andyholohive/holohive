@@ -272,7 +272,7 @@ export default function DiscoveryPanel() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <p className="text-sm text-gray-600">
-            AI-driven lead discovery from DropsTab and the broader web. Finds projects with live outreach triggers and pulls their contact info.
+            Candidates sourced from DropsTab's raised-funds list. For each, Claude hunts POC handles on project sites, X bios, and crypto directories — prioritizing Telegram handles (your BD channel) over X.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -459,8 +459,23 @@ export default function DiscoveryPanel() {
                             <span className="text-xs font-medium text-gray-700">
                               {p.outreach_contacts[0].name}
                               <span className="text-gray-400 ml-1">· {p.outreach_contacts[0].role}</span>
+                              {!p.outreach_contacts[0].telegram_handle && (
+                                <span className="ml-1 text-[9px] text-amber-600 font-semibold">(No TG)</span>
+                              )}
                             </span>
                             <div className="flex items-center gap-1.5">
+                              {telegramUrl(p.outreach_contacts[0].telegram_handle) && (
+                                <a
+                                  href={telegramUrl(p.outreach_contacts[0].telegram_handle)!}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={e => e.stopPropagation()}
+                                  className="text-[#229ED9] hover:opacity-80"
+                                  title={`Telegram: ${p.outreach_contacts[0].telegram_handle}`}
+                                >
+                                  <Send className="h-3.5 w-3.5" />
+                                </a>
+                              )}
                               {twitterUrl(p.outreach_contacts[0].twitter_handle) && (
                                 <a
                                   href={twitterUrl(p.outreach_contacts[0].twitter_handle)!}
@@ -468,21 +483,9 @@ export default function DiscoveryPanel() {
                                   rel="noopener noreferrer"
                                   onClick={e => e.stopPropagation()}
                                   className="text-gray-500 hover:text-[#1DA1F2]"
-                                  title={p.outreach_contacts[0].twitter_handle}
+                                  title={`X: ${p.outreach_contacts[0].twitter_handle}`}
                                 >
                                   <Twitter className="h-3.5 w-3.5" />
-                                </a>
-                              )}
-                              {telegramUrl(p.outreach_contacts[0].telegram_handle) && (
-                                <a
-                                  href={telegramUrl(p.outreach_contacts[0].telegram_handle)!}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={e => e.stopPropagation()}
-                                  className="text-gray-500 hover:text-[#229ED9]"
-                                  title={p.outreach_contacts[0].telegram_handle}
-                                >
-                                  <Send className="h-3.5 w-3.5" />
                                 </a>
                               )}
                               <span
@@ -773,9 +776,9 @@ export default function DiscoveryPanel() {
           <DialogHeader>
             <DialogTitle>Run Discovery Scan</DialogTitle>
             <DialogDescription>
-              Claude will search DropsTab and the broader web for crypto projects matching your criteria,
-              identify outreach triggers, and pull contact info. Expect this to take 30-90 seconds and
-              cost ~$0.30-$1 per run.
+              Candidates sourced from DropsTab only. For each, Claude leaves DropsTab to hunt
+              individual POC handles (project team pages, X bios, crypto directories) —
+              Telegram priority, X fallback. Expect 30-90s and ~$0.30-$1 per run.
             </DialogDescription>
           </DialogHeader>
 
