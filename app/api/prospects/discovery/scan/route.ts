@@ -159,6 +159,8 @@ async function findCandidates(
     minRaise: number;
     maxCandidates: number;
     categories: string[];
+    skipNames: string[];      // projects we've already scanned recently — don't return these
+    cooldownDays: number;     // how old the skip list is, for the prompt
   },
 ): Promise<{
   candidates: CandidateBasics[];
@@ -166,12 +168,25 @@ async function findCandidates(
   outputTokens: number;
   stopReason: string | null;
 }> {
+  // Build the exclusion clause. If the list is long, cap it so we don't
+  // blow the prompt budget on skip-names (Claude doesn't need to see all 500
+  // to get the point — a couple hundred is sufficient context).
+  const skipSample = params.skipNames.slice(0, 200);
+  const exclusionClause = skipSample.length > 0
+    ? `\n\n## ALREADY SCANNED — DO NOT INCLUDE
+The following projects were scanned in the last ${params.cooldownDays} days and are already in our database. DO NOT include them — they'd be wasted research. Go DEEPER on the DropsTab list (scroll past the top entries, open page 2+ if available) to find DIFFERENT projects.
+
+${skipSample.map(n => `- ${n}`).join('\n')}${params.skipNames.length > skipSample.length ? `\n  (...and ${params.skipNames.length - skipSample.length} more — same rule applies)` : ''}
+
+If the entire top of the list is in the skip list, that's expected — you need to go further down.`
+    : '';
+
   const userPrompt = `List up to ${params.maxCandidates} crypto projects that appear on DropsTab's raised-funds page and meet these filters:
 
 - Raised at least $${params.minRaise.toLocaleString()} USD
 - Announced within the last ${params.recencyDays} days${params.categories.length > 0 ? `\n- Category is one of: ${params.categories.join(', ')}` : ''}
 
-For each, include name, symbol, category, funding amount, round type, date (if visible), lead investors, DropsTab URL, and website URL.
+For each, include name, symbol, category, funding amount, round type, date (if visible), lead investors, DropsTab URL, and website URL.${exclusionClause}
 
 Call submit_candidates when done.`;
 
@@ -746,10 +761,28 @@ export async function POST(request: Request) {
 
     const anthropic = getClaudeClient();
 
+    // ── Pre-scan: fetch the skip list (dedup) ────────────────────────
+    // Projects we've already scanned within the cooldown window. Without this
+    // Claude keeps finding the same top-of-DropsTab projects every run and
+    // burning cost to re-research them.
+    const COOLDOWN_DAYS = Number(body.cooldown_days) || 14;
+    const cooldownCutoff = new Date(Date.now() - COOLDOWN_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const { data: recentProspects } = await (supabase as any)
+      .from('prospects')
+      .select('name, updated_at, discovery_snapshot')
+      .eq('source', 'dropstab_discovery')
+      .gte('updated_at', cooldownCutoff)
+      .limit(500);
+    const skipNames: string[] = (recentProspects || [])
+      .map((p: any) => p.name)
+      .filter(Boolean);
+
     // ── Stage 1 ──────────────────────────────────────────────────────
     await updateProgress({
       stage: 'discovering_candidates',
-      message: 'Finding candidates on DropsTab...',
+      message: skipNames.length > 0
+        ? `Finding new candidates on DropsTab (skipping ${skipNames.length} already scanned)...`
+        : 'Finding candidates on DropsTab...',
       percent: 5,
     });
 
@@ -758,6 +791,8 @@ export async function POST(request: Request) {
       minRaise,
       maxCandidates: maxProjects,
       categories,
+      skipNames,
+      cooldownDays: COOLDOWN_DAYS,
     });
 
     if (stage1.candidates.length === 0) {
@@ -853,9 +888,18 @@ export async function POST(request: Request) {
     }
 
     // ── Write to DB ──────────────────────────────────────────────────
+    // Extra safety: filter out any enriched projects whose name is in the
+    // skip list (Claude might occasionally ignore the instruction). We still
+    // wrote progress during enrichment, but we don't want to re-overwrite
+    // the existing record with a fresh Claude snapshot when the user just
+    // wanted NEW projects.
+    const skipSet = new Set(skipNames.map(n => n.toLowerCase()));
+    const projectsToWrite = allProjects.filter(p => !skipSet.has((p.name || '').toLowerCase()));
+    const skippedDupes = allProjects.length - projectsToWrite.length;
+
     await updateProgress({
       stage: 'writing',
-      message: `Saving ${allProjects.length} enriched prospects...`,
+      message: `Saving ${projectsToWrite.length} enriched prospects${skippedDupes > 0 ? ` (${skippedDupes} dupes filtered)` : ''}...`,
       percent: 92,
     });
 
@@ -864,7 +908,7 @@ export async function POST(request: Request) {
     let signalsAdded = 0;
     const writeErrors: string[] = [];
 
-    for (const p of allProjects) {
+    for (const p of projectsToWrite) {
       if (!p.name) continue;
       const result = await writeProject(supabase, p, runId);
       if (result === 'inserted') inserted++;
@@ -884,6 +928,9 @@ export async function POST(request: Request) {
       batches_run: batches.length,
       batches_failed: batchErrors.length,
       projects_enriched: allProjects.length,
+      skipped_duplicates: skippedDupes,
+      skip_list_size: skipNames.length,
+      cooldown_days: COOLDOWN_DAYS,
       inserted,
       updated,
       signals_added: signalsAdded,
@@ -899,7 +946,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       candidates_found: stage1.candidates.length,
-      projects_found: allProjects.length,
+      projects_found: projectsToWrite.length,
+      skipped_duplicates: skippedDupes,
+      skip_list_size: skipNames.length,
       inserted,
       updated,
       signals_added: signalsAdded,
