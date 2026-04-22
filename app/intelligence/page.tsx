@@ -10,7 +10,7 @@ import AgentDashboard from '@/components/agents/AgentDashboard';
 import DiscoveryPanel from '@/components/agents/DiscoveryPanel';
 
 export default function IntelligencePage() {
-  const [activeTab, setActiveTab] = useState('prospects');
+  const [activeTab, setActiveTab] = useState('discovery');
 
   return (
     <div className="space-y-6">

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -18,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   Sparkles, Loader2, ExternalLink, Send, Twitter, Globe,
   ChevronDown, ChevronRight as ChevronRightIcon, CheckCircle, XCircle,
-  ArrowRight, AlertTriangle, RefreshCw, UserSearch,
+  ArrowRight, AlertTriangle, RefreshCw, UserSearch, Eye, Zap,
 } from 'lucide-react';
 
 interface Trigger {
@@ -312,16 +313,28 @@ export default function DiscoveryPanel() {
     p => p.discovery_action_tier !== 'SKIP' && (!p.outreach_contacts || p.outreach_contacts.length === 0),
   ).length;
 
+  // Summary stats for the cards at top (always derived from the full prospects
+  // list, ignoring the hide-disqualified toggle — we want stable counts that
+  // don't flicker when the filter changes).
+  const totalCount = prospects.length;
+  const needsReviewCount = prospects.filter(p => p.status === 'needs_review').length;
+  const hotLeadCount = prospects.filter(
+    p => p.discovery_action_tier === 'REACH_OUT_NOW' || p.discovery_action_tier === 'PRE_TOKEN_PRIORITY',
+  ).length;
+  const withTelegramCount = prospects.filter(
+    p => (p.outreach_contacts || []).some(c => c.telegram_handle && c.telegram_handle.trim()),
+  ).length;
+
   return (
-    <div className="pb-8">
-      {/* Header + scan button */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-sm text-gray-600">
-            Candidates sourced from DropsTab's raised-funds list. For each, Claude hunts POC handles on project sites, X bios, and crypto directories — prioritizing Telegram handles (your BD channel) over X.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <div className="pb-8 space-y-4">
+      {/* Description + primary actions */}
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-sm text-gray-600 max-w-2xl">
+          AI-driven lead finder anchored on DropsTab. For each candidate, Claude hunts
+          outreach triggers from X and decision-maker contacts — Telegram priority,
+          X fallback — using the SCOUT ICP framework to score fit.
+        </p>
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
             size="sm"
@@ -359,23 +372,68 @@ export default function DiscoveryPanel() {
         </div>
       </div>
 
-      {/* Status filter tabs */}
-      <div className="flex items-center gap-1.5 mb-4 flex-wrap">
-        {STATUS_TABS.map(tab => (
-          <button
-            key={tab.value}
-            onClick={() => setStatusFilter(tab.value)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-              statusFilter === tab.value
-                ? 'text-white'
-                : 'text-gray-600 hover:bg-gray-100 border border-transparent'
-            }`}
-            style={statusFilter === tab.value ? { backgroundColor: 'var(--brand)' } : {}}
-          >
-            {tab.label}
-          </button>
-        ))}
-        <div className="w-px h-5 bg-gray-200 mx-1.5" />
+      {/* Summary stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Globe className="h-3.5 w-3.5 text-gray-400" />
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">{totalCount}</div>
+            <div className="text-xs text-gray-500 mt-0.5">discovered projects</div>
+          </CardContent>
+        </Card>
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Eye className="h-3.5 w-3.5 text-blue-500" />
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Needs Review</span>
+            </div>
+            <div className="text-2xl font-bold text-blue-700">{needsReviewCount}</div>
+            <div className="text-xs text-gray-500 mt-0.5">awaiting your decision</div>
+          </CardContent>
+        </Card>
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Zap className="h-3.5 w-3.5 text-red-500" />
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Hot Leads</span>
+            </div>
+            <div className="text-2xl font-bold text-red-700">{hotLeadCount}</div>
+            <div className="text-xs text-gray-500 mt-0.5">Reach Out Now / Pre-Token</div>
+          </CardContent>
+        </Card>
+        <Card className="hover:shadow-md transition-shadow">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Send className="h-3.5 w-3.5 text-[#229ED9]" />
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">With Telegram</span>
+            </div>
+            <div className="text-2xl font-bold text-gray-900">{withTelegramCount}</div>
+            <div className="text-xs text-gray-500 mt-0.5">DM-ready POCs found</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Status filter tabs + hide-disqualified toggle */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {STATUS_TABS.map(tab => (
+            <button
+              key={tab.value}
+              onClick={() => setStatusFilter(tab.value)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                statusFilter === tab.value
+                  ? 'text-white'
+                  : 'text-gray-600 hover:bg-gray-100 border border-transparent'
+              }`}
+              style={statusFilter === tab.value ? { backgroundColor: 'var(--brand)' } : {}}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
         <div className="flex items-center gap-2">
           <Switch
             id="hide-disqualified"
@@ -385,7 +443,7 @@ export default function DiscoveryPanel() {
           <Label htmlFor="hide-disqualified" className="text-xs text-gray-600 cursor-pointer select-none">
             Hide disqualified
             {hideSkip && hiddenSkipCount > 0 && (
-              <span className="text-[10px] text-gray-400 ml-1">({hiddenSkipCount} hidden)</span>
+              <span className="text-[10px] text-gray-400 ml-1">({hiddenSkipCount})</span>
             )}
           </Label>
         </div>
@@ -393,32 +451,40 @@ export default function DiscoveryPanel() {
 
       {/* Table */}
       {loading ? (
-        <div className="space-y-2">
-          {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
-        </div>
+        <Card>
+          <CardContent className="p-4 space-y-2">
+            {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
+          </CardContent>
+        </Card>
       ) : filteredProspects.length === 0 ? (
-        <div className="text-center py-12 border rounded-lg bg-gray-50">
-          <Sparkles className="h-10 w-10 mx-auto text-gray-400 mb-3" />
-          <p className="text-gray-700 font-medium">
-            {statusFilter === 'needs_review'
-              ? 'No prospects awaiting review'
-              : `No ${statusFilter.replace('_', ' ')} prospects yet`}
-          </p>
-          <p className="text-gray-500 text-sm mt-1 mb-4">
-            Run a Discovery scan to find projects with live outreach triggers.
-          </p>
-          <Button
-            onClick={() => setScanOpen(true)}
-            size="sm"
-            style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-            className="hover:opacity-90"
-          >
-            <Sparkles className="w-4 h-4 mr-1.5" />
-            Run Discovery
-          </Button>
-        </div>
+        <Card>
+          <CardContent className="text-center py-16">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-4">
+              <Sparkles className="h-6 w-6 text-gray-500" />
+            </div>
+            <p className="text-gray-900 font-medium text-base">
+              {statusFilter === 'needs_review'
+                ? 'No prospects awaiting review'
+                : `No ${statusFilter.replace('_', ' ')} prospects yet`}
+            </p>
+            <p className="text-gray-500 text-sm mt-1 mb-5 max-w-md mx-auto">
+              {statusFilter === 'needs_review'
+                ? 'Run a Discovery scan to surface crypto projects with live outreach triggers from DropsTab.'
+                : 'Run a scan to surface new candidates matching the SCOUT ICP framework.'}
+            </p>
+            <Button
+              onClick={() => setScanOpen(true)}
+              size="sm"
+              style={{ backgroundColor: 'var(--brand)', color: 'white' }}
+              className="hover:opacity-90"
+            >
+              <Sparkles className="w-4 h-4 mr-1.5" />
+              Run Discovery
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="border rounded-lg overflow-hidden">
+        <Card>
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50">
@@ -829,7 +895,7 @@ export default function DiscoveryPanel() {
               })}
             </TableBody>
           </Table>
-        </div>
+        </Card>
       )}
 
       {/* Scan config dialog */}
