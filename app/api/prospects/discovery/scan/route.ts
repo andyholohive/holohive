@@ -517,16 +517,38 @@ Run ICP check + scoring per the framework. Include disqualified projects with di
       },
     };
 
-    const response = await anthropic.messages.create({
+    const toolsConfig = [
+      { type: 'web_search_20250305', name: 'web_search', max_uses: 30 } as any,
+      submitToolSchema as any,
+    ];
+    const messages: any[] = [{ role: 'user', content: userPrompt }];
+
+    let response = await anthropic.messages.create({
       model,
       max_tokens: 16000,
       system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-      tools: [
-        { type: 'web_search_20250305', name: 'web_search', max_uses: 30 } as any,
-        submitToolSchema as any,
-      ],
+      messages,
+      tools: toolsConfig,
     });
+
+    // Handle pause_turn — Anthropic pauses long-running research sessions
+    // when they exceed internal server thresholds. To continue, feed the
+    // prior assistant response back and let the model resume.
+    //
+    // We cap resume attempts to prevent runaway loops (and runaway cost).
+    const MAX_RESUME = 4;
+    let resumeCount = 0;
+    while (response.stop_reason === 'pause_turn' && resumeCount < MAX_RESUME) {
+      resumeCount++;
+      messages.push({ role: 'assistant', content: response.content });
+      response = await anthropic.messages.create({
+        model,
+        max_tokens: 16000,
+        system: systemPrompt,
+        messages,
+        tools: toolsConfig,
+      });
+    }
 
     // Find the submit_discoveries tool call in the response
     const submitBlock = response.content.find(
@@ -559,21 +581,29 @@ Run ICP check + scoring per the framework. Include disqualified projects with di
       try {
         parsed = JSON.parse(jsonStr);
       } catch {
+        const hintByStopReason: Record<string, string> = {
+          pause_turn: `Still paused after ${resumeCount} continuation attempts — the model wanted to keep researching. Try lowering max_projects to 10-15 or increasing MAX_RESUME.`,
+          max_tokens: 'Hit the max_tokens ceiling — try lowering max_projects or reduce research depth.',
+          refusal: 'Model refused to respond. Check system prompt for anything it might consider off-policy.',
+        };
+        const hint = hintByStopReason[response.stop_reason || ''] || 'Try a narrower scan (smaller max_projects or wider recency).';
         await finishRun(
           'failed',
           {
             stop_reason: response.stop_reason,
             block_types: response.content.map((b: any) => b.type),
             last_text_sample: lastText.slice(0, 500),
+            resume_attempts: resumeCount,
           },
-          'Claude did not call submit_discoveries and response did not contain parseable JSON',
+          `Claude did not call submit_discoveries. stop_reason=${response.stop_reason}`,
         );
         return NextResponse.json(
           {
-            error: 'Claude did not return structured results. This usually means it ran out of tokens, hit rate limits, or couldn\'t find enough projects. Try a narrower scan (smaller max_projects or wider recency).',
+            error: `Claude did not return structured results (stop_reason: ${response.stop_reason}). ${hint}`,
             stop_reason: response.stop_reason,
             block_types: response.content.map((b: any) => b.type),
             last_text_sample: lastText.slice(0, 500),
+            resume_attempts: resumeCount,
           },
           { status: 502 },
         );
