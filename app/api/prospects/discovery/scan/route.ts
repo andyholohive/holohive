@@ -142,6 +142,15 @@ export async function POST(request: Request) {
     const maxProjects = Math.max(1, Math.min(50, Number(body.max_projects) || 20));
     const categories: string[] = Array.isArray(body.categories) ? body.categories : [];
 
+    // Model selector — defaults to Opus (better judgment for BD research).
+    // Accepts the short alias "sonnet" / "opus" for UI convenience, or a full
+    // model string for power users.
+    const modelAlias = String(body.model || 'opus').toLowerCase();
+    const model =
+      modelAlias === 'sonnet' ? 'claude-sonnet-4-5'
+      : modelAlias === 'opus' ? 'claude-opus-4-7'
+      : body.model; // already a full model id
+
     const anthropic = getClaudeClient();
 
     const systemPrompt = `You are DISCOVERY, the bulk-candidate finder for HoloHive — a Seoul-based KOL growth agency. Your output feeds into SCOUT (which does single-project deep-dives). You use the same ICP framework as SCOUT so rankings are consistent.
@@ -509,7 +518,7 @@ Run ICP check + scoring per the framework. Include disqualified projects with di
     };
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
+      model,
       max_tokens: 16000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
@@ -760,8 +769,13 @@ Run ICP check + scoring per the framework. Include disqualified projects with di
 
     const inputTokens = response.usage?.input_tokens ?? 0;
     const outputTokens = response.usage?.output_tokens ?? 0;
-    // Sonnet 4.5 pricing: $3/MTok in, $15/MTok out (rough)
-    const costUsd = (inputTokens / 1_000_000) * 3 + (outputTokens / 1_000_000) * 15;
+    // Model-specific pricing (approximate, in USD per 1M tokens):
+    //   Sonnet 4.5: $3 in / $15 out
+    //   Opus 4.7:   $15 in / $75 out  (~5x Sonnet)
+    const isOpus = typeof model === 'string' && model.includes('opus');
+    const inPricePerM = isOpus ? 15 : 3;
+    const outPricePerM = isOpus ? 75 : 15;
+    const costUsd = (inputTokens / 1_000_000) * inPricePerM + (outputTokens / 1_000_000) * outPricePerM;
 
     await finishRun('completed', {
       projects_found: projects.length,

@@ -43,6 +43,7 @@ async function findPOCsForProject(
     website_url: string | null;
     twitter_url: string | null;
   },
+  model: string,
 ): Promise<{ contacts: OutreachContact[]; inputTokens: number; outputTokens: number }> {
   const systemPrompt = `You are HoloHive's POC hunter. HoloHive does cold BD outreach via Telegram DM — NOT joining community channels. Your job is to find individual decision-maker handles for a single crypto project.
 
@@ -117,7 +118,7 @@ Call submit_pocs when done.`;
   };
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
+    model,
     max_tokens: 4000,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],
@@ -180,6 +181,14 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const specificIds: string[] | null = Array.isArray(body.prospect_ids) ? body.prospect_ids : null;
 
+    // Model selector — same rules as the main scan endpoint. Defaults to Opus
+    // because POC accuracy > speed for BD outreach.
+    const modelAlias = String(body.model || 'opus').toLowerCase();
+    const model =
+      modelAlias === 'sonnet' ? 'claude-sonnet-4-5'
+      : modelAlias === 'opus' ? 'claude-opus-4-7'
+      : body.model;
+
     // Load target prospects. If specific IDs provided, just those. Otherwise,
     // all discovery-sourced prospects that currently have no outreach_contacts.
     let query = (supabase as any)
@@ -231,7 +240,7 @@ export async function POST(request: Request) {
     // project and a few-per-minute cap, we throttle between projects.
     for (const p of prospects) {
       try {
-        const result = await findPOCsForProject(anthropic, p);
+        const result = await findPOCsForProject(anthropic, p, model);
         totalInput += result.inputTokens;
         totalOutput += result.outputTokens;
 
@@ -289,8 +298,13 @@ export async function POST(request: Request) {
       }
     }
 
-    // Sonnet 4.5 pricing: $3/MTok in, $15/MTok out
-    const costUsd = (totalInput / 1_000_000) * 3 + (totalOutput / 1_000_000) * 15;
+    // Model-specific pricing (approximate, per 1M tokens):
+    //   Sonnet 4.5: $3 in / $15 out
+    //   Opus 4.7:   $15 in / $75 out
+    const isOpus = typeof model === 'string' && model.includes('opus');
+    const inPricePerM = isOpus ? 15 : 3;
+    const outPricePerM = isOpus ? 75 : 15;
+    const costUsd = (totalInput / 1_000_000) * inPricePerM + (totalOutput / 1_000_000) * outPricePerM;
 
     if (runId) {
       await (supabase as any)

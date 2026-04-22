@@ -176,6 +176,7 @@ export default function DiscoveryPanel() {
     min_raise_usd: '1000000',
     max_projects: '20',
     categories: '',
+    model: 'opus' as 'sonnet' | 'opus',
   });
   const [lastScanResult, setLastScanResult] = useState<any>(null);
 
@@ -183,6 +184,7 @@ export default function DiscoveryPanel() {
   const [enrichDialogOpen, setEnrichDialogOpen] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [lastEnrichResult, setLastEnrichResult] = useState<any>(null);
+  const [enrichModel, setEnrichModel] = useState<'sonnet' | 'opus'>('opus');
 
   const fetchProspects = useCallback(async () => {
     setLoading(true);
@@ -218,6 +220,7 @@ export default function DiscoveryPanel() {
         recency_days: parseInt(scanParams.recency_days, 10) || 30,
         min_raise_usd: parseInt(scanParams.min_raise_usd, 10) || 1_000_000,
         max_projects: parseInt(scanParams.max_projects, 10) || 20,
+        model: scanParams.model,
       };
       const cats = scanParams.categories.split(',').map(s => s.trim()).filter(Boolean);
       if (cats.length > 0) body.categories = cats;
@@ -253,7 +256,7 @@ export default function DiscoveryPanel() {
       const res = await fetch('/api/prospects/discovery/enrich-pocs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}), // empty = enrich all missing
+        body: JSON.stringify({ model: enrichModel }), // empty = enrich all missing
       });
       const data = await res.json();
       setLastEnrichResult(data);
@@ -887,6 +890,41 @@ export default function DiscoveryPanel() {
               <p className="text-xs text-gray-500 mt-1">Comma-separated. Leave blank to scan all.</p>
             </div>
 
+            <div>
+              <Label className="mb-1.5 block">Model</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setScanParams(p => ({ ...p, model: 'opus' }))}
+                  className={`text-left rounded-lg border p-2.5 transition-colors ${
+                    scanParams.model === 'opus'
+                      ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-xs font-semibold text-gray-900">Opus 4.7</div>
+                  <div className="text-[10px] text-gray-600 mt-0.5">Thorough · Better judgment</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">~$1.50-$5 per scan</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScanParams(p => ({ ...p, model: 'sonnet' }))}
+                  className={`text-left rounded-lg border p-2.5 transition-colors ${
+                    scanParams.model === 'sonnet'
+                      ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-xs font-semibold text-gray-900">Sonnet 4.5</div>
+                  <div className="text-[10px] text-gray-600 mt-0.5">Fast · Cheaper</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">~$0.30-$1 per scan</div>
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1.5">
+                Opus is better at POC accuracy and edge-case ICP judgment. Use Sonnet for bulk/experimental scans.
+              </p>
+            </div>
+
             {lastScanResult && (
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
                 <div className="font-semibold text-gray-700">Last scan</div>
@@ -935,20 +973,57 @@ export default function DiscoveryPanel() {
           </DialogHeader>
 
           <div className="space-y-3 py-2 text-sm">
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 text-xs">
-              <p className="font-semibold mb-1 flex items-center gap-1">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                Estimated cost
-              </p>
-              <p>
-                ~$0.05–$0.15 per prospect. For {missingPocCount} prospect{missingPocCount !== 1 ? 's' : ''}:
-                roughly <strong>${(missingPocCount * 0.05).toFixed(2)} to ${(missingPocCount * 0.15).toFixed(2)}</strong>.
-              </p>
-              <p className="mt-1">
-                Duration: ~5-15s per prospect (sequential, to stay under web_search rate limits).
-                Estimated total: <strong>{Math.round(missingPocCount * 10 / 60)}-{Math.round(missingPocCount * 15 / 60)} min</strong>.
-              </p>
+            <div>
+              <Label className="mb-1.5 block">Model</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEnrichModel('opus')}
+                  className={`text-left rounded-lg border p-2.5 transition-colors ${
+                    enrichModel === 'opus'
+                      ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-xs font-semibold text-gray-900">Opus 4.7</div>
+                  <div className="text-[10px] text-gray-600 mt-0.5">Better POC accuracy</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEnrichModel('sonnet')}
+                  className={`text-left rounded-lg border p-2.5 transition-colors ${
+                    enrichModel === 'sonnet'
+                      ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-xs font-semibold text-gray-900">Sonnet 4.5</div>
+                  <div className="text-[10px] text-gray-600 mt-0.5">Faster, cheaper</div>
+                </button>
+              </div>
             </div>
+
+            {(() => {
+              const lo = enrichModel === 'opus' ? 0.25 : 0.05;
+              const hi = enrichModel === 'opus' ? 0.75 : 0.15;
+              return (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 text-xs">
+                  <p className="font-semibold mb-1 flex items-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Estimated cost
+                  </p>
+                  <p>
+                    ~${lo.toFixed(2)}–${hi.toFixed(2)} per prospect on {enrichModel === 'opus' ? 'Opus' : 'Sonnet'}.
+                    For {missingPocCount} prospect{missingPocCount !== 1 ? 's' : ''}:
+                    roughly <strong>${(missingPocCount * lo).toFixed(2)} to ${(missingPocCount * hi).toFixed(2)}</strong>.
+                  </p>
+                  <p className="mt-1">
+                    Duration: ~5-15s per prospect (sequential, to stay under web_search rate limits).
+                    Estimated total: <strong>{Math.round(missingPocCount * 10 / 60)}-{Math.round(missingPocCount * 15 / 60)} min</strong>.
+                  </p>
+                </div>
+              );
+            })()}
 
             {lastEnrichResult && (
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
