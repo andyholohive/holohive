@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   let query = (supabase as any)
     .from('prospects')
     .select(
-      'id, name, symbol, category, website_url, twitter_url, telegram_url, discord_url, source_url, status, scraped_at, updated_at, korea_relevancy_score, icp_score, action_tier, outreach_contacts',
+      'id, name, symbol, category, website_url, twitter_url, telegram_url, discord_url, source_url, status, scraped_at, updated_at, korea_relevancy_score, icp_score, action_tier, outreach_contacts, discovery_snapshot',
     )
     .eq('source', 'dropstab_discovery')
     .order('updated_at', { ascending: false })
@@ -68,10 +68,7 @@ export async function GET(request: Request) {
 
   const enriched = (prospects || []).map((p: any) => {
     const signals = signalsByProspect.get(p.id) || [];
-    const latest = signals[0];
-    const fitReasoning = latest?.metadata?.fit_reasoning ?? null;
-    const fitScore = latest?.metadata?.fit_score ?? null;
-    const funding = latest?.metadata?.funding ?? null;
+    const snap = p.discovery_snapshot || {};
     return {
       ...p,
       triggers: signals.map((s: any) => ({
@@ -81,12 +78,19 @@ export async function GET(request: Request) {
         detail: s.snippet,
         source_url: s.source_url,
         source_type: s.metadata?.source_type ?? null,
+        tier: s.metadata?.tier ?? null,
         weight: s.relevancy_weight,
         detected_at: s.detected_at,
       })),
-      fit_reasoning: fitReasoning,
-      fit_score: fitScore,
-      funding,
+      // Hoist the commonly-used fields up for easier client consumption
+      icp_verdict: snap.icp_verdict ?? null,
+      icp_checks: snap.icp_checks ?? null,
+      prospect_score: snap.prospect_score ?? null,
+      discovery_action_tier: snap.action_tier ?? null,
+      disqualification_reason: snap.disqualification_reason ?? null,
+      consideration_reason: snap.consideration_reason ?? null,
+      fit_reasoning: snap.fit_reasoning ?? null,
+      funding: snap.funding ?? null,
     };
   });
 

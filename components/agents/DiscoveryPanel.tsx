@@ -27,9 +27,21 @@ interface Trigger {
   detail?: string | null;
   source_url?: string | null;
   source_type?: 'tweet' | 'article' | 'other' | null;
+  tier?: 'TIER_1' | 'TIER_2' | 'TIER_3' | null;
   weight?: number;
   detected_at: string;
 }
+
+type IcpCheck = { pass: boolean; evidence: string };
+type IcpVerdict = 'PASS' | 'FAIL' | 'BORDERLINE' | null;
+type DiscoveryActionTier =
+  | 'REACH_OUT_NOW'
+  | 'PRE_TOKEN_PRIORITY'
+  | 'RESEARCH'
+  | 'WATCH'
+  | 'NURTURE'
+  | 'SKIP'
+  | null;
 
 interface OutreachContact {
   name: string;
@@ -58,8 +70,21 @@ interface DiscoveryProspect {
   action_tier: string | null;
   outreach_contacts: OutreachContact[];
   triggers: Trigger[];
+  // SCOUT-aligned qualification
+  icp_verdict: IcpVerdict;
+  icp_checks: {
+    credible_funding: IcpCheck;
+    pre_token_or_tge_6mo: IcpCheck;
+    no_korea_presence: IcpCheck;
+    end_user_product: IcpCheck;
+    real_product: IcpCheck;
+    not_with_competitor: IcpCheck;
+  } | null;
+  prospect_score: { icp_fit: number; signal_strength: number; timing: number; total: number } | null;
+  discovery_action_tier: DiscoveryActionTier;
+  disqualification_reason: string | null;
+  consideration_reason: string | null;
   fit_reasoning: string | null;
-  fit_score: number | null;
   funding: {
     round: string | null;
     amount_usd: number | null;
@@ -80,6 +105,30 @@ const CONTACT_CONFIDENCE_STYLE: Record<string, string> = {
   high: 'bg-emerald-100 text-emerald-700',
   medium: 'bg-amber-100 text-amber-700',
   low: 'bg-gray-100 text-gray-600',
+};
+
+const ACTION_TIER_STYLE: Record<string, { label: string; className: string }> = {
+  REACH_OUT_NOW:       { label: 'REACH OUT NOW',      className: 'bg-red-100 text-red-700 border-red-200' },
+  PRE_TOKEN_PRIORITY:  { label: 'PRE-TOKEN PRIORITY', className: 'bg-orange-100 text-orange-700 border-orange-200' },
+  RESEARCH:            { label: 'RESEARCH FIRST',     className: 'bg-blue-100 text-blue-700 border-blue-200' },
+  WATCH:               { label: 'WATCH',              className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
+  NURTURE:             { label: 'NURTURE',            className: 'bg-gray-100 text-gray-700 border-gray-200' },
+  SKIP:                { label: 'SKIP',               className: 'bg-gray-50 text-gray-400 border-gray-200 line-through decoration-gray-300' },
+};
+
+const VERDICT_STYLE: Record<string, string> = {
+  PASS: 'bg-emerald-100 text-emerald-700',
+  BORDERLINE: 'bg-amber-100 text-amber-700',
+  FAIL: 'bg-red-100 text-red-700',
+};
+
+const ICP_CRITERIA_LABELS: Record<string, string> = {
+  credible_funding: 'Credible funding',
+  pre_token_or_tge_6mo: 'Pre-token or TGE <6mo',
+  no_korea_presence: 'No Korea presence',
+  end_user_product: 'End-user product',
+  real_product: 'Real product',
+  not_with_competitor: 'Not with competitor agency',
 };
 
 /** Normalize a twitter handle or URL to a clickable URL */
@@ -117,6 +166,7 @@ export default function DiscoveryPanel() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('needs_review');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [hideSkip, setHideSkip] = useState<boolean>(true);
 
   const [scanOpen, setScanOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -206,6 +256,16 @@ export default function DiscoveryPanel() {
     }
   };
 
+  // Apply client-side "hide disqualified" filter. We ALWAYS keep disqualified
+  // prospects in state so flipping the checkbox off shows them immediately
+  // (no refetch needed) — satisfies the "show rejects with reason" requirement.
+  const filteredProspects = hideSkip
+    ? prospects.filter(p => p.discovery_action_tier !== 'SKIP')
+    : prospects;
+  const hiddenSkipCount = hideSkip
+    ? prospects.filter(p => p.discovery_action_tier === 'SKIP').length
+    : 0;
+
   return (
     <div className="pb-8">
       {/* Header + scan button */}
@@ -254,6 +314,19 @@ export default function DiscoveryPanel() {
             {tab.label}
           </button>
         ))}
+        <div className="w-px h-5 bg-gray-200 mx-1.5" />
+        <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={hideSkip}
+            onChange={e => setHideSkip(e.target.checked)}
+            className="rounded border-gray-300"
+          />
+          Hide disqualified
+          {hideSkip && hiddenSkipCount > 0 && (
+            <span className="text-[10px] text-gray-400">({hiddenSkipCount} hidden)</span>
+          )}
+        </label>
       </div>
 
       {/* Table */}
@@ -261,7 +334,7 @@ export default function DiscoveryPanel() {
         <div className="space-y-2">
           {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
         </div>
-      ) : prospects.length === 0 ? (
+      ) : filteredProspects.length === 0 ? (
         <div className="text-center py-12 border rounded-lg bg-gray-50">
           <Sparkles className="h-10 w-10 mx-auto text-gray-400 mb-3" />
           <p className="text-gray-700 font-medium">
@@ -292,13 +365,14 @@ export default function DiscoveryPanel() {
                 <TableHead>Category</TableHead>
                 <TableHead>Funding</TableHead>
                 <TableHead>Triggers</TableHead>
-                <TableHead>Fit</TableHead>
+                <TableHead>Tier</TableHead>
+                <TableHead>Score</TableHead>
                 <TableHead>POC</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {prospects.map(p => {
+              {filteredProspects.map(p => {
                 const isExpanded = expanded.has(p.id);
                 return (
                   <React.Fragment key={p.id}>
@@ -359,15 +433,25 @@ export default function DiscoveryPanel() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {p.fit_score != null ? (
+                        {p.discovery_action_tier ? (
+                          <span
+                            className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded border pointer-events-none ${ACTION_TIER_STYLE[p.discovery_action_tier]?.className || ''}`}
+                            title={p.disqualification_reason || p.consideration_reason || ''}
+                          >
+                            {ACTION_TIER_STYLE[p.discovery_action_tier]?.label || p.discovery_action_tier}
+                          </span>
+                        ) : <span className="text-xs text-gray-400">—</span>}
+                      </TableCell>
+                      <TableCell>
+                        {p.prospect_score?.total != null ? (
                           <span className={`text-sm font-semibold ${
-                            p.fit_score >= 70 ? 'text-emerald-700' :
-                            p.fit_score >= 40 ? 'text-amber-700' :
+                            p.prospect_score.total >= 60 ? 'text-emerald-700' :
+                            p.prospect_score.total >= 30 ? 'text-amber-700' :
                             'text-gray-500'
                           }`}>
-                            {p.fit_score}
+                            {p.prospect_score.total}<span className="text-xs text-gray-400">/100</span>
                           </span>
-                        ) : '—'}
+                        ) : <span className="text-xs text-gray-400">—</span>}
                       </TableCell>
                       <TableCell>
                         {p.outreach_contacts && p.outreach_contacts.length > 0 ? (
@@ -449,13 +533,65 @@ export default function DiscoveryPanel() {
                     {/* Expanded detail row */}
                     {isExpanded && (
                       <TableRow className="bg-gray-50 hover:bg-gray-50">
-                        <TableCell colSpan={8} className="py-4">
+                        <TableCell colSpan={9} className="py-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-                            {/* Fit reasoning */}
-                            {p.fit_reasoning && (
-                              <div>
-                                <h4 className="font-semibold text-gray-700 mb-1">Why they're a fit</h4>
-                                <p className="text-gray-600">{p.fit_reasoning}</p>
+                            {/* Verdict summary + reasons */}
+                            <div className="md:col-span-2">
+                              <div className="flex items-center gap-2 flex-wrap mb-2">
+                                {p.icp_verdict && (
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded pointer-events-none ${VERDICT_STYLE[p.icp_verdict]}`}>
+                                    ICP: {p.icp_verdict}
+                                  </span>
+                                )}
+                                {p.prospect_score && (
+                                  <span className="text-[10px] text-gray-600 px-1.5 py-0.5 rounded border border-gray-200 pointer-events-none">
+                                    Score: {p.prospect_score.icp_fit}+{p.prospect_score.signal_strength}+{p.prospect_score.timing} = {p.prospect_score.total}/100
+                                  </span>
+                                )}
+                              </div>
+                              {p.disqualification_reason && (
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 mb-2">
+                                  <h4 className="font-semibold text-red-700 text-xs mb-0.5">Disqualified</h4>
+                                  <p className="text-red-700 text-xs">{p.disqualification_reason}</p>
+                                </div>
+                              )}
+                              {p.consideration_reason && !p.disqualification_reason && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-2">
+                                  <h4 className="font-semibold text-amber-700 text-xs mb-0.5">Reason to consider</h4>
+                                  <p className="text-amber-700 text-xs">{p.consideration_reason}</p>
+                                </div>
+                              )}
+                              {p.fit_reasoning && (
+                                <div>
+                                  <h4 className="font-semibold text-gray-700 mb-1">Why they're a fit</h4>
+                                  <p className="text-gray-600">{p.fit_reasoning}</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* ICP checklist */}
+                            {p.icp_checks && (
+                              <div className="md:col-span-2">
+                                <h4 className="font-semibold text-gray-700 mb-2">ICP Checklist</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+                                  {Object.entries(ICP_CRITERIA_LABELS).map(([key, label]) => {
+                                    const check = (p.icp_checks as any)[key] as IcpCheck | undefined;
+                                    if (!check) return null;
+                                    return (
+                                      <div key={key} className="flex items-start gap-2 text-xs bg-white border rounded px-2 py-1.5">
+                                        {check.pass ? (
+                                          <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                                        ) : (
+                                          <XCircle className="h-3.5 w-3.5 text-red-600 shrink-0 mt-0.5" />
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <div className={`font-medium ${check.pass ? 'text-gray-900' : 'text-red-700'}`}>{label}</div>
+                                          <div className="text-gray-600 text-[11px]">{check.evidence}</div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             )}
 

@@ -38,6 +38,16 @@ interface OutreachContact {
   notes?: string;
 }
 
+type IcpCheck = { pass: boolean; evidence: string };
+
+type ActionTier =
+  | 'REACH_OUT_NOW'
+  | 'PRE_TOKEN_PRIORITY'
+  | 'RESEARCH'
+  | 'WATCH'
+  | 'NURTURE'
+  | 'SKIP';
+
 interface DiscoveredProject {
   name: string;
   symbol?: string | null;
@@ -51,6 +61,24 @@ interface DiscoveredProject {
   funding_amount_usd?: number | null;
   funding_date?: string | null;
   investors?: string[];
+  icp_verdict: 'PASS' | 'FAIL' | 'BORDERLINE';
+  icp_checks: {
+    credible_funding: IcpCheck;
+    pre_token_or_tge_6mo: IcpCheck;
+    no_korea_presence: IcpCheck;
+    end_user_product: IcpCheck;
+    real_product: IcpCheck;
+    not_with_competitor: IcpCheck;
+  };
+  disqualification_reason?: string | null;
+  consideration_reason?: string | null;
+  prospect_score: {
+    icp_fit: number;
+    signal_strength: number;
+    timing: number;
+    total: number;
+  };
+  action_tier: ActionTier;
   outreach_contacts?: OutreachContact[];
   triggers?: Array<{
     signal_type: string;
@@ -58,10 +86,10 @@ interface DiscoveredProject {
     detail?: string;
     source_url?: string;
     source_type?: 'tweet' | 'article' | 'other';
+    tier?: 'TIER_1' | 'TIER_2' | 'TIER_3';
     weight?: number;
   }>;
-  fit_reasoning?: string;
-  fit_score?: number;
+  fit_reasoning?: string | null;
 }
 
 export async function POST(request: Request) {
@@ -116,63 +144,164 @@ export async function POST(request: Request) {
 
     const anthropic = getClaudeClient();
 
-    const systemPrompt = `You are DISCOVERY, a BD research agent for HoloHive — a KOL marketing agency serving the Korean crypto market.
+    const systemPrompt = `You are DISCOVERY, the bulk-candidate finder for HoloHive — a Seoul-based KOL growth agency. Your output feeds into SCOUT (which does single-project deep-dives). You use the same ICP framework as SCOUT so rankings are consistent.
 
-Your job: find crypto projects that are prime reach-out candidates RIGHT NOW, and surface individual humans on the team who could be DM'd.
+HoloHive sells a 90-day Korea Growth Partnership ($48-61K). Clients: pre-token or recently-launched crypto projects looking to enter the Korean market.
 
-## ICP (Ideal Customer Profile)
-- Raised $${minRaise.toLocaleString()}+ in the last ${recencyDays} days
-- Pre-TGE OR recent TGE, OR planning a token launch
-- Any sign of Korea / APAC market interest (ideal but not required)
-- Active team, not dormant
-- Categories we serve well: DeFi, Gaming, AI, Infrastructure, L1/L2, RWA, DePIN${categories.length > 0 ? `\n- User-specified category filter: ${categories.join(', ')}` : ''}
+## THE 6-CRITERIA ICP CHECK (binary, ALL must PASS)
 
-## Finding triggers (THE BAR IS HIGH)
-Primary source for triggers is **Twitter/X — both the project account AND team members' personal accounts**. This is where founders announce raises, TGE dates, Korea plans, partnerships, etc. — usually weeks before news coverage.
+| # | Criteria | Pass Condition |
+|---|----------|----------------|
+| 1 | Credible funding | Any amount with credible backers (Crunchbase/RootData/CryptoRank visible, real VCs — not rug-prone) |
+| 2 | Pre-token OR TGE within 6 months | Verify via CoinGecko, roadmap, tokenomics |
+| 3 | No existing Korea community / marketing team | Check Korean Telegram size (< 1K members = pass), Korean Twitter, LinkedIn for Korea BD hires — but note a NEW Korea BD hire post is a positive trigger, not a fail |
+| 4 | End-user product — NOT B2B service provider, VC, exchange, or infrastructure-only (L1/L2 counts as end-user) | Website must show consumer-facing product, app, or protocol. B2B data tools, VC funds, exchanges, trading platforms → FAIL |
+| 5 | Real product in development or launched | GitHub commits, app URL, testnet, TVL — not just a whitepaper |
+| 6 | Not already with a competitor Korea agency | Check Twitter, announcements for Korea agency partnerships |
 
-- Search: "site:x.com <project> raise", "site:x.com <founder> Korea", etc.
-- Read the project's pinned tweet, last 5-10 tweets, and key team members' recent posts
-- Only fall back to news articles (TokenPost, BlockMedia, Decrypt) if nothing on X
+For each, record a boolean \`pass\` and a one-line \`evidence\` string.
 
-Trigger types (use these signal_type slugs, or invent snake_case new ones if needed):
-- "recent_raise" — closed a round in the last 30 days
-- "tge_within_60d" — token launch scheduled in <60 days
-- "korea_expansion_announce" — announced Korea market entry
-- "korea_exchange_listing" — listed or about to list on Upbit / Bithumb
-- "korea_job_posting" — hiring Korean-speaking staff
-- "mainnet_launch" — mainnet going live soon
-- "airdrop_announcement" — airdrop coming
-- "partnership_announcement" — major partnership
-- "leadership_change" — new CMO/BD/Growth hire
-- "ecosystem_asia_initiative" — Asia-focused grants/initiatives
-- "founder_active_on_x" — founder has been posting actively about growth
+\`icp_verdict\`: PASS (all 6 pass), FAIL (any fail), BORDERLINE (one unclear).
 
-Every trigger's \`source_url\` should ideally be a specific tweet URL (x.com or twitter.com) that evidences it. If using a news article, that's fine — just make sure the URL points to the exact piece.
+## INSTANT DISQUALIFIERS (kill switches)
 
-## Contacts — CRITICAL
-HoloHive does **cold BD outreach via Telegram DM**. We do NOT want to join the project's community channel. We want the DECISION-MAKER's personal handle — someone who can say yes to a KOL campaign.
+If any match → icp_verdict=FAIL, action_tier=SKIP, and populate disqualification_reason with a clear explanation:
+- B2B service provider or infrastructure tool (unless L1/L2)
+- VC firm or fund
+- Exchange, DEX, or trading platform
+- No activity in 60+ days (dead project)
+- Korean Telegram already has 1K+ members or active community
+- Already working with a competitor Korea marketing agency
+- Token launched 6+ months ago AND no Korea-specific trigger
+- Team fully anonymous AND no credible backers
+- Rug pull history or serious documented controversy
+- Pure "global expansion" with ZERO Korea-specific signals
 
-For each project, try to identify **1-3 humans on the team** — prioritizing in order:
-  1. CEO / Founder (best)
-  2. CMO / Head of Marketing / Head of Growth
-  3. BD lead / Head of BD
-  4. Community lead / Ecosystem lead (last resort — they usually gate-keep)
+**IMPORTANT:** Even disqualified projects should be included in your submit_discoveries output (with verdict=FAIL + disqualification_reason). Do NOT silently skip them — we want to see your rejections to audit the logic.
 
-For each contact, look for:
-- Their **X/Twitter handle** (usually in the project's team page or their tweets)
-- Their **Telegram handle** — often put in their X bio specifically for cold DMs. Search "<person name> telegram" or read their bio.
-- Confidence rating: "high" = found it on their verified X bio or project team page; "medium" = found it via crypto directory or second-hand mention; "low" = guessed from similar name patterns (DON'T return low-confidence contacts unless it's the only lead).
+## GLOBAL-ONLY PROJECTS (edge case)
 
-If you can't find any personal handle for a project, return an empty \`outreach_contacts\` array — that's fine. Empty is better than fabricated.
+If a project passes the other 5 ICP criteria but has ZERO Korea signal whatsoever (and Korea is not a stated/implied future plan), DO NOT set verdict to FAIL. Instead:
+- verdict: BORDERLINE
+- action_tier: RESEARCH
+- Populate \`consideration_reason\`: 1-2 sentences on why this might still be worth human review (e.g. "Strong Series A with Asia-curious investors; worth a 5-min check on founders' recent Asia mentions")
 
-The \`project_twitter_url\` and \`project_telegram_url\` fields are for the project's community channels — useful for monitoring, NOT outreach.
+This preserves optionality — the human team decides whether to pursue.
 
-## How to respond
-Use web_search to gather evidence. You have up to 30 searches. When done, call \`submit_discoveries\` EXACTLY ONCE with the final list.
+## SIGNAL TAXONOMY (triggers)
 
-Do NOT reply with plain text. Only call the tool.
+Pick the HIGHEST tier a project matches. Multiple triggers add bonus (see scoring).
 
-Return at most ${maxProjects} projects, sorted by fit_score descending. Every project must have at least one trigger and a fit_reasoning. Quality over quantity — return fewer if that means better data.`;
+### TIER 1 — URGENT (within last 7 days)
+- "tge_within_60d" — TGE announced, date within 60 days
+- "korea_exchange_listing" — Upbit/Bithumb listing confirmed
+- "mainnet_launching_this_month" — mainnet going live <30 days
+- "korea_bd_hire" — Korea-specific BD hire announced
+- "team_relocation_seoul" — team (or exec) relocated to Seoul
+
+### TIER 2 — HIGH (within last 7 days / ongoing)
+- "recent_raise" — funding round closed in last 30 days
+- "korea_bd_hiring" — Korea BD role actively listed (job post)
+- "airdrop_announced" — airdrop planned (team or region-specific)
+- "competitor_entered_korea" — peer competitor just launched Korea play
+- "korean_media_partnership" — partnership with Korean media/influencer
+
+### TIER 3 — MEDIUM (within last 14 days)
+- "accelerator_graduation" — YC, Polkadot Substrate, Binance Labs, etc.
+- "hackathon_win"
+- "ecosystem_grant_asia"
+- "mainnet_2_to_3_months_out"
+
+Each trigger must have: signal_type, headline (<80 chars), detail (1-2 sentences), source_url (preferably a specific tweet), source_type ("tweet" | "article" | "other"), weight (5-25).
+
+**Freshness rules:** TIER 1/2 signals should be within 7 days; TIER 3 within 14 days. Older signals only count for ongoing things (active job posts, product stage).
+
+## SCORING FORMULA (0-100)
+
+**prospect_score.total = icp_fit (0-40) + signal_strength (0-35) + timing (0-25)**
+
+### icp_fit (0-40)
+- credible_funding: +10 if pass
+- pre_token_or_tge_6mo: +10 if pass
+- no_korea_presence: +5 if pass
+- real_product: +5 if pass
+- team_credible_doxxed: +5 if founders are public and have track record
+- hot_narrative: +5 if category is AI, DePIN, RWA, Stablecoins, Restaking, or selective Gaming (currently trending in Korean Telegram)
+
+### signal_strength (0-35, HARD CAP)
+Base (pick HIGHEST, don't stack):
+- TIER 1 (URGENT) trigger: +15 base
+- TIER 2 (HIGH) trigger: +10 base
+- TIER 3 (MEDIUM) trigger: +5 base
+Bonuses on top:
+- Multiple triggers (2+): +5
+- Behavioral signal (engaged with HoloHive team, mentioned Asia/Korea in thread): +5
+- Contextual signal (category trending in Korean Telegram): +5
+
+### timing (0-25, pick SINGLE highest)
+- TGE in <8 weeks: 25
+- Post-funding <30 days: 20
+- Mainnet launching this month: 20
+- TGE in 2-4 months: 15
+- Korea BD role actively hired: 15
+- Expressed interest in Asia/Korea recently: 15
+- Major Seoul event coming (ETH Seoul, KBW): 10
+- No timing trigger: 0
+
+## ACTION TIER MAPPING
+
+- 80-100 → "REACH_OUT_NOW"
+- 60-79  → "PRE_TOKEN_PRIORITY"
+- 45-59  → "RESEARCH"
+- 30-44  → "WATCH"
+- 15-29  → "NURTURE"
+- 0-14 OR disqualified → "SKIP"
+
+## KOREA MARKET CONTEXT (April 2026)
+
+- 2nd-largest crypto market globally ($663B YTD)
+- Corporate crypto ban lifted Feb 2026 → institutions can trade
+- Upbit: 72% market share. Bithumb: #2, IPO planned
+- **Trending in Korean Telegram:** AI, DePIN, RWA, Stablecoins, Restaking, selective Gaming
+- **Korea = Telegram, NOT Twitter.** Korean Twitter is noisy; retail discovery happens on Telegram. When checking Korea presence (ICP criterion #3), check TELEGRAM size, not Twitter follower counts.
+
+## TRIGGER RESEARCH APPROACH
+
+Primary source for triggers: **X/Twitter** — the project account + team members' personal accounts. Founders announce raises/TGE/Korea plans there first, often weeks before news.
+- Read the pinned tweet + last ~10 tweets
+- Check key team members' recent posts
+- Fall back to news (TokenPost, BlockMedia, Decrypt, The Block) only if nothing on X
+
+Each trigger's source_url should be a specific URL (tweet, announcement blog, press release). Not a generic homepage.
+
+## OUTREACH CONTACTS (POCs)
+
+HoloHive does cold BD via **Telegram DM**. We need individual decision-makers' personal handles — NOT the project's community channel.
+
+For each project, identify 1-3 team members in priority order:
+1. CEO / Founder (best)
+2. CMO / Head of Marketing / Head of Growth
+3. BD lead / Head of BD
+4. Community lead (last resort — they gate-keep)
+
+For each contact find:
+- Personal X handle (from team page or their tweets)
+- Personal Telegram handle (often in X bio — crypto founders/BDs put their TG there specifically for cold DMs)
+- confidence: "high" (verified X bio or project team page), "medium" (crypto directory / second-hand), "low" (guess — only return if no better lead)
+
+Empty outreach_contacts is FINE and better than fabricated.
+
+The \`project_twitter_url\` and \`project_telegram_url\` fields are the project's community channels — useful for monitoring, NOT outreach.
+
+## OUTPUT RULES
+
+- Return ALL projects you researched, including disqualified ones (with verdict=FAIL + disqualification_reason)
+- Sort by prospect_score descending
+- At most ${maxProjects} projects total
+- Use web_search for evidence — up to 30 searches
+- When done, call submit_discoveries EXACTLY ONCE. Do not reply with plain text.
+- Quality > quantity. If you can only find 8 qualifying candidates, return 8.${categories.length > 0 ? `\n- User-specified category filter: ${categories.join(', ')}` : ''}
+- User-specified funding filter: minimum $${minRaise.toLocaleString()} raised in the last ${recencyDays} days`;
 
     const userPrompt = `Find the top ${maxProjects} crypto projects HoloHive should DM this week.
 
@@ -203,13 +332,90 @@ Call submit_discoveries when done. If a project has no triggers from X and only 
                 category: { type: 'string' },
                 website_url: { type: 'string' },
                 project_twitter_url: { type: 'string', description: "Project's official X/Twitter URL — community channel, NOT for outreach" },
-                project_telegram_url: { type: 'string', description: "Project's public Telegram channel URL — for community/announcements, NOT for outreach" },
+                project_telegram_url: { type: 'string', description: "Project's public Telegram channel URL — for community, NOT for outreach" },
                 discord_url: { type: 'string' },
                 dropstab_url: { type: 'string' },
                 funding_round: { type: 'string' },
                 funding_amount_usd: { type: 'number' },
                 funding_date: { type: 'string', description: 'ISO YYYY-MM-DD if known' },
                 investors: { type: 'array', items: { type: 'string' } },
+
+                // ICP qualification (the 6 binary checks)
+                icp_verdict: {
+                  type: 'string',
+                  enum: ['PASS', 'FAIL', 'BORDERLINE'],
+                  description: 'PASS = all 6 criteria pass. FAIL = any criterion fails OR instant disqualifier triggered. BORDERLINE = one criterion unclear OR global-only project with no Korea signal.',
+                },
+                icp_checks: {
+                  type: 'object',
+                  description: 'Each criterion: { pass: boolean, evidence: string }',
+                  properties: {
+                    credible_funding: {
+                      type: 'object',
+                      properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } },
+                      required: ['pass', 'evidence'],
+                    },
+                    pre_token_or_tge_6mo: {
+                      type: 'object',
+                      properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } },
+                      required: ['pass', 'evidence'],
+                    },
+                    no_korea_presence: {
+                      type: 'object',
+                      properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } },
+                      required: ['pass', 'evidence'],
+                    },
+                    end_user_product: {
+                      type: 'object',
+                      properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } },
+                      required: ['pass', 'evidence'],
+                    },
+                    real_product: {
+                      type: 'object',
+                      properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } },
+                      required: ['pass', 'evidence'],
+                    },
+                    not_with_competitor: {
+                      type: 'object',
+                      properties: { pass: { type: 'boolean' }, evidence: { type: 'string' } },
+                      required: ['pass', 'evidence'],
+                    },
+                  },
+                  required: [
+                    'credible_funding',
+                    'pre_token_or_tge_6mo',
+                    'no_korea_presence',
+                    'end_user_product',
+                    'real_product',
+                    'not_with_competitor',
+                  ],
+                },
+                disqualification_reason: {
+                  type: 'string',
+                  description: 'Required if icp_verdict=FAIL. Explains which criterion failed or which instant disqualifier triggered.',
+                },
+                consideration_reason: {
+                  type: 'string',
+                  description: 'For BORDERLINE projects (e.g. global-only, no Korea signal). Why this might still be worth human review.',
+                },
+
+                // Prospect score (0-100)
+                prospect_score: {
+                  type: 'object',
+                  properties: {
+                    icp_fit: { type: 'number', description: '0-40' },
+                    signal_strength: { type: 'number', description: '0-35 hard cap' },
+                    timing: { type: 'number', description: '0-25' },
+                    total: { type: 'number', description: '0-100 — must equal sum of the three subscores' },
+                  },
+                  required: ['icp_fit', 'signal_strength', 'timing', 'total'],
+                },
+                action_tier: {
+                  type: 'string',
+                  enum: ['REACH_OUT_NOW', 'PRE_TOKEN_PRIORITY', 'RESEARCH', 'WATCH', 'NURTURE', 'SKIP'],
+                  description: 'Derived from prospect_score. REACH_OUT_NOW=80-100, PRE_TOKEN_PRIORITY=60-79, RESEARCH=45-59, WATCH=30-44, NURTURE=15-29, SKIP=0-14 or disqualified.',
+                },
+
                 outreach_contacts: {
                   type: 'array',
                   description: 'Individual decision-makers at the project to DM directly. Prefer CEO/Founder > CMO > BD. Empty array is fine — better than fabricated.',
@@ -229,24 +435,27 @@ Call submit_discoveries when done. If a project has no triggers from X and only 
                 },
                 triggers: {
                   type: 'array',
+                  description: 'Active outreach triggers. Empty allowed for disqualified projects; required for PASS/BORDERLINE.',
                   items: {
                     type: 'object',
                     properties: {
-                      signal_type: { type: 'string', description: 'e.g. recent_raise, tge_within_60d, korea_expansion_announce, founder_active_on_x' },
+                      signal_type: { type: 'string', description: 'e.g. recent_raise, tge_within_60d, korea_bd_hire' },
                       headline: { type: 'string', description: 'Short summary, <80 chars' },
                       detail: { type: 'string', description: '1-2 sentences of context. Quote the tweet if applicable.' },
                       source_url: { type: 'string', description: 'Ideally a specific tweet URL (x.com / twitter.com) — fall back to article URL only if no tweet available' },
                       source_type: { type: 'string', enum: ['tweet', 'article', 'other'], description: 'Where the trigger was found' },
+                      tier: { type: 'string', enum: ['TIER_1', 'TIER_2', 'TIER_3'], description: 'Urgency tier per the taxonomy' },
                       weight: { type: 'number', description: '5-25, higher = stronger trigger' },
                     },
                     required: ['signal_type', 'headline'],
                   },
-                  minItems: 1,
                 },
-                fit_reasoning: { type: 'string', description: 'Why this is a good fit for HoloHive, 1-2 sentences' },
-                fit_score: { type: 'number', description: '0-100 confidence they would be a good client' },
+                fit_reasoning: {
+                  type: 'string',
+                  description: 'Why this is a good fit for HoloHive, 1-2 sentences. Required for PASS/BORDERLINE. Leave empty for FAIL projects (use disqualification_reason instead).',
+                },
               },
-              required: ['name', 'triggers', 'fit_reasoning'],
+              required: ['name', 'icp_verdict', 'icp_checks', 'prospect_score', 'action_tier'],
             },
           },
         },
@@ -343,6 +552,26 @@ Call submit_discoveries when done. If a project has no triggers from X and only 
       // but the UI will flag them.
       const contacts = (p.outreach_contacts || []).filter(c => c && c.name && c.role);
 
+      // Full Discovery qualification snapshot. We keep this separate from the
+      // Korea-Signals-driven action_tier field so the two systems don't overwrite
+      // each other.
+      const discoverySnapshot = {
+        icp_verdict: p.icp_verdict,
+        icp_checks: p.icp_checks,
+        prospect_score: p.prospect_score,
+        action_tier: p.action_tier,
+        disqualification_reason: p.disqualification_reason ?? null,
+        consideration_reason: p.consideration_reason ?? null,
+        fit_reasoning: p.fit_reasoning ?? null,
+        funding: {
+          round: p.funding_round ?? null,
+          amount_usd: p.funding_amount_usd ?? null,
+          date: p.funding_date ?? null,
+          investors: p.investors ?? [],
+        },
+        scanned_at: new Date().toISOString(),
+      };
+
       const prospectFields: Record<string, any> = {
         name: p.name,
         symbol: p.symbol ?? null,
@@ -354,6 +583,7 @@ Call submit_discoveries when done. If a project has no triggers from X and only 
         discord_url: p.discord_url ?? null,
         source_url: p.dropstab_url ?? null,
         outreach_contacts: contacts,
+        discovery_snapshot: discoverySnapshot,
         updated_at: new Date().toISOString(),
       };
 
@@ -379,7 +609,11 @@ Call submit_discoveries when done. If a project has no triggers from X and only 
         // Existing prospect — only update fields we learned (don't overwrite with nulls).
         // For outreach_contacts, MERGE with existing (dedup by name+role) rather than replace,
         // so manual edits aren't blown away.
-        const patch: Record<string, any> = { updated_at: new Date().toISOString() };
+        const patch: Record<string, any> = {
+          updated_at: new Date().toISOString(),
+          // Discovery always overwrites its own snapshot with the latest qualification
+          discovery_snapshot: discoverySnapshot,
+        };
         if (p.project_twitter_url) patch.twitter_url = p.project_twitter_url;
         if (p.project_telegram_url) patch.telegram_url = p.project_telegram_url;
         if (p.category) patch.category = p.category;
@@ -448,8 +682,10 @@ Call submit_discoveries when done. If a project has no triggers from X and only 
             shelf_life_days: 30,
             metadata: {
               fit_reasoning: p.fit_reasoning ?? null,
-              fit_score: p.fit_score ?? null,
+              prospect_score: p.prospect_score?.total ?? null,
+              action_tier: p.action_tier,
               source_type: trigger.source_type ?? null,
+              tier: trigger.tier ?? null,
               funding: {
                 round: p.funding_round ?? null,
                 amount_usd: p.funding_amount_usd ?? null,
