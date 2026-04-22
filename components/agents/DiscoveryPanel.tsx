@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
@@ -17,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   Sparkles, Loader2, ExternalLink, Send, Twitter, Globe,
   ChevronDown, ChevronRight as ChevronRightIcon, CheckCircle, XCircle,
-  ArrowRight, AlertTriangle, RefreshCw,
+  ArrowRight, AlertTriangle, RefreshCw, UserSearch,
 } from 'lucide-react';
 
 interface Trigger {
@@ -178,6 +179,11 @@ export default function DiscoveryPanel() {
   });
   const [lastScanResult, setLastScanResult] = useState<any>(null);
 
+  // POC enrichment state
+  const [enrichDialogOpen, setEnrichDialogOpen] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [lastEnrichResult, setLastEnrichResult] = useState<any>(null);
+
   const fetchProspects = useCallback(async () => {
     setLoading(true);
     try {
@@ -240,6 +246,37 @@ export default function DiscoveryPanel() {
     }
   };
 
+  const runPocEnrichment = async () => {
+    setEnriching(true);
+    setLastEnrichResult(null);
+    try {
+      const res = await fetch('/api/prospects/discovery/enrich-pocs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}), // empty = enrich all missing
+      });
+      const data = await res.json();
+      setLastEnrichResult(data);
+      if (!res.ok || data.error) {
+        toast({
+          title: 'Enrichment failed',
+          description: data.error || 'Unknown error',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'POC enrichment complete',
+          description: `${data.enriched} enriched · ${data.failed || 0} failed · $${data.cost_usd?.toFixed(2) ?? '—'}`,
+        });
+        fetchProspects();
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message ?? 'Enrichment failed', variant: 'destructive' });
+    } finally {
+      setEnriching(false);
+    }
+  };
+
   const updateStatus = async (id: string, status: string) => {
     try {
       const res = await fetch('/api/prospects/discovery', {
@@ -257,7 +294,7 @@ export default function DiscoveryPanel() {
   };
 
   // Apply client-side "hide disqualified" filter. We ALWAYS keep disqualified
-  // prospects in state so flipping the checkbox off shows them immediately
+  // prospects in state so flipping the toggle off shows them immediately
   // (no refetch needed) — satisfies the "show rejects with reason" requirement.
   const filteredProspects = hideSkip
     ? prospects.filter(p => p.discovery_action_tier !== 'SKIP')
@@ -265,6 +302,12 @@ export default function DiscoveryPanel() {
   const hiddenSkipCount = hideSkip
     ? prospects.filter(p => p.discovery_action_tier === 'SKIP').length
     : 0;
+
+  // Count prospects with no outreach contacts — candidates for POC enrichment.
+  // We only count non-SKIP (no point enriching dismissed/disqualified).
+  const missingPocCount = prospects.filter(
+    p => p.discovery_action_tier !== 'SKIP' && (!p.outreach_contacts || p.outreach_contacts.length === 0),
+  ).length;
 
   return (
     <div className="pb-8">
@@ -286,6 +329,21 @@ export default function DiscoveryPanel() {
             <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
+          {missingPocCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEnrichDialogOpen(true)}
+              disabled={enriching}
+              className="h-9 text-amber-700 border-amber-200 hover:bg-amber-50"
+              title="Run POC lookup for prospects that don't have outreach contacts yet"
+            >
+              {enriching
+                ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                : <UserSearch className="w-4 h-4 mr-1.5" />}
+              Find POCs ({missingPocCount})
+            </Button>
+          )}
           <Button
             size="sm"
             onClick={() => setScanOpen(true)}
@@ -315,18 +373,19 @@ export default function DiscoveryPanel() {
           </button>
         ))}
         <div className="w-px h-5 bg-gray-200 mx-1.5" />
-        <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
-          <input
-            type="checkbox"
+        <div className="flex items-center gap-2">
+          <Switch
+            id="hide-disqualified"
             checked={hideSkip}
-            onChange={e => setHideSkip(e.target.checked)}
-            className="rounded border-gray-300"
+            onCheckedChange={setHideSkip}
           />
-          Hide disqualified
-          {hideSkip && hiddenSkipCount > 0 && (
-            <span className="text-[10px] text-gray-400">({hiddenSkipCount} hidden)</span>
-          )}
-        </label>
+          <Label htmlFor="hide-disqualified" className="text-xs text-gray-600 cursor-pointer select-none">
+            Hide disqualified
+            {hideSkip && hiddenSkipCount > 0 && (
+              <span className="text-[10px] text-gray-400 ml-1">({hiddenSkipCount} hidden)</span>
+            )}
+          </Label>
+        </div>
       </div>
 
       {/* Table */}
@@ -858,6 +917,77 @@ export default function DiscoveryPanel() {
             >
               {scanning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {scanning ? 'Scanning...' : 'Start Scan'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* POC enrichment confirmation dialog */}
+      <Dialog open={enrichDialogOpen} onOpenChange={setEnrichDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Find POCs for {missingPocCount} prospect{missingPocCount !== 1 ? 's' : ''}?</DialogTitle>
+            <DialogDescription>
+              For each of the {missingPocCount} discovered prospect{missingPocCount !== 1 ? 's' : ''} without a POC,
+              Claude will use web_search to find 1-3 decision-maker handles from project team pages,
+              X bios, and crypto directories — prioritizing Telegram.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-sm">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 text-xs">
+              <p className="font-semibold mb-1 flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Estimated cost
+              </p>
+              <p>
+                ~$0.05–$0.15 per prospect. For {missingPocCount} prospect{missingPocCount !== 1 ? 's' : ''}:
+                roughly <strong>${(missingPocCount * 0.05).toFixed(2)} to ${(missingPocCount * 0.15).toFixed(2)}</strong>.
+              </p>
+              <p className="mt-1">
+                Duration: ~5-15s per prospect (sequential, to stay under web_search rate limits).
+                Estimated total: <strong>{Math.round(missingPocCount * 10 / 60)}-{Math.round(missingPocCount * 15 / 60)} min</strong>.
+              </p>
+            </div>
+
+            {lastEnrichResult && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
+                <div className="font-semibold text-gray-700">Last run</div>
+                {lastEnrichResult.error ? (
+                  <div className="text-red-600 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {lastEnrichResult.error}
+                  </div>
+                ) : (
+                  <>
+                    <div>Enriched: {lastEnrichResult.enriched} · Failed: {lastEnrichResult.failed}</div>
+                    <div>Cost: ${lastEnrichResult.cost_usd?.toFixed(3) ?? '—'} · Duration: {Math.round((lastEnrichResult.duration_ms || 0) / 1000)}s</div>
+                    {lastEnrichResult.errors?.length > 0 && (
+                      <div className="text-amber-700 mt-1">
+                        {lastEnrichResult.errors.length} error{lastEnrichResult.errors.length !== 1 ? 's' : ''}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEnrichDialogOpen(false)} disabled={enriching}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                setEnrichDialogOpen(false);
+                await runPocEnrichment();
+              }}
+              disabled={enriching || missingPocCount === 0}
+              style={{ backgroundColor: 'var(--brand)', color: 'white' }}
+              className="hover:opacity-90"
+            >
+              {enriching && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {enriching ? 'Finding POCs...' : `Find ${missingPocCount} POC${missingPocCount !== 1 ? 's' : ''}`}
             </Button>
           </DialogFooter>
         </DialogContent>
