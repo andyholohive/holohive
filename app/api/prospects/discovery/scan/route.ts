@@ -701,6 +701,19 @@ export async function POST(request: Request) {
       .eq('id', runId);
   };
 
+  // Progressive progress updates — the scan dialog polls these via
+  // GET /api/prospects/discovery/progress to render a live progress bar.
+  // Non-blocking best-effort: failures don't break the scan.
+  const updateProgress = async (progress: Record<string, any>) => {
+    if (!runId) return;
+    try {
+      await (supabase as any)
+        .from('agent_runs')
+        .update({ output_summary: progress })
+        .eq('id', runId);
+    } catch { /* ignore — progress updates shouldn't fail the scan */ }
+  };
+
   try {
     const body = await request.json().catch(() => ({}));
     const recencyDays = Math.max(1, Math.min(365, Number(body.recency_days) || 30));
@@ -716,6 +729,12 @@ export async function POST(request: Request) {
     const anthropic = getClaudeClient();
 
     // ── Stage 1 ──────────────────────────────────────────────────────
+    await updateProgress({
+      stage: 'discovering_candidates',
+      message: 'Finding candidates on DropsTab...',
+      percent: 5,
+    });
+
     const stage1 = await findCandidates(anthropic, model, {
       recencyDays,
       minRaise,
@@ -755,8 +774,47 @@ export async function POST(request: Request) {
       batches.push(stage1.candidates.slice(i, i + BATCH_SIZE));
     }
 
+    await updateProgress({
+      stage: 'enriching',
+      message: `Enriching ${stage1.candidates.length} candidates in ${batches.length} parallel batches...`,
+      candidates_found: stage1.candidates.length,
+      batches_total: batches.length,
+      batches_complete: 0,
+      percent: 25,
+    });
+
+    // Wrap each batch to write progress as it finishes. Promise.allSettled
+    // still waits for ALL, but the individual wrappers patch output_summary
+    // as they settle — so the client sees batches_complete climb in real time.
+    let batchesCompleted = 0;
     const batchResults = await Promise.allSettled(
-      batches.map(batch => enrichBatch(anthropic, model, batch)),
+      batches.map(async (batch, i) => {
+        try {
+          const result = await enrichBatch(anthropic, model, batch);
+          batchesCompleted++;
+          await updateProgress({
+            stage: 'enriching',
+            message: `Enriched batch ${batchesCompleted} of ${batches.length}...`,
+            candidates_found: stage1.candidates.length,
+            batches_total: batches.length,
+            batches_complete: batchesCompleted,
+            // Scale 25% (start of stage 2) to 90% (end of stage 2)
+            percent: Math.round(25 + (65 * batchesCompleted) / batches.length),
+          });
+          return result;
+        } catch (err) {
+          batchesCompleted++;
+          await updateProgress({
+            stage: 'enriching',
+            message: `Batch ${batchesCompleted} of ${batches.length} failed, continuing...`,
+            candidates_found: stage1.candidates.length,
+            batches_total: batches.length,
+            batches_complete: batchesCompleted,
+            percent: Math.round(25 + (65 * batchesCompleted) / batches.length),
+          });
+          throw err;
+        }
+      }),
     );
 
     const allProjects: DiscoveredProject[] = [];
@@ -777,6 +835,12 @@ export async function POST(request: Request) {
     }
 
     // ── Write to DB ──────────────────────────────────────────────────
+    await updateProgress({
+      stage: 'writing',
+      message: `Saving ${allProjects.length} enriched prospects...`,
+      percent: 92,
+    });
+
     let inserted = 0;
     let updated = 0;
     let signalsAdded = 0;

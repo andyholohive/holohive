@@ -20,6 +20,7 @@ import {
   Sparkles, Loader2, ExternalLink, Send, Twitter, Globe,
   ChevronDown, ChevronRight as ChevronRightIcon, CheckCircle, XCircle,
   ArrowRight, AlertTriangle, RefreshCw, UserSearch, Eye, Zap,
+  ArrowUp, ArrowDown, ArrowUpDown,
 } from 'lucide-react';
 
 interface Trigger {
@@ -170,6 +171,30 @@ export default function DiscoveryPanel() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [hideSkip, setHideSkip] = useState<boolean>(true);
 
+  // Column sort state — cycles through none → asc → desc → none
+  type SortField = 'tier' | 'score' | 'funding' | null;
+  const [sort, setSort] = useState<{ field: SortField; direction: 'asc' | 'desc' }>({
+    field: null,
+    direction: 'asc',
+  });
+  const toggleSort = (field: Exclude<SortField, null>) => {
+    setSort(prev => {
+      if (prev.field !== field) return { field, direction: 'asc' };
+      if (prev.direction === 'asc') return { field, direction: 'desc' };
+      return { field: null, direction: 'asc' }; // clear
+    });
+  };
+
+  // Order used to rank tiers (lower index = "hotter")
+  const TIER_ORDER: Record<string, number> = {
+    REACH_OUT_NOW: 0,
+    PRE_TOKEN_PRIORITY: 1,
+    RESEARCH: 2,
+    WATCH: 3,
+    NURTURE: 4,
+    SKIP: 5,
+  };
+
   const [scanOpen, setScanOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanParams, setScanParams] = useState({
@@ -180,6 +205,17 @@ export default function DiscoveryPanel() {
     model: 'opus' as 'sonnet' | 'opus',
   });
   const [lastScanResult, setLastScanResult] = useState<any>(null);
+
+  // Live progress (polled from /api/prospects/discovery/progress while scanning)
+  const [scanProgress, setScanProgress] = useState<{
+    stage: string | null;
+    message: string | null;
+    percent: number | null;
+    candidates_found: number | null;
+    batches_total: number | null;
+    batches_complete: number | null;
+  } | null>(null);
+  const progressPollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
   // POC enrichment state
   const [enrichDialogOpen, setEnrichDialogOpen] = useState(false);
@@ -213,9 +249,55 @@ export default function DiscoveryPanel() {
     });
   };
 
+  // Start polling the progress endpoint. Anchors on the scan's start-time
+  // so we don't confuse the UI by showing an unrelated prior run's progress.
+  const startProgressPolling = (scanStartedAt: number) => {
+    setScanProgress({
+      stage: 'starting',
+      message: 'Starting scan...',
+      percent: 1,
+      candidates_found: null,
+      batches_total: null,
+      batches_complete: null,
+    });
+    if (progressPollRef.current) clearInterval(progressPollRef.current);
+    progressPollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch('/api/prospects/discovery/progress', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        // Only trust this row if it represents OUR scan: started_at after we fired POST.
+        // Allow 5s grace because the server inserts the row after the POST arrives.
+        const rowStartMs = data.started_at ? new Date(data.started_at).getTime() : 0;
+        if (rowStartMs < scanStartedAt - 5000) return;
+        if (data.progress) setScanProgress(data.progress);
+        if (data.status === 'completed' || data.status === 'failed') {
+          stopProgressPolling();
+        }
+      } catch {
+        // swallow — the POST will still return the real result
+      }
+    }, 2000);
+  };
+
+  const stopProgressPolling = () => {
+    if (progressPollRef.current) {
+      clearInterval(progressPollRef.current);
+      progressPollRef.current = null;
+    }
+  };
+
+  React.useEffect(() => {
+    return () => stopProgressPolling();
+  }, []);
+
   const runScan = async () => {
     setScanning(true);
     setLastScanResult(null);
+    setScanProgress(null);
+    const scanStartedAt = Date.now();
+    startProgressPolling(scanStartedAt);
+
     try {
       const body: any = {
         recency_days: parseInt(scanParams.recency_days, 10) || 30,
@@ -233,6 +315,15 @@ export default function DiscoveryPanel() {
       });
       const data = await res.json();
       setLastScanResult(data);
+      stopProgressPolling();
+      setScanProgress({
+        stage: res.ok && !data.error ? 'done' : 'failed',
+        message: res.ok && !data.error ? 'Scan complete' : (data.error || 'Scan failed'),
+        percent: 100,
+        candidates_found: data.candidates_found ?? null,
+        batches_total: data.batches_run ?? null,
+        batches_complete: data.batches_run ?? null,
+      });
 
       if (!res.ok || data.error) {
         toast({ title: 'Scan failed', description: data.error || 'Unknown error', variant: 'destructive' });
@@ -246,6 +337,7 @@ export default function DiscoveryPanel() {
     } catch (err: any) {
       toast({ title: 'Error', description: err?.message ?? 'Scan failed', variant: 'destructive' });
     } finally {
+      stopProgressPolling();
       setScanning(false);
     }
   };
@@ -300,9 +392,37 @@ export default function DiscoveryPanel() {
   // Apply client-side "hide disqualified" filter. We ALWAYS keep disqualified
   // prospects in state so flipping the toggle off shows them immediately
   // (no refetch needed) — satisfies the "show rejects with reason" requirement.
-  const filteredProspects = hideSkip
+  const filteredProspectsUnsorted = hideSkip
     ? prospects.filter(p => p.discovery_action_tier !== 'SKIP')
     : prospects;
+
+  // Apply sort if a column is selected
+  const filteredProspects = (() => {
+    if (!sort.field) return filteredProspectsUnsorted;
+    const copy = [...filteredProspectsUnsorted];
+    const dir = sort.direction === 'asc' ? 1 : -1;
+    copy.sort((a, b) => {
+      switch (sort.field) {
+        case 'tier': {
+          const av = TIER_ORDER[a.discovery_action_tier || 'SKIP'] ?? 99;
+          const bv = TIER_ORDER[b.discovery_action_tier || 'SKIP'] ?? 99;
+          return (av - bv) * dir;
+        }
+        case 'score': {
+          const av = a.prospect_score?.total ?? -1;
+          const bv = b.prospect_score?.total ?? -1;
+          return (av - bv) * dir;
+        }
+        case 'funding': {
+          const av = a.funding?.amount_usd ?? -1;
+          const bv = b.funding?.amount_usd ?? -1;
+          return (av - bv) * dir;
+        }
+      }
+      return 0;
+    });
+    return copy;
+  })();
   const hiddenSkipCount = hideSkip
     ? prospects.filter(p => p.discovery_action_tier === 'SKIP').length
     : 0;
@@ -491,10 +611,58 @@ export default function DiscoveryPanel() {
                 <TableHead className="w-8"></TableHead>
                 <TableHead>Project</TableHead>
                 <TableHead>Category</TableHead>
-                <TableHead>Funding</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('funding')}
+                    className="flex items-center gap-1 group hover:text-gray-900"
+                    title="Sort by funding amount"
+                  >
+                    <span>Funding</span>
+                    {sort.field === 'funding' ? (
+                      sort.direction === 'asc'
+                        ? <ArrowUp className="h-3 w-3" />
+                        : <ArrowDown className="h-3 w-3" />
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />
+                    )}
+                  </button>
+                </TableHead>
                 <TableHead>Triggers</TableHead>
-                <TableHead>Tier</TableHead>
-                <TableHead>Score</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('tier')}
+                    className="flex items-center gap-1 group hover:text-gray-900"
+                    title="Sort by action tier (hot leads first)"
+                  >
+                    <span>Tier</span>
+                    {sort.field === 'tier' ? (
+                      sort.direction === 'asc'
+                        ? <ArrowUp className="h-3 w-3" />
+                        : <ArrowDown className="h-3 w-3" />
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('score')}
+                    className="flex items-center gap-1 group hover:text-gray-900"
+                    title="Sort by prospect score"
+                  >
+                    <span>Score</span>
+                    {sort.field === 'score' ? (
+                      sort.direction === 'asc'
+                        ? <ArrowUp className="h-3 w-3" />
+                        : <ArrowDown className="h-3 w-3" />
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />
+                    )}
+                  </button>
+                </TableHead>
                 <TableHead>POC</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -990,6 +1158,44 @@ export default function DiscoveryPanel() {
                 Opus is better at POC accuracy and edge-case ICP judgment. Sonnet is fine for bulk/experimental scans. Scans now run in parallel batches with prompt caching, so costs are 2-3x lower than before.
               </p>
             </div>
+
+            {/* Live progress (while scanning) */}
+            {scanning && scanProgress && (
+              <div className="rounded-lg border border-[#3e8692]/40 bg-[#e8f4f5] p-3 text-xs space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-3.5 w-3.5 text-[#3e8692] animate-spin shrink-0" />
+                    <span className="font-semibold text-gray-800">
+                      {scanProgress.message || 'Scanning...'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-gray-600 tabular-nums">
+                    {typeof scanProgress.percent === 'number' ? `${scanProgress.percent}%` : ''}
+                  </span>
+                </div>
+                {/* Progress bar */}
+                <div className="h-1.5 w-full rounded-full bg-white/60 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-[width] duration-500 ease-out"
+                    style={{
+                      width: `${Math.max(2, Math.min(100, scanProgress.percent ?? 0))}%`,
+                      backgroundColor: 'var(--brand)',
+                    }}
+                  />
+                </div>
+                {/* Sub-details */}
+                {(scanProgress.candidates_found != null || scanProgress.batches_total != null) && (
+                  <div className="text-[10px] text-gray-600 flex items-center gap-3">
+                    {scanProgress.candidates_found != null && (
+                      <span>Candidates: {scanProgress.candidates_found}</span>
+                    )}
+                    {scanProgress.batches_total != null && (
+                      <span>Batches: {scanProgress.batches_complete ?? 0} / {scanProgress.batches_total}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {lastScanResult && (
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
