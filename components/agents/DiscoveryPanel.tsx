@@ -26,8 +26,19 @@ interface Trigger {
   headline: string;
   detail?: string | null;
   source_url?: string | null;
+  source_type?: 'tweet' | 'article' | 'other' | null;
   weight?: number;
   detected_at: string;
+}
+
+interface OutreachContact {
+  name: string;
+  role: string;
+  twitter_handle?: string;
+  telegram_handle?: string;
+  source_url?: string;
+  confidence: 'high' | 'medium' | 'low';
+  notes?: string;
 }
 
 interface DiscoveryProspect {
@@ -36,8 +47,8 @@ interface DiscoveryProspect {
   symbol: string | null;
   category: string | null;
   website_url: string | null;
-  twitter_url: string | null;
-  telegram_url: string | null;
+  twitter_url: string | null;          // project-level (community)
+  telegram_url: string | null;         // project-level (community)
   source_url: string | null;
   status: string;
   scraped_at: string;
@@ -45,10 +56,10 @@ interface DiscoveryProspect {
   korea_relevancy_score: number;
   icp_score: number;
   action_tier: string | null;
+  outreach_contacts: OutreachContact[];
   triggers: Trigger[];
   fit_reasoning: string | null;
   fit_score: number | null;
-  contact_confidence: 'high' | 'medium' | 'low' | null;
   funding: {
     round: string | null;
     amount_usd: number | null;
@@ -70,6 +81,23 @@ const CONTACT_CONFIDENCE_STYLE: Record<string, string> = {
   medium: 'bg-amber-100 text-amber-700',
   low: 'bg-gray-100 text-gray-600',
 };
+
+/** Normalize a twitter handle or URL to a clickable URL */
+function twitterUrl(handle?: string): string | null {
+  if (!handle) return null;
+  if (handle.startsWith('http')) return handle;
+  const clean = handle.replace(/^@/, '').trim();
+  if (!clean) return null;
+  return `https://x.com/${clean}`;
+}
+/** Normalize a telegram handle or URL to a clickable URL */
+function telegramUrl(handle?: string): string | null {
+  if (!handle) return null;
+  if (handle.startsWith('http')) return handle;
+  const clean = handle.replace(/^@/, '').trim();
+  if (!clean) return null;
+  return `https://t.me/${clean}`;
+}
 
 function formatSignalType(s: string): string {
   return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -265,7 +293,7 @@ export default function DiscoveryPanel() {
                 <TableHead>Funding</TableHead>
                 <TableHead>Triggers</TableHead>
                 <TableHead>Fit</TableHead>
-                <TableHead>Contacts</TableHead>
+                <TableHead>POC</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -342,55 +370,51 @@ export default function DiscoveryPanel() {
                         ) : '—'}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          {p.twitter_url && (
-                            <a
-                              href={p.twitter_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={e => e.stopPropagation()}
-                              className="text-gray-500 hover:text-[#1DA1F2]"
-                              title={p.twitter_url}
-                            >
-                              <Twitter className="h-4 w-4" />
-                            </a>
-                          )}
-                          {p.telegram_url && (
-                            <a
-                              href={p.telegram_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={e => e.stopPropagation()}
-                              className="text-gray-500 hover:text-[#229ED9]"
-                              title={p.telegram_url}
-                            >
-                              <Send className="h-4 w-4" />
-                            </a>
-                          )}
-                          {p.website_url && (
-                            <a
-                              href={p.website_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={e => e.stopPropagation()}
-                              className="text-gray-500 hover:text-gray-900"
-                              title={p.website_url}
-                            >
-                              <Globe className="h-4 w-4" />
-                            </a>
-                          )}
-                          {p.contact_confidence && (
-                            <span
-                              className={`text-[9px] font-semibold px-1 py-0.5 rounded pointer-events-none ${CONTACT_CONFIDENCE_STYLE[p.contact_confidence]}`}
-                              title={`Contact confidence: ${p.contact_confidence}`}
-                            >
-                              {p.contact_confidence[0].toUpperCase()}
+                        {p.outreach_contacts && p.outreach_contacts.length > 0 ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-medium text-gray-700">
+                              {p.outreach_contacts[0].name}
+                              <span className="text-gray-400 ml-1">· {p.outreach_contacts[0].role}</span>
                             </span>
-                          )}
-                          {!p.twitter_url && !p.telegram_url && !p.website_url && (
-                            <span className="text-xs text-gray-400">—</span>
-                          )}
-                        </div>
+                            <div className="flex items-center gap-1.5">
+                              {twitterUrl(p.outreach_contacts[0].twitter_handle) && (
+                                <a
+                                  href={twitterUrl(p.outreach_contacts[0].twitter_handle)!}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={e => e.stopPropagation()}
+                                  className="text-gray-500 hover:text-[#1DA1F2]"
+                                  title={p.outreach_contacts[0].twitter_handle}
+                                >
+                                  <Twitter className="h-3.5 w-3.5" />
+                                </a>
+                              )}
+                              {telegramUrl(p.outreach_contacts[0].telegram_handle) && (
+                                <a
+                                  href={telegramUrl(p.outreach_contacts[0].telegram_handle)!}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={e => e.stopPropagation()}
+                                  className="text-gray-500 hover:text-[#229ED9]"
+                                  title={p.outreach_contacts[0].telegram_handle}
+                                >
+                                  <Send className="h-3.5 w-3.5" />
+                                </a>
+                              )}
+                              <span
+                                className={`text-[9px] font-semibold px-1 py-0.5 rounded pointer-events-none ${CONTACT_CONFIDENCE_STYLE[p.outreach_contacts[0].confidence]}`}
+                                title={`Confidence: ${p.outreach_contacts[0].confidence}`}
+                              >
+                                {p.outreach_contacts[0].confidence[0].toUpperCase()}
+                              </span>
+                              {p.outreach_contacts.length > 1 && (
+                                <span className="text-[10px] text-gray-500">+{p.outreach_contacts.length - 1}</span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">No POC found</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
@@ -455,6 +479,99 @@ export default function DiscoveryPanel() {
                               </div>
                             )}
 
+                            {/* Outreach contacts — the humans to DM */}
+                            <div className="md:col-span-2">
+                              <h4 className="font-semibold text-gray-700 mb-2">
+                                Outreach POCs ({p.outreach_contacts?.length || 0})
+                                <span className="font-normal text-xs text-gray-500 ml-2">— individual handles for cold BD, not the project community channel</span>
+                              </h4>
+                              {!p.outreach_contacts || p.outreach_contacts.length === 0 ? (
+                                <p className="text-xs text-gray-500 italic">No decision-maker handles found. Worth a manual search on X.</p>
+                              ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                  {p.outreach_contacts.map((c, i) => (
+                                    <div key={i} className="bg-white border rounded-lg p-2.5 text-xs">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="font-semibold text-gray-900">{c.name}</span>
+                                            <span className={`text-[9px] font-semibold px-1 py-0.5 rounded pointer-events-none ${CONTACT_CONFIDENCE_STYLE[c.confidence]}`}>
+                                              {c.confidence}
+                                            </span>
+                                          </div>
+                                          <div className="text-gray-500 text-[11px]">{c.role}</div>
+                                          {c.notes && (
+                                            <p className="text-gray-600 text-[11px] mt-1">{c.notes}</p>
+                                          )}
+                                          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                            {twitterUrl(c.twitter_handle) && (
+                                              <a
+                                                href={twitterUrl(c.twitter_handle)!}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-[11px] text-gray-600 hover:text-[#1DA1F2] flex items-center gap-1"
+                                              >
+                                                <Twitter className="h-3 w-3" />
+                                                {c.twitter_handle?.replace(/^https?:\/\/[^/]+\//, '@').replace(/^@@/, '@')}
+                                              </a>
+                                            )}
+                                            {telegramUrl(c.telegram_handle) ? (
+                                              <a
+                                                href={telegramUrl(c.telegram_handle)!}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-[11px] text-gray-600 hover:text-[#229ED9] flex items-center gap-1"
+                                              >
+                                                <Send className="h-3 w-3" />
+                                                {c.telegram_handle?.replace(/^https?:\/\/[^/]+\//, '@').replace(/^@@/, '@')}
+                                              </a>
+                                            ) : (
+                                              <span className="text-[10px] text-amber-600 italic">No TG found</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        {c.source_url && (
+                                          <a
+                                            href={c.source_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-gray-400 hover:text-gray-700 shrink-0"
+                                            title="Where we found this contact"
+                                          >
+                                            <ExternalLink className="h-3 w-3" />
+                                          </a>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Project community channels (for monitoring, not outreach) */}
+                            {(p.twitter_url || p.telegram_url || p.website_url) && (
+                              <div className="md:col-span-2">
+                                <h4 className="font-semibold text-gray-700 mb-1 text-xs">Community channels <span className="font-normal text-gray-500">(not for outreach)</span></h4>
+                                <div className="flex items-center gap-3 text-xs">
+                                  {p.website_url && (
+                                    <a href={p.website_url} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-gray-900 flex items-center gap-1">
+                                      <Globe className="h-3 w-3" /> Website
+                                    </a>
+                                  )}
+                                  {p.twitter_url && (
+                                    <a href={p.twitter_url} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#1DA1F2] flex items-center gap-1">
+                                      <Twitter className="h-3 w-3" /> Project X
+                                    </a>
+                                  )}
+                                  {p.telegram_url && (
+                                    <a href={p.telegram_url} target="_blank" rel="noopener noreferrer" className="text-gray-600 hover:text-[#229ED9] flex items-center gap-1">
+                                      <Send className="h-3 w-3" /> Community TG
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
                             {/* All triggers */}
                             <div className="md:col-span-2">
                               <h4 className="font-semibold text-gray-700 mb-2">Triggers ({p.triggers.length})</h4>
@@ -467,6 +584,16 @@ export default function DiscoveryPanel() {
                                           <Badge variant="outline" className="text-[10px] pointer-events-none">
                                             {formatSignalType(t.signal_type)}
                                           </Badge>
+                                          {t.source_type && (
+                                            <Badge
+                                              variant="outline"
+                                              className={`text-[10px] pointer-events-none ${
+                                                t.source_type === 'tweet' ? 'bg-[#e8f4f5] text-[#1DA1F2]' : ''
+                                              }`}
+                                            >
+                                              {t.source_type === 'tweet' ? 'X' : t.source_type}
+                                            </Badge>
+                                          )}
                                           {t.weight && (
                                             <span className="text-[10px] text-gray-500">weight: {t.weight}</span>
                                           )}

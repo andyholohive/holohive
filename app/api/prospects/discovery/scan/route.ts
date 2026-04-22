@@ -28,29 +28,40 @@ export const maxDuration = 300;
  *   }
  */
 
+interface OutreachContact {
+  name: string;
+  role: string;
+  twitter_handle?: string;
+  telegram_handle?: string;
+  source_url?: string;
+  confidence: 'high' | 'medium' | 'low';
+  notes?: string;
+}
+
 interface DiscoveredProject {
   name: string;
   symbol?: string | null;
   category?: string | null;
   website_url?: string | null;
-  twitter_url?: string | null;
-  telegram_url?: string | null;
+  project_twitter_url?: string | null;
+  project_telegram_url?: string | null;
   discord_url?: string | null;
   dropstab_url?: string | null;
-  contact_confidence?: 'high' | 'medium' | 'low';
   funding_round?: string | null;
   funding_amount_usd?: number | null;
   funding_date?: string | null;
   investors?: string[];
+  outreach_contacts?: OutreachContact[];
   triggers?: Array<{
     signal_type: string;
     headline: string;
     detail?: string;
     source_url?: string;
+    source_type?: 'tweet' | 'article' | 'other';
     weight?: number;
   }>;
   fit_reasoning?: string;
-  fit_score?: number; // 0–100 Claude's subjective fit
+  fit_score?: number;
 }
 
 export async function POST(request: Request) {
@@ -107,49 +118,71 @@ export async function POST(request: Request) {
 
     const systemPrompt = `You are DISCOVERY, a BD research agent for HoloHive — a KOL marketing agency serving the Korean crypto market.
 
-Your job: find crypto projects that are prime reach-out candidates RIGHT NOW.
+Your job: find crypto projects that are prime reach-out candidates RIGHT NOW, and surface individual humans on the team who could be DM'd.
 
-Our ICP (Ideal Customer Profile):
+## ICP (Ideal Customer Profile)
 - Raised $${minRaise.toLocaleString()}+ in the last ${recencyDays} days
 - Pre-TGE OR recent TGE, OR planning a token launch
 - Any sign of Korea / APAC market interest (ideal but not required)
 - Active team, not dormant
 - Categories we serve well: DeFi, Gaming, AI, Infrastructure, L1/L2, RWA, DePIN${categories.length > 0 ? `\n- User-specified category filter: ${categories.join(', ')}` : ''}
 
-For each project, identify OUTREACH TRIGGERS — specific reasons NOW is the moment:
+## Finding triggers (THE BAR IS HIGH)
+Primary source for triggers is **Twitter/X — both the project account AND team members' personal accounts**. This is where founders announce raises, TGE dates, Korea plans, partnerships, etc. — usually weeks before news coverage.
+
+- Search: "site:x.com <project> raise", "site:x.com <founder> Korea", etc.
+- Read the project's pinned tweet, last 5-10 tweets, and key team members' recent posts
+- Only fall back to news articles (TokenPost, BlockMedia, Decrypt) if nothing on X
+
+Trigger types (use these signal_type slugs, or invent snake_case new ones if needed):
 - "recent_raise" — closed a round in the last 30 days
-- "tge_within_60d" — token launch scheduled or likely in <60 days
+- "tge_within_60d" — token launch scheduled in <60 days
 - "korea_expansion_announce" — announced Korea market entry
 - "korea_exchange_listing" — listed or about to list on Upbit / Bithumb
-- "korea_job_posting" — hiring Korean-speaking staff / community manager
+- "korea_job_posting" — hiring Korean-speaking staff
 - "mainnet_launch" — mainnet going live soon
 - "airdrop_announcement" — airdrop coming
 - "partnership_announcement" — major partnership
-- "leadership_change" — new CMO/BD hire
+- "leadership_change" — new CMO/BD/Growth hire
 - "ecosystem_asia_initiative" — Asia-focused grants/initiatives
+- "founder_active_on_x" — founder has been posting actively about growth
 
-Primary source: https://dropstab.com (browse funding rounds, coin pages for contact links and tokenomics).
-Also valid: CryptoRank, Messari, project websites, Twitter announcements, Korean crypto news (TokenPost, BlockMedia).
+Every trigger's \`source_url\` should ideally be a specific tweet URL (x.com or twitter.com) that evidences it. If using a news article, that's fine — just make sure the URL points to the exact piece.
 
-CONTACT LOOKUP: From DropsTab project pages (or the project's own site), find:
-- Twitter/X URL (project official account)
-- Telegram URL (project official channel or group)
-Rate your confidence: "high" if on dropstab/official site, "medium" if from reputable secondary, "low" if inferred.
+## Contacts — CRITICAL
+HoloHive does **cold BD outreach via Telegram DM**. We do NOT want to join the project's community channel. We want the DECISION-MAKER's personal handle — someone who can say yes to a KOL campaign.
 
-HOW TO RESPOND:
-Use web_search to gather evidence (DropsTab funding pages, project profiles, Twitter announcements, news, etc.). Make as many searches as you need — you have up to 30. When you have your findings, call the submit_discoveries tool EXACTLY ONCE with the final list.
+For each project, try to identify **1-3 humans on the team** — prioritizing in order:
+  1. CEO / Founder (best)
+  2. CMO / Head of Marketing / Head of Growth
+  3. BD lead / Head of BD
+  4. Community lead / Ecosystem lead (last resort — they usually gate-keep)
 
-Do NOT reply with plain text JSON. Do NOT wrap anything in markdown. Only call the submit_discoveries tool.
+For each contact, look for:
+- Their **X/Twitter handle** (usually in the project's team page or their tweets)
+- Their **Telegram handle** — often put in their X bio specifically for cold DMs. Search "<person name> telegram" or read their bio.
+- Confidence rating: "high" = found it on their verified X bio or project team page; "medium" = found it via crypto directory or second-hand mention; "low" = guessed from similar name patterns (DON'T return low-confidence contacts unless it's the only lead).
 
-Return at most ${maxProjects} projects, sorted by fit_score descending. Every project must have at least one trigger and a fit_reasoning. If you cannot find ${maxProjects} qualifying projects, return fewer — quality over quantity.`;
+If you can't find any personal handle for a project, return an empty \`outreach_contacts\` array — that's fine. Empty is better than fabricated.
 
-    const userPrompt = `Find the top ${maxProjects} crypto projects that HoloHive should reach out to this week.
+The \`project_twitter_url\` and \`project_telegram_url\` fields are for the project's community channels — useful for monitoring, NOT outreach.
 
-Start on https://dropstab.com/tab/by-raised-funds to see recent raises. For each promising project, open its DropsTab coin page to get Twitter + Telegram URLs and investor list. Cross-reference with Twitter announcements and Korean crypto news for outreach triggers.
+## How to respond
+Use web_search to gather evidence. You have up to 30 searches. When done, call \`submit_discoveries\` EXACTLY ONCE with the final list.
 
-Focus on the last ${recencyDays} days. Minimum raise: $${minRaise.toLocaleString()}.
+Do NOT reply with plain text. Only call the tool.
 
-When you have your findings, call the submit_discoveries tool with the final list. Every project you submit must have at least one trigger and a fit_reasoning.`;
+Return at most ${maxProjects} projects, sorted by fit_score descending. Every project must have at least one trigger and a fit_reasoning. Quality over quantity — return fewer if that means better data.`;
+
+    const userPrompt = `Find the top ${maxProjects} crypto projects HoloHive should DM this week.
+
+Process per project:
+  1. Start on https://dropstab.com/tab/by-raised-funds or equivalent to identify candidates (recent raise in last ${recencyDays} days, $${minRaise.toLocaleString()}+ raised).
+  2. Open the project's X/Twitter account. Read the pinned tweet + last ~10 tweets. Pull triggers from what the team is saying RIGHT NOW — raises, TGE dates, Korea plans, new hires. Each trigger's source_url should be a tweet URL where possible.
+  3. Identify 1-3 decision-makers on the team (CEO > CMO > BD > Community). For each, find their personal X handle and — if possible — their Telegram handle from their X bio or crypto directories. Rate confidence per contact.
+  4. Fit_reasoning: 1-2 sentences on why this project would be a good HoloHive client.
+
+Call submit_discoveries when done. If a project has no triggers from X and only news mentions, include it but lower its fit_score.`;
 
     // Structured output via a custom tool. Claude uses web_search to gather
     // evidence, then calls submit_discoveries with the final structured list
@@ -169,24 +202,41 @@ When you have your findings, call the submit_discoveries tool with the final lis
                 symbol: { type: 'string' },
                 category: { type: 'string' },
                 website_url: { type: 'string' },
-                twitter_url: { type: 'string' },
-                telegram_url: { type: 'string' },
+                project_twitter_url: { type: 'string', description: "Project's official X/Twitter URL — community channel, NOT for outreach" },
+                project_telegram_url: { type: 'string', description: "Project's public Telegram channel URL — for community/announcements, NOT for outreach" },
                 discord_url: { type: 'string' },
                 dropstab_url: { type: 'string' },
-                contact_confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
                 funding_round: { type: 'string' },
                 funding_amount_usd: { type: 'number' },
                 funding_date: { type: 'string', description: 'ISO YYYY-MM-DD if known' },
                 investors: { type: 'array', items: { type: 'string' } },
+                outreach_contacts: {
+                  type: 'array',
+                  description: 'Individual decision-makers at the project to DM directly. Prefer CEO/Founder > CMO > BD. Empty array is fine — better than fabricated.',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      name: { type: 'string', description: 'Person\'s full name' },
+                      role: { type: 'string', description: 'e.g. CEO, Founder, CMO, Head of BD, Head of Growth' },
+                      twitter_handle: { type: 'string', description: 'Their personal X handle, e.g. "@alice" or full URL' },
+                      telegram_handle: { type: 'string', description: 'Their personal Telegram handle for cold DM. Empty if not findable.' },
+                      source_url: { type: 'string', description: 'Where you found this info (X bio, team page, etc.)' },
+                      confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+                      notes: { type: 'string', description: 'Optional: recent activity or why they\'re the right POC' },
+                    },
+                    required: ['name', 'role', 'confidence'],
+                  },
+                },
                 triggers: {
                   type: 'array',
                   items: {
                     type: 'object',
                     properties: {
-                      signal_type: { type: 'string', description: 'e.g. recent_raise, tge_within_60d, korea_expansion_announce' },
+                      signal_type: { type: 'string', description: 'e.g. recent_raise, tge_within_60d, korea_expansion_announce, founder_active_on_x' },
                       headline: { type: 'string', description: 'Short summary, <80 chars' },
-                      detail: { type: 'string', description: '1-2 sentences of context' },
-                      source_url: { type: 'string' },
+                      detail: { type: 'string', description: '1-2 sentences of context. Quote the tweet if applicable.' },
+                      source_url: { type: 'string', description: 'Ideally a specific tweet URL (x.com / twitter.com) — fall back to article URL only if no tweet available' },
+                      source_type: { type: 'string', enum: ['tweet', 'article', 'other'], description: 'Where the trigger was found' },
                       weight: { type: 'number', description: '5-25, higher = stronger trigger' },
                     },
                     required: ['signal_type', 'headline'],
@@ -288,15 +338,22 @@ When you have your findings, call the submit_discoveries tool with the final lis
 
       let prospectId: string | null = existing?.id ?? null;
 
+      // Filter out low-confidence contacts — keep high + medium.
+      // If nothing but low is available, keep low so we don't throw away leads,
+      // but the UI will flag them.
+      const contacts = (p.outreach_contacts || []).filter(c => c && c.name && c.role);
+
       const prospectFields: Record<string, any> = {
         name: p.name,
         symbol: p.symbol ?? null,
         category: p.category ?? null,
         website_url: p.website_url ?? null,
-        twitter_url: p.twitter_url ?? null,
-        telegram_url: p.telegram_url ?? null,
+        // Project-level channels (community, not outreach)
+        twitter_url: p.project_twitter_url ?? null,
+        telegram_url: p.project_telegram_url ?? null,
         discord_url: p.discord_url ?? null,
         source_url: p.dropstab_url ?? null,
+        outreach_contacts: contacts,
         updated_at: new Date().toISOString(),
       };
 
@@ -319,12 +376,44 @@ When you have your findings, call the submit_discoveries tool with the final lis
         prospectId = ins.id;
         inserted++;
       } else {
-        // Existing prospect — only update fields we learned (don't overwrite with nulls)
+        // Existing prospect — only update fields we learned (don't overwrite with nulls).
+        // For outreach_contacts, MERGE with existing (dedup by name+role) rather than replace,
+        // so manual edits aren't blown away.
         const patch: Record<string, any> = { updated_at: new Date().toISOString() };
-        if (p.twitter_url && !prospectFields.twitter_url_existing) patch.twitter_url = p.twitter_url;
-        if (p.telegram_url) patch.telegram_url = p.telegram_url;
+        if (p.project_twitter_url) patch.twitter_url = p.project_twitter_url;
+        if (p.project_telegram_url) patch.telegram_url = p.project_telegram_url;
         if (p.category) patch.category = p.category;
         if (p.website_url) patch.website_url = p.website_url;
+
+        if (contacts.length > 0) {
+          const { data: currentProspect } = await (supabase as any)
+            .from('prospects')
+            .select('outreach_contacts')
+            .eq('id', prospectId)
+            .single();
+          const existingContacts: OutreachContact[] = currentProspect?.outreach_contacts || [];
+          const merged = [...existingContacts];
+          for (const newC of contacts) {
+            const match = merged.findIndex(e =>
+              e.name?.toLowerCase() === newC.name.toLowerCase() && e.role === newC.role,
+            );
+            if (match >= 0) {
+              // Update if new has higher confidence or fills missing fields
+              const cur = merged[match];
+              merged[match] = {
+                ...cur,
+                twitter_handle: cur.twitter_handle || newC.twitter_handle,
+                telegram_handle: cur.telegram_handle || newC.telegram_handle,
+                source_url: cur.source_url || newC.source_url,
+                notes: cur.notes || newC.notes,
+                confidence: newC.confidence === 'high' ? 'high' : cur.confidence,
+              };
+            } else {
+              merged.push(newC);
+            }
+          }
+          patch.outreach_contacts = merged;
+        }
         await (supabase as any).from('prospects').update(patch).eq('id', prospectId);
         updated++;
       }
@@ -360,7 +449,7 @@ When you have your findings, call the submit_discoveries tool with the final lis
             metadata: {
               fit_reasoning: p.fit_reasoning ?? null,
               fit_score: p.fit_score ?? null,
-              contact_confidence: p.contact_confidence ?? null,
+              source_type: trigger.source_type ?? null,
               funding: {
                 round: p.funding_round ?? null,
                 amount_usd: p.funding_amount_usd ?? null,

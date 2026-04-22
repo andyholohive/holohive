@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   let query = (supabase as any)
     .from('prospects')
     .select(
-      'id, name, symbol, category, website_url, twitter_url, telegram_url, discord_url, source_url, status, scraped_at, updated_at, korea_relevancy_score, icp_score, action_tier',
+      'id, name, symbol, category, website_url, twitter_url, telegram_url, discord_url, source_url, status, scraped_at, updated_at, korea_relevancy_score, icp_score, action_tier, outreach_contacts',
     )
     .eq('source', 'dropstab_discovery')
     .order('updated_at', { ascending: false })
@@ -68,11 +68,9 @@ export async function GET(request: Request) {
 
   const enriched = (prospects || []).map((p: any) => {
     const signals = signalsByProspect.get(p.id) || [];
-    // Pull the latest fit_reasoning + fit_score from the most recent signal
     const latest = signals[0];
     const fitReasoning = latest?.metadata?.fit_reasoning ?? null;
     const fitScore = latest?.metadata?.fit_score ?? null;
-    const contactConfidence = latest?.metadata?.contact_confidence ?? null;
     const funding = latest?.metadata?.funding ?? null;
     return {
       ...p,
@@ -82,12 +80,12 @@ export async function GET(request: Request) {
         headline: s.headline,
         detail: s.snippet,
         source_url: s.source_url,
+        source_type: s.metadata?.source_type ?? null,
         weight: s.relevancy_weight,
         detected_at: s.detected_at,
       })),
       fit_reasoning: fitReasoning,
       fit_score: fitScore,
-      contact_confidence: contactConfidence,
       funding,
     };
   });
