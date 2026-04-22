@@ -246,8 +246,23 @@ If a project passes all other 5 criteria but has NO Korea signal:
 ## TRIGGER HUNTING (X-FIRST)
 For each candidate, OPEN the project's X/Twitter account. Read the pinned tweet + last ~10 posts + key team members' recent posts. Triggers come primarily from X; only fall back to news if nothing useful on X.
 
+**CRITICAL — POC PERSONAL FEED CHECK**
+After identifying POCs (see next section), for the TOP-role POC (typically CEO/Founder), explicitly check THEIR personal X feed: pinned tweet + last 5 posts. If they mention ANY of:
+  - Korea, Seoul, KBW, Upbit, Bithumb, Hashed, Dunamu, Kakao
+  - Asia, APAC, Tokyo, Singapore (as lead-in to Korea interest)
+  - Korean conferences, meetups, partnerships
+  - Trips to Korea, hiring in Korea, Korean advisors
+Record it as a trigger with:
+  - signal_type: "poc_korea_mention"
+  - tier: "TIER_1" (it's a decision-maker's personal signal — highest possible)
+  - weight: 20-25
+  - source_type: "tweet"
+  - detail: "<POC name> (<role>) tweeted: '<short quote>' (<date>)"
+  - source_url: specific tweet URL
+This is the single highest-value trigger class for BD. Do not skip it if a POC is identified.
+
 Trigger types (snake_case):
-- TIER 1 (within 7d): tge_within_60d, korea_exchange_listing, mainnet_launching_this_month, korea_bd_hire, team_relocation_seoul
+- TIER 1 (within 7d): poc_korea_mention, tge_within_60d, korea_exchange_listing, mainnet_launching_this_month, korea_bd_hire, team_relocation_seoul
 - TIER 2 (within 7d or ongoing): recent_raise, korea_bd_hiring, airdrop_announced, competitor_entered_korea, korean_media_partnership
 - TIER 3 (within 14d): accelerator_graduation, hackathon_win, ecosystem_grant_asia, mainnet_2_to_3_months_out
 
@@ -450,7 +465,10 @@ Call submit_enrichments when done.`;
     ],
     messages: [{ role: 'user', content: userPrompt }],
     tools: [
-      { type: 'web_search_20250305', name: 'web_search', max_uses: 10 } as any,
+      // 12 searches per batch: ~2 for X-account triggers, ~2 for article cross-
+      // check, ~3 for POC discovery (team page + X bios + crypto dirs), ~2 for
+      // the top POC's personal feed check (Korea/Asia mentions), plus slack.
+      { type: 'web_search_20250305', name: 'web_search', max_uses: 12 } as any,
       enrichmentsTool as any,
     ],
   });

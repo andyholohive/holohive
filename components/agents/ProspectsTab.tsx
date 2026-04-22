@@ -84,6 +84,9 @@ const SIGNAL_LABELS: Record<string, string> = {
   volume_spike_bithumb: 'Bithumb Volume Spike',
   volume_spike_korean: 'KR Exchange Volume Spike',
   hermes_custom: 'Hermes Observation',
+  // Discovery agent — POC personal feed signals
+  poc_korea_mention: 'POC Mentioned Korea',
+  poc_asia_mention: 'POC Mentioned Asia',
 };
 
 const ACTION_TIER_BADGE: Record<string, { label: string; color: string }> = {
