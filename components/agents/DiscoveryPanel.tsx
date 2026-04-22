@@ -904,7 +904,7 @@ export default function DiscoveryPanel() {
                 >
                   <div className="text-xs font-semibold text-gray-900">Opus 4.7</div>
                   <div className="text-[10px] text-gray-600 mt-0.5">Thorough · Better judgment</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">~$1.50-$5 per scan</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">~$3-$12 per scan</div>
                 </button>
                 <button
                   type="button"
@@ -917,9 +917,14 @@ export default function DiscoveryPanel() {
                 >
                   <div className="text-xs font-semibold text-gray-900">Sonnet 4.5</div>
                   <div className="text-[10px] text-gray-600 mt-0.5">Fast · Cheaper</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">~$0.30-$1 per scan</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">~$0.60-$2.50 per scan</div>
                 </button>
               </div>
+              {scanParams.model === 'opus' && (
+                <div className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800">
+                  <strong>Heads up:</strong> Opus scans can run $10+ if Claude hits a mid-research pause. Hard cap is ~$12 per scan (circuit breaker). Use Sonnet for first-run testing.
+                </div>
+              )}
               <p className="text-xs text-gray-500 mt-1.5">
                 Opus is better at POC accuracy and edge-case ICP judgment. Use Sonnet for bulk/experimental scans.
               </p>

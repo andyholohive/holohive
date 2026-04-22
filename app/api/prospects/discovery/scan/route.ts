@@ -517,37 +517,61 @@ Run ICP check + scoring per the framework. Include disqualified projects with di
       },
     };
 
+    // COST GUARDRAILS (critical)
+    //
+    // Each pause_turn continuation resends the ENTIRE prior conversation
+    // (including bulky web_search tool results). On Opus at $15/MTok in,
+    // 4 continuation cycles with 20+ searches can run $30-50 per scan.
+    //
+    // Hard caps below prevent runaway spend. Tune these DOWN before UP.
+    const MAX_RESUME = 1;          // ONE continuation only (was 4 — too costly)
+    const MAX_INPUT_TOKENS = 800_000; // ~$12 on Opus / ~$2.40 on Sonnet
+    const MAX_WEB_SEARCHES = 12;   // per single Claude call (was 30 — too many)
+
     const toolsConfig = [
-      { type: 'web_search_20250305', name: 'web_search', max_uses: 30 } as any,
+      { type: 'web_search_20250305', name: 'web_search', max_uses: MAX_WEB_SEARCHES } as any,
       submitToolSchema as any,
     ];
     const messages: any[] = [{ role: 'user', content: userPrompt }];
 
     let response = await anthropic.messages.create({
       model,
-      max_tokens: 16000,
+      max_tokens: 8000,
       system: systemPrompt,
       messages,
       tools: toolsConfig,
     });
 
-    // Handle pause_turn — Anthropic pauses long-running research sessions
-    // when they exceed internal server thresholds. To continue, feed the
-    // prior assistant response back and let the model resume.
-    //
-    // We cap resume attempts to prevent runaway loops (and runaway cost).
-    const MAX_RESUME = 4;
     let resumeCount = 0;
-    while (response.stop_reason === 'pause_turn' && resumeCount < MAX_RESUME) {
+    let cumulativeInputTokens = response.usage?.input_tokens ?? 0;
+    let cumulativeOutputTokens = response.usage?.output_tokens ?? 0;
+    let abortedForCost = false;
+
+    while (
+      response.stop_reason === 'pause_turn' &&
+      resumeCount < MAX_RESUME &&
+      cumulativeInputTokens < MAX_INPUT_TOKENS
+    ) {
       resumeCount++;
       messages.push({ role: 'assistant', content: response.content });
       response = await anthropic.messages.create({
         model,
-        max_tokens: 16000,
+        max_tokens: 8000,
         system: systemPrompt,
         messages,
         tools: toolsConfig,
       });
+      cumulativeInputTokens += response.usage?.input_tokens ?? 0;
+      cumulativeOutputTokens += response.usage?.output_tokens ?? 0;
+    }
+
+    // Circuit breaker: if we blew past the token cap, abort further continuations
+    // even if still pausing. Parse whatever Claude has returned so far.
+    if (response.stop_reason === 'pause_turn' && cumulativeInputTokens >= MAX_INPUT_TOKENS) {
+      abortedForCost = true;
+      console.warn(
+        `[discovery/scan] Aborted pause_turn continuation at ${cumulativeInputTokens} input tokens to prevent cost blowup.`,
+      );
     }
 
     // Find the submit_discoveries tool call in the response
@@ -797,8 +821,11 @@ Run ICP check + scoring per the framework. Include disqualified projects with di
       }
     }
 
-    const inputTokens = response.usage?.input_tokens ?? 0;
-    const outputTokens = response.usage?.output_tokens ?? 0;
+    // Use CUMULATIVE tokens across all pause_turn continuations —
+    // not just the last response — since each continuation charges input
+    // for the full prior conversation state.
+    const inputTokens = cumulativeInputTokens;
+    const outputTokens = cumulativeOutputTokens;
     // Model-specific pricing (approximate, in USD per 1M tokens):
     //   Sonnet 4.5: $3 in / $15 out
     //   Opus 4.7:   $15 in / $75 out  (~5x Sonnet)
@@ -815,6 +842,9 @@ Run ICP check + scoring per the framework. Include disqualified projects with di
       errors: errors.length,
       input_tokens: inputTokens,
       output_tokens: outputTokens,
+      resume_count: resumeCount,
+      aborted_for_cost: abortedForCost,
+      cost_usd: Number(costUsd.toFixed(4)),
     });
 
     return NextResponse.json({
