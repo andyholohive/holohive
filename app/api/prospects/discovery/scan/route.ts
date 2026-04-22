@@ -136,40 +136,12 @@ CONTACT LOOKUP: From DropsTab project pages (or the project's own site), find:
 - Telegram URL (project official channel or group)
 Rate your confidence: "high" if on dropstab/official site, "medium" if from reputable secondary, "low" if inferred.
 
-OUTPUT STRICT JSON ONLY, no markdown, no prose. Schema:
+HOW TO RESPOND:
+Use web_search to gather evidence (DropsTab funding pages, project profiles, Twitter announcements, news, etc.). Make as many searches as you need — you have up to 30. When you have your findings, call the submit_discoveries tool EXACTLY ONCE with the final list.
 
-{
-  "projects": [
-    {
-      "name": string (required),
-      "symbol": string | null,
-      "category": string | null,
-      "website_url": string | null,
-      "twitter_url": string | null,
-      "telegram_url": string | null,
-      "discord_url": string | null,
-      "dropstab_url": string | null,
-      "contact_confidence": "high" | "medium" | "low",
-      "funding_round": string | null,
-      "funding_amount_usd": number | null,
-      "funding_date": string | null,          // ISO YYYY-MM-DD if known
-      "investors": string[],
-      "triggers": [
-        {
-          "signal_type": string,                 // one of the list above, or a new snake_case slug
-          "headline": string,                    // short, <80 chars
-          "detail": string,                      // 1-2 sentences of context
-          "source_url": string,                  // link to the evidence
-          "weight": number                       // 5-25, higher = stronger trigger
-        }
-      ],
-      "fit_reasoning": string,                   // WHY this is a good fit for HoloHive, 1-2 sentences
-      "fit_score": number                        // 0-100, your confidence they'd be a good client
-    }
-  ]
-}
+Do NOT reply with plain text JSON. Do NOT wrap anything in markdown. Only call the submit_discoveries tool.
 
-Return at most ${maxProjects} projects, sorted by fit_score descending. Every project must have at least one trigger.`;
+Return at most ${maxProjects} projects, sorted by fit_score descending. Every project must have at least one trigger and a fit_reasoning. If you cannot find ${maxProjects} qualifying projects, return fewer — quality over quantity.`;
 
     const userPrompt = `Find the top ${maxProjects} crypto projects that HoloHive should reach out to this week.
 
@@ -177,46 +149,122 @@ Start on https://dropstab.com/tab/by-raised-funds to see recent raises. For each
 
 Focus on the last ${recencyDays} days. Minimum raise: $${minRaise.toLocaleString()}.
 
-Remember: output strict JSON only.`;
+When you have your findings, call the submit_discoveries tool with the final list. Every project you submit must have at least one trigger and a fit_reasoning.`;
 
-    // Call Claude with server-side web_search tool enabled.
-    // Anthropic executes searches and page fetches internally and gives us
-    // the final synthesized answer — no tool-use loop needed on our side.
+    // Structured output via a custom tool. Claude uses web_search to gather
+    // evidence, then calls submit_discoveries with the final structured list
+    // — this gives us guaranteed valid JSON without regex parsing.
+    const submitToolSchema = {
+      name: 'submit_discoveries',
+      description: 'Submit the final list of discovered projects with their outreach triggers, contacts, and fit reasoning. Call this ONCE when research is complete.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          projects: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                symbol: { type: 'string' },
+                category: { type: 'string' },
+                website_url: { type: 'string' },
+                twitter_url: { type: 'string' },
+                telegram_url: { type: 'string' },
+                discord_url: { type: 'string' },
+                dropstab_url: { type: 'string' },
+                contact_confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+                funding_round: { type: 'string' },
+                funding_amount_usd: { type: 'number' },
+                funding_date: { type: 'string', description: 'ISO YYYY-MM-DD if known' },
+                investors: { type: 'array', items: { type: 'string' } },
+                triggers: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      signal_type: { type: 'string', description: 'e.g. recent_raise, tge_within_60d, korea_expansion_announce' },
+                      headline: { type: 'string', description: 'Short summary, <80 chars' },
+                      detail: { type: 'string', description: '1-2 sentences of context' },
+                      source_url: { type: 'string' },
+                      weight: { type: 'number', description: '5-25, higher = stronger trigger' },
+                    },
+                    required: ['signal_type', 'headline'],
+                  },
+                  minItems: 1,
+                },
+                fit_reasoning: { type: 'string', description: 'Why this is a good fit for HoloHive, 1-2 sentences' },
+                fit_score: { type: 'number', description: '0-100 confidence they would be a good client' },
+              },
+              required: ['name', 'triggers', 'fit_reasoning'],
+            },
+          },
+        },
+        required: ['projects'],
+      },
+    };
+
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5',
-      max_tokens: 8000,
+      max_tokens: 16000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
       tools: [
-        {
-          type: 'web_search_20250305',
-          name: 'web_search',
-          max_uses: 30,
-        } as any,
+        { type: 'web_search_20250305', name: 'web_search', max_uses: 30 } as any,
+        submitToolSchema as any,
       ],
     });
 
-    // Extract the final text block
-    const textBlocks = response.content.filter((b: any) => b.type === 'text');
-    const rawText = textBlocks.map((b: any) => b.text).join('\n');
-
-    // Claude sometimes wraps JSON in ```json fences despite instructions
-    const jsonMatch =
-      rawText.match(/```json\s*([\s\S]*?)```/) ||
-      rawText.match(/\{[\s\S]*"projects"[\s\S]*\}/);
-    const jsonStr = jsonMatch
-      ? (jsonMatch[1] || jsonMatch[0])
-      : rawText;
+    // Find the submit_discoveries tool call in the response
+    const submitBlock = response.content.find(
+      (b: any) => b.type === 'tool_use' && b.name === 'submit_discoveries',
+    ) as any;
 
     let parsed: { projects: DiscoveredProject[] };
-    try {
-      parsed = JSON.parse(jsonStr);
-    } catch (parseErr) {
-      await finishRun('failed', { raw_text: rawText.slice(0, 500) }, 'Failed to parse Claude JSON response');
-      return NextResponse.json(
-        { error: 'Failed to parse Claude response as JSON', raw: rawText.slice(0, 1000) },
-        { status: 502 },
-      );
+
+    if (submitBlock?.input?.projects) {
+      // Happy path — structured tool call
+      parsed = submitBlock.input as { projects: DiscoveredProject[] };
+    } else {
+      // Fallback: Claude responded with plain text. Try to extract JSON
+      // from the last text block (not a concatenation — intermediate
+      // text blocks contain reasoning, not the final answer).
+      const textBlocks = response.content.filter((b: any) => b.type === 'text') as any[];
+      const lastText = textBlocks.length > 0 ? textBlocks[textBlocks.length - 1].text : '';
+
+      const extractJson = (src: string): string | null => {
+        const fence = src.match(/```json\s*([\s\S]*?)```/) || src.match(/```\s*([\s\S]*?)```/);
+        if (fence) return fence[1];
+        const firstBrace = src.indexOf('{');
+        const lastBrace = src.lastIndexOf('}');
+        if (firstBrace >= 0 && lastBrace > firstBrace) return src.slice(firstBrace, lastBrace + 1);
+        return null;
+      };
+
+      const jsonStr = extractJson(lastText) || extractJson(textBlocks.map(b => b.text).join('\n')) || '';
+
+      try {
+        parsed = JSON.parse(jsonStr);
+      } catch {
+        await finishRun(
+          'failed',
+          {
+            stop_reason: response.stop_reason,
+            block_types: response.content.map((b: any) => b.type),
+            last_text_sample: lastText.slice(0, 500),
+          },
+          'Claude did not call submit_discoveries and response did not contain parseable JSON',
+        );
+        return NextResponse.json(
+          {
+            error: 'Claude did not return structured results. This usually means it ran out of tokens, hit rate limits, or couldn\'t find enough projects. Try a narrower scan (smaller max_projects or wider recency).',
+            stop_reason: response.stop_reason,
+            block_types: response.content.map((b: any) => b.type),
+            last_text_sample: lastText.slice(0, 500),
+          },
+          { status: 502 },
+        );
+      }
     }
 
     const projects = parsed.projects || [];
