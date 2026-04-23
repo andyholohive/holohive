@@ -106,10 +106,16 @@ export async function GET(request: Request) {
     }
 
     // ── 2. Load current DB snapshot (active markets only) ────────────
+    //
+    // IMPORTANT: Supabase/PostgREST defaults to a 1000-row limit on SELECT.
+    // Both exchanges combined have ~1200 markets, so the default limit would
+    // cause ~200 real-but-truncated rows to be falsely detected as "new" on
+    // every run. Explicit high limit prevents this.
     const { data: dbActiveRaw, error: dbErr } = await (supabase as any)
       .from('korean_exchange_markets')
       .select('id, exchange, symbol, market_pair, listing_signal_fired_at')
-      .is('delisted_at', null);
+      .is('delisted_at', null)
+      .limit(10000);
     if (dbErr) throw new Error(`DB read failed: ${dbErr.message}`);
 
     const dbActive = (dbActiveRaw || []).map((r: any) => ({
