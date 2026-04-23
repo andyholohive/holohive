@@ -31,6 +31,7 @@ const SIGNAL_LABELS: Record<string, string> = {
   dao_asia_governance: 'DAO Asia Vote',
   korea_job_posting: 'Korea Job',
   korea_exchange_no_community: 'KR Exchange No Community',
+  korea_exchange_listing: 'KR Exchange Listing',
   korea_collab: 'Korea Collab',
   // Tier 2
   ecosystem_asia_initiative: 'Asia Initiative',

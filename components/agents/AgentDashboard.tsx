@@ -11,6 +11,7 @@ import {
   Bot, Radar, Database, MessageSquare, Shield, Eye, Search, Pen, Hammer,
   RefreshCw, Clock, CheckCircle, XCircle, Loader2, DollarSign, Zap,
   ArrowRight, Activity, TrendingUp, AlertTriangle, Plus, Satellite, Sparkles,
+  Building2,
 } from 'lucide-react';
 import ScoutQualifyDialog from './ScoutQualifyDialog';
 import { supabase } from '@/lib/supabase';
@@ -159,6 +160,14 @@ const AGENT_INFO: Record<string, {
     color: 'text-violet-600',
     schedule: 'On-demand',
     type: 'on_demand',
+  },
+  KOREAN_EXCHANGES: {
+    label: 'KOREAN_EXCHANGES',
+    description: 'Listings Watcher — checks Upbit and Bithumb hourly for new token listings (Tier 1 trigger) and delistings (disqualifier)',
+    icon: Building2,
+    color: 'text-rose-600',
+    schedule: 'Hourly',
+    type: 'scheduled',
   },
 };
 
