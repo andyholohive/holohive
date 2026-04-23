@@ -107,16 +107,25 @@ export async function GET(request: Request) {
 
     // ── 2. Load current DB snapshot (active markets only) ────────────
     //
-    // IMPORTANT: Supabase/PostgREST defaults to a 1000-row limit on SELECT.
-    // Both exchanges combined have ~1200 markets, so the default limit would
-    // cause ~200 real-but-truncated rows to be falsely detected as "new" on
-    // every run. Explicit high limit prevents this.
-    const { data: dbActiveRaw, error: dbErr } = await (supabase as any)
-      .from('korean_exchange_markets')
-      .select('id, exchange, symbol, market_pair, listing_signal_fired_at')
-      .is('delisted_at', null)
-      .limit(10000);
-    if (dbErr) throw new Error(`DB read failed: ${dbErr.message}`);
+    // PostgREST enforces a server-side max-rows cap (default 1000 on
+    // Supabase). Client `.limit(10000)` doesn't override it. Paginate
+    // with `.range()` instead — that's the documented reliable way to
+    // fetch all rows.
+    const PAGE_SIZE = 1000;
+    const dbActiveRaw: any[] = [];
+    for (let page = 0; page < 50; page++) {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      const { data, error } = await (supabase as any)
+        .from('korean_exchange_markets')
+        .select('id, exchange, symbol, market_pair, listing_signal_fired_at')
+        .is('delisted_at', null)
+        .range(from, to);
+      if (error) throw new Error(`DB read failed (page ${page}): ${error.message}`);
+      if (!data || data.length === 0) break;
+      dbActiveRaw.push(...data);
+      if (data.length < PAGE_SIZE) break;
+    }
 
     const dbActive = (dbActiveRaw || []).map((r: any) => ({
       id: r.id,
