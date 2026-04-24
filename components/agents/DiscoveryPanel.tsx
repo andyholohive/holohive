@@ -1947,13 +1947,11 @@ export default function DiscoveryPanel() {
                                               <span className="text-[10px] text-amber-600 italic">No TG found</span>
                                             )}
                                           </div>
-                                          {/* Per-POC action row — shown when
-                                              we have an actionable handle.
-                                              Draft DM works for either X or
-                                              TG; Deep Dive needs an X handle.
-                                              The DM dialog will hide its
-                                              "Open in Telegram" link when
-                                              no TG is available. */}
+                                          {/* Per-POC action row — Deep Dive
+                                              needs an X handle. Draft DM is
+                                              gated off until the feature is
+                                              finalized (shows as disabled
+                                              "Coming soon" placeholder). */}
                                           {(c.telegram_handle || c.twitter_handle) && (
                                             <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                                               {(c.telegram_handle || c.twitter_handle) && (
@@ -1961,14 +1959,16 @@ export default function DiscoveryPanel() {
                                                   type="button"
                                                   variant="outline"
                                                   size="sm"
-                                                  className="h-6 text-[10px] text-[#229ED9] border-[#229ED9]/30 hover:bg-[#e8f4f5]"
-                                                  onClick={() => openDmDraft(p, c)}
-                                                  title={c.telegram_handle
-                                                    ? 'Generate a Telegram DM draft using the strongest Grok signal'
-                                                    : 'Generate a message draft (no TG handle — copy into X DM instead)'}
+                                                  className="h-6 text-[10px] text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed"
+                                                  disabled
+                                                  title="Draft DM is coming soon — not yet ready to ship."
+                                                  aria-disabled="true"
                                                 >
                                                   <MessageSquare className="h-2.5 w-2.5 mr-1" />
                                                   Draft DM
+                                                  <span className="ml-1 text-[8px] font-bold px-1 py-0.5 rounded bg-gray-200 text-gray-500">
+                                                    SOON
+                                                  </span>
                                                 </Button>
                                               )}
                                               {c.twitter_handle && p.discovery_action_tier !== 'SKIP' && (
