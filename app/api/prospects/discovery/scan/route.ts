@@ -116,8 +116,8 @@ interface DiscoveredProject extends CandidateBasics {
 
 // Supported discovery sources. Keep the list explicit so the UI and
 // prompt builder agree on what's valid.
-type DiscoverySource = 'dropstab' | 'cryptorank';
-const SUPPORTED_SOURCES: DiscoverySource[] = ['dropstab', 'cryptorank'];
+type DiscoverySource = 'dropstab' | 'cryptorank' | 'rootdata' | 'ethglobal';
+const SUPPORTED_SOURCES: DiscoverySource[] = ['dropstab', 'cryptorank', 'rootdata', 'ethglobal'];
 
 const SOURCE_DEFS: Record<DiscoverySource, { url: string; note: string }> = {
   dropstab: {
@@ -127,6 +127,23 @@ const SOURCE_DEFS: Record<DiscoverySource, { url: string; note: string }> = {
   cryptorank: {
     url: 'https://cryptorank.io/funding-rounds',
     note: 'Public funding tracker. Often catches rounds that have not yet hit DropsTab.',
+  },
+  rootdata: {
+    // Asian-origin funding tracker. Content is English and fully SSR
+    // (unlike CryptoRank's JS-rendered table), so web_search reads it
+    // cleanly. Strong on pre-TGE APAC-but-non-Korean rounds — which
+    // match HoloHive ICP rule #3 ("no Korea presence yet").
+    url: 'https://www.rootdata.com/Fundraising',
+    note: 'SSR funding tracker. Asian-region bias (non-Korean) — catches rounds DropsTab misses by 24-48h. Data is plain English with amounts, investors, dates in the raw HTML.',
+  },
+  ethglobal: {
+    // Hackathon-winner feed — orthogonal signal. Projects here are
+    // typically PRE-funding, so they satisfy ICP rule #1 by default
+    // and are too early to be on Korean exchanges (rule #3 usually safe).
+    // Caveat: noisy without a "won ≥1 prize" filter, so the prompt
+    // builder adds that hint when this source is enabled.
+    url: 'https://ethglobal.com/showcase',
+    note: 'ETHGlobal hackathon winners. Pre-funding dev teams with working products — orthogonal to funding trackers. Filter to prize-winners only.',
   },
 };
 
@@ -142,14 +159,38 @@ function buildCandidatesSystemPrompt(sources: DiscoverySource[]): string {
   const sourceLines = sources.map(s => `- ${SOURCE_DEFS[s].url} — ${SOURCE_DEFS[s].note}`);
   const multi = sources.length > 1;
 
+  // ETHGlobal Showcase is noisy by default (hobby projects, tutorials)
+  // unless we constrain to prize-winners. Add an explicit hint when it's
+  // in the sources list. The rest of the prompt doesn't need per-source
+  // customization — it's all funding trackers with similar shape.
+  const perSourceHints: string[] = [];
+  if (sources.includes('ethglobal')) {
+    perSourceHints.push(
+      '- ethglobal.com/showcase: include ONLY projects that won at least one prize at a recent ETHGlobal event (look for "winner" or "sponsor prize" tags). Pre-funding teams are expected here, so funding_amount_usd may be null — fill what you can from their public sites but do not fabricate.',
+    );
+  }
+  if (sources.includes('rootdata')) {
+    perSourceHints.push(
+      '- rootdata.com/Fundraising: data is in SSR HTML as a table. Extract rows directly: project name, round stage, amount, valuation, date, lead investors. Examples: "3F Seed $ 4 M Apr 24 Maven 11 * GSR +9" → {name: "3F", funding_round: "Seed", funding_amount_usd: 4000000, funding_date: "2026-04-24", investors: ["Maven 11", "GSR"]}.',
+    );
+  }
+
   return `You are a crypto-funding research assistant for HoloHive BD. Your only job in this call is to PRODUCE A LIST of candidate crypto projects that recently raised capital. Do not evaluate fit, do not find contacts, do not score — later calls do that.
 
 ## SOURCE RULES${multi ? ` (${sources.length} sources)` : ''}
 
 ${sourceLines.join('\n')}
+${perSourceHints.length > 0 ? `\n### Per-source hints\n\n${perSourceHints.join('\n')}\n` : ''}
 ${multi ? `
-Check every source above. If a candidate appears on multiple sources,
-record it once with primary_source set to where you first verified it.
+You MUST check every source above — do not fill the entire quota from
+one source while ignoring the others. For each source, return at least
+1-2 candidates if the source has any qualifying rounds in the window.
+Only after each source has been sampled may you return more candidates
+from the source with the richest matches.
+
+If a candidate appears on multiple sources, record it once with
+primary_source set to where you first verified it.
+
 Do NOT use general web search outside these listed sources — they are
 the source of truth.
 

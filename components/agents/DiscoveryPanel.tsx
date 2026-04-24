@@ -199,6 +199,41 @@ function timeAgo(iso: string | null | undefined): string | null {
 
 const DEEP_DIVE_COOLDOWN_HOURS = 24;
 
+// Discovery source picker — the four sources the Run Discovery scan can
+// query (must match SUPPORTED_SOURCES in app/api/prospects/discovery/scan/route.ts).
+type DiscoverySourceId = 'dropstab' | 'cryptorank' | 'rootdata' | 'ethglobal';
+const DISCOVERY_SOURCE_CARDS: Array<{
+  id: DiscoverySourceId;
+  title: string;
+  oneLiner: string;
+  footnote: string;
+}> = [
+  {
+    id: 'dropstab',
+    title: 'DropsTab',
+    oneLiner: 'Trending crypto funding list',
+    footnote: 'Default · battle-tested',
+  },
+  {
+    id: 'rootdata',
+    title: 'RootData',
+    oneLiner: 'SSR funding tracker (APAC bias)',
+    footnote: 'Leads DefiLlama by 24-48h · clean HTML',
+  },
+  {
+    id: 'cryptorank',
+    title: 'CryptoRank',
+    oneLiner: 'Catches rounds DropsTab may miss',
+    footnote: 'JS-rendered · noisy · optional',
+  },
+  {
+    id: 'ethglobal',
+    title: 'ETHGlobal',
+    oneLiner: 'Hackathon prize-winners',
+    footnote: 'Pre-funding teams · orthogonal signal',
+  },
+];
+
 /**
  * Build a Telegram DM draft for a single POC using their prospect context
  * and the strongest available Grok signal. Pure templating — no LLM call,
@@ -312,11 +347,12 @@ export default function DiscoveryPanel() {
     categories: '',
     model: 'opus' as 'sonnet' | 'opus',
     // Which candidate sources Claude queries. DropsTab only is the
-    // battle-tested default. CryptoRank is available as a secondary
-    // source that catches rounds DropsTab may not yet have indexed.
-    sources: ['dropstab'] as ('dropstab' | 'cryptorank')[],
+    // battle-tested default. RootData / CryptoRank are funding-tracker
+    // alternatives; ETHGlobal is orthogonal (pre-funding hackathon
+    // winners). All four can be toggled independently.
+    sources: ['dropstab'] as DiscoverySourceId[],
   });
-  const toggleScanSource = (src: 'dropstab' | 'cryptorank') => {
+  const toggleScanSource = (src: DiscoverySourceId) => {
     setScanParams(p => {
       const has = p.sources.includes(src);
       // Never allow the empty set — at minimum one source must be selected.
@@ -2307,47 +2343,34 @@ export default function DiscoveryPanel() {
                 </span>
               </Label>
               <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => toggleScanSource('dropstab')}
-                  className={`text-left rounded-lg border p-2.5 transition-colors ${
-                    scanParams.sources.includes('dropstab')
-                      ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-xs font-semibold text-gray-900 flex items-center gap-1">
-                    DropsTab
-                    {scanParams.sources.includes('dropstab') && (
-                      <CheckCircle className="h-3 w-3 text-[#3e8692]" />
-                    )}
-                  </div>
-                  <div className="text-[10px] text-gray-600 mt-0.5">Trending crypto funding list</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">Default · battle-tested</div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleScanSource('cryptorank')}
-                  className={`text-left rounded-lg border p-2.5 transition-colors ${
-                    scanParams.sources.includes('cryptorank')
-                      ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-xs font-semibold text-gray-900 flex items-center gap-1">
-                    CryptoRank
-                    {scanParams.sources.includes('cryptorank') && (
-                      <CheckCircle className="h-3 w-3 text-[#3e8692]" />
-                    )}
-                  </div>
-                  <div className="text-[10px] text-gray-600 mt-0.5">Catches rounds DropsTab may miss</div>
-                  <div className="text-[10px] text-gray-500 mt-0.5">+1 search call · ~1.2× cost</div>
-                </button>
+                {DISCOVERY_SOURCE_CARDS.map(card => {
+                  const selected = scanParams.sources.includes(card.id);
+                  return (
+                    <button
+                      key={card.id}
+                      type="button"
+                      onClick={() => toggleScanSource(card.id)}
+                      className={`text-left rounded-lg border p-2.5 transition-colors ${
+                        selected
+                          ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="text-xs font-semibold text-gray-900 flex items-center gap-1">
+                        {card.title}
+                        {selected && <CheckCircle className="h-3 w-3 text-[#3e8692]" />}
+                      </div>
+                      <div className="text-[10px] text-gray-600 mt-0.5">{card.oneLiner}</div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">{card.footnote}</div>
+                    </button>
+                  );
+                })}
               </div>
               <p className="text-xs text-gray-500 mt-1.5">
-                Both sources are public HTML pages that Claude reads via web_search.
-                Adding CryptoRank usually finds 2–4 additional candidates per scan that
-                DropsTab didn't index yet.
+                All sources are public HTML pages Claude reads via web_search.
+                Each extra source adds ~4 web_search calls and ~1.2× cost.
+                RootData is the cleanest addition for broader funding coverage;
+                ETHGlobal is orthogonal (pre-funding hackathon winners).
               </p>
             </div>
 
