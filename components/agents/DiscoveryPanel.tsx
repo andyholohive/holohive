@@ -242,6 +242,35 @@ export default function DiscoveryPanel() {
   // Per-prospect "Find POCs" state (Grok-powered).
   const [findingPocsIds, setFindingPocsIds] = useState<Set<string>>(new Set());
 
+  // Per-prospect Deep Dive dialog — opens when the user clicks the row's
+  // Deep Dive button. Lets them pick lookback / shelf-life per-project
+  // instead of inheriting the batch dialog's settings, and shows live
+  // elapsed-time progress since the API itself doesn't stream updates.
+  const [rowDeepDive, setRowDeepDive] = useState<{
+    open: boolean;
+    prospectId: string | null;
+    projectName: string;
+    xPocCount: number;
+    lookbackDays: 30 | 90 | 180 | 365;
+    shelfLifeDays: 7 | 14 | 30 | 60 | 90;
+    running: boolean;
+    startedAt: number | null;
+    elapsedSec: number;
+    result: any | null;
+  }>({
+    open: false,
+    prospectId: null,
+    projectName: '',
+    xPocCount: 0,
+    lookbackDays: 90,
+    shelfLifeDays: 30,
+    running: false,
+    startedAt: null,
+    elapsedSec: 0,
+    result: null,
+  });
+  const rowDeepDiveTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
   const fetchProspects = useCallback(async () => {
     setLoading(true);
     try {
@@ -490,36 +519,80 @@ export default function DiscoveryPanel() {
     }
   };
 
-  // Per-prospect Deep Dive — scans only the X handles on ONE prospect. Uses
-  // the lookback / shelf-life settings from the batch dialog (90d / 30d by
-  // default) so the user doesn't have to configure twice. Runs immediately
-  // — no confirmation dialog — because the cost is bounded (~$0.22 per POC,
-  // typically 1-2 POCs per project).
-  const runDeepDiveForProspect = async (
+  // Open the per-row Deep Dive dialog (does NOT start the scan — user picks
+  // lookback / shelf-life first, then hits Run inside the popup).
+  const openRowDeepDive = (
     prospectId: string,
     projectName: string,
     xPocCount: number,
   ) => {
+    setRowDeepDive(prev => ({
+      ...prev,
+      open: true,
+      prospectId,
+      projectName,
+      xPocCount,
+      // Inherit last-used values from the batch dialog so power users don't
+      // re-pick the same settings every time. They can still change them.
+      lookbackDays: scanLookbackDays,
+      shelfLifeDays: scanShelfLifeDays,
+      running: false,
+      startedAt: null,
+      elapsedSec: 0,
+      result: null,
+    }));
+  };
+
+  // Close the per-row Deep Dive dialog. Safe to call mid-run — the fetch
+  // will still complete in the background and write signals, we just stop
+  // displaying progress.
+  const closeRowDeepDive = () => {
+    if (rowDeepDiveTimerRef.current) {
+      clearInterval(rowDeepDiveTimerRef.current);
+      rowDeepDiveTimerRef.current = null;
+    }
+    setRowDeepDive(prev => ({ ...prev, open: false }));
+  };
+
+  // Actually fires the scan — called from the Run button inside the popup.
+  const startRowDeepDive = async () => {
+    const prospectId = rowDeepDive.prospectId;
+    const projectName = rowDeepDive.projectName;
+    const xPocCount = rowDeepDive.xPocCount;
+    if (!prospectId) return;
+
     setDeepDivingIds(prev => {
       const next = new Set(prev);
       next.add(prospectId);
       return next;
     });
-    toast({
-      title: 'Deep diving',
-      description: `Grok is reading ${xPocCount} X timeline${xPocCount !== 1 ? 's' : ''} for ${projectName}. ~${xPocCount * 2} min.`,
-    });
+    const startedAt = Date.now();
+    setRowDeepDive(prev => ({ ...prev, running: true, startedAt, elapsedSec: 0, result: null }));
+
+    // Tick the elapsed counter every 1s so the progress bar animates smoothly.
+    if (rowDeepDiveTimerRef.current) clearInterval(rowDeepDiveTimerRef.current);
+    rowDeepDiveTimerRef.current = setInterval(() => {
+      setRowDeepDive(prev => ({ ...prev, elapsedSec: Math.floor((Date.now() - startedAt) / 1000) }));
+    }, 1000);
+
     try {
       const res = await fetch('/api/prospects/discovery/grok-deep-dive', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prospect_ids: [prospectId],
-          lookback_days: scanLookbackDays,
-          shelf_life_days: scanShelfLifeDays,
+          lookback_days: rowDeepDive.lookbackDays,
+          shelf_life_days: rowDeepDive.shelfLifeDays,
         }),
       });
       const data = await res.json();
+
+      if (rowDeepDiveTimerRef.current) {
+        clearInterval(rowDeepDiveTimerRef.current);
+        rowDeepDiveTimerRef.current = null;
+      }
+      setRowDeepDive(prev => ({ ...prev, running: false, result: data }));
+
       if (!res.ok || data.error) {
         toast({
           title: `Deep Dive failed — ${projectName}`,
@@ -534,6 +607,11 @@ export default function DiscoveryPanel() {
         fetchProspects();
       }
     } catch (err: any) {
+      if (rowDeepDiveTimerRef.current) {
+        clearInterval(rowDeepDiveTimerRef.current);
+        rowDeepDiveTimerRef.current = null;
+      }
+      setRowDeepDive(prev => ({ ...prev, running: false, result: { error: err?.message ?? 'Deep Dive failed' } }));
       toast({
         title: `Error — ${projectName}`,
         description: err?.message ?? 'Deep Dive failed',
@@ -547,6 +625,13 @@ export default function DiscoveryPanel() {
       });
     }
   };
+
+  // Clean up the per-row progress timer on unmount.
+  React.useEffect(() => {
+    return () => {
+      if (rowDeepDiveTimerRef.current) clearInterval(rowDeepDiveTimerRef.current);
+    };
+  }, []);
 
   // Unified scan dispatcher — routes to POC Lookup, Deep Dive, or both
   // based on the mode selected in the Scan dialog.
@@ -1037,13 +1122,13 @@ export default function DiscoveryPanel() {
                                 ? 'Disqualified — deep dive disabled'
                                 : isDiving
                                   ? 'Deep dive in progress…'
-                                  : `Deep dive ${xPocCount} X timeline${xPocCount !== 1 ? 's' : ''} with Grok (~$${(xPocCount * 0.22).toFixed(2)}, ~${xPocCount * 2} min)`;
+                                  : `Configure and run Grok deep dive on ${xPocCount} X timeline${xPocCount !== 1 ? 's' : ''}`;
                             return (
                               <Button
                                 variant="outline"
                                 size="sm"
                                 className="h-7 text-xs text-violet-700 border-violet-200 hover:bg-violet-50 disabled:text-gray-300 disabled:border-gray-200"
-                                onClick={() => runDeepDiveForProspect(p.id, p.name, xPocCount)}
+                                onClick={() => openRowDeepDive(p.id, p.name, xPocCount)}
                                 disabled={disabled}
                                 title={title}
                               >
@@ -1815,6 +1900,202 @@ export default function DiscoveryPanel() {
               {enriching && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {enriching ? 'Running...' : 'Run Scan'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Per-prospect Deep Dive dialog — opened from the row Deep Dive button.
+          Shows settings (lookback + shelf life), estimated cost/time, a
+          progress bar that animates while running, and the result. */}
+      <Dialog
+        open={rowDeepDive.open}
+        onOpenChange={o => { if (!o && !rowDeepDive.running) closeRowDeepDive(); }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Radar className="h-4 w-4 text-violet-600" />
+              Deep Dive
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">
+                GROK
+              </span>
+            </DialogTitle>
+            <DialogDescription>
+              <span className="font-semibold text-gray-900">{rowDeepDive.projectName}</span>
+              {' · '}
+              <span>
+                {rowDeepDive.xPocCount} POC{rowDeepDive.xPocCount !== 1 ? 's' : ''} with X handle
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-sm">
+            {/* Lookback window */}
+            <div>
+              <Label htmlFor="row-lookback" className="mb-1.5 block">
+                Lookback window
+                <span className="font-normal text-[10px] text-gray-500 ml-1">
+                  — how far back to read posts
+                </span>
+              </Label>
+              <select
+                id="row-lookback"
+                value={rowDeepDive.lookbackDays}
+                onChange={e => setRowDeepDive(prev => ({ ...prev, lookbackDays: Number(e.target.value) as 30 | 90 | 180 | 365 }))}
+                disabled={rowDeepDive.running}
+                className="auth-input w-full"
+              >
+                <option value={30}>Last 30 days — very recent / active signals</option>
+                <option value={90}>Last 90 days — balanced (default)</option>
+                <option value={180}>Last 6 months — broader pattern</option>
+                <option value={365}>Last 12 months — historical</option>
+              </select>
+            </div>
+
+            {/* Signal shelf life */}
+            <div>
+              <Label htmlFor="row-shelf" className="mb-1.5 block">
+                Signal shelf life
+                <span className="font-normal text-[10px] text-gray-500 ml-1">
+                  — how long signals stay "fresh"
+                </span>
+              </Label>
+              <select
+                id="row-shelf"
+                value={rowDeepDive.shelfLifeDays}
+                onChange={e => setRowDeepDive(prev => ({ ...prev, shelfLifeDays: Number(e.target.value) as 7 | 14 | 30 | 60 | 90 }))}
+                disabled={rowDeepDive.running}
+                className="auth-input w-full"
+              >
+                <option value={7}>7 days — very fresh only</option>
+                <option value={14}>14 days — short-term actionable</option>
+                <option value={30}>30 days — standard (default)</option>
+                <option value={60}>60 days — extended</option>
+                <option value={90}>90 days — long-lived (use sparingly)</option>
+              </select>
+            </div>
+
+            {/* Cost + time estimate */}
+            {!rowDeepDive.running && !rowDeepDive.result && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 text-xs">
+                <p className="font-semibold mb-1 flex items-center gap-1">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                  Estimated cost &amp; time
+                </p>
+                <p>
+                  {rowDeepDive.xPocCount} POC{rowDeepDive.xPocCount !== 1 ? 's' : ''} × ~$0.22 each: roughly{' '}
+                  <strong>${(rowDeepDive.xPocCount * 0.10).toFixed(2)}–${(rowDeepDive.xPocCount * 0.30).toFixed(2)}</strong>
+                  {' · '}
+                  ~{rowDeepDive.xPocCount * 2} min
+                </p>
+              </div>
+            )}
+
+            {/* Live progress — shown while running. Progress bar uses estimated
+                duration (~110s per POC, sequential) since the API doesn't
+                stream per-POC updates back to us. */}
+            {rowDeepDive.running && (() => {
+              const expectedSec = Math.max(30, rowDeepDive.xPocCount * 110);
+              const pct = Math.min(95, Math.floor((rowDeepDive.elapsedSec / expectedSec) * 100));
+              // Guess which POC Grok is probably on based on elapsed time.
+              const pocIndex = Math.min(rowDeepDive.xPocCount, Math.floor(rowDeepDive.elapsedSec / 110) + 1);
+              const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+              return (
+                <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-xs space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-3.5 w-3.5 text-violet-700 animate-spin shrink-0" />
+                      <span className="font-semibold text-gray-800">
+                        {rowDeepDive.xPocCount > 1
+                          ? `Reading X timeline ${pocIndex} of ${rowDeepDive.xPocCount}…`
+                          : 'Reading X timeline with Grok…'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono text-gray-600 tabular-nums">
+                      {mmss(rowDeepDive.elapsedSec)} / ~{mmss(expectedSec)}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-white/60 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-violet-600 transition-[width] duration-700 ease-out"
+                      style={{ width: `${Math.max(2, pct)}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-gray-600">
+                    Each POC takes ~110s — Grok pulls recent tweets, filters by your {rowDeepDive.lookbackDays}-day window,
+                    and extracts Korea / Asia signals. You can close this popup; the scan continues in the background.
+                  </p>
+                </div>
+              );
+            })()}
+
+            {/* Result card — shown after completion */}
+            {rowDeepDive.result && !rowDeepDive.running && (
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
+                <div className="font-semibold text-gray-700">Result</div>
+                {rowDeepDive.result.error ? (
+                  <div className="text-red-600 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    {rowDeepDive.result.error}
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      POCs scanned: {rowDeepDive.result.pocs_scanned ?? 0}
+                      {' · '}
+                      Signals added: <span className="font-semibold">{rowDeepDive.result.signals_added ?? 0}</span>
+                    </div>
+                    <div>
+                      Cost: ${rowDeepDive.result.cost_usd?.toFixed(3) ?? '—'}
+                      {' · '}
+                      Duration: {Math.round((rowDeepDive.result.duration_ms || 0) / 1000)}s
+                    </div>
+                    {Array.isArray(rowDeepDive.result.per_poc) && rowDeepDive.result.per_poc.length > 0 && (
+                      <div className="mt-1.5 pt-1.5 border-t border-gray-200 space-y-1">
+                        {rowDeepDive.result.per_poc.map((r: any) => (
+                          <div key={r.handle} className="text-[11px]">
+                            <span className="font-medium">@{r.handle}</span>
+                            <span className="text-gray-500"> · {r.findings_written} signal{r.findings_written !== 1 ? 's' : ''}</span>
+                            {typeof r.korea_interest_score === 'number' && (
+                              <span className={`ml-1 font-semibold ${
+                                r.korea_interest_score >= 70 ? 'text-emerald-700' :
+                                r.korea_interest_score >= 40 ? 'text-amber-700' :
+                                'text-gray-500'
+                              }`}>
+                                score: {r.korea_interest_score}
+                              </span>
+                            )}
+                            {r.summary && (
+                              <p className="text-gray-600 mt-0.5">{r.summary}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={closeRowDeepDive}
+              disabled={rowDeepDive.running}
+            >
+              {rowDeepDive.result ? 'Close' : 'Cancel'}
+            </Button>
+            {!rowDeepDive.result && (
+              <Button
+                onClick={startRowDeepDive}
+                disabled={rowDeepDive.running || rowDeepDive.xPocCount === 0}
+                className="bg-violet-600 hover:bg-violet-700 text-white"
+              >
+                {rowDeepDive.running && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {rowDeepDive.running ? 'Running…' : 'Run Deep Dive'}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
