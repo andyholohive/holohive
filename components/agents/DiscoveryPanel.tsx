@@ -26,7 +26,7 @@ import {
   Sparkles, Loader2, ExternalLink, Send, Twitter, Globe,
   ChevronDown, ChevronRight as ChevronRightIcon, CheckCircle, XCircle,
   ArrowRight, AlertTriangle, RefreshCw, UserSearch, Eye, Zap,
-  ArrowUp, ArrowDown, ArrowUpDown, Radar, Search,
+  ArrowUp, ArrowDown, ArrowUpDown, Radar, Search, Info,
 } from 'lucide-react';
 
 interface Trigger {
@@ -85,6 +85,10 @@ interface DiscoveryProspect {
   // Most recent Grok Deep Dive timestamp (null if never). Used to show
   // "scanned Nd ago" + enforce a 24h cooldown on the row button.
   last_deep_dive_at: string | null;
+  // Max korea_interest_score across this prospect's active Grok signals.
+  // >= 70 triggers a "Grok-hot" badge for fast triage. Null if never
+  // deep-dived.
+  grok_korea_score: number | null;
   // SCOUT-aligned qualification
   icp_verdict: IcpVerdict;
   icp_checks: {
@@ -978,21 +982,53 @@ export default function DiscoveryPanel() {
                   </button>
                 </TableHead>
                 <TableHead>
-                  <button
-                    type="button"
-                    onClick={() => toggleSort('score')}
-                    className="flex items-center gap-1 group hover:text-gray-900"
-                    title="Sort by prospect score"
-                  >
-                    <span>Score</span>
-                    {sort.field === 'score' ? (
-                      sort.direction === 'asc'
-                        ? <ArrowUp className="h-3 w-3" />
-                        : <ArrowDown className="h-3 w-3" />
-                    ) : (
-                      <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />
-                    )}
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('score')}
+                      className="flex items-center gap-1 group hover:text-gray-900"
+                      title="Sort by prospect score"
+                    >
+                      <span>Score</span>
+                      {sort.field === 'score' ? (
+                        sort.direction === 'asc'
+                          ? <ArrowUp className="h-3 w-3" />
+                          : <ArrowDown className="h-3 w-3" />
+                      ) : (
+                        <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />
+                      )}
+                    </button>
+                    {/* Score rubric — shown on hover. Makes the 60/30 color
+                        thresholds self-documenting instead of folklore. */}
+                    <HoverCard openDelay={100} closeDelay={50}>
+                      <HoverCardTrigger asChild>
+                        <Info className="h-3 w-3 text-gray-400 hover:text-gray-700 cursor-help" />
+                      </HoverCardTrigger>
+                      <HoverCardContent side="bottom" align="start" className="w-72 text-xs">
+                        <div className="font-semibold text-gray-800 mb-1.5">
+                          Prospect score (0–100)
+                        </div>
+                        <div className="text-gray-600 mb-2">
+                          Sum of three components, each 0–33:
+                          ICP fit · Signal strength · Timing.
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-baseline gap-2">
+                            <span className="inline-block w-10 text-right text-emerald-700 font-semibold tabular-nums">≥60</span>
+                            <span className="text-gray-700">Strong — prioritize outreach now.</span>
+                          </div>
+                          <div className="flex items-baseline gap-2">
+                            <span className="inline-block w-10 text-right text-amber-700 font-semibold tabular-nums">30–59</span>
+                            <span className="text-gray-700">Borderline — review reasoning before reaching out.</span>
+                          </div>
+                          <div className="flex items-baseline gap-2">
+                            <span className="inline-block w-10 text-right text-gray-500 font-semibold tabular-nums">&lt;30</span>
+                            <span className="text-gray-700">Weak — probably nurture or skip.</span>
+                          </div>
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
+                  </div>
                 </TableHead>
                 <TableHead>POC</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -1113,14 +1149,29 @@ export default function DiscoveryPanel() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {p.discovery_action_tier ? (
-                          <span
-                            className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded border pointer-events-none ${ACTION_TIER_STYLE[p.discovery_action_tier]?.className || ''}`}
-                            title={p.disqualification_reason || p.consideration_reason || ''}
-                          >
-                            {ACTION_TIER_STYLE[p.discovery_action_tier]?.label || p.discovery_action_tier}
-                          </span>
-                        ) : <span className="text-xs text-gray-400">—</span>}
+                        <div className="flex flex-col gap-1 items-start">
+                          {p.discovery_action_tier ? (
+                            <span
+                              className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded border pointer-events-none ${ACTION_TIER_STYLE[p.discovery_action_tier]?.className || ''}`}
+                              title={p.disqualification_reason || p.consideration_reason || ''}
+                            >
+                              {ACTION_TIER_STYLE[p.discovery_action_tier]?.label || p.discovery_action_tier}
+                            </span>
+                          ) : <span className="text-xs text-gray-400">—</span>}
+                          {/* Grok-hot flag: fires when Grok's korea_interest_score
+                              hits 70+. Orthogonal to tier — a REACH_OUT_NOW
+                              prospect might have no Grok coverage yet, and a
+                              WATCH prospect might be Grok-hot (worth re-evaluating). */}
+                          {p.grok_korea_score != null && p.grok_korea_score >= 70 && (
+                            <span
+                              className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 border border-violet-200 pointer-events-none"
+                              title={`Grok korea_interest_score: ${p.grok_korea_score}`}
+                            >
+                              <Radar className="h-2.5 w-2.5" />
+                              GROK-HOT {p.grok_korea_score}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {p.prospect_score?.total != null ? (
@@ -1480,18 +1531,68 @@ export default function DiscoveryPanel() {
                               </div>
                             )}
 
+                            {/* Last Deep Dive summary — only if the prospect
+                                has been Grok-scanned. Shows scan recency, max
+                                Grok korea score, and links to the raw run. */}
+                            {p.last_deep_dive_at && (
+                              <div className="md:col-span-2">
+                                <h4 className="font-semibold text-gray-700 mb-1 text-xs flex items-center gap-1.5">
+                                  <Radar className="h-3 w-3 text-violet-600" />
+                                  Last Deep Dive
+                                </h4>
+                                <div className="bg-violet-50 border border-violet-200 rounded-lg p-2.5 text-xs">
+                                  <div className="flex items-center gap-2 flex-wrap text-gray-700">
+                                    <span>Scanned <span className="font-semibold">{timeAgo(p.last_deep_dive_at)}</span></span>
+                                    <span className="text-gray-400">·</span>
+                                    <span>
+                                      {p.triggers.filter(t => t.source_name === 'grok_x_deep_scan').length} Grok signal
+                                      {p.triggers.filter(t => t.source_name === 'grok_x_deep_scan').length !== 1 ? 's' : ''}
+                                    </span>
+                                    {p.grok_korea_score != null && (
+                                      <>
+                                        <span className="text-gray-400">·</span>
+                                        <span>
+                                          Korea interest:{' '}
+                                          <span className={`font-semibold ${
+                                            p.grok_korea_score >= 70 ? 'text-emerald-700' :
+                                            p.grok_korea_score >= 40 ? 'text-amber-700' :
+                                            'text-gray-600'
+                                          }`}>
+                                            {p.grok_korea_score}/100
+                                          </span>
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
                             {/* All triggers */}
                             <div className="md:col-span-2">
                               <h4 className="font-semibold text-gray-700 mb-2">Triggers ({p.triggers.length})</h4>
                               <div className="space-y-2">
                                 {p.triggers.map(t => (
-                                  <div key={t.id} className="bg-white border rounded-lg p-2.5 text-xs">
+                                  <div
+                                    key={t.id}
+                                    className={`border rounded-lg p-2.5 text-xs ${
+                                      t.source_name === 'grok_x_deep_scan'
+                                        ? 'bg-violet-50/40 border-violet-200'
+                                        : 'bg-white'
+                                    }`}
+                                  >
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="flex-1">
                                         <div className="flex items-center gap-2 flex-wrap">
                                           <Badge variant="outline" className="text-[10px] pointer-events-none">
                                             {formatSignalType(t.signal_type)}
                                           </Badge>
+                                          {t.source_name === 'grok_x_deep_scan' && (
+                                            <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 pointer-events-none">
+                                              <Radar className="h-2.5 w-2.5" />
+                                              GROK
+                                            </span>
+                                          )}
                                           {t.source_type && (
                                             <Badge
                                               variant="outline"
@@ -1504,6 +1605,9 @@ export default function DiscoveryPanel() {
                                           )}
                                           {t.weight && (
                                             <span className="text-[10px] text-gray-500">weight: {t.weight}</span>
+                                          )}
+                                          {t.detected_at && (
+                                            <span className="text-[10px] text-gray-400">· {timeAgo(t.detected_at)}</span>
                                           )}
                                         </div>
                                         <div className="font-medium text-gray-900 mt-1">{t.headline}</div>

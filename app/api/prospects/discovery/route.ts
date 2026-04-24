@@ -54,6 +54,9 @@ export async function GET(request: Request) {
   // Per-prospect last Deep Dive timestamp — used by the UI to show
   // "scanned Nd ago" and enforce a 24h cooldown on the Deep Dive button.
   let lastDeepDiveByProspect: Map<string, string> = new Map();
+  // Per-prospect max korea_interest_score across their active Grok signals.
+  // If >= 70 the row gets a "Grok-hot" badge to make triage obvious.
+  let maxGrokScoreByProspect: Map<string, number> = new Map();
 
   if (prospectIds.length > 0) {
     const { data: signals } = await (supabase as any)
@@ -69,10 +72,17 @@ export async function GET(request: Request) {
       const arr = signalsByProspect.get(s.prospect_id) || [];
       arr.push(s);
       signalsByProspect.set(s.prospect_id, arr);
-      // First grok signal we see per prospect is the most recent one
-      // (query is ordered by detected_at desc).
-      if (s.source_name === 'grok_x_deep_scan' && !lastDeepDiveByProspect.has(s.prospect_id)) {
-        lastDeepDiveByProspect.set(s.prospect_id, s.detected_at);
+      if (s.source_name === 'grok_x_deep_scan') {
+        // First grok signal we see per prospect is the most recent one
+        // (query is ordered by detected_at desc).
+        if (!lastDeepDiveByProspect.has(s.prospect_id)) {
+          lastDeepDiveByProspect.set(s.prospect_id, s.detected_at);
+        }
+        const score = Number(s.metadata?.korea_interest_score);
+        if (Number.isFinite(score)) {
+          const cur = maxGrokScoreByProspect.get(s.prospect_id) ?? 0;
+          if (score > cur) maxGrokScoreByProspect.set(s.prospect_id, score);
+        }
       }
     }
   }
@@ -95,6 +105,7 @@ export async function GET(request: Request) {
         detected_at: s.detected_at,
       })),
       last_deep_dive_at: lastDeepDiveByProspect.get(p.id) ?? null,
+      grok_korea_score: maxGrokScoreByProspect.get(p.id) ?? null,
       // Hoist the commonly-used fields up for easier client consumption
       icp_verdict: snap.icp_verdict ?? null,
       icp_checks: snap.icp_checks ?? null,
