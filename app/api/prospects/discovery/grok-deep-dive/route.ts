@@ -318,6 +318,11 @@ Use the x_search tool to pull the POC's recent timeline. Return strict JSON per 
 
           const weight = CONFIDENCE_WEIGHT[f.confidence] ?? 12;
 
+          // Compute explicit expires_at from shelf_life_days so the list
+          // endpoint can filter stale signals cheaply.
+          const detectedAt = new Date();
+          const expiresAt = new Date(detectedAt.getTime() + shelfLifeDays * 24 * 60 * 60 * 1000);
+
           const { error: sigErr } = await (supabase as any)
             .from('prospect_signals')
             .insert({
@@ -342,7 +347,8 @@ Use the x_search tool to pull the POC's recent timeline. Return strict JSON per 
                 korea_interest_score: parsed.korea_interest_score,
                 agent_run_id: runId,
               },
-              detected_at: new Date().toISOString(),
+              detected_at: detectedAt.toISOString(),
+              expires_at: expiresAt.toISOString(),
               is_active: true,
             });
           if (!sigErr) {

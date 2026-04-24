@@ -26,7 +26,7 @@ import {
   Sparkles, Loader2, ExternalLink, Send, Twitter, Globe,
   ChevronDown, ChevronRight as ChevronRightIcon, CheckCircle, XCircle,
   ArrowRight, AlertTriangle, RefreshCw, UserSearch, Eye, Zap,
-  ArrowUp, ArrowDown, ArrowUpDown, Radar, Search, Info,
+  ArrowUp, ArrowDown, ArrowUpDown, Radar, Search, Info, Trash2,
 } from 'lucide-react';
 
 interface Trigger {
@@ -63,6 +63,11 @@ interface OutreachContact {
   source_url?: string;
   confidence: 'high' | 'medium' | 'low';
   notes?: string;
+  // Grok-sourced POCs are flagged for human review because Grok has been
+  // observed to hallucinate. Amber styling + Confirm/Remove buttons until
+  // a human reviews. Flipped to false on Confirm.
+  is_grok_sourced?: boolean;
+  reviewed_at?: string;
 }
 
 interface DiscoveryProspect {
@@ -278,6 +283,13 @@ export default function DiscoveryPanel() {
   const [deepDivingIds, setDeepDivingIds] = useState<Set<string>>(new Set());
   // Per-prospect "Find POCs" state (Grok-powered).
   const [findingPocsIds, setFindingPocsIds] = useState<Set<string>>(new Set());
+  // Signals currently being deleted — lets us dim the row + disable the
+  // button so the user can't double-click.
+  const [deletingSignalIds, setDeletingSignalIds] = useState<Set<string>>(new Set());
+  // POCs (prospectId + index keys) currently being confirmed / removed.
+  // Keyed as `${prospectId}|${pocIndex}` so one POC action doesn't block
+  // actions on other POCs or other prospects.
+  const [pocActionInFlight, setPocActionInFlight] = useState<Set<string>>(new Set());
 
   // Per-prospect Deep Dive dialog — opens when the user clicks the row's
   // Deep Dive button. Lets them pick lookback / shelf-life per-project
@@ -462,6 +474,78 @@ export default function DiscoveryPanel() {
       toast({ title: 'Error', description: err?.message ?? 'Enrichment failed', variant: 'destructive' });
     } finally {
       setEnriching(false);
+    }
+  };
+
+  // Confirm a Grok-sourced POC as legitimate (flips is_grok_sourced to
+  // false, removes the amber tint). Or delete it if it's a hallucination.
+  const confirmOrDeletePoc = async (
+    prospectId: string,
+    pocIndex: number,
+    pocName: string,
+    action: 'confirm' | 'delete',
+  ) => {
+    if (action === 'delete') {
+      const ok = window.confirm(`Remove "${pocName}" from this project's POCs?`);
+      if (!ok) return;
+    }
+    const key = `${prospectId}|${pocIndex}`;
+    setPocActionInFlight(prev => { const n = new Set(prev); n.add(key); return n; });
+    try {
+      const res = await fetch('/api/prospects/discovery/confirm-poc', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prospect_id: prospectId, poc_index: pocIndex, action }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        toast({ title: 'Action failed', description: data.error || 'Unknown error', variant: 'destructive' });
+      } else {
+        toast({
+          title: action === 'delete' ? 'POC removed' : 'POC confirmed',
+          description: `${pocName} — remaining POCs: ${data.remaining_contacts}`,
+        });
+        fetchProspects();
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message ?? 'Action failed', variant: 'destructive' });
+    } finally {
+      setPocActionInFlight(prev => { const n = new Set(prev); n.delete(key); return n; });
+    }
+  };
+
+  // Soft-delete a signal (sets is_active=false on the DB row). Used to prune
+  // obvious hallucinations without opening SQL. Requires a window.confirm
+  // because the UI gives no other safety net.
+  const deleteSignal = async (signalId: string, headline: string) => {
+    const ok = window.confirm(`Delete this signal?\n\n"${headline}"\n\nThe DB row stays (soft delete); only marked inactive.`);
+    if (!ok) return;
+    setDeletingSignalIds(prev => {
+      const next = new Set(prev);
+      next.add(signalId);
+      return next;
+    });
+    try {
+      const res = await fetch(`/api/prospects/signals/${signalId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        toast({
+          title: 'Delete failed',
+          description: data.error || 'Unknown error',
+          variant: 'destructive',
+        });
+        return;
+      }
+      toast({ title: 'Signal deleted', description: 'Marked inactive. Refresh to remove from view.' });
+      fetchProspects();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message ?? 'Delete failed', variant: 'destructive' });
+    } finally {
+      setDeletingSignalIds(prev => {
+        const next = new Set(prev);
+        next.delete(signalId);
+        return next;
+      });
     }
   };
 
@@ -1448,8 +1532,19 @@ export default function DiscoveryPanel() {
                                 <p className="text-xs text-gray-500 italic">No decision-maker handles found. Worth a manual search on X.</p>
                               ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                  {p.outreach_contacts.map((c, i) => (
-                                    <div key={i} className="bg-white border rounded-lg p-2.5 text-xs">
+                                  {p.outreach_contacts.map((c, i) => {
+                                    const key = `${p.id}|${i}`;
+                                    const pocActionBusy = pocActionInFlight.has(key);
+                                    const needsReview = !!c.is_grok_sourced;
+                                    return (
+                                    <div
+                                      key={i}
+                                      className={`border rounded-lg p-2.5 text-xs transition-opacity ${
+                                        pocActionBusy ? 'opacity-50' : ''
+                                      } ${
+                                        needsReview ? 'bg-amber-50 border-amber-200' : 'bg-white'
+                                      }`}
+                                    >
                                       <div className="flex items-start justify-between gap-2">
                                         <div className="flex-1 min-w-0">
                                           <div className="flex items-center gap-2 flex-wrap">
@@ -1457,10 +1552,47 @@ export default function DiscoveryPanel() {
                                             <span className={`text-[9px] font-semibold px-1 py-0.5 rounded pointer-events-none ${CONTACT_CONFIDENCE_STYLE[c.confidence]}`}>
                                               {c.confidence}
                                             </span>
+                                            {needsReview && (
+                                              <span
+                                                className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 pointer-events-none"
+                                                title="Found by Grok — human hasn't verified this name/handle matches"
+                                              >
+                                                <AlertTriangle className="h-2.5 w-2.5" />
+                                                UNVERIFIED
+                                              </span>
+                                            )}
                                           </div>
                                           <div className="text-gray-500 text-[11px]">{c.role}</div>
                                           {c.notes && (
                                             <p className="text-gray-600 text-[11px] mt-1">{c.notes}</p>
+                                          )}
+                                          {needsReview && (
+                                            <div className="flex items-center gap-1.5 mt-2">
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-6 text-[10px] text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                                                onClick={() => confirmOrDeletePoc(p.id, i, c.name, 'confirm')}
+                                                disabled={pocActionBusy}
+                                                title="Mark this POC as human-verified"
+                                              >
+                                                <CheckCircle className="h-2.5 w-2.5 mr-1" />
+                                                Confirm
+                                              </Button>
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-6 text-[10px] text-red-700 border-red-200 hover:bg-red-50"
+                                                onClick={() => confirmOrDeletePoc(p.id, i, c.name, 'delete')}
+                                                disabled={pocActionBusy}
+                                                title="Remove this POC (hallucination / wrong person)"
+                                              >
+                                                <XCircle className="h-2.5 w-2.5 mr-1" />
+                                                Remove
+                                              </Button>
+                                            </div>
                                           )}
                                           <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                                             {twitterUrl(c.twitter_handle) && (
@@ -1502,7 +1634,8 @@ export default function DiscoveryPanel() {
                                         )}
                                       </div>
                                     </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
@@ -1572,63 +1705,82 @@ export default function DiscoveryPanel() {
                             <div className="md:col-span-2">
                               <h4 className="font-semibold text-gray-700 mb-2">Triggers ({p.triggers.length})</h4>
                               <div className="space-y-2">
-                                {p.triggers.map(t => (
-                                  <div
-                                    key={t.id}
-                                    className={`border rounded-lg p-2.5 text-xs ${
-                                      t.source_name === 'grok_x_deep_scan'
-                                        ? 'bg-violet-50/40 border-violet-200'
-                                        : 'bg-white'
-                                    }`}
-                                  >
-                                    <div className="flex items-start justify-between gap-2">
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <Badge variant="outline" className="text-[10px] pointer-events-none">
-                                            {formatSignalType(t.signal_type)}
-                                          </Badge>
-                                          {t.source_name === 'grok_x_deep_scan' && (
-                                            <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 pointer-events-none">
-                                              <Radar className="h-2.5 w-2.5" />
-                                              GROK
-                                            </span>
-                                          )}
-                                          {t.source_type && (
-                                            <Badge
-                                              variant="outline"
-                                              className={`text-[10px] pointer-events-none ${
-                                                t.source_type === 'tweet' ? 'bg-[#e8f4f5] text-[#1DA1F2]' : ''
-                                              }`}
-                                            >
-                                              {t.source_type === 'tweet' ? 'X' : t.source_type}
+                                {p.triggers.map(t => {
+                                  const isDeleting = deletingSignalIds.has(t.id);
+                                  return (
+                                    <div
+                                      key={t.id}
+                                      className={`border rounded-lg p-2.5 text-xs transition-opacity ${
+                                        isDeleting ? 'opacity-50' : ''
+                                      } ${
+                                        t.source_name === 'grok_x_deep_scan'
+                                          ? 'bg-violet-50/40 border-violet-200'
+                                          : 'bg-white'
+                                      }`}
+                                    >
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <Badge variant="outline" className="text-[10px] pointer-events-none">
+                                              {formatSignalType(t.signal_type)}
                                             </Badge>
-                                          )}
-                                          {t.weight && (
-                                            <span className="text-[10px] text-gray-500">weight: {t.weight}</span>
-                                          )}
-                                          {t.detected_at && (
-                                            <span className="text-[10px] text-gray-400">· {timeAgo(t.detected_at)}</span>
+                                            {t.source_name === 'grok_x_deep_scan' && (
+                                              <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 pointer-events-none">
+                                                <Radar className="h-2.5 w-2.5" />
+                                                GROK
+                                              </span>
+                                            )}
+                                            {t.source_type && (
+                                              <Badge
+                                                variant="outline"
+                                                className={`text-[10px] pointer-events-none ${
+                                                  t.source_type === 'tweet' ? 'bg-[#e8f4f5] text-[#1DA1F2]' : ''
+                                                }`}
+                                              >
+                                                {t.source_type === 'tweet' ? 'X' : t.source_type}
+                                              </Badge>
+                                            )}
+                                            {t.weight && (
+                                              <span className="text-[10px] text-gray-500">weight: {t.weight}</span>
+                                            )}
+                                            {t.detected_at && (
+                                              <span className="text-[10px] text-gray-400">· {timeAgo(t.detected_at)}</span>
+                                            )}
+                                          </div>
+                                          <div className="font-medium text-gray-900 mt-1">{t.headline}</div>
+                                          {t.detail && (
+                                            <p className="text-gray-600 mt-0.5">{t.detail}</p>
                                           )}
                                         </div>
-                                        <div className="font-medium text-gray-900 mt-1">{t.headline}</div>
-                                        {t.detail && (
-                                          <p className="text-gray-600 mt-0.5">{t.detail}</p>
-                                        )}
+                                        <div className="flex items-start gap-1 shrink-0">
+                                          {t.source_url && (
+                                            <a
+                                              href={t.source_url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-gray-400 hover:text-gray-700 p-0.5"
+                                              title="View source"
+                                            >
+                                              <ExternalLink className="h-3.5 w-3.5" />
+                                            </a>
+                                          )}
+                                          <button
+                                            type="button"
+                                            onClick={() => deleteSignal(t.id, t.headline)}
+                                            disabled={isDeleting}
+                                            className="text-gray-400 hover:text-red-600 p-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            title="Delete this signal (soft delete — DB row stays)"
+                                            aria-label="Delete signal"
+                                          >
+                                            {isDeleting
+                                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                              : <Trash2 className="h-3.5 w-3.5" />}
+                                          </button>
+                                        </div>
                                       </div>
-                                      {t.source_url && (
-                                        <a
-                                          href={t.source_url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="text-gray-400 hover:text-gray-700 shrink-0"
-                                          title="View source"
-                                        >
-                                          <ExternalLink className="h-3.5 w-3.5" />
-                                        </a>
-                                      )}
                                     </div>
-                                  </div>
-                                ))}
+                                  );
+                                })}
                               </div>
                             </div>
                           </div>

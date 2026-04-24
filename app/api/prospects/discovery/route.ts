@@ -59,12 +59,17 @@ export async function GET(request: Request) {
   let maxGrokScoreByProspect: Map<string, number> = new Map();
 
   if (prospectIds.length > 0) {
+    const nowIso = new Date().toISOString();
     const { data: signals } = await (supabase as any)
       .from('prospect_signals')
-      .select('id, prospect_id, signal_type, headline, snippet, source_url, source_name, relevancy_weight, metadata, detected_at')
+      .select('id, prospect_id, signal_type, headline, snippet, source_url, source_name, relevancy_weight, metadata, detected_at, expires_at')
       .in('prospect_id', prospectIds)
       .in('source_name', ['discovery_claude', 'grok_x_deep_scan'])
       .eq('is_active', true)
+      // Filter out expired signals — an expires_at IN THE PAST means the
+      // signal has aged out of its shelf_life. NULL expires_at means "never
+      // set" (older signals pre-dating expires_at population) — keep those.
+      .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
       .order('detected_at', { ascending: false });
 
     for (const s of signals || []) {

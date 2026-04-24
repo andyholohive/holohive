@@ -32,6 +32,12 @@ interface OutreachContact {
   source_url?: string;
   confidence: 'high' | 'medium' | 'low';
   notes?: string;
+  // Marks contacts produced by the Grok POC finder so the UI can render
+  // them in "needs review" amber until a human confirms. Grok has been
+  // observed to hallucinate plausible-sounding but fake contacts —
+  // see docs/grok-hallucination-cases (if any) or the initial Pharos run.
+  is_grok_sourced?: boolean;
+  reviewed_at?: string; // ISO — set when a human confirms / edits
 }
 
 interface GrokPocsResult {
@@ -292,6 +298,9 @@ export async function POST(request: Request) {
             );
             if (match >= 0) {
               const cur = merged[match];
+              // Preserve any existing review status on the existing contact —
+              // if a human already confirmed them, Grok's re-find shouldn't
+              // reset them to "needs review".
               merged[match] = {
                 ...cur,
                 twitter_handle: cur.twitter_handle || newC.twitter_handle,
@@ -301,7 +310,8 @@ export async function POST(request: Request) {
                 confidence: newC.confidence === 'high' ? 'high' : cur.confidence,
               };
             } else {
-              merged.push(newC);
+              // Brand new contact from Grok — mark it for human review.
+              merged.push({ ...newC, is_grok_sourced: true });
             }
           }
           // Re-sort Telegram-first
