@@ -748,19 +748,11 @@ export default function DiscoveryPanel() {
             <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setEnrichDialogOpen(true)}
-            disabled={enriching}
-            className="h-9"
-            title="Scan for POCs, deep-dive their X feeds, or both"
-          >
-            {enriching
-              ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-              : <UserSearch className="w-4 h-4 mr-1.5" />}
-            Scan
-          </Button>
+          {/* Batch "Scan" button hidden — the per-row Find POCs and Deep Dive
+              buttons on each prospect are the primary paths now. The batch
+              dialog component is kept mounted in the tree (we don't render
+              it via the button anymore) so any future keyboard shortcut or
+              re-exposure is trivial. */}
           <Button
             size="sm"
             onClick={() => setScanOpen(true)}
