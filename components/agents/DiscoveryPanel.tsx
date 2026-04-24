@@ -13,6 +13,9 @@ import {
   DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
@@ -1714,17 +1717,20 @@ export default function DiscoveryPanel() {
             {(scanMode === 'deep_dive_x' || scanMode === 'both') && (
               <div>
                 <Label htmlFor="lookback" className="mb-1.5 block">Lookback window (Deep Dive)</Label>
-                <select
-                  id="lookback"
-                  value={scanLookbackDays}
-                  onChange={e => setScanLookbackDays(Number(e.target.value) as 30 | 90 | 180 | 365)}
-                  className="auth-input w-full"
+                <Select
+                  value={String(scanLookbackDays)}
+                  onValueChange={v => setScanLookbackDays(Number(v) as 30 | 90 | 180 | 365)}
                 >
-                  <option value={30}>Last 30 days — very recent / active signals</option>
-                  <option value={90}>Last 90 days — balanced (default)</option>
-                  <option value={180}>Last 6 months — broader pattern</option>
-                  <option value={365}>Last 12 months — historical</option>
-                </select>
+                  <SelectTrigger id="lookback">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30">Last 30 days — very recent / active signals</SelectItem>
+                    <SelectItem value="90">Last 90 days — balanced (default)</SelectItem>
+                    <SelectItem value="180">Last 6 months — broader pattern</SelectItem>
+                    <SelectItem value="365">Last 12 months — historical</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
@@ -1734,18 +1740,21 @@ export default function DiscoveryPanel() {
             {(scanMode === 'deep_dive_x' || scanMode === 'both') && (
               <div>
                 <Label htmlFor="shelf" className="mb-1.5 block">Signal shelf life (Deep Dive)</Label>
-                <select
-                  id="shelf"
-                  value={scanShelfLifeDays}
-                  onChange={e => setScanShelfLifeDays(Number(e.target.value) as 7 | 14 | 30 | 60 | 90)}
-                  className="auth-input w-full"
+                <Select
+                  value={String(scanShelfLifeDays)}
+                  onValueChange={v => setScanShelfLifeDays(Number(v) as 7 | 14 | 30 | 60 | 90)}
                 >
-                  <option value={7}>7 days — very fresh only</option>
-                  <option value={14}>14 days — short-term actionable</option>
-                  <option value={30}>30 days — standard (default)</option>
-                  <option value={60}>60 days — extended</option>
-                  <option value={90}>90 days — long-lived (use sparingly)</option>
-                </select>
+                  <SelectTrigger id="shelf">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">7 days — very fresh only</SelectItem>
+                    <SelectItem value="14">14 days — short-term actionable</SelectItem>
+                    <SelectItem value="30">30 days — standard (default)</SelectItem>
+                    <SelectItem value="60">60 days — extended</SelectItem>
+                    <SelectItem value="90">90 days — long-lived (use sparingly)</SelectItem>
+                  </SelectContent>
+                </Select>
                 <p className="text-[10px] text-gray-500 mt-1">
                   How long the resulting X timeline signals stay "fresh" on prospects before expiring.
                 </p>
@@ -1762,19 +1771,22 @@ export default function DiscoveryPanel() {
                     — cost brake, hot leads first
                   </span>
                 </Label>
-                <select
-                  id="maxpocs"
-                  value={scanMaxPocs}
-                  onChange={e => setScanMaxPocs(Number(e.target.value) as 1 | 3 | 5 | 10 | 25 | 9999)}
-                  className="auth-input w-full"
+                <Select
+                  value={String(scanMaxPocs)}
+                  onValueChange={v => setScanMaxPocs(Number(v) as 1 | 3 | 5 | 10 | 25 | 9999)}
                 >
-                  <option value={1}>1 POC — smoke test</option>
-                  <option value={3}>3 POCs — quick check</option>
-                  <option value={5}>5 POCs — default</option>
-                  <option value={10}>10 POCs</option>
-                  <option value={25}>25 POCs</option>
-                  <option value={9999}>All ({pocsWithXCount}) — full sweep</option>
-                </select>
+                  <SelectTrigger id="maxpocs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 POC — smoke test</SelectItem>
+                    <SelectItem value="3">3 POCs — quick check</SelectItem>
+                    <SelectItem value="5">5 POCs — default</SelectItem>
+                    <SelectItem value="10">10 POCs</SelectItem>
+                    <SelectItem value="25">25 POCs</SelectItem>
+                    <SelectItem value="9999">All ({pocsWithXCount}) — full sweep</SelectItem>
+                  </SelectContent>
+                </Select>
                 <p className="text-[10px] text-gray-500 mt-1">
                   Grok scans in tier order (Reach Out Now → Pre-Token → Research → Watch → Nurture),
                   so capping at N keeps the highest-value POCs.
@@ -1926,18 +1938,21 @@ export default function DiscoveryPanel() {
             {/* Lookback window */}
             <div>
               <Label htmlFor="row-lookback">Lookback window</Label>
-              <select
-                id="row-lookback"
-                value={rowDeepDive.lookbackDays}
-                onChange={e => setRowDeepDive(prev => ({ ...prev, lookbackDays: Number(e.target.value) as 30 | 90 | 180 | 365 }))}
+              <Select
+                value={String(rowDeepDive.lookbackDays)}
+                onValueChange={v => setRowDeepDive(prev => ({ ...prev, lookbackDays: Number(v) as 30 | 90 | 180 | 365 }))}
                 disabled={rowDeepDive.running}
-                className="auth-input mt-1 w-full"
               >
-                <option value={30}>Last 30 days — very recent / active signals</option>
-                <option value={90}>Last 90 days — balanced (default)</option>
-                <option value={180}>Last 6 months — broader pattern</option>
-                <option value={365}>Last 12 months — historical</option>
-              </select>
+                <SelectTrigger id="row-lookback" className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">Last 30 days — very recent / active signals</SelectItem>
+                  <SelectItem value="90">Last 90 days — balanced (default)</SelectItem>
+                  <SelectItem value="180">Last 6 months — broader pattern</SelectItem>
+                  <SelectItem value="365">Last 12 months — historical</SelectItem>
+                </SelectContent>
+              </Select>
               <p className="text-xs text-gray-500 mt-1">
                 How far back Grok looks when reading the POC's tweets.
               </p>
@@ -1946,19 +1961,22 @@ export default function DiscoveryPanel() {
             {/* Signal shelf life */}
             <div>
               <Label htmlFor="row-shelf">Signal shelf life</Label>
-              <select
-                id="row-shelf"
-                value={rowDeepDive.shelfLifeDays}
-                onChange={e => setRowDeepDive(prev => ({ ...prev, shelfLifeDays: Number(e.target.value) as 7 | 14 | 30 | 60 | 90 }))}
+              <Select
+                value={String(rowDeepDive.shelfLifeDays)}
+                onValueChange={v => setRowDeepDive(prev => ({ ...prev, shelfLifeDays: Number(v) as 7 | 14 | 30 | 60 | 90 }))}
                 disabled={rowDeepDive.running}
-                className="auth-input mt-1 w-full"
               >
-                <option value={7}>7 days — very fresh only</option>
-                <option value={14}>14 days — short-term actionable</option>
-                <option value={30}>30 days — standard (default)</option>
-                <option value={60}>60 days — extended</option>
-                <option value={90}>90 days — long-lived (use sparingly)</option>
-              </select>
+                <SelectTrigger id="row-shelf" className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">7 days — very fresh only</SelectItem>
+                  <SelectItem value="14">14 days — short-term actionable</SelectItem>
+                  <SelectItem value="30">30 days — standard (default)</SelectItem>
+                  <SelectItem value="60">60 days — extended</SelectItem>
+                  <SelectItem value="90">90 days — long-lived (use sparingly)</SelectItem>
+                </SelectContent>
+              </Select>
               <p className="text-xs text-gray-500 mt-1">
                 How long resulting signals stay "fresh" on the prospect before expiring.
               </p>
