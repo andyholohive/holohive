@@ -20,7 +20,7 @@ import {
   Sparkles, Loader2, ExternalLink, Send, Twitter, Globe,
   ChevronDown, ChevronRight as ChevronRightIcon, CheckCircle, XCircle,
   ArrowRight, AlertTriangle, RefreshCw, UserSearch, Eye, Zap,
-  ArrowUp, ArrowDown, ArrowUpDown,
+  ArrowUp, ArrowDown, ArrowUpDown, Radar,
 } from 'lucide-react';
 
 interface Trigger {
@@ -228,9 +228,15 @@ export default function DiscoveryPanel() {
   const [scanMode, setScanMode] = useState<ScanMode>('poc_lookup');
   const [scanLookbackDays, setScanLookbackDays] = useState<30 | 90 | 180 | 365>(90);
   const [scanShelfLifeDays, setScanShelfLifeDays] = useState<7 | 14 | 30 | 60 | 90>(30);
-  // Deep Dive safety cap: max POCs Grok will scan in one run. Default 5 so a
-  // misclick doesn't spend $10+. Hot leads (by tier) get the budget first.
+  // Deep Dive safety cap: max POCs Grok will scan in one BATCH run. Default 5
+  // so a misclick doesn't spend $10+. Per-prospect runs (the row button) are
+  // not subject to this cap — they're scoped to one prospect's POCs.
   const [scanMaxPocs, setScanMaxPocs] = useState<1 | 3 | 5 | 10 | 25 | 9999>(5);
+
+  // Per-prospect Deep Dive state — tracks which rows are currently running
+  // so we can show a spinner on just that row and disable the button to
+  // prevent double-clicks.
+  const [deepDivingIds, setDeepDivingIds] = useState<Set<string>>(new Set());
 
   const fetchProspects = useCallback(async () => {
     setLoading(true);
@@ -416,6 +422,64 @@ export default function DiscoveryPanel() {
       toast({ title: 'Error', description: err?.message ?? 'Deep Dive failed', variant: 'destructive' });
     } finally {
       setEnriching(false);
+    }
+  };
+
+  // Per-prospect Deep Dive — scans only the X handles on ONE prospect. Uses
+  // the lookback / shelf-life settings from the batch dialog (90d / 30d by
+  // default) so the user doesn't have to configure twice. Runs immediately
+  // — no confirmation dialog — because the cost is bounded (~$0.22 per POC,
+  // typically 1-2 POCs per project).
+  const runDeepDiveForProspect = async (
+    prospectId: string,
+    projectName: string,
+    xPocCount: number,
+  ) => {
+    setDeepDivingIds(prev => {
+      const next = new Set(prev);
+      next.add(prospectId);
+      return next;
+    });
+    toast({
+      title: 'Deep diving',
+      description: `Grok is reading ${xPocCount} X timeline${xPocCount !== 1 ? 's' : ''} for ${projectName}. ~${xPocCount * 2} min.`,
+    });
+    try {
+      const res = await fetch('/api/prospects/discovery/grok-deep-dive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prospect_ids: [prospectId],
+          lookback_days: scanLookbackDays,
+          shelf_life_days: scanShelfLifeDays,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        toast({
+          title: `Deep Dive failed — ${projectName}`,
+          description: data.error || (data.errors?.[0] ?? 'Unknown error'),
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: `Deep Dive complete — ${projectName}`,
+          description: `${data.pocs_scanned ?? 0} POCs scanned · ${data.signals_added ?? 0} signals added · $${data.cost_usd?.toFixed(2) ?? '—'}`,
+        });
+        fetchProspects();
+      }
+    } catch (err: any) {
+      toast({
+        title: `Error — ${projectName}`,
+        description: err?.message ?? 'Deep Dive failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeepDivingIds(prev => {
+        const next = new Set(prev);
+        next.delete(prospectId);
+        return next;
+      });
     }
   };
 
@@ -865,6 +929,34 @@ export default function DiscoveryPanel() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
+                          {(() => {
+                            const xPocCount = (p.outreach_contacts || []).filter(c => !!c.twitter_handle).length;
+                            const isSkip = p.discovery_action_tier === 'SKIP';
+                            const isDiving = deepDivingIds.has(p.id);
+                            const disabled = xPocCount === 0 || isSkip || isDiving;
+                            const title = xPocCount === 0
+                              ? 'No POC with X handle — run POC Lookup first'
+                              : isSkip
+                                ? 'Disqualified — deep dive disabled'
+                                : isDiving
+                                  ? 'Deep dive in progress…'
+                                  : `Deep dive ${xPocCount} X timeline${xPocCount !== 1 ? 's' : ''} with Grok (~$${(xPocCount * 0.22).toFixed(2)}, ~${xPocCount * 2} min)`;
+                            return (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs text-violet-700 border-violet-200 hover:bg-violet-50 disabled:text-gray-300 disabled:border-gray-200"
+                                onClick={() => runDeepDiveForProspect(p.id, p.name, xPocCount)}
+                                disabled={disabled}
+                                title={title}
+                              >
+                                {isDiving
+                                  ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  : <Radar className="h-3 w-3 mr-1" />}
+                                Deep Dive
+                              </Button>
+                            );
+                          })()}
                           {p.status !== 'promoted' && (
                             <Button
                               variant="outline"
@@ -1340,15 +1432,20 @@ export default function DiscoveryPanel() {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="text-xs font-semibold text-gray-900">Deep Dive X Timeline</div>
+                    <div className="text-xs font-semibold text-gray-900">
+                      Deep Dive X Timeline
+                      <span className="ml-1.5 inline-flex items-center text-[9px] font-bold px-1 py-0.5 rounded bg-violet-100 text-violet-700 pointer-events-none">
+                        GROK
+                      </span>
+                    </div>
                     <span className="text-[10px] text-gray-500">{pocsWithXCount} POCs</span>
                   </div>
                   <div className="text-[11px] text-gray-600 mt-0.5">
-                    Grok reads each POC's X feed for Korea / Asia relevance signals.
-                    Targets POCs that already have an X handle.
+                    Grok (grok-4) reads each POC's X feed for Korea / Asia relevance signals.
+                    Batch mode — scans many at once, hot leads first.
                   </div>
-                  <div className="text-[10px] text-amber-700 mt-1">
-                    Requires <code>GROK_API_KEY</code> env var.
+                  <div className="text-[10px] text-gray-500 mt-1 italic">
+                    Tip: for a single project, use the Deep Dive button on its row instead.
                   </div>
                 </button>
 
@@ -1370,10 +1467,16 @@ export default function DiscoveryPanel() {
               </div>
             </div>
 
-            {/* Model picker (POC Lookup only) */}
+            {/* Model picker — Claude Opus/Sonnet for POC Lookup only.
+                Deep Dive X always uses Grok (not a user-selectable model). */}
             {(scanMode === 'poc_lookup' || scanMode === 'both') && (
               <div>
-                <Label className="mb-1.5 block">Model (POC Lookup)</Label>
+                <Label className="mb-1.5 block">
+                  Claude model
+                  <span className="font-normal text-[10px] text-gray-500 ml-1">
+                    — POC Lookup only; Deep Dive always uses Grok
+                  </span>
+                </Label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
