@@ -376,23 +376,13 @@ export default function DiscoveryPanel() {
   } | null>(null);
   const progressPollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // POC enrichment state
-  const [enrichDialogOpen, setEnrichDialogOpen] = useState(false);
-  const [enriching, setEnriching] = useState(false);
-  const [lastEnrichResult, setLastEnrichResult] = useState<any>(null);
-  // POC Lookup engine — Claude (Opus/Sonnet) uses web_search;
-  // Grok uses native x_search + web_search (better at scraping X bios).
-  const [enrichModel, setEnrichModel] = useState<'sonnet' | 'opus' | 'grok'>('grok');
-
-  // Unified "Scan" dialog settings
-  type ScanMode = 'poc_lookup' | 'deep_dive_x' | 'both';
-  const [scanMode, setScanMode] = useState<ScanMode>('poc_lookup');
-  const [scanLookbackDays, setScanLookbackDays] = useState<30 | 90 | 180 | 365>(90);
-  const [scanShelfLifeDays, setScanShelfLifeDays] = useState<7 | 14 | 30 | 60 | 90>(30);
-  // Deep Dive safety cap: max POCs Grok will scan in one BATCH run. Default 5
-  // so a misclick doesn't spend $10+. Per-prospect runs (the row button) are
-  // not subject to this cap — they're scoped to one prospect's POCs.
-  const [scanMaxPocs, setScanMaxPocs] = useState<1 | 3 | 5 | 10 | 25 | 9999>(5);
+  // Defaults for Deep Dive runs (previously user-tunable via the batch
+  // Scan dialog, now constants since the per-row dialog has its own
+  // lookback/shelf-life controls). Bulk Deep Dive uses the POC cap
+  // below as a hardcoded safety brake.
+  const DEEP_DIVE_DEFAULT_LOOKBACK_DAYS = 90;
+  const DEEP_DIVE_DEFAULT_SHELF_LIFE_DAYS = 30;
+  const BULK_DEEP_DIVE_MAX_POCS = 5;
 
   // Per-prospect Deep Dive state — tracks which rows are currently running
   // so we can show a spinner on just that row and disable the button to
@@ -583,44 +573,6 @@ export default function DiscoveryPanel() {
     }
   };
 
-  const runPocEnrichment = async () => {
-    setEnriching(true);
-    setLastEnrichResult(null);
-    // Route to Grok endpoint when the user picks Grok; otherwise use Claude.
-    const endpoint = enrichModel === 'grok'
-      ? '/api/prospects/discovery/grok-find-pocs'
-      : '/api/prospects/discovery/enrich-pocs';
-    const bodyPayload = enrichModel === 'grok'
-      ? {}                           // Grok endpoint doesn't need model param
-      : { model: enrichModel };
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyPayload),
-      });
-      const data = await res.json();
-      setLastEnrichResult(data);
-      if (!res.ok || data.error) {
-        toast({
-          title: 'Enrichment failed',
-          description: data.error || 'Unknown error',
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'POC enrichment complete',
-          description: `${data.enriched} enriched · ${data.failed || 0} failed · $${data.cost_usd?.toFixed(2) ?? '—'}`,
-        });
-        fetchProspects();
-      }
-    } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Enrichment failed', variant: 'destructive' });
-    } finally {
-      setEnriching(false);
-    }
-  };
-
   // Open the Telegram DM draft dialog for a specific POC and generate
   // an initial message using the 'signal' variant (most specific).
   const openDmDraft = (prospect: DiscoveryProspect, poc: OutreachContact) => {
@@ -782,41 +734,6 @@ export default function DiscoveryPanel() {
 
   // Grok-powered Deep Dive: reads each eligible POC's X timeline for
   // Korea / Asia signals over the chosen lookback window.
-  const runDeepDive = async () => {
-    setEnriching(true);
-    setLastEnrichResult(null);
-    try {
-      const res = await fetch('/api/prospects/discovery/grok-deep-dive', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lookback_days: scanLookbackDays,
-          shelf_life_days: scanShelfLifeDays,
-          max_pocs: scanMaxPocs,
-        }),
-      });
-      const data = await res.json();
-      setLastEnrichResult(data);
-      if (!res.ok || data.error) {
-        toast({
-          title: 'Deep Dive failed',
-          description: data.error || 'Unknown error',
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Deep Dive complete',
-          description: `${data.pocs_scanned ?? 0} POCs scanned · ${data.signals_added ?? 0} signals added · $${data.cost_usd?.toFixed(2) ?? '—'}`,
-        });
-        fetchProspects();
-      }
-    } catch (err: any) {
-      toast({ title: 'Error', description: err?.message ?? 'Deep Dive failed', variant: 'destructive' });
-    } finally {
-      setEnriching(false);
-    }
-  };
-
   // Open the per-row Deep Dive dialog (does NOT start the scan — user picks
   // lookback / shelf-life first, then hits Run inside the popup).
   const openRowDeepDive = (
@@ -832,10 +749,9 @@ export default function DiscoveryPanel() {
       xPocCount,
       pocHandle: null,
       pocName: null,
-      // Inherit last-used values from the batch dialog so power users don't
-      // re-pick the same settings every time. They can still change them.
-      lookbackDays: scanLookbackDays,
-      shelfLifeDays: scanShelfLifeDays,
+      // Start from the house defaults; user can change per-scan inside the popup.
+      lookbackDays: DEEP_DIVE_DEFAULT_LOOKBACK_DAYS,
+      shelfLifeDays: DEEP_DIVE_DEFAULT_SHELF_LIFE_DAYS,
       running: false,
       startedAt: null,
       elapsedSec: 0,
@@ -860,8 +776,8 @@ export default function DiscoveryPanel() {
       xPocCount: 1, // single-POC scope
       pocHandle: handle,
       pocName: poc.name,
-      lookbackDays: scanLookbackDays,
-      shelfLifeDays: scanShelfLifeDays,
+      lookbackDays: DEEP_DIVE_DEFAULT_LOOKBACK_DAYS,
+      shelfLifeDays: DEEP_DIVE_DEFAULT_SHELF_LIFE_DAYS,
       running: false,
       startedAt: null,
       elapsedSec: 0,
@@ -962,20 +878,6 @@ export default function DiscoveryPanel() {
       if (rowDeepDiveTimerRef.current) clearInterval(rowDeepDiveTimerRef.current);
     };
   }, []);
-
-  // Unified scan dispatcher — routes to POC Lookup, Deep Dive, or both
-  // based on the mode selected in the Scan dialog.
-  const runUnifiedScan = async () => {
-    if (scanMode === 'poc_lookup') {
-      await runPocEnrichment();
-    } else if (scanMode === 'deep_dive_x') {
-      await runDeepDive();
-    } else {
-      // both — POC lookup first so newly-found POCs are available for Deep Dive
-      await runPocEnrichment();
-      await runDeepDive();
-    }
-  };
 
   const updateStatus = async (id: string, status: string) => {
     try {
@@ -1099,14 +1001,14 @@ export default function DiscoveryPanel() {
       `Deep Dive ${ids.length} prospect${ids.length !== 1 ? 's' : ''}?\n\n` +
       `Rough cost: $${estMin.toFixed(2)}–$${estMax.toFixed(2)}\n` +
       `Time: ~${Math.round(ids.length * 2)} min (sequential).\n` +
-      `Capped at ${scanMaxPocs} total POCs.`
+      `Capped at ${BULK_DEEP_DIVE_MAX_POCS} total POCs across all selected projects.`
     );
     if (!ok) return;
 
     setBulkBusy(true);
     toast({
       title: 'Bulk Deep Dive started',
-      description: `${ids.length} prospects · capped at ${scanMaxPocs} POCs total.`,
+      description: `${ids.length} prospects · capped at ${BULK_DEEP_DIVE_MAX_POCS} POCs total.`,
     });
     try {
       const res = await fetch('/api/prospects/discovery/grok-deep-dive', {
@@ -1114,9 +1016,9 @@ export default function DiscoveryPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prospect_ids: ids,
-          lookback_days: scanLookbackDays,
-          shelf_life_days: scanShelfLifeDays,
-          max_pocs: scanMaxPocs,
+          lookback_days: DEEP_DIVE_DEFAULT_LOOKBACK_DAYS,
+          shelf_life_days: DEEP_DIVE_DEFAULT_SHELF_LIFE_DAYS,
+          max_pocs: BULK_DEEP_DIVE_MAX_POCS,
         }),
       });
       const data = await res.json();
@@ -1192,18 +1094,6 @@ export default function DiscoveryPanel() {
     ? prospects.filter(p => p.discovery_action_tier === 'SKIP').length
     : 0;
 
-  // Count prospects with no outreach contacts — candidates for POC enrichment.
-  // We only count non-SKIP (no point enriching dismissed/disqualified).
-  const missingPocCount = prospects.filter(
-    p => p.discovery_action_tier !== 'SKIP' && (!p.outreach_contacts || p.outreach_contacts.length === 0),
-  ).length;
-
-  // POCs with findable X handles — the target set for Deep Dive X scans.
-  // We only deep-dive non-SKIP prospects (no point spending money on disqualified ones).
-  const pocsWithXCount = prospects
-    .filter(p => p.discovery_action_tier !== 'SKIP')
-    .reduce((acc, p) => acc + (p.outreach_contacts || []).filter(c => !!c.twitter_handle).length, 0);
-
   // Summary stats for the cards at top (always derived from the full prospects
   // list, ignoring the hide-disqualified toggle — we want stable counts that
   // don't flicker when the filter changes).
@@ -1221,9 +1111,11 @@ export default function DiscoveryPanel() {
       {/* Description + primary actions */}
       <div className="flex items-start justify-between gap-4">
         <p className="text-sm text-gray-600 max-w-2xl">
-          AI-driven lead finder anchored on DropsTab. For each candidate, Claude hunts
-          outreach triggers from X and decision-maker contacts — Telegram priority,
-          X fallback — using the SCOUT ICP framework to score fit.
+          AI-driven lead finder. Claude scans configurable funding sources
+          (DropsTab, RootData, CryptoRank, ETHGlobal), scores each candidate
+          against our ICP, and finds Telegram/X decision-maker handles.
+          Use the per-row actions to deep-dive a POC's X timeline with Grok,
+          draft a DM, or promote to CRM.
         </p>
         <div className="flex items-center gap-2 shrink-0">
           <Button
@@ -1236,11 +1128,6 @@ export default function DiscoveryPanel() {
             <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          {/* Batch "Scan" button hidden — the per-row Find POCs and Deep Dive
-              buttons on each prospect are the primary paths now. The batch
-              dialog component is kept mounted in the tree (we don't render
-              it via the button anymore) so any future keyboard shortcut or
-              re-exposure is trivial. */}
           <Button
             size="sm"
             onClick={() => setScanOpen(true)}
@@ -2482,348 +2369,12 @@ export default function DiscoveryPanel() {
         </DialogContent>
       </Dialog>
 
-      {/* Unified Scan dialog — POC Lookup (Claude) or Deep Dive X (Grok) */}
-      <Dialog open={enrichDialogOpen} onOpenChange={setEnrichDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Scan</DialogTitle>
-            <DialogDescription>
-              Pick what you want to scan and how aggressive the freshness window should be.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2 text-sm">
-            {/* Mode picker */}
-            <div>
-              <Label className="mb-1.5 block">Scan type</Label>
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => setScanMode('poc_lookup')}
-                  className={`w-full text-left rounded-lg border p-3 transition-colors ${
-                    scanMode === 'poc_lookup'
-                      ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs font-semibold text-gray-900">POC Lookup</div>
-                    <span className="text-[10px] text-gray-500">{missingPocCount} missing</span>
-                  </div>
-                  <div className="text-[11px] text-gray-600 mt-0.5">
-                    Claude searches project sites + X bios for decision-maker handles.
-                    Targets prospects without any POC yet.
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setScanMode('deep_dive_x')}
-                  className={`w-full text-left rounded-lg border p-3 transition-colors ${
-                    scanMode === 'deep_dive_x'
-                      ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs font-semibold text-gray-900">
-                      Deep Dive X Timeline
-                      <span className="ml-1.5 inline-flex items-center text-[9px] font-bold px-1 py-0.5 rounded bg-violet-100 text-violet-700 pointer-events-none">
-                        GROK
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-gray-500">{pocsWithXCount} POCs</span>
-                  </div>
-                  <div className="text-[11px] text-gray-600 mt-0.5">
-                    Grok (grok-4) reads each POC's X feed for Korea / Asia relevance signals.
-                    Batch mode — scans many at once, hot leads first.
-                  </div>
-                  <div className="text-[10px] text-gray-500 mt-1 italic">
-                    Tip: for a single project, use the Deep Dive button on its row instead.
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setScanMode('both')}
-                  className={`w-full text-left rounded-lg border p-3 transition-colors ${
-                    scanMode === 'both'
-                      ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-xs font-semibold text-gray-900">Both (POC Lookup → Deep Dive)</div>
-                  <div className="text-[11px] text-gray-600 mt-0.5">
-                    Runs POC Lookup first, then Deep Dive on all resulting POCs.
-                    Most thorough. Highest cost.
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* POC Lookup engine picker. Three choices:
-                  - Grok: native X search + web_search (best for X bios w/ TG)
-                  - Opus: Claude via web_search (better judgment on edge cases)
-                  - Sonnet: Claude via web_search (fastest, cheapest)
-                Deep Dive always uses Grok, so this picker only affects POC Lookup. */}
-            {(scanMode === 'poc_lookup' || scanMode === 'both') && (
-              <div>
-                <Label className="mb-1.5 block">
-                  POC Lookup engine
-                  <span className="font-normal text-[10px] text-gray-500 ml-1">
-                    — Deep Dive always uses Grok
-                  </span>
-                </Label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEnrichModel('grok')}
-                    className={`text-left rounded-lg border p-2.5 transition-colors ${
-                      enrichModel === 'grok'
-                        ? 'border-violet-500 bg-violet-50 ring-1 ring-violet-500'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="text-xs font-semibold text-gray-900 flex items-center gap-1">
-                      Grok
-                      <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-violet-100 text-violet-700">X</span>
-                    </div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">Native X + web</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEnrichModel('opus')}
-                    className={`text-left rounded-lg border p-2.5 transition-colors ${
-                      enrichModel === 'opus'
-                        ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="text-xs font-semibold text-gray-900">Opus 4.7</div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">Web search</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEnrichModel('sonnet')}
-                    className={`text-left rounded-lg border p-2.5 transition-colors ${
-                      enrichModel === 'sonnet'
-                        ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="text-xs font-semibold text-gray-900">Sonnet 4.5</div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">Web search</div>
-                  </button>
-                </div>
-                <p className="text-[10px] text-gray-500 mt-1.5">
-                  Grok is better at finding Telegram handles from X bios (crypto BDs often put "tg: @handle" there).
-                  Claude is a better fallback when X turns up nothing.
-                </p>
-              </div>
-            )}
-
-            {/* Lookback window (Deep Dive only) */}
-            {(scanMode === 'deep_dive_x' || scanMode === 'both') && (
-              <div>
-                <Label htmlFor="lookback" className="mb-1.5 block">Lookback window (Deep Dive)</Label>
-                <Select
-                  value={String(scanLookbackDays)}
-                  onValueChange={v => setScanLookbackDays(Number(v) as 30 | 90 | 180 | 365)}
-                >
-                  <SelectTrigger id="lookback">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="30">Last 30 days — very recent / active signals</SelectItem>
-                    <SelectItem value="90">Last 90 days — balanced (default)</SelectItem>
-                    <SelectItem value="180">Last 6 months — broader pattern</SelectItem>
-                    <SelectItem value="365">Last 12 months — historical</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {/* Signal shelf life — only relevant when signals are being
-                written, i.e. Deep Dive X or Both. POC Lookup doesn't
-                produce signals (it updates the contact list). */}
-            {(scanMode === 'deep_dive_x' || scanMode === 'both') && (
-              <div>
-                <Label htmlFor="shelf" className="mb-1.5 block">Signal shelf life (Deep Dive)</Label>
-                <Select
-                  value={String(scanShelfLifeDays)}
-                  onValueChange={v => setScanShelfLifeDays(Number(v) as 7 | 14 | 30 | 60 | 90)}
-                >
-                  <SelectTrigger id="shelf">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="7">7 days — very fresh only</SelectItem>
-                    <SelectItem value="14">14 days — short-term actionable</SelectItem>
-                    <SelectItem value="30">30 days — standard (default)</SelectItem>
-                    <SelectItem value="60">60 days — extended</SelectItem>
-                    <SelectItem value="90">90 days — long-lived (use sparingly)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-[10px] text-gray-500 mt-1">
-                  How long the resulting X timeline signals stay "fresh" on prospects before expiring.
-                </p>
-              </div>
-            )}
-
-            {/* Max POCs cap — safety brake so a misclick doesn't scan every
-                POC in the pipeline. Hot leads (by tier) get the budget first. */}
-            {(scanMode === 'deep_dive_x' || scanMode === 'both') && (
-              <div>
-                <Label htmlFor="maxpocs" className="mb-1.5 block">
-                  Max POCs (Deep Dive)
-                  <span className="font-normal text-[10px] text-gray-500 ml-1">
-                    — cost brake, hot leads first
-                  </span>
-                </Label>
-                <Select
-                  value={String(scanMaxPocs)}
-                  onValueChange={v => setScanMaxPocs(Number(v) as 1 | 3 | 5 | 10 | 25 | 9999)}
-                >
-                  <SelectTrigger id="maxpocs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 POC — smoke test</SelectItem>
-                    <SelectItem value="3">3 POCs — quick check</SelectItem>
-                    <SelectItem value="5">5 POCs — default</SelectItem>
-                    <SelectItem value="10">10 POCs</SelectItem>
-                    <SelectItem value="25">25 POCs</SelectItem>
-                    <SelectItem value="9999">All ({pocsWithXCount}) — full sweep</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-[10px] text-gray-500 mt-1">
-                  Grok scans in tier order (Reach Out Now → Pre-Token → Research → Watch → Nurture),
-                  so capping at N keeps the highest-value POCs.
-                </p>
-              </div>
-            )}
-
-            {/* Cost estimate */}
-            {(() => {
-              // POC lookup cost range — depends on engine
-              //   Grok: ~$0.10-$0.30 per project (x_search + web_search)
-              //   Opus: ~$0.25-$0.75 per project (Claude web_search, pricier)
-              //   Sonnet: ~$0.05-$0.15 per project (Claude web_search, cheap)
-              const pocLo =
-                enrichModel === 'grok' ? 0.10
-                : enrichModel === 'opus' ? 0.25
-                : 0.05;
-              const pocHi =
-                enrichModel === 'grok' ? 0.30
-                : enrichModel === 'opus' ? 0.75
-                : 0.15;
-              const pocCount = missingPocCount;
-              // Grok deep dive cost range (~$0.10-$0.40 per POC — real runs
-              // observed closer to $0.22)
-              const grokLo = 0.10;
-              const grokHi = 0.40;
-              // Apply the max_pocs cap — this is what'll actually be scanned.
-              const grokCount = Math.min(pocsWithXCount, scanMaxPocs);
-              const grokSkipped = Math.max(0, pocsWithXCount - grokCount);
-
-              let lo = 0, hi = 0, descr = '';
-              if (scanMode === 'poc_lookup') {
-                lo = pocLo * pocCount; hi = pocHi * pocCount;
-                descr = `${pocCount} prospect${pocCount !== 1 ? 's' : ''} × POC lookup`;
-              } else if (scanMode === 'deep_dive_x') {
-                lo = grokLo * grokCount; hi = grokHi * grokCount;
-                descr = `${grokCount} POC${grokCount !== 1 ? 's' : ''} × Grok deep dive`;
-              } else {
-                lo = pocLo * pocCount + grokLo * grokCount;
-                hi = pocHi * pocCount + grokHi * grokCount;
-                descr = `POC lookup + Grok deep dive (${grokCount} POC${grokCount !== 1 ? 's' : ''})`;
-              }
-
-              // Estimated wall-clock (deep dive is ~110s/POC, sequential)
-              const deepDiveSeconds = grokCount * 110;
-              const showTime = scanMode !== 'poc_lookup' && grokCount > 0;
-
-              return (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 text-xs">
-                  <p className="font-semibold mb-1 flex items-center gap-1">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    Estimated cost
-                  </p>
-                  <p>
-                    {descr}: roughly <strong>${lo.toFixed(2)} to ${hi.toFixed(2)}</strong>
-                    {showTime && (
-                      <span className="text-amber-700">
-                        {' · '}
-                        ~{deepDiveSeconds < 60 ? `${deepDiveSeconds}s` : `${Math.round(deepDiveSeconds / 60)}m`}
-                      </span>
-                    )}
-                  </p>
-                  {grokSkipped > 0 && (scanMode === 'deep_dive_x' || scanMode === 'both') && (
-                    <p className="text-[10px] text-amber-700 mt-1">
-                      {grokSkipped} POC{grokSkipped !== 1 ? 's' : ''} over the cap won't be scanned.
-                      Raise "Max POCs" to include them.
-                    </p>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* Last result */}
-            {lastEnrichResult && (
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
-                <div className="font-semibold text-gray-700">Last run</div>
-                {lastEnrichResult.error ? (
-                  <div className="text-red-600 flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" />
-                    {lastEnrichResult.error}
-                  </div>
-                ) : (
-                  <>
-                    {lastEnrichResult.enriched != null && (
-                      <div>POCs enriched: {lastEnrichResult.enriched} · Failed: {lastEnrichResult.failed ?? 0}</div>
-                    )}
-                    {lastEnrichResult.pocs_scanned != null && (
-                      <div>
-                        POCs deep-scanned: {lastEnrichResult.pocs_scanned} · Signals added: {lastEnrichResult.signals_added ?? 0}
-                        {lastEnrichResult.pocs_skipped_due_to_cap > 0 && (
-                          <span className="text-amber-700">
-                            {' · '}
-                            {lastEnrichResult.pocs_skipped_due_to_cap} skipped (cap)
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    <div>Cost: ${lastEnrichResult.cost_usd?.toFixed(3) ?? '—'} · Duration: {Math.round((lastEnrichResult.duration_ms || 0) / 1000)}s</div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEnrichDialogOpen(false)} disabled={enriching}>
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                setEnrichDialogOpen(false);
-                await runUnifiedScan();
-              }}
-              disabled={
-                enriching ||
-                (scanMode === 'poc_lookup' && missingPocCount === 0) ||
-                (scanMode === 'deep_dive_x' && pocsWithXCount === 0) ||
-                (scanMode === 'both' && missingPocCount === 0 && pocsWithXCount === 0)
-              }
-              style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-              className="hover:opacity-90"
-            >
-              {enriching && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {enriching ? 'Running...' : 'Run Scan'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* NOTE: The old "Unified Scan" batch dialog (POC Lookup + Deep
+          Dive X + Both mode picker, 340 lines of JSX) was removed in
+          favor of per-row actions. Users now run POC Lookup via the
+          amber "Find POCs" row button (always Grok) and Deep Dive via
+          the violet row button (per-POC popup). Bulk actions cover the
+          "do it for multiple prospects at once" use case. */}
 
       {/* Per-prospect Deep Dive dialog — opened from the row Deep Dive button.
           Styled to match the Run Discovery + batch Scan dialogs:
