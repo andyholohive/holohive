@@ -221,7 +221,9 @@ export default function DiscoveryPanel() {
   const [enrichDialogOpen, setEnrichDialogOpen] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [lastEnrichResult, setLastEnrichResult] = useState<any>(null);
-  const [enrichModel, setEnrichModel] = useState<'sonnet' | 'opus'>('opus');
+  // POC Lookup engine — Claude (Opus/Sonnet) uses web_search;
+  // Grok uses native x_search + web_search (better at scraping X bios).
+  const [enrichModel, setEnrichModel] = useState<'sonnet' | 'opus' | 'grok'>('grok');
 
   // Unified "Scan" dialog settings
   type ScanMode = 'poc_lookup' | 'deep_dive_x' | 'both';
@@ -237,6 +239,8 @@ export default function DiscoveryPanel() {
   // so we can show a spinner on just that row and disable the button to
   // prevent double-clicks.
   const [deepDivingIds, setDeepDivingIds] = useState<Set<string>>(new Set());
+  // Per-prospect "Find POCs" state (Grok-powered).
+  const [findingPocsIds, setFindingPocsIds] = useState<Set<string>>(new Set());
 
   const fetchProspects = useCallback(async () => {
     setLoading(true);
@@ -360,11 +364,18 @@ export default function DiscoveryPanel() {
   const runPocEnrichment = async () => {
     setEnriching(true);
     setLastEnrichResult(null);
+    // Route to Grok endpoint when the user picks Grok; otherwise use Claude.
+    const endpoint = enrichModel === 'grok'
+      ? '/api/prospects/discovery/grok-find-pocs'
+      : '/api/prospects/discovery/enrich-pocs';
+    const bodyPayload = enrichModel === 'grok'
+      ? {}                           // Grok endpoint doesn't need model param
+      : { model: enrichModel };
     try {
-      const res = await fetch('/api/prospects/discovery/enrich-pocs', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: enrichModel }),
+        body: JSON.stringify(bodyPayload),
       });
       const data = await res.json();
       setLastEnrichResult(data);
@@ -385,6 +396,60 @@ export default function DiscoveryPanel() {
       toast({ title: 'Error', description: err?.message ?? 'Enrichment failed', variant: 'destructive' });
     } finally {
       setEnriching(false);
+    }
+  };
+
+  // Per-prospect Grok POC finder — searches for 1-3 decision-maker handles
+  // (X + Telegram) for ONE project. Grok's native X access is better than
+  // Claude's web search for scraping X bios for Telegram handles.
+  const runFindPocsForProspect = async (prospectId: string, projectName: string) => {
+    setFindingPocsIds(prev => {
+      const next = new Set(prev);
+      next.add(prospectId);
+      return next;
+    });
+    toast({
+      title: 'Finding POCs',
+      description: `Grok is searching X + web for decision-makers at ${projectName}. ~1-2 min.`,
+    });
+    try {
+      const res = await fetch('/api/prospects/discovery/grok-find-pocs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prospect_ids: [prospectId] }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        toast({
+          title: `Find POCs failed — ${projectName}`,
+          description: data.error || (data.errors?.[0] ?? 'Unknown error'),
+          variant: 'destructive',
+        });
+      } else {
+        const didEnrich = (data.enriched ?? 0) > 0;
+        toast({
+          title: didEnrich
+            ? `POCs found — ${projectName}`
+            : `No POCs found — ${projectName}`,
+          description: didEnrich
+            ? `${data.enriched} prospect updated · $${data.cost_usd?.toFixed(2) ?? '—'}`
+            : `Grok couldn't find credible decision-makers. Try manually. $${data.cost_usd?.toFixed(2) ?? '—'}`,
+          variant: didEnrich ? 'default' : 'destructive',
+        });
+        fetchProspects();
+      }
+    } catch (err: any) {
+      toast({
+        title: `Error — ${projectName}`,
+        description: err?.message ?? 'Find POCs failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setFindingPocsIds(prev => {
+        const next = new Set(prev);
+        next.delete(prospectId);
+        return next;
+      });
     }
   };
 
@@ -928,14 +993,46 @@ export default function DiscoveryPanel() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center gap-1 justify-end" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center gap-1 justify-end flex-wrap" onClick={e => e.stopPropagation()}>
+                          {/* Find POCs button (Grok) — only shown when the
+                              prospect has fewer than 3 POCs. Re-runnable if
+                              the first attempt missed some. */}
+                          {(() => {
+                            const pocCount = (p.outreach_contacts || []).length;
+                            if (pocCount >= 3) return null;
+                            const isSkip = p.discovery_action_tier === 'SKIP';
+                            const isFinding = findingPocsIds.has(p.id);
+                            const disabled = isSkip || isFinding;
+                            const title = isSkip
+                              ? 'Disqualified — POC search disabled'
+                              : isFinding
+                                ? 'Searching X + web for POCs…'
+                                : pocCount === 0
+                                  ? 'Find 1-3 decision-maker handles with Grok (~$0.20, ~1-2 min)'
+                                  : `Find more POCs (currently ${pocCount}) with Grok`;
+                            return (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs text-amber-700 border-amber-200 hover:bg-amber-50 disabled:text-gray-300 disabled:border-gray-200"
+                                onClick={() => runFindPocsForProspect(p.id, p.name)}
+                                disabled={disabled}
+                                title={title}
+                              >
+                                {isFinding
+                                  ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  : <UserSearch className="h-3 w-3 mr-1" />}
+                                {pocCount === 0 ? 'Find POCs' : 'Find more'}
+                              </Button>
+                            );
+                          })()}
                           {(() => {
                             const xPocCount = (p.outreach_contacts || []).filter(c => !!c.twitter_handle).length;
                             const isSkip = p.discovery_action_tier === 'SKIP';
                             const isDiving = deepDivingIds.has(p.id);
                             const disabled = xPocCount === 0 || isSkip || isDiving;
                             const title = xPocCount === 0
-                              ? 'No POC with X handle — run POC Lookup first'
+                              ? 'No POC with X handle — run Find POCs first'
                               : isSkip
                                 ? 'Disqualified — deep dive disabled'
                                 : isDiving
@@ -1467,17 +1564,35 @@ export default function DiscoveryPanel() {
               </div>
             </div>
 
-            {/* Model picker — Claude Opus/Sonnet for POC Lookup only.
-                Deep Dive X always uses Grok (not a user-selectable model). */}
+            {/* POC Lookup engine picker. Three choices:
+                  - Grok: native X search + web_search (best for X bios w/ TG)
+                  - Opus: Claude via web_search (better judgment on edge cases)
+                  - Sonnet: Claude via web_search (fastest, cheapest)
+                Deep Dive always uses Grok, so this picker only affects POC Lookup. */}
             {(scanMode === 'poc_lookup' || scanMode === 'both') && (
               <div>
                 <Label className="mb-1.5 block">
-                  Claude model
+                  POC Lookup engine
                   <span className="font-normal text-[10px] text-gray-500 ml-1">
-                    — POC Lookup only; Deep Dive always uses Grok
+                    — Deep Dive always uses Grok
                   </span>
                 </Label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEnrichModel('grok')}
+                    className={`text-left rounded-lg border p-2.5 transition-colors ${
+                      enrichModel === 'grok'
+                        ? 'border-violet-500 bg-violet-50 ring-1 ring-violet-500'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="text-xs font-semibold text-gray-900 flex items-center gap-1">
+                      Grok
+                      <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-violet-100 text-violet-700">X</span>
+                    </div>
+                    <div className="text-[10px] text-gray-600 mt-0.5">Native X + web</div>
+                  </button>
                   <button
                     type="button"
                     onClick={() => setEnrichModel('opus')}
@@ -1488,7 +1603,7 @@ export default function DiscoveryPanel() {
                     }`}
                   >
                     <div className="text-xs font-semibold text-gray-900">Opus 4.7</div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">Better accuracy</div>
+                    <div className="text-[10px] text-gray-600 mt-0.5">Web search</div>
                   </button>
                   <button
                     type="button"
@@ -1500,9 +1615,13 @@ export default function DiscoveryPanel() {
                     }`}
                   >
                     <div className="text-xs font-semibold text-gray-900">Sonnet 4.5</div>
-                    <div className="text-[10px] text-gray-600 mt-0.5">Faster, cheaper</div>
+                    <div className="text-[10px] text-gray-600 mt-0.5">Web search</div>
                   </button>
                 </div>
+                <p className="text-[10px] text-gray-500 mt-1.5">
+                  Grok is better at finding Telegram handles from X bios (crypto BDs often put "tg: @handle" there).
+                  Claude is a better fallback when X turns up nothing.
+                </p>
               </div>
             )}
 
@@ -1580,9 +1699,18 @@ export default function DiscoveryPanel() {
 
             {/* Cost estimate */}
             {(() => {
-              // POC lookup cost range
-              const pocLo = enrichModel === 'opus' ? 0.25 : 0.05;
-              const pocHi = enrichModel === 'opus' ? 0.75 : 0.15;
+              // POC lookup cost range — depends on engine
+              //   Grok: ~$0.10-$0.30 per project (x_search + web_search)
+              //   Opus: ~$0.25-$0.75 per project (Claude web_search, pricier)
+              //   Sonnet: ~$0.05-$0.15 per project (Claude web_search, cheap)
+              const pocLo =
+                enrichModel === 'grok' ? 0.10
+                : enrichModel === 'opus' ? 0.25
+                : 0.05;
+              const pocHi =
+                enrichModel === 'grok' ? 0.30
+                : enrichModel === 'opus' ? 0.75
+                : 0.15;
               const pocCount = missingPocCount;
               // Grok deep dive cost range (~$0.10-$0.40 per POC — real runs
               // observed closer to $0.22)

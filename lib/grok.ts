@@ -104,7 +104,10 @@ export async function grokChatCompletion(req: GrokRequest): Promise<GrokResponse
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(120_000),
+    // 4 min ceiling — agent-tool chains (x_search + web_search) can legitimately
+    // take 2-3 min, but anything longer means Grok's in a search loop and we
+    // should fail fast so the dev server isn't blocked.
+    signal: AbortSignal.timeout(240_000),
   });
 
   if (!res.ok) {
