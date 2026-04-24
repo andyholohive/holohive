@@ -122,6 +122,16 @@ const CampaignDetailsPage = () => {
   // Contents tab toggle state
   const [contentsViewMode, setContentsViewMode] = useState<'overview' | 'table'>('overview');
 
+  // Content-list state hoisted here (used to be declared at line ~2573,
+  // after the places that call it). `getPaymentStatus` below reads
+  // `contents` to decide if a payment is overdue, and `overdueCount`
+  // at the top of the component calls getPaymentStatus during render.
+  // If `contents` is declared below that call site, the render crashes
+  // with a TDZ ReferenceError on any campaign where payments have
+  // content_ids linked. Keep this state up here.
+  const [contents, setContents] = useState<any[]>([]);
+  const [loadingContents, setLoadingContents] = useState(false);
+
   // Payments state
   const [payments, setPayments] = useState<any[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
@@ -2569,9 +2579,8 @@ const CampaignDetailsPage = () => {
 
   const [isAddingContent, setIsAddingContent] = useState(false);
 
-  // 1. Add state for contents and loading
-  const [contents, setContents] = useState<any[]>([]);
-  const [loadingContents, setLoadingContents] = useState(false);
+  // Note: contents / loadingContents state is declared near the top of
+  // the component alongside contentsViewMode. Don't redeclare here.
 
   // 2. Fetch contents for campaign when campaign changes
   const fetchContents = async () => {
