@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Sparkles, Building2, DollarSign } from 'lucide-react';
+import { Sparkles, Building2, DollarSign, Activity } from 'lucide-react';
 import {
   HoverCard, HoverCardTrigger, HoverCardContent,
 } from '@/components/ui/hover-card';
 import DiscoveryPanel from '@/components/agents/DiscoveryPanel';
 import ExchangeListingsPanel from '@/components/agents/ExchangeListingsPanel';
+import RecentSignalsPanel from '@/components/agents/RecentSignalsPanel';
 
 // NOTE: Prospects, Korea Signals, Funding Radar, and AI Agents tabs are
 // temporarily hidden while the team focuses on Discovery + KR Exchanges.
@@ -96,6 +97,10 @@ export default function IntelligencePage() {
             <Sparkles className="h-4 w-4" />
             Discovery
           </TabsTrigger>
+          <TabsTrigger value="signals" className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Signals
+          </TabsTrigger>
           <TabsTrigger value="kr_exchanges" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             KR Exchanges
@@ -104,6 +109,10 @@ export default function IntelligencePage() {
 
         <TabsContent value="discovery" className="mt-4">
           <DiscoveryPanel />
+        </TabsContent>
+
+        <TabsContent value="signals" className="mt-4">
+          <RecentSignalsPanel />
         </TabsContent>
 
         <TabsContent value="kr_exchanges" className="mt-4">

@@ -762,26 +762,52 @@ export async function POST(request: Request) {
     const anthropic = getClaudeClient();
 
     // ── Pre-scan: fetch the skip list (dedup) ────────────────────────
-    // Projects we've already scanned within the cooldown window. Without this
-    // Claude keeps finding the same top-of-DropsTab projects every run and
-    // burning cost to re-research them.
+    // Projects we've already scanned within the cooldown window, OR projects
+    // already in our CRM pipeline. Without this Claude keeps finding the
+    // same top-of-DropsTab projects every run and burning cost to
+    // re-research them.
     const COOLDOWN_DAYS = Number(body.cooldown_days) || 14;
     const cooldownCutoff = new Date(Date.now() - COOLDOWN_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+    // Source 1: recently-scanned discovery prospects (cooldown window).
     const { data: recentProspects } = await (supabase as any)
       .from('prospects')
       .select('name, updated_at, discovery_snapshot')
       .eq('source', 'dropstab_discovery')
       .gte('updated_at', cooldownCutoff)
       .limit(500);
-    const skipNames: string[] = (recentProspects || [])
-      .map((p: any) => p.name)
-      .filter(Boolean);
+
+    // Source 2: everything in our CRM — we already know these projects so
+    // there's no point "discovering" them again. No time filter here:
+    // once a project is in CRM, it stays in the skip list permanently.
+    const { data: crmRows } = await (supabase as any)
+      .from('crm_opportunities')
+      .select('name')
+      .range(0, 4999);
+
+    // Dedupe names case-insensitively. A Set of lowercase names + an array
+    // of original-cased names (what Claude sees in the prompt).
+    // (Named skipSeen to avoid collision with `skipSet` declared later in
+    // this function for the post-enrichment filter.)
+    const skipSeen = new Set<string>();
+    const skipNames: string[] = [];
+    const addSkip = (n: unknown) => {
+      if (typeof n !== 'string') return;
+      const key = n.trim().toLowerCase();
+      if (!key || skipSeen.has(key)) return;
+      skipSeen.add(key);
+      skipNames.push(n.trim());
+    };
+    for (const p of recentProspects || []) addSkip(p.name);
+    for (const c of crmRows || []) addSkip(c.name);
+    const crmSkipCount = (crmRows || []).length;
+    const recentSkipCount = (recentProspects || []).length;
 
     // ── Stage 1 ──────────────────────────────────────────────────────
     await updateProgress({
       stage: 'discovering_candidates',
       message: skipNames.length > 0
-        ? `Finding new candidates on DropsTab (skipping ${skipNames.length} already scanned)...`
+        ? `Finding new candidates on DropsTab (skipping ${skipNames.length}: ${recentSkipCount} recently scanned, ${crmSkipCount} in CRM)...`
         : 'Finding candidates on DropsTab...',
       percent: 5,
     });
