@@ -69,6 +69,10 @@ interface CandidateBasics {
   investors?: string[];
   dropstab_url?: string | null;
   website_url?: string | null;
+  // Experimental: which source surfaced this candidate. Used when the scan
+  // runs with body.experimental_sources=true to A/B whether adding
+  // cryptorank.io/funding-rounds produces new coverage vs DropsTab alone.
+  primary_source?: 'dropstab' | 'cryptorank' | string | null;
 }
 
 interface DiscoveredProject extends CandidateBasics {
@@ -110,17 +114,60 @@ interface DiscoveredProject extends CandidateBasics {
 // Stage 1: Find candidates on DropsTab
 // ────────────────────────────────────────────────────────────────────
 
-const CANDIDATES_SYSTEM_PROMPT = `You are a crypto-funding research assistant for HoloHive BD. Your only job in this call is to PRODUCE A LIST of candidate projects from DropsTab that recently raised capital. Do not evaluate fit, do not find contacts, do not score — later calls do that.
+// Supported discovery sources. Keep the list explicit so the UI and
+// prompt builder agree on what's valid.
+type DiscoverySource = 'dropstab' | 'cryptorank';
+const SUPPORTED_SOURCES: DiscoverySource[] = ['dropstab', 'cryptorank'];
 
-## SOURCE RULES
-- Primary: https://dropstab.com/tab/by-raised-funds (the raised-funds list)
-- Open individual DropsTab coin pages as needed to confirm funding details
-- DO NOT use general web search for candidate discovery. DropsTab is the source of truth for this list.
+const SOURCE_DEFS: Record<DiscoverySource, { url: string; note: string }> = {
+  dropstab: {
+    url: 'https://dropstab.com/tab/by-raised-funds',
+    note: 'Comprehensive trending list. Open individual coin pages to confirm funding details.',
+  },
+  cryptorank: {
+    url: 'https://cryptorank.io/funding-rounds',
+    note: 'Public funding tracker. Often catches rounds that have not yet hit DropsTab.',
+  },
+};
 
+/**
+ * Build the Stage 1 system prompt dynamically from the user-selected
+ * sources. A scan configured with only DropsTab gets the classic prompt;
+ * a scan with both gets multi-source cross-reference instructions.
+ *
+ * Defaulting to ['dropstab'] preserves the prior single-source behavior
+ * when the `sources` field is missing from the request body.
+ */
+function buildCandidatesSystemPrompt(sources: DiscoverySource[]): string {
+  const sourceLines = sources.map(s => `- ${SOURCE_DEFS[s].url} — ${SOURCE_DEFS[s].note}`);
+  const multi = sources.length > 1;
+
+  return `You are a crypto-funding research assistant for HoloHive BD. Your only job in this call is to PRODUCE A LIST of candidate crypto projects that recently raised capital. Do not evaluate fit, do not find contacts, do not score — later calls do that.
+
+## SOURCE RULES${multi ? ` (${sources.length} sources)` : ''}
+
+${sourceLines.join('\n')}
+${multi ? `
+Check every source above. If a candidate appears on multiple sources,
+record it once with primary_source set to where you first verified it.
+Do NOT use general web search outside these listed sources — they are
+the source of truth.
+
+If a source's page is JS-rendered and you cannot see the data through
+web_search, say so in a single candidate entry's notes field rather
+than guessing — do NOT fabricate rounds you haven't actually seen.
+` : `
+DO NOT use general web search for candidate discovery — the listed
+source is the source of truth for this list.
+`}
 ## OUTPUT
-Call submit_candidates exactly once with the list. No text replies.
 
-Return AT MOST the requested count. Quality over quantity — if you can only find 6 qualifying projects, submit 6.`;
+Call submit_candidates exactly once with the list. No text replies.
+For each candidate, set primary_source to one of: ${sources.map(s => `'${s}'`).join(', ')}.
+
+Return AT MOST the requested count. Quality over quantity — if you can
+only find 6 qualifying projects, submit 6.`;
+}
 
 const candidatesTool = {
   name: 'submit_candidates',
@@ -142,6 +189,10 @@ const candidatesTool = {
             investors: { type: 'array', items: { type: 'string' } },
             dropstab_url: { type: 'string' },
             website_url: { type: 'string' },
+            primary_source: {
+              type: 'string',
+              description: "Source where this candidate was first found. 'dropstab' (default) or 'cryptorank' when the experimental source list is active.",
+            },
           },
           required: ['name'],
         },
@@ -161,6 +212,7 @@ async function findCandidates(
     categories: string[];
     skipNames: string[];      // projects we've already scanned recently — don't return these
     cooldownDays: number;     // how old the skip list is, for the prompt
+    sources: DiscoverySource[]; // which sources Claude is allowed to query
   },
 ): Promise<{
   candidates: CandidateBasics[];
@@ -190,19 +242,25 @@ For each, include name, symbol, category, funding amount, round type, date (if v
 
 Call submit_candidates when done.`;
 
+  const systemPromptText = buildCandidatesSystemPrompt(params.sources);
+
+  // Scale the web_search budget with the number of sources — one extra
+  // source costs ~4 searches (scan + verify a couple of candidates).
+  const searchBudget = 10 + (params.sources.length - 1) * 4;
+
   const response = await anthropic.messages.create({
     model,
     max_tokens: 6000,
     system: [
       {
         type: 'text',
-        text: CANDIDATES_SYSTEM_PROMPT,
+        text: systemPromptText,
         cache_control: { type: 'ephemeral' },
       },
     ],
     messages: [{ role: 'user', content: userPrompt }],
     tools: [
-      { type: 'web_search_20250305', name: 'web_search', max_uses: 10 } as any,
+      { type: 'web_search_20250305', name: 'web_search', max_uses: searchBudget } as any,
       candidatesTool as any,
     ],
   });
@@ -766,10 +824,18 @@ export async function POST(request: Request) {
     // already in our CRM pipeline. Without this Claude keeps finding the
     // same top-of-DropsTab projects every run and burning cost to
     // re-research them.
+    //
+    // Architecture note: we only pass RECENT prospect names to Claude's
+    // prompt (small set, ~20-50). CRM names go into a server-side post-
+    // filter that runs AFTER Claude returns candidates. Passing 1000+ CRM
+    // names in the prompt was crowding Claude's context and causing
+    // Stage 1 to return zero candidates — the reason we fought a "scan
+    // returns empty" regression for a session.
     const COOLDOWN_DAYS = Number(body.cooldown_days) || 14;
     const cooldownCutoff = new Date(Date.now() - COOLDOWN_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
     // Source 1: recently-scanned discovery prospects (cooldown window).
+    // These go into Claude's prompt as "don't re-research these".
     const { data: recentProspects } = await (supabase as any)
       .from('prospects')
       .select('name, updated_at, discovery_snapshot')
@@ -777,16 +843,20 @@ export async function POST(request: Request) {
       .gte('updated_at', cooldownCutoff)
       .limit(500);
 
-    // Source 2: everything in our CRM — we already know these projects so
-    // there's no point "discovering" them again. No time filter here:
-    // once a project is in CRM, it stays in the skip list permanently.
+    // Source 2: all CRM names. These go into a SET only, used server-side
+    // after Claude returns candidates — not passed to Claude.
     const { data: crmRows } = await (supabase as any)
       .from('crm_opportunities')
       .select('name')
       .range(0, 4999);
+    const crmNameSet = new Set<string>(
+      (crmRows || [])
+        .map((c: any) => (typeof c.name === 'string' ? c.name.trim().toLowerCase() : ''))
+        .filter(Boolean),
+    );
 
-    // Dedupe names case-insensitively. A Set of lowercase names + an array
-    // of original-cased names (what Claude sees in the prompt).
+    // Dedupe names case-insensitively. Only recent discovery prospects are
+    // shown to Claude — keeps the prompt small and Stage 1 functional.
     // (Named skipSeen to avoid collision with `skipSet` declared later in
     // this function for the post-enrichment filter.)
     const skipSeen = new Set<string>();
@@ -799,8 +869,7 @@ export async function POST(request: Request) {
       skipNames.push(n.trim());
     };
     for (const p of recentProspects || []) addSkip(p.name);
-    for (const c of crmRows || []) addSkip(c.name);
-    const crmSkipCount = (crmRows || []).length;
+    const crmSkipCount = crmNameSet.size;
     const recentSkipCount = (recentProspects || []).length;
 
     // ── Stage 1 ──────────────────────────────────────────────────────
@@ -812,14 +881,51 @@ export async function POST(request: Request) {
       percent: 5,
     });
 
-    const stage1 = await findCandidates(anthropic, model, {
+    // Resolve which sources this scan should query.
+    //   - `body.sources` (preferred) is an array like ['dropstab', 'cryptorank']
+    //   - legacy `body.experimental_sources: true` means dropstab + cryptorank
+    //   - default (neither set) is dropstab only
+    let sources: DiscoverySource[];
+    if (Array.isArray(body.sources) && body.sources.length > 0) {
+      sources = body.sources
+        .filter((s: unknown): s is DiscoverySource =>
+          typeof s === 'string' && (SUPPORTED_SOURCES as string[]).includes(s),
+        );
+      if (sources.length === 0) sources = ['dropstab'];
+    } else if (body.experimental_sources === true) {
+      sources = ['dropstab', 'cryptorank'];
+    } else {
+      sources = ['dropstab'];
+    }
+
+    const stage1Raw = await findCandidates(anthropic, model, {
       recencyDays,
       minRaise,
       maxCandidates: maxProjects,
       categories,
       skipNames,
       cooldownDays: COOLDOWN_DAYS,
+      sources,
     });
+
+    // Server-side CRM post-filter. Moved out of Claude's prompt because
+    // passing 1,000+ CRM names into the system prompt was causing Stage 1
+    // to return zero candidates (the prompt got swamped and Claude stopped
+    // emitting submit_candidates).
+    const crmFilteredOut: string[] = [];
+    const filteredCandidates = stage1Raw.candidates.filter(c => {
+      if (!c.name) return false;
+      const key = c.name.trim().toLowerCase();
+      if (crmNameSet.has(key)) {
+        crmFilteredOut.push(c.name);
+        return false;
+      }
+      return true;
+    });
+    const stage1 = { ...stage1Raw, candidates: filteredCandidates };
+    if (crmFilteredOut.length > 0) {
+      console.log(`Discovery scan: post-filter dropped ${crmFilteredOut.length} CRM-known candidates:`, crmFilteredOut);
+    }
 
     if (stage1.candidates.length === 0) {
       await finishRun(
@@ -842,6 +948,31 @@ export async function POST(request: Request) {
         signals_added: 0,
         errors: ['Stage 1 found no candidates matching filters'],
         cost_usd: Number(estimateCost(model, stage1.inputTokens, stage1.outputTokens).toFixed(4)),
+        duration_ms: Date.now() - startedAt.getTime(),
+      });
+    }
+
+    // Experimental short-circuit: return after Stage 1 without paying to
+    // enrich. Used by the CryptoRank A/B test where we only need to see
+    // which candidates Claude surfaced, not their full enrichment.
+    if (body.skip_enrichment === true) {
+      const stage1Cost = Number(estimateCost(model, stage1.inputTokens, stage1.outputTokens).toFixed(4));
+      await finishRun('completed', {
+        stage: 1,
+        stage1_only: true,
+        sources,
+        candidates_found: stage1.candidates.length,
+        candidates: stage1.candidates,
+        input_tokens: stage1.inputTokens,
+        output_tokens: stage1.outputTokens,
+        cost_usd: stage1Cost,
+      });
+      return NextResponse.json({
+        success: true,
+        stage1_only: true,
+        candidates_found: stage1.candidates.length,
+        candidates: stage1.candidates,
+        cost_usd: stage1Cost,
         duration_ms: Date.now() - startedAt.getTime(),
       });
     }

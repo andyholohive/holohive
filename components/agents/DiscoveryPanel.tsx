@@ -311,7 +311,22 @@ export default function DiscoveryPanel() {
     max_projects: '20',
     categories: '',
     model: 'opus' as 'sonnet' | 'opus',
+    // Which candidate sources Claude queries. DropsTab only is the
+    // battle-tested default. CryptoRank is available as a secondary
+    // source that catches rounds DropsTab may not yet have indexed.
+    sources: ['dropstab'] as ('dropstab' | 'cryptorank')[],
   });
+  const toggleScanSource = (src: 'dropstab' | 'cryptorank') => {
+    setScanParams(p => {
+      const has = p.sources.includes(src);
+      // Never allow the empty set — at minimum one source must be selected.
+      if (has && p.sources.length === 1) return p;
+      return {
+        ...p,
+        sources: has ? p.sources.filter(s => s !== src) : [...p.sources, src],
+      };
+    });
+  };
   const [lastScanResult, setLastScanResult] = useState<any>(null);
 
   // Live progress (polled from /api/prospects/discovery/progress while scanning)
@@ -493,6 +508,7 @@ export default function DiscoveryPanel() {
         min_raise_usd: parseInt(scanParams.min_raise_usd, 10) || 1_000_000,
         max_projects: parseInt(scanParams.max_projects, 10) || 20,
         model: scanParams.model,
+        sources: scanParams.sources,
       };
       const cats = scanParams.categories.split(',').map(s => s.trim()).filter(Boolean);
       if (cats.length > 0) body.categories = cats;
@@ -2281,6 +2297,58 @@ export default function DiscoveryPanel() {
                 placeholder="DeFi, Gaming, AI"
               />
               <p className="text-xs text-gray-500 mt-1">Comma-separated. Leave blank to scan all.</p>
+            </div>
+
+            <div>
+              <Label className="mb-1.5 block">
+                Sources
+                <span className="font-normal text-[10px] text-gray-500 ml-1">
+                  — click to toggle; at least one must stay selected
+                </span>
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => toggleScanSource('dropstab')}
+                  className={`text-left rounded-lg border p-2.5 transition-colors ${
+                    scanParams.sources.includes('dropstab')
+                      ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-xs font-semibold text-gray-900 flex items-center gap-1">
+                    DropsTab
+                    {scanParams.sources.includes('dropstab') && (
+                      <CheckCircle className="h-3 w-3 text-[#3e8692]" />
+                    )}
+                  </div>
+                  <div className="text-[10px] text-gray-600 mt-0.5">Trending crypto funding list</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">Default · battle-tested</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleScanSource('cryptorank')}
+                  className={`text-left rounded-lg border p-2.5 transition-colors ${
+                    scanParams.sources.includes('cryptorank')
+                      ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-xs font-semibold text-gray-900 flex items-center gap-1">
+                    CryptoRank
+                    {scanParams.sources.includes('cryptorank') && (
+                      <CheckCircle className="h-3 w-3 text-[#3e8692]" />
+                    )}
+                  </div>
+                  <div className="text-[10px] text-gray-600 mt-0.5">Catches rounds DropsTab may miss</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">+1 search call · ~1.2× cost</div>
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1.5">
+                Both sources are public HTML pages that Claude reads via web_search.
+                Adding CryptoRank usually finds 2–4 additional candidates per scan that
+                DropsTab didn't index yet.
+              </p>
             </div>
 
             <div>
