@@ -223,6 +223,12 @@ export default function DiscoveryPanel() {
   const [lastEnrichResult, setLastEnrichResult] = useState<any>(null);
   const [enrichModel, setEnrichModel] = useState<'sonnet' | 'opus'>('opus');
 
+  // Unified "Scan" dialog settings
+  type ScanMode = 'poc_lookup' | 'deep_dive_x' | 'both';
+  const [scanMode, setScanMode] = useState<ScanMode>('poc_lookup');
+  const [scanLookbackDays, setScanLookbackDays] = useState<30 | 90 | 180 | 365>(90);
+  const [scanShelfLifeDays, setScanShelfLifeDays] = useState<7 | 14 | 30 | 60 | 90>(30);
+
   const fetchProspects = useCallback(async () => {
     setLoading(true);
     try {
@@ -349,7 +355,7 @@ export default function DiscoveryPanel() {
       const res = await fetch('/api/prospects/discovery/enrich-pocs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: enrichModel }), // empty = enrich all missing
+        body: JSON.stringify({ model: enrichModel }),
       });
       const data = await res.json();
       setLastEnrichResult(data);
@@ -370,6 +376,56 @@ export default function DiscoveryPanel() {
       toast({ title: 'Error', description: err?.message ?? 'Enrichment failed', variant: 'destructive' });
     } finally {
       setEnriching(false);
+    }
+  };
+
+  // Grok-powered Deep Dive: reads each eligible POC's X timeline for
+  // Korea / Asia signals over the chosen lookback window.
+  const runDeepDive = async () => {
+    setEnriching(true);
+    setLastEnrichResult(null);
+    try {
+      const res = await fetch('/api/prospects/discovery/grok-deep-dive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lookback_days: scanLookbackDays,
+          shelf_life_days: scanShelfLifeDays,
+        }),
+      });
+      const data = await res.json();
+      setLastEnrichResult(data);
+      if (!res.ok || data.error) {
+        toast({
+          title: 'Deep Dive failed',
+          description: data.error || 'Unknown error',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Deep Dive complete',
+          description: `${data.pocs_scanned ?? 0} POCs scanned · ${data.signals_added ?? 0} signals added · $${data.cost_usd?.toFixed(2) ?? '—'}`,
+        });
+        fetchProspects();
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message ?? 'Deep Dive failed', variant: 'destructive' });
+    } finally {
+      setEnriching(false);
+    }
+  };
+
+  // Unified scan dispatcher — routes to POC Lookup, Deep Dive, or both
+  // based on the mode selected in the Scan dialog.
+  const runUnifiedScan = async () => {
+    if (scanMode === 'poc_lookup') {
+      await runPocEnrichment();
+    } else if (scanMode === 'deep_dive_x') {
+      await runDeepDive();
+    } else {
+      // both — POC lookup first so newly-found POCs are available for Deep Dive
+      await runPocEnrichment();
+      await runDeepDive();
     }
   };
 
@@ -433,6 +489,12 @@ export default function DiscoveryPanel() {
     p => p.discovery_action_tier !== 'SKIP' && (!p.outreach_contacts || p.outreach_contacts.length === 0),
   ).length;
 
+  // POCs with findable X handles — the target set for Deep Dive X scans.
+  // We only deep-dive non-SKIP prospects (no point spending money on disqualified ones).
+  const pocsWithXCount = prospects
+    .filter(p => p.discovery_action_tier !== 'SKIP')
+    .reduce((acc, p) => acc + (p.outreach_contacts || []).filter(c => !!c.twitter_handle).length, 0);
+
   // Summary stats for the cards at top (always derived from the full prospects
   // list, ignoring the hide-disqualified toggle — we want stable counts that
   // don't flicker when the filter changes).
@@ -465,21 +527,19 @@ export default function DiscoveryPanel() {
             <RefreshCw className={`w-4 h-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          {missingPocCount > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEnrichDialogOpen(true)}
-              disabled={enriching}
-              className="h-9 text-amber-700 border-amber-200 hover:bg-amber-50"
-              title="Run POC lookup for prospects that don't have outreach contacts yet"
-            >
-              {enriching
-                ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                : <UserSearch className="w-4 h-4 mr-1.5" />}
-              Find POCs ({missingPocCount})
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEnrichDialogOpen(true)}
+            disabled={enriching}
+            className="h-9"
+            title="Scan for POCs, deep-dive their X feeds, or both"
+          >
+            {enriching
+              ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+              : <UserSearch className="w-4 h-4 mr-1.5" />}
+            Scan
+          </Button>
           <Button
             size="sm"
             onClick={() => setScanOpen(true)}
@@ -1232,52 +1292,179 @@ export default function DiscoveryPanel() {
         </DialogContent>
       </Dialog>
 
-      {/* POC enrichment confirmation dialog */}
+      {/* Unified Scan dialog — POC Lookup (Claude) or Deep Dive X (Grok) */}
       <Dialog open={enrichDialogOpen} onOpenChange={setEnrichDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Find POCs for {missingPocCount} prospect{missingPocCount !== 1 ? 's' : ''}?</DialogTitle>
+            <DialogTitle>Scan</DialogTitle>
             <DialogDescription>
-              For each of the {missingPocCount} discovered prospect{missingPocCount !== 1 ? 's' : ''} without a POC,
-              Claude will use web_search to find 1-3 decision-maker handles from project team pages,
-              X bios, and crypto directories — prioritizing Telegram.
+              Pick what you want to scan and how aggressive the freshness window should be.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-2 text-sm">
+          <div className="space-y-4 py-2 text-sm">
+            {/* Mode picker */}
             <div>
-              <Label className="mb-1.5 block">Model</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <Label className="mb-1.5 block">Scan type</Label>
+              <div className="space-y-2">
                 <button
                   type="button"
-                  onClick={() => setEnrichModel('opus')}
-                  className={`text-left rounded-lg border p-2.5 transition-colors ${
-                    enrichModel === 'opus'
+                  onClick={() => setScanMode('poc_lookup')}
+                  className={`w-full text-left rounded-lg border p-3 transition-colors ${
+                    scanMode === 'poc_lookup'
                       ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="text-xs font-semibold text-gray-900">Opus 4.7</div>
-                  <div className="text-[10px] text-gray-600 mt-0.5">Better POC accuracy</div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold text-gray-900">POC Lookup</div>
+                    <span className="text-[10px] text-gray-500">{missingPocCount} missing</span>
+                  </div>
+                  <div className="text-[11px] text-gray-600 mt-0.5">
+                    Claude searches project sites + X bios for decision-maker handles.
+                    Targets prospects without any POC yet.
+                  </div>
                 </button>
+
                 <button
                   type="button"
-                  onClick={() => setEnrichModel('sonnet')}
-                  className={`text-left rounded-lg border p-2.5 transition-colors ${
-                    enrichModel === 'sonnet'
+                  onClick={() => setScanMode('deep_dive_x')}
+                  className={`w-full text-left rounded-lg border p-3 transition-colors ${
+                    scanMode === 'deep_dive_x'
                       ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <div className="text-xs font-semibold text-gray-900">Sonnet 4.5</div>
-                  <div className="text-[10px] text-gray-600 mt-0.5">Faster, cheaper</div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-semibold text-gray-900">Deep Dive X Timeline</div>
+                    <span className="text-[10px] text-gray-500">{pocsWithXCount} POCs</span>
+                  </div>
+                  <div className="text-[11px] text-gray-600 mt-0.5">
+                    Grok reads each POC's X feed for Korea / Asia relevance signals.
+                    Targets POCs that already have an X handle.
+                  </div>
+                  <div className="text-[10px] text-amber-700 mt-1">
+                    Requires <code>GROK_API_KEY</code> env var.
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setScanMode('both')}
+                  className={`w-full text-left rounded-lg border p-3 transition-colors ${
+                    scanMode === 'both'
+                      ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-xs font-semibold text-gray-900">Both (POC Lookup → Deep Dive)</div>
+                  <div className="text-[11px] text-gray-600 mt-0.5">
+                    Runs POC Lookup first, then Deep Dive on all resulting POCs.
+                    Most thorough. Highest cost.
+                  </div>
                 </button>
               </div>
             </div>
 
+            {/* Model picker (POC Lookup only) */}
+            {(scanMode === 'poc_lookup' || scanMode === 'both') && (
+              <div>
+                <Label className="mb-1.5 block">Model (POC Lookup)</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEnrichModel('opus')}
+                    className={`text-left rounded-lg border p-2.5 transition-colors ${
+                      enrichModel === 'opus'
+                        ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="text-xs font-semibold text-gray-900">Opus 4.7</div>
+                    <div className="text-[10px] text-gray-600 mt-0.5">Better accuracy</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEnrichModel('sonnet')}
+                    className={`text-left rounded-lg border p-2.5 transition-colors ${
+                      enrichModel === 'sonnet'
+                        ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="text-xs font-semibold text-gray-900">Sonnet 4.5</div>
+                    <div className="text-[10px] text-gray-600 mt-0.5">Faster, cheaper</div>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Lookback window (Deep Dive only) */}
+            {(scanMode === 'deep_dive_x' || scanMode === 'both') && (
+              <div>
+                <Label htmlFor="lookback" className="mb-1.5 block">Lookback window (Deep Dive)</Label>
+                <select
+                  id="lookback"
+                  value={scanLookbackDays}
+                  onChange={e => setScanLookbackDays(Number(e.target.value) as 30 | 90 | 180 | 365)}
+                  className="auth-input w-full"
+                >
+                  <option value={30}>Last 30 days — very recent / active signals</option>
+                  <option value={90}>Last 90 days — balanced (default)</option>
+                  <option value={180}>Last 6 months — broader pattern</option>
+                  <option value={365}>Last 12 months — historical</option>
+                </select>
+              </div>
+            )}
+
+            {/* Signal shelf life — only relevant when signals are being
+                written, i.e. Deep Dive X or Both. POC Lookup doesn't
+                produce signals (it updates the contact list). */}
+            {(scanMode === 'deep_dive_x' || scanMode === 'both') && (
+              <div>
+                <Label htmlFor="shelf" className="mb-1.5 block">Signal shelf life (Deep Dive)</Label>
+                <select
+                  id="shelf"
+                  value={scanShelfLifeDays}
+                  onChange={e => setScanShelfLifeDays(Number(e.target.value) as 7 | 14 | 30 | 60 | 90)}
+                  className="auth-input w-full"
+                >
+                  <option value={7}>7 days — very fresh only</option>
+                  <option value={14}>14 days — short-term actionable</option>
+                  <option value={30}>30 days — standard (default)</option>
+                  <option value={60}>60 days — extended</option>
+                  <option value={90}>90 days — long-lived (use sparingly)</option>
+                </select>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  How long the resulting X timeline signals stay "fresh" on prospects before expiring.
+                </p>
+              </div>
+            )}
+
+            {/* Cost estimate */}
             {(() => {
-              const lo = enrichModel === 'opus' ? 0.25 : 0.05;
-              const hi = enrichModel === 'opus' ? 0.75 : 0.15;
+              // POC lookup cost range
+              const pocLo = enrichModel === 'opus' ? 0.25 : 0.05;
+              const pocHi = enrichModel === 'opus' ? 0.75 : 0.15;
+              const pocCount = missingPocCount;
+              // Grok deep dive cost range (~$0.10-$0.50 per POC)
+              const grokLo = 0.10;
+              const grokHi = 0.40;
+              const grokCount = pocsWithXCount;
+
+              let lo = 0, hi = 0, descr = '';
+              if (scanMode === 'poc_lookup') {
+                lo = pocLo * pocCount; hi = pocHi * pocCount;
+                descr = `${pocCount} prospect${pocCount !== 1 ? 's' : ''} × POC lookup`;
+              } else if (scanMode === 'deep_dive_x') {
+                lo = grokLo * grokCount; hi = grokHi * grokCount;
+                descr = `${grokCount} POC${grokCount !== 1 ? 's' : ''} × Grok deep dive`;
+              } else {
+                lo = pocLo * pocCount + grokLo * grokCount;
+                hi = pocHi * pocCount + grokHi * grokCount;
+                descr = `POC lookup + Grok deep dive`;
+              }
+
               return (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 text-xs">
                   <p className="font-semibold mb-1 flex items-center gap-1">
@@ -1285,18 +1472,13 @@ export default function DiscoveryPanel() {
                     Estimated cost
                   </p>
                   <p>
-                    ~${lo.toFixed(2)}–${hi.toFixed(2)} per prospect on {enrichModel === 'opus' ? 'Opus' : 'Sonnet'}.
-                    For {missingPocCount} prospect{missingPocCount !== 1 ? 's' : ''}:
-                    roughly <strong>${(missingPocCount * lo).toFixed(2)} to ${(missingPocCount * hi).toFixed(2)}</strong>.
-                  </p>
-                  <p className="mt-1">
-                    Duration: ~5-15s per prospect (sequential, to stay under web_search rate limits).
-                    Estimated total: <strong>{Math.round(missingPocCount * 10 / 60)}-{Math.round(missingPocCount * 15 / 60)} min</strong>.
+                    {descr}: roughly <strong>${lo.toFixed(2)} to ${hi.toFixed(2)}</strong>
                   </p>
                 </div>
               );
             })()}
 
+            {/* Last result */}
             {lastEnrichResult && (
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
                 <div className="font-semibold text-gray-700">Last run</div>
@@ -1307,13 +1489,13 @@ export default function DiscoveryPanel() {
                   </div>
                 ) : (
                   <>
-                    <div>Enriched: {lastEnrichResult.enriched} · Failed: {lastEnrichResult.failed}</div>
-                    <div>Cost: ${lastEnrichResult.cost_usd?.toFixed(3) ?? '—'} · Duration: {Math.round((lastEnrichResult.duration_ms || 0) / 1000)}s</div>
-                    {lastEnrichResult.errors?.length > 0 && (
-                      <div className="text-amber-700 mt-1">
-                        {lastEnrichResult.errors.length} error{lastEnrichResult.errors.length !== 1 ? 's' : ''}
-                      </div>
+                    {lastEnrichResult.enriched != null && (
+                      <div>POCs enriched: {lastEnrichResult.enriched} · Failed: {lastEnrichResult.failed ?? 0}</div>
                     )}
+                    {lastEnrichResult.pocs_scanned != null && (
+                      <div>POCs deep-scanned: {lastEnrichResult.pocs_scanned} · Signals added: {lastEnrichResult.signals_added ?? 0}</div>
+                    )}
+                    <div>Cost: ${lastEnrichResult.cost_usd?.toFixed(3) ?? '—'} · Duration: {Math.round((lastEnrichResult.duration_ms || 0) / 1000)}s</div>
                   </>
                 )}
               </div>
@@ -1327,14 +1509,19 @@ export default function DiscoveryPanel() {
             <Button
               onClick={async () => {
                 setEnrichDialogOpen(false);
-                await runPocEnrichment();
+                await runUnifiedScan();
               }}
-              disabled={enriching || missingPocCount === 0}
+              disabled={
+                enriching ||
+                (scanMode === 'poc_lookup' && missingPocCount === 0) ||
+                (scanMode === 'deep_dive_x' && pocsWithXCount === 0) ||
+                (scanMode === 'both' && missingPocCount === 0 && pocsWithXCount === 0)
+              }
               style={{ backgroundColor: 'var(--brand)', color: 'white' }}
               className="hover:opacity-90"
             >
               {enriching && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {enriching ? 'Finding POCs...' : `Find ${missingPocCount} POC${missingPocCount !== 1 ? 's' : ''}`}
+              {enriching ? 'Running...' : 'Run Scan'}
             </Button>
           </DialogFooter>
         </DialogContent>
