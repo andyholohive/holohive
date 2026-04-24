@@ -18,6 +18,7 @@ import {
 import {
   HoverCard, HoverCardTrigger, HoverCardContent,
 } from '@/components/ui/hover-card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -91,6 +92,9 @@ interface DiscoveryProspect {
   // Most recent Grok Deep Dive timestamp (null if never). Used to show
   // "scanned Nd ago" + enforce a 24h cooldown on the row button.
   last_deep_dive_at: string | null;
+  // Cost of that most-recent Grok run (null if we can't attribute because
+  // input_params wasn't populated at the time the run happened).
+  last_deep_dive_cost_usd: number | null;
   // Max korea_interest_score across this prospect's active Grok signals.
   // >= 70 triggers a "Grok-hot" badge for fast triage. Null if never
   // deep-dived.
@@ -270,6 +274,10 @@ export default function DiscoveryPanel() {
   // Free-text filter matching project name, symbol, or any POC name/handle.
   // Client-side only; the list is already capped at 200 rows.
   const [searchQuery, setSearchQuery] = useState<string>('');
+  // Bulk selection state — set of prospect IDs checked via the row checkboxes.
+  // Enables the Promote-all / Dismiss-all / Deep-Dive-all toolbar.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState<boolean>(false);
 
   // Column sort state — cycles through none → asc → desc → none
   type SortField = 'tier' | 'score' | 'funding' | null;
@@ -372,11 +380,16 @@ export default function DiscoveryPanel() {
   // Deep Dive button. Lets them pick lookback / shelf-life per-project
   // instead of inheriting the batch dialog's settings, and shows live
   // elapsed-time progress since the API itself doesn't stream updates.
+  //
+  // When `pocHandle` is set, the scan targets exactly that one handle
+  // (used by the per-POC Deep Dive button on each POC card).
   const [rowDeepDive, setRowDeepDive] = useState<{
     open: boolean;
     prospectId: string | null;
     projectName: string;
     xPocCount: number;
+    pocHandle: string | null;   // null = all POCs on this prospect
+    pocName: string | null;
     lookbackDays: 30 | 90 | 180 | 365;
     shelfLifeDays: 7 | 14 | 30 | 60 | 90;
     running: boolean;
@@ -388,6 +401,8 @@ export default function DiscoveryPanel() {
     prospectId: null,
     projectName: '',
     xPocCount: 0,
+    pocHandle: null,
+    pocName: null,
     lookbackDays: 90,
     shelfLifeDays: 30,
     running: false,
@@ -763,8 +778,36 @@ export default function DiscoveryPanel() {
       prospectId,
       projectName,
       xPocCount,
+      pocHandle: null,
+      pocName: null,
       // Inherit last-used values from the batch dialog so power users don't
       // re-pick the same settings every time. They can still change them.
+      lookbackDays: scanLookbackDays,
+      shelfLifeDays: scanShelfLifeDays,
+      running: false,
+      startedAt: null,
+      elapsedSec: 0,
+      result: null,
+    }));
+  };
+
+  // Open the Deep Dive dialog targeting ONE specific POC on a prospect.
+  // Same dialog, same flow — just scopes the scan to one X handle so you
+  // only pay for the person you care about (e.g. "just dive the CEO").
+  const openSinglePocDeepDive = (
+    prospect: DiscoveryProspect,
+    poc: OutreachContact,
+  ) => {
+    const handle = (poc.twitter_handle || '').replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//i, '').replace(/^@/, '').split(/[?/#]/)[0];
+    if (!handle) return;
+    setRowDeepDive(prev => ({
+      ...prev,
+      open: true,
+      prospectId: prospect.id,
+      projectName: prospect.name,
+      xPocCount: 1, // single-POC scope
+      pocHandle: handle,
+      pocName: poc.name,
       lookbackDays: scanLookbackDays,
       shelfLifeDays: scanShelfLifeDays,
       running: false,
@@ -812,6 +855,10 @@ export default function DiscoveryPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prospect_ids: [prospectId],
+          // When the dialog was opened from the per-POC button, scope the
+          // scan to that single handle. Otherwise scan all POCs on the
+          // prospect (original behavior).
+          ...(rowDeepDive.pocHandle ? { poc_handles: [rowDeepDive.pocHandle] } : {}),
           lookback_days: rowDeepDive.lookbackDays,
           shelf_life_days: rowDeepDive.shelfLifeDays,
         }),
@@ -916,6 +963,125 @@ export default function DiscoveryPanel() {
       fetchProspects();
     } catch (err: any) {
       toast({ title: 'Error', description: err?.message ?? 'Update failed', variant: 'destructive' });
+    }
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+  const clearSelection = () => setSelectedIds(new Set());
+
+  // Bulk Promote / Dismiss — fires PATCH sequentially with a small
+  // throttle to stay friendly to Supabase. Reports success count +
+  // first failure if any.
+  const bulkUpdateStatus = async (status: 'promoted' | 'dismissed') => {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    const verb = status === 'promoted' ? 'Promote' : 'Dismiss';
+    const ok = window.confirm(`${verb} ${ids.length} prospect${ids.length !== 1 ? 's' : ''}?`);
+    if (!ok) return;
+
+    setBulkBusy(true);
+    let okCount = 0;
+    let firstError: string | null = null;
+    let crmAdded = 0;
+    let crmAlready = 0;
+    try {
+      for (const id of ids) {
+        try {
+          const res = await fetch('/api/prospects/discovery', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, status }),
+          });
+          const data = await res.json();
+          if (!res.ok || data.error) {
+            if (!firstError) firstError = data.error || res.statusText;
+            continue;
+          }
+          okCount++;
+          if (status === 'promoted') {
+            if (data.crm_already_existed) crmAlready++;
+            else if (data.crm_opportunity_id) crmAdded++;
+          }
+        } catch (err: any) {
+          if (!firstError) firstError = err?.message || 'unknown';
+        }
+        // Small throttle so a 30-prospect bulk doesn't hammer the API
+        await new Promise(r => setTimeout(r, 80));
+      }
+    } finally {
+      setBulkBusy(false);
+      clearSelection();
+      const parts = [`${okCount} ${status}`];
+      if (status === 'promoted') {
+        parts.push(`${crmAdded} added to CRM`);
+        if (crmAlready > 0) parts.push(`${crmAlready} already in CRM`);
+      }
+      if (firstError) parts.push(`first error: ${firstError}`);
+      toast({
+        title: firstError ? `Bulk ${verb} partial` : `Bulk ${verb} complete`,
+        description: parts.join(' · '),
+        variant: firstError ? 'destructive' : 'default',
+      });
+      fetchProspects();
+    }
+  };
+
+  // Bulk Deep Dive — passes all selected prospect_ids to the existing
+  // Grok endpoint in one request. Uses the max_pocs cap from the batch
+  // dialog so this can't accidentally sweep 50+ POCs.
+  const bulkDeepDive = async () => {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    // Rough cost preview — we don't know the actual POC-with-X count per
+    // prospect without walking `prospects`, so estimate 1 POC per prospect.
+    const estMin = ids.length * 0.10;
+    const estMax = ids.length * 0.44; // 2 POCs × $0.22 upper bound
+    const ok = window.confirm(
+      `Deep Dive ${ids.length} prospect${ids.length !== 1 ? 's' : ''}?\n\n` +
+      `Rough cost: $${estMin.toFixed(2)}–$${estMax.toFixed(2)}\n` +
+      `Time: ~${Math.round(ids.length * 2)} min (sequential).\n` +
+      `Capped at ${scanMaxPocs} total POCs.`
+    );
+    if (!ok) return;
+
+    setBulkBusy(true);
+    toast({
+      title: 'Bulk Deep Dive started',
+      description: `${ids.length} prospects · capped at ${scanMaxPocs} POCs total.`,
+    });
+    try {
+      const res = await fetch('/api/prospects/discovery/grok-deep-dive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prospect_ids: ids,
+          lookback_days: scanLookbackDays,
+          shelf_life_days: scanShelfLifeDays,
+          max_pocs: scanMaxPocs,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        toast({ title: 'Bulk Deep Dive failed', description: data.error || 'Unknown error', variant: 'destructive' });
+      } else {
+        toast({
+          title: 'Bulk Deep Dive complete',
+          description: `${data.pocs_scanned} POCs · ${data.signals_added} signals · $${data.cost_usd?.toFixed(2)}`,
+        });
+        fetchProspects();
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message ?? 'Bulk Deep Dive failed', variant: 'destructive' });
+    } finally {
+      setBulkBusy(false);
+      clearSelection();
     }
   };
 
@@ -1123,6 +1289,61 @@ export default function DiscoveryPanel() {
         </div>
       </div>
 
+      {/* Bulk actions toolbar — appears only when rows are selected */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 bg-[#e8f4f5] border border-[#3e8692]/40 rounded-lg px-3 py-2">
+          <div className="text-sm font-semibold text-gray-800">
+            {selectedIds.size} selected
+          </div>
+          <div className="h-4 w-px bg-[#3e8692]/30" />
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+              onClick={() => bulkUpdateStatus('promoted')}
+              disabled={bulkBusy}
+            >
+              {bulkBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <CheckCircle className="h-3 w-3 mr-1" />}
+              Promote all
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs text-gray-700"
+              onClick={() => bulkUpdateStatus('dismissed')}
+              disabled={bulkBusy}
+            >
+              {bulkBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <XCircle className="h-3 w-3 mr-1" />}
+              Dismiss all
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs text-violet-700 border-violet-200 hover:bg-violet-50"
+              onClick={bulkDeepDive}
+              disabled={bulkBusy}
+            >
+              {bulkBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Radar className="h-3 w-3 mr-1" />}
+              Deep Dive all
+            </Button>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs ml-auto"
+            onClick={clearSelection}
+            disabled={bulkBusy}
+          >
+            Clear
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       {loading ? (
         <Card>
@@ -1162,6 +1383,24 @@ export default function DiscoveryPanel() {
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50">
+                <TableHead className="w-8 px-2">
+                  {(() => {
+                    // Indeterminate state: some but not all visible rows selected.
+                    const visible = filteredProspects.map(p => p.id);
+                    const selectedVisible = visible.filter(id => selectedIds.has(id));
+                    const allChecked = visible.length > 0 && selectedVisible.length === visible.length;
+                    return (
+                      <Checkbox
+                        checked={allChecked}
+                        onCheckedChange={v => {
+                          if (v) setSelectedIds(new Set(visible));
+                          else clearSelection();
+                        }}
+                        aria-label="Select all visible"
+                      />
+                    );
+                  })()}
+                </TableHead>
                 <TableHead className="w-8"></TableHead>
                 <TableHead>Project</TableHead>
                 <TableHead>Category</TableHead>
@@ -1259,6 +1498,13 @@ export default function DiscoveryPanel() {
                 return (
                   <React.Fragment key={p.id}>
                     <TableRow className="hover:bg-gray-50 cursor-pointer" onClick={() => toggleExpand(p.id)}>
+                      <TableCell className="px-2" onClick={e => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(p.id)}
+                          onCheckedChange={() => toggleSelected(p.id)}
+                          aria-label={`Select ${p.name}`}
+                        />
+                      </TableCell>
                       <TableCell className="px-2">
                         {isExpanded
                           ? <ChevronDown className="h-4 w-4 text-gray-400" />
@@ -1266,7 +1512,14 @@ export default function DiscoveryPanel() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">{p.name}</span>
+                          <a
+                            href={`/intelligence/discovery/${p.id}`}
+                            onClick={e => e.stopPropagation()}
+                            className="font-medium text-gray-900 hover:underline hover:text-[#3e8692]"
+                            title="Open prospect detail page"
+                          >
+                            {p.name}
+                          </a>
                           {p.symbol && <span className="text-xs text-gray-500">{p.symbol}</span>}
                           {p.source_url && (
                             <a
@@ -1575,7 +1828,7 @@ export default function DiscoveryPanel() {
                     {/* Expanded detail row */}
                     {isExpanded && (
                       <TableRow className="bg-gray-50 hover:bg-gray-50">
-                        <TableCell colSpan={9} className="py-4">
+                        <TableCell colSpan={10} className="py-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
                             {/* Verdict summary + reasons */}
                             <div className="md:col-span-2">
@@ -1755,20 +2008,39 @@ export default function DiscoveryPanel() {
                                               <span className="text-[10px] text-amber-600 italic">No TG found</span>
                                             )}
                                           </div>
-                                          {/* Draft DM — only shown when we have
-                                              a Telegram handle to send to. */}
-                                          {c.telegram_handle && (
-                                            <Button
-                                              type="button"
-                                              variant="outline"
-                                              size="sm"
-                                              className="h-6 mt-1.5 text-[10px] text-[#229ED9] border-[#229ED9]/30 hover:bg-[#e8f4f5]"
-                                              onClick={() => openDmDraft(p, c)}
-                                              title="Generate a Telegram DM draft using the strongest Grok signal"
-                                            >
-                                              <MessageSquare className="h-2.5 w-2.5 mr-1" />
-                                              Draft DM
-                                            </Button>
+                                          {/* Per-POC action row — shown when
+                                              we have an actionable handle.
+                                              Draft DM needs TG; Deep Dive
+                                              needs X. Both may be shown. */}
+                                          {(c.telegram_handle || c.twitter_handle) && (
+                                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                              {c.telegram_handle && (
+                                                <Button
+                                                  type="button"
+                                                  variant="outline"
+                                                  size="sm"
+                                                  className="h-6 text-[10px] text-[#229ED9] border-[#229ED9]/30 hover:bg-[#e8f4f5]"
+                                                  onClick={() => openDmDraft(p, c)}
+                                                  title="Generate a Telegram DM draft using the strongest Grok signal"
+                                                >
+                                                  <MessageSquare className="h-2.5 w-2.5 mr-1" />
+                                                  Draft DM
+                                                </Button>
+                                              )}
+                                              {c.twitter_handle && p.discovery_action_tier !== 'SKIP' && (
+                                                <Button
+                                                  type="button"
+                                                  variant="outline"
+                                                  size="sm"
+                                                  className="h-6 text-[10px] text-violet-700 border-violet-200 hover:bg-violet-50"
+                                                  onClick={() => openSinglePocDeepDive(p, c)}
+                                                  title={`Deep dive @${(c.twitter_handle||'').replace(/^@/,'')} — ~$0.22, ~2 min`}
+                                                >
+                                                  <Radar className="h-2.5 w-2.5 mr-1" />
+                                                  Deep Dive
+                                                </Button>
+                                              )}
+                                            </div>
                                           )}
                                         </div>
                                         {c.source_url && (
@@ -1831,6 +2103,14 @@ export default function DiscoveryPanel() {
                                       {p.triggers.filter(t => t.source_name === 'grok_x_deep_scan').length} Grok signal
                                       {p.triggers.filter(t => t.source_name === 'grok_x_deep_scan').length !== 1 ? 's' : ''}
                                     </span>
+                                    {p.last_deep_dive_cost_usd != null && (
+                                      <>
+                                        <span className="text-gray-400">·</span>
+                                        <span className="tabular-nums">
+                                          Cost: <span className="font-semibold">${p.last_deep_dive_cost_usd.toFixed(2)}</span>
+                                        </span>
+                                      </>
+                                    )}
                                     {p.grok_korea_score != null && (
                                       <>
                                         <span className="text-gray-400">·</span>
@@ -2468,7 +2748,14 @@ export default function DiscoveryPanel() {
               Grok reads each POC's X timeline for Korea / Asia relevance signals.
               Target: <span className="font-semibold text-gray-900">{rowDeepDive.projectName}</span>
               {' · '}
-              {rowDeepDive.xPocCount} POC{rowDeepDive.xPocCount !== 1 ? 's' : ''} with X handle.
+              {rowDeepDive.pocHandle ? (
+                <>
+                  1 POC (<span className="font-mono">@{rowDeepDive.pocHandle}</span>
+                  {rowDeepDive.pocName && <> · {rowDeepDive.pocName}</>})
+                </>
+              ) : (
+                <>{rowDeepDive.xPocCount} POC{rowDeepDive.xPocCount !== 1 ? 's' : ''} with X handle</>
+              )}.
             </DialogDescription>
           </DialogHeader>
 

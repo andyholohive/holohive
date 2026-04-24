@@ -22,6 +22,7 @@ export const maxDuration = 300;
  * Body:
  *   {
  *     prospect_ids?: string[],      // optional, restrict to these prospects
+ *     poc_handles?:  string[],       // optional, restrict to these X handles (case-insensitive)
  *     lookback_days?: number,        // default 90
  *     shelf_life_days?: number,      // default 30
  *     max_tweets?: number,           // default 50 per POC
@@ -88,6 +89,11 @@ export async function POST(request: Request) {
     );
   }
 
+  // Capture input_params at start so per-prospect cost attribution later
+  // can find which prospects this run touched. Re-parse body here (we also
+  // parse it inside the try below, but we want input_params recorded even
+  // if later validation throws).
+  const bodyForLog = await request.clone().json().catch(() => ({}));
   const { data: runRow } = await (supabase as any)
     .from('agent_runs')
     .insert({
@@ -95,7 +101,13 @@ export async function POST(request: Request) {
       run_type: 'grok_deep_dive',
       status: 'running',
       started_at: startedAt.toISOString(),
-      input_params: {},
+      input_params: {
+        prospect_ids: Array.isArray(bodyForLog.prospect_ids) ? bodyForLog.prospect_ids : null,
+        poc_handles: Array.isArray(bodyForLog.poc_handles) ? bodyForLog.poc_handles : null,
+        lookback_days: bodyForLog.lookback_days ?? null,
+        shelf_life_days: bodyForLog.shelf_life_days ?? null,
+        max_pocs: bodyForLog.max_pocs ?? null,
+      },
     })
     .select('id')
     .single();
@@ -119,6 +131,16 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
     const specificIds: string[] | null = Array.isArray(body.prospect_ids) ? body.prospect_ids : null;
+    // Optional per-POC filter. Useful for the "Deep Dive this one POC" row
+    // button — avoids scanning every team member just because you want to
+    // check the CEO's feed. Case-insensitive, @ prefix stripped.
+    const pocHandlesFilter: Set<string> | null = Array.isArray(body.poc_handles) && body.poc_handles.length > 0
+      ? new Set(
+          body.poc_handles
+            .filter((h: unknown) => typeof h === 'string')
+            .map((h: string) => h.trim().replace(/^@/, '').toLowerCase()),
+        )
+      : null;
     const lookbackDays = Math.max(7, Math.min(365, Number(body.lookback_days) || 90));
     const shelfLifeDays = Math.max(1, Math.min(180, Number(body.shelf_life_days) || 30));
     const maxTweets = Math.max(10, Math.min(200, Number(body.max_tweets) || 50));
@@ -155,12 +177,17 @@ export async function POST(request: Request) {
       if (tier === 'SKIP') continue;
       for (const c of p.outreach_contacts || []) {
         if (!c?.twitter_handle) continue;
+        const normalized = normalizeHandle(c.twitter_handle);
+        // Apply the per-POC filter if one was provided. Matching is done on
+        // the normalized (no @, no URL prefix) handle so callers don't have
+        // to care about formatting.
+        if (pocHandlesFilter && !pocHandlesFilter.has(normalized.toLowerCase())) continue;
         allTargets.push({
           prospect_id: p.id,
           project_name: p.name,
           poc_name: c.name,
           poc_role: c.role || 'contact',
-          handle: normalizeHandle(c.twitter_handle),
+          handle: normalized,
         });
       }
     }

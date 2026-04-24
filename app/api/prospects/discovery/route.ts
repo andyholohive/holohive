@@ -57,6 +57,9 @@ export async function GET(request: Request) {
   // Per-prospect max korea_interest_score across their active Grok signals.
   // If >= 70 the row gets a "Grok-hot" badge to make triage obvious.
   let maxGrokScoreByProspect: Map<string, number> = new Map();
+  // Per-prospect cumulative Grok cost so the expanded view can show
+  // "$0.22 · 5 signals" for the most recent dive.
+  let lastDeepDiveCostByProspect: Map<string, number> = new Map();
 
   if (prospectIds.length > 0) {
     const nowIso = new Date().toISOString();
@@ -90,6 +93,34 @@ export async function GET(request: Request) {
         }
       }
     }
+
+    // Attribute Grok run costs to prospects via agent_runs.input_params.
+    // Newer runs populate input_params.prospect_ids; older runs (before
+    // that field was added) get left out — that's fine, they'll simply
+    // show a null cost next to "Scanned Nd ago".
+    const { data: runs } = await (supabase as any)
+      .from('agent_runs')
+      .select('input_params, output_summary, started_at')
+      .eq('run_type', 'grok_deep_dive')
+      .eq('status', 'completed')
+      .order('started_at', { ascending: false })
+      .limit(200);
+
+    // Walk most-recent-first so the first cost we see per prospect is
+    // from their most recent run (matches lastDeepDiveByProspect).
+    for (const r of runs || []) {
+      const runProspectIds: string[] = Array.isArray(r.input_params?.prospect_ids)
+        ? r.input_params.prospect_ids
+        : [];
+      const cost = Number(r.output_summary?.cost_usd);
+      if (!Number.isFinite(cost)) continue;
+      for (const pid of runProspectIds) {
+        if (!prospectIds.includes(pid)) continue;
+        if (!lastDeepDiveCostByProspect.has(pid)) {
+          lastDeepDiveCostByProspect.set(pid, cost);
+        }
+      }
+    }
   }
 
   const enriched = (prospects || []).map((p: any) => {
@@ -110,6 +141,7 @@ export async function GET(request: Request) {
         detected_at: s.detected_at,
       })),
       last_deep_dive_at: lastDeepDiveByProspect.get(p.id) ?? null,
+      last_deep_dive_cost_usd: lastDeepDiveCostByProspect.get(p.id) ?? null,
       grok_korea_score: maxGrokScoreByProspect.get(p.id) ?? null,
       // Hoist the commonly-used fields up for easier client consumption
       icp_verdict: snap.icp_verdict ?? null,

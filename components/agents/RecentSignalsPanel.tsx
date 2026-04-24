@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import {
   ExternalLink, RefreshCw, Loader2, Trash2, Radar, Twitter,
-  AlertTriangle, Activity,
+  AlertTriangle, Activity, Download,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -76,13 +76,52 @@ function timeAgo(iso: string | null | undefined): string {
   return `${mos}mo ago`;
 }
 
+type GroupMode = 'project' | 'poc';
+
 export default function RecentSignalsPanel() {
   const { toast } = useToast();
   const [signals, setSignals] = useState<RecentSignal[]>([]);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState<1 | 7 | 30 | 90>(7);
   const [minScore, setMinScore] = useState<0 | 40 | 70>(0);
+  const [groupMode, setGroupMode] = useState<GroupMode>('project');
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+
+  /** Client-side CSV export of the currently-filtered signals. Browsers
+   *  handle the download via URL.createObjectURL — no server roundtrip. */
+  const exportToCsv = () => {
+    if (signals.length === 0) {
+      toast({ title: 'Nothing to export', description: 'No signals in the current view.' });
+      return;
+    }
+    const cols = [
+      'detected_at', 'project_name', 'project_symbol', 'action_tier',
+      'signal_type', 'finding_type', 'poc_handle', 'poc_name', 'poc_role',
+      'korea_interest_score', 'relevancy_weight', 'tweet_date',
+      'headline', 'snippet', 'source_url',
+    ];
+    const escape = (v: unknown): string => {
+      if (v == null) return '';
+      const s = String(v);
+      if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+    const lines = [cols.join(',')];
+    for (const s of signals) {
+      lines.push(cols.map(c => escape((s as any)[c])).join(','));
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const today = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `grok-signals-${today}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: 'Exported', description: `${signals.length} signals downloaded as CSV.` });
+  };
 
   const fetchSignals = useCallback(async () => {
     setLoading(true);
@@ -126,28 +165,49 @@ export default function RecentSignalsPanel() {
     }
   };
 
-  // Group signals by project so the same Pharos tweet-storm doesn't fragment
-  // across 5 rows — one card per project with its signals listed inside.
-  const byProject: Record<string, { project_name: string; project_symbol: string | null; action_tier: string | null; prospect_id: string; prospect_status: string | null; signals: RecentSignal[] }> = {};
+  // Build both group structures — 'project' groups all signals per project,
+  // 'poc' groups per @handle across projects. Either way we show a header
+  // card with the group's identity and list the signals inside, sorted
+  // most-recent-first within each group.
+  type Group = {
+    key: string;                       // groupMode: prospect_id or poc_handle
+    project_name: string | null;       // null when grouping by POC with signals on multiple projects
+    project_symbol: string | null;
+    action_tier: string | null;
+    prospect_id: string;
+    poc_handle: string | null;
+    poc_name: string | null;
+    signals: RecentSignal[];
+  };
+  const groups: Record<string, Group> = {};
   for (const s of signals) {
-    if (!byProject[s.prospect_id]) {
-      byProject[s.prospect_id] = {
-        project_name: s.project_name,
-        project_symbol: s.project_symbol,
-        action_tier: s.action_tier,
-        prospect_status: s.prospect_status,
+    const key = groupMode === 'project'
+      ? s.prospect_id
+      : (s.poc_handle || 'unknown');
+    if (!groups[key]) {
+      groups[key] = {
+        key,
+        // For project grouping, the project name is stable; for POC grouping,
+        // we may see the same POC across multiple projects — use the first
+        // one seen (most recent) and show others as sub-context per signal.
+        project_name: groupMode === 'project' ? s.project_name : null,
+        project_symbol: groupMode === 'project' ? s.project_symbol : null,
+        action_tier: groupMode === 'project' ? s.action_tier : null,
         prospect_id: s.prospect_id,
+        poc_handle: s.poc_handle,
+        poc_name: s.poc_name,
         signals: [],
       };
     }
-    byProject[s.prospect_id].signals.push(s);
+    groups[key].signals.push(s);
   }
-  // Sort groups by most recent signal within
-  const projectGroups = Object.values(byProject).sort((a, b) => {
+  // Sort groups by most recent signal within each group.
+  const orderedGroups = Object.values(groups).sort((a, b) => {
     const aT = new Date(a.signals[0]?.detected_at || 0).getTime();
     const bT = new Date(b.signals[0]?.detected_at || 0).getTime();
     return bT - aT;
   });
+  const projectGroups = orderedGroups; // back-compat name used in JSX below
 
   return (
     <div className="space-y-4 pb-8">
@@ -159,6 +219,17 @@ export default function RecentSignalsPanel() {
           or delete the signal if it's noise.
         </p>
         <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportToCsv}
+            disabled={loading || signals.length === 0}
+            className="h-9"
+            title="Download the filtered list as CSV"
+          >
+            <Download className="w-4 h-4 mr-1.5" />
+            Export CSV
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -198,6 +269,18 @@ export default function RecentSignalsPanel() {
               <SelectItem value="0">Any score</SelectItem>
               <SelectItem value="40">≥ 40 (warm / borderline)</SelectItem>
               <SelectItem value="70">≥ 70 (Grok-hot only)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="group-by" className="text-xs">Group by</Label>
+          <Select value={groupMode} onValueChange={v => setGroupMode(v as GroupMode)}>
+            <SelectTrigger id="group-by" className="w-40 h-9 mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="project">Project</SelectItem>
+              <SelectItem value="poc">POC (X handle)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -243,27 +326,54 @@ export default function RecentSignalsPanel() {
       ) : (
         <div className="space-y-3">
           {projectGroups.map(g => (
-            <Card key={g.prospect_id} className="overflow-hidden">
+            <Card key={g.key} className="overflow-hidden">
               <CardContent className="p-3">
-                {/* Project header */}
+                {/* Group header — shape depends on groupMode */}
                 <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-gray-100">
                   <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    <span className="font-semibold text-gray-900 truncate">{g.project_name}</span>
-                    {g.project_symbol && (
-                      <span className="text-xs text-gray-500 font-mono">{g.project_symbol}</span>
-                    )}
-                    {g.action_tier && (
-                      <span
-                        className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded border pointer-events-none ${ACTION_TIER_STYLE[g.action_tier]?.className || ''}`}
-                      >
-                        {ACTION_TIER_STYLE[g.action_tier]?.label || g.action_tier}
-                      </span>
+                    {groupMode === 'project' ? (
+                      <>
+                        <span className="font-semibold text-gray-900 truncate">{g.project_name}</span>
+                        {g.project_symbol && (
+                          <span className="text-xs text-gray-500 font-mono">{g.project_symbol}</span>
+                        )}
+                        {g.action_tier && (
+                          <span
+                            className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded border pointer-events-none ${ACTION_TIER_STYLE[g.action_tier]?.className || ''}`}
+                          >
+                            {ACTION_TIER_STYLE[g.action_tier]?.label || g.action_tier}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <a
+                          href={g.poc_handle ? `https://x.com/${g.poc_handle}` : '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-gray-900 hover:text-[#1DA1F2] flex items-center gap-1"
+                        >
+                          <Twitter className="h-3.5 w-3.5" />
+                          @{g.poc_handle || 'unknown'}
+                        </a>
+                        {g.poc_name && (
+                          <span className="text-xs text-gray-600">· {g.poc_name}</span>
+                        )}
+                        {(() => {
+                          const uniqueProjects = new Set(g.signals.map(s => s.prospect_id)).size;
+                          return (
+                            <span className="text-[10px] text-gray-500">
+                              {uniqueProjects} project{uniqueProjects !== 1 ? 's' : ''}
+                            </span>
+                          );
+                        })()}
+                      </>
                     )}
                     <span className="text-[10px] text-gray-500">
                       {g.signals.length} signal{g.signals.length !== 1 ? 's' : ''}
                     </span>
                   </div>
-                  {/* Max Korea score across this project's signals */}
+                  {/* Max Korea score across this group's signals */}
                   {(() => {
                     const maxScore = Math.max(
                       ...g.signals.map(s => s.korea_interest_score ?? 0),
@@ -321,6 +431,18 @@ export default function RecentSignalsPanel() {
                             <span className="text-[10px] text-gray-400">
                               · {timeAgo(s.detected_at)}
                             </span>
+                            {groupMode === 'poc' && (
+                              <span className="text-[10px] text-gray-600">
+                                · <span className="font-medium">{s.project_name}</span>
+                                {s.action_tier && (
+                                  <span
+                                    className={`ml-1 inline-flex items-center text-[9px] font-bold px-1 py-0.5 rounded border pointer-events-none ${ACTION_TIER_STYLE[s.action_tier]?.className || ''}`}
+                                  >
+                                    {ACTION_TIER_STYLE[s.action_tier]?.label || s.action_tier}
+                                  </span>
+                                )}
+                              </span>
+                            )}
                           </div>
                           <div className="text-gray-900 font-medium">{s.headline}</div>
                           {s.snippet && (
