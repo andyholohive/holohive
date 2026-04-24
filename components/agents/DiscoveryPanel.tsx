@@ -1905,67 +1905,53 @@ export default function DiscoveryPanel() {
       </Dialog>
 
       {/* Per-prospect Deep Dive dialog — opened from the row Deep Dive button.
-          Shows settings (lookback + shelf life), estimated cost/time, a
-          progress bar that animates while running, and the result. */}
+          Styled to match the Run Discovery + batch Scan dialogs:
+          brand teal accent (#3e8692), amber cost card, same progress structure. */}
       <Dialog
         open={rowDeepDive.open}
         onOpenChange={o => { if (!o && !rowDeepDive.running) closeRowDeepDive(); }}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Radar className="h-4 w-4 text-violet-600" />
-              Deep Dive
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">
-                GROK
-              </span>
-            </DialogTitle>
+            <DialogTitle>Deep Dive</DialogTitle>
             <DialogDescription>
-              <span className="font-semibold text-gray-900">{rowDeepDive.projectName}</span>
+              Grok reads each POC's X timeline for Korea / Asia relevance signals.
+              Target: <span className="font-semibold text-gray-900">{rowDeepDive.projectName}</span>
               {' · '}
-              <span>
-                {rowDeepDive.xPocCount} POC{rowDeepDive.xPocCount !== 1 ? 's' : ''} with X handle
-              </span>
+              {rowDeepDive.xPocCount} POC{rowDeepDive.xPocCount !== 1 ? 's' : ''} with X handle.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-2 text-sm">
+          <div className="space-y-4 py-2">
             {/* Lookback window */}
             <div>
-              <Label htmlFor="row-lookback" className="mb-1.5 block">
-                Lookback window
-                <span className="font-normal text-[10px] text-gray-500 ml-1">
-                  — how far back to read posts
-                </span>
-              </Label>
+              <Label htmlFor="row-lookback">Lookback window</Label>
               <select
                 id="row-lookback"
                 value={rowDeepDive.lookbackDays}
                 onChange={e => setRowDeepDive(prev => ({ ...prev, lookbackDays: Number(e.target.value) as 30 | 90 | 180 | 365 }))}
                 disabled={rowDeepDive.running}
-                className="auth-input w-full"
+                className="auth-input mt-1 w-full"
               >
                 <option value={30}>Last 30 days — very recent / active signals</option>
                 <option value={90}>Last 90 days — balanced (default)</option>
                 <option value={180}>Last 6 months — broader pattern</option>
                 <option value={365}>Last 12 months — historical</option>
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                How far back Grok looks when reading the POC's tweets.
+              </p>
             </div>
 
             {/* Signal shelf life */}
             <div>
-              <Label htmlFor="row-shelf" className="mb-1.5 block">
-                Signal shelf life
-                <span className="font-normal text-[10px] text-gray-500 ml-1">
-                  — how long signals stay "fresh"
-                </span>
-              </Label>
+              <Label htmlFor="row-shelf">Signal shelf life</Label>
               <select
                 id="row-shelf"
                 value={rowDeepDive.shelfLifeDays}
                 onChange={e => setRowDeepDive(prev => ({ ...prev, shelfLifeDays: Number(e.target.value) as 7 | 14 | 30 | 60 | 90 }))}
                 disabled={rowDeepDive.running}
-                className="auth-input w-full"
+                className="auth-input mt-1 w-full"
               >
                 <option value={7}>7 days — very fresh only</option>
                 <option value={14}>14 days — short-term actionable</option>
@@ -1973,38 +1959,41 @@ export default function DiscoveryPanel() {
                 <option value={60}>60 days — extended</option>
                 <option value={90}>90 days — long-lived (use sparingly)</option>
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                How long resulting signals stay "fresh" on the prospect before expiring.
+              </p>
             </div>
 
-            {/* Cost + time estimate */}
+            {/* Cost + time estimate — matches the amber box in the batch Scan dialog */}
             {!rowDeepDive.running && !rowDeepDive.result && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 text-xs">
                 <p className="font-semibold mb-1 flex items-center gap-1">
                   <AlertTriangle className="h-3.5 w-3.5" />
-                  Estimated cost &amp; time
+                  Estimated cost
                 </p>
                 <p>
-                  {rowDeepDive.xPocCount} POC{rowDeepDive.xPocCount !== 1 ? 's' : ''} × ~$0.22 each: roughly{' '}
-                  <strong>${(rowDeepDive.xPocCount * 0.10).toFixed(2)}–${(rowDeepDive.xPocCount * 0.30).toFixed(2)}</strong>
-                  {' · '}
-                  ~{rowDeepDive.xPocCount * 2} min
+                  {rowDeepDive.xPocCount} POC{rowDeepDive.xPocCount !== 1 ? 's' : ''} × Grok deep dive: roughly{' '}
+                  <strong>${(rowDeepDive.xPocCount * 0.10).toFixed(2)} to ${(rowDeepDive.xPocCount * 0.30).toFixed(2)}</strong>
+                  <span className="text-amber-700">
+                    {' · '}
+                    ~{rowDeepDive.xPocCount * 2} min
+                  </span>
                 </p>
               </div>
             )}
 
-            {/* Live progress — shown while running. Progress bar uses estimated
-                duration (~110s per POC, sequential) since the API doesn't
-                stream per-POC updates back to us. */}
+            {/* Live progress — same structure / brand colors as the Run Discovery
+                dialog's progress card. Time-based since the API doesn't stream. */}
             {rowDeepDive.running && (() => {
               const expectedSec = Math.max(30, rowDeepDive.xPocCount * 110);
               const pct = Math.min(95, Math.floor((rowDeepDive.elapsedSec / expectedSec) * 100));
-              // Guess which POC Grok is probably on based on elapsed time.
               const pocIndex = Math.min(rowDeepDive.xPocCount, Math.floor(rowDeepDive.elapsedSec / 110) + 1);
               const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
               return (
-                <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-xs space-y-2">
+                <div className="rounded-lg border border-[#3e8692]/40 bg-[#e8f4f5] p-3 text-xs space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <Loader2 className="h-3.5 w-3.5 text-violet-700 animate-spin shrink-0" />
+                      <Loader2 className="h-3.5 w-3.5 text-[#3e8692] animate-spin shrink-0" />
                       <span className="font-semibold text-gray-800">
                         {rowDeepDive.xPocCount > 1
                           ? `Reading X timeline ${pocIndex} of ${rowDeepDive.xPocCount}…`
@@ -2012,24 +2001,27 @@ export default function DiscoveryPanel() {
                       </span>
                     </div>
                     <span className="text-[10px] font-mono text-gray-600 tabular-nums">
-                      {mmss(rowDeepDive.elapsedSec)} / ~{mmss(expectedSec)}
+                      {mmss(rowDeepDive.elapsedSec)} / ~{mmss(expectedSec)} · {pct}%
                     </span>
                   </div>
                   <div className="h-1.5 w-full rounded-full bg-white/60 overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-violet-600 transition-[width] duration-700 ease-out"
-                      style={{ width: `${Math.max(2, pct)}%` }}
+                      className="h-full rounded-full transition-[width] duration-500 ease-out"
+                      style={{
+                        width: `${Math.max(2, pct)}%`,
+                        backgroundColor: 'var(--brand)',
+                      }}
                     />
                   </div>
-                  <p className="text-[10px] text-gray-600">
-                    Each POC takes ~110s — Grok pulls recent tweets, filters by your {rowDeepDive.lookbackDays}-day window,
-                    and extracts Korea / Asia signals. You can close this popup; the scan continues in the background.
-                  </p>
+                  <div className="text-[10px] text-gray-600">
+                    Grok pulls recent tweets, filters by your {rowDeepDive.lookbackDays}-day window,
+                    and extracts Korea / Asia signals.
+                  </div>
                 </div>
               );
             })()}
 
-            {/* Result card — shown after completion */}
+            {/* Result card — matches the "Last run" summary style from the other dialogs */}
             {rowDeepDive.result && !rowDeepDive.running && (
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
                 <div className="font-semibold text-gray-700">Result</div>
@@ -2041,30 +2033,34 @@ export default function DiscoveryPanel() {
                 ) : (
                   <>
                     <div>
-                      POCs scanned: {rowDeepDive.result.pocs_scanned ?? 0}
-                      {' · '}
-                      Signals added: <span className="font-semibold">{rowDeepDive.result.signals_added ?? 0}</span>
+                      POCs scanned: {rowDeepDive.result.pocs_scanned ?? 0} · Signals added: {rowDeepDive.result.signals_added ?? 0}
                     </div>
                     <div>
-                      Cost: ${rowDeepDive.result.cost_usd?.toFixed(3) ?? '—'}
-                      {' · '}
-                      Duration: {Math.round((rowDeepDive.result.duration_ms || 0) / 1000)}s
+                      Cost: ${rowDeepDive.result.cost_usd?.toFixed(3) ?? '—'} · Duration: {Math.round((rowDeepDive.result.duration_ms || 0) / 1000)}s
                     </div>
                     {Array.isArray(rowDeepDive.result.per_poc) && rowDeepDive.result.per_poc.length > 0 && (
-                      <div className="mt-1.5 pt-1.5 border-t border-gray-200 space-y-1">
+                      <div className="mt-1.5 pt-1.5 border-t border-gray-200 space-y-1.5">
                         {rowDeepDive.result.per_poc.map((r: any) => (
                           <div key={r.handle} className="text-[11px]">
-                            <span className="font-medium">@{r.handle}</span>
-                            <span className="text-gray-500"> · {r.findings_written} signal{r.findings_written !== 1 ? 's' : ''}</span>
-                            {typeof r.korea_interest_score === 'number' && (
-                              <span className={`ml-1 font-semibold ${
-                                r.korea_interest_score >= 70 ? 'text-emerald-700' :
-                                r.korea_interest_score >= 40 ? 'text-amber-700' :
-                                'text-gray-500'
-                              }`}>
-                                score: {r.korea_interest_score}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-medium">@{r.handle}</span>
+                              <span className="text-gray-500">·</span>
+                              <span className="text-gray-600">
+                                {r.findings_written} signal{r.findings_written !== 1 ? 's' : ''}
                               </span>
-                            )}
+                              {typeof r.korea_interest_score === 'number' && (
+                                <>
+                                  <span className="text-gray-500">·</span>
+                                  <span className={`font-semibold ${
+                                    r.korea_interest_score >= 70 ? 'text-emerald-700' :
+                                    r.korea_interest_score >= 40 ? 'text-amber-700' :
+                                    'text-gray-500'
+                                  }`}>
+                                    score {r.korea_interest_score}
+                                  </span>
+                                </>
+                              )}
+                            </div>
                             {r.summary && (
                               <p className="text-gray-600 mt-0.5">{r.summary}</p>
                             )}
@@ -2090,7 +2086,8 @@ export default function DiscoveryPanel() {
               <Button
                 onClick={startRowDeepDive}
                 disabled={rowDeepDive.running || rowDeepDive.xPocCount === 0}
-                className="bg-violet-600 hover:bg-violet-700 text-white"
+                style={{ backgroundColor: 'var(--brand)', color: 'white' }}
+                className="hover:opacity-90"
               >
                 {rowDeepDive.running && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 {rowDeepDive.running ? 'Running…' : 'Run Deep Dive'}
