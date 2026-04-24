@@ -25,8 +25,19 @@ export const maxDuration = 300;
  *     lookback_days?: number,        // default 90
  *     shelf_life_days?: number,      // default 30
  *     max_tweets?: number,           // default 50 per POC
+ *     max_pocs?: number,             // default 500 (safety cap), set lower to limit cost
  *   }
  */
+
+// Tier priority — lower number = "hotter", scanned first when max_pocs caps
+// the work. Prospects with no tier fall to the bottom.
+const TIER_PRIORITY: Record<string, number> = {
+  REACH_OUT_NOW: 0,
+  PRE_TOKEN_PRIORITY: 1,
+  RESEARCH: 2,
+  WATCH: 3,
+  NURTURE: 4,
+};
 
 interface Finding {
   type: string;                       // e.g. "korea_direct_mention", "asia_strategy_hint"
@@ -111,6 +122,9 @@ export async function POST(request: Request) {
     const lookbackDays = Math.max(7, Math.min(365, Number(body.lookback_days) || 90));
     const shelfLifeDays = Math.max(1, Math.min(180, Number(body.shelf_life_days) || 30));
     const maxTweets = Math.max(10, Math.min(200, Number(body.max_tweets) || 50));
+    // Safety cap: refuse to scan more than `max_pocs` POCs in a single run.
+    // Prospects are prioritized by action_tier so hot leads get the budget.
+    const maxPocs = Math.max(1, Math.min(500, Number(body.max_pocs) || 500));
 
     // Load target prospects. Non-SKIP, with outreach_contacts that have x handles.
     let query = (supabase as any)
@@ -123,15 +137,25 @@ export async function POST(request: Request) {
     const { data: prospects, error: loadErr } = await query;
     if (loadErr) throw loadErr;
 
+    // Sort prospects by tier priority so hot leads are first. That way, if
+    // `max_pocs` caps the run, the highest-value POCs are the ones scanned.
+    const sortedProspects = [...(prospects || [])].sort((a: any, b: any) => {
+      const aTier = a.discovery_snapshot?.action_tier ?? '';
+      const bTier = b.discovery_snapshot?.action_tier ?? '';
+      const aPri = TIER_PRIORITY[aTier] ?? 99;
+      const bPri = TIER_PRIORITY[bTier] ?? 99;
+      return aPri - bPri;
+    });
+
     // Flatten to a per-POC work list. Skip SKIP-tier and any POC without a handle.
     type PocTarget = { prospect_id: string; project_name: string; poc_name: string; poc_role: string; handle: string };
-    const targets: PocTarget[] = [];
-    for (const p of prospects || []) {
+    const allTargets: PocTarget[] = [];
+    for (const p of sortedProspects) {
       const tier = p.discovery_snapshot?.action_tier;
       if (tier === 'SKIP') continue;
       for (const c of p.outreach_contacts || []) {
         if (!c?.twitter_handle) continue;
-        targets.push({
+        allTargets.push({
           prospect_id: p.id,
           project_name: p.name,
           poc_name: c.name,
@@ -140,6 +164,10 @@ export async function POST(request: Request) {
         });
       }
     }
+
+    // Apply the max_pocs cap after sorting — hot leads first.
+    const targets = allTargets.slice(0, maxPocs);
+    const skippedDueToCap = allTargets.length - targets.length;
 
     if (targets.length === 0) {
       await finishRun('completed', { pocs_scanned: 0, signals_added: 0 });
@@ -324,6 +352,8 @@ Use the x_search tool to pull the POC's recent timeline. Return strict JSON per 
 
     await finishRun('completed', {
       targets_total: targets.length,
+      targets_available: allTargets.length,
+      skipped_due_to_cap: skippedDueToCap,
       pocs_scanned: pocsScanned,
       pocs_failed: pocsFailed,
       signals_added: signalsAdded,
@@ -333,12 +363,15 @@ Use the x_search tool to pull the POC's recent timeline. Return strict JSON per 
       cost_usd: Number(costUsd.toFixed(4)),
       lookback_days: lookbackDays,
       shelf_life_days: shelfLifeDays,
+      max_pocs: maxPocs,
     });
 
     return NextResponse.json({
       success: true,
       pocs_scanned: pocsScanned,
       pocs_failed: pocsFailed,
+      pocs_skipped_due_to_cap: skippedDueToCap,
+      targets_available: allTargets.length,
       signals_added: signalsAdded,
       per_poc: perPocResults,
       errors,

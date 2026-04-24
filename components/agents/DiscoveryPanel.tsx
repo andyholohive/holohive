@@ -228,6 +228,9 @@ export default function DiscoveryPanel() {
   const [scanMode, setScanMode] = useState<ScanMode>('poc_lookup');
   const [scanLookbackDays, setScanLookbackDays] = useState<30 | 90 | 180 | 365>(90);
   const [scanShelfLifeDays, setScanShelfLifeDays] = useState<7 | 14 | 30 | 60 | 90>(30);
+  // Deep Dive safety cap: max POCs Grok will scan in one run. Default 5 so a
+  // misclick doesn't spend $10+. Hot leads (by tier) get the budget first.
+  const [scanMaxPocs, setScanMaxPocs] = useState<1 | 3 | 5 | 10 | 25 | 9999>(5);
 
   const fetchProspects = useCallback(async () => {
     setLoading(true);
@@ -391,6 +394,7 @@ export default function DiscoveryPanel() {
         body: JSON.stringify({
           lookback_days: scanLookbackDays,
           shelf_life_days: scanShelfLifeDays,
+          max_pocs: scanMaxPocs,
         }),
       });
       const data = await res.json();
@@ -1441,16 +1445,49 @@ export default function DiscoveryPanel() {
               </div>
             )}
 
+            {/* Max POCs cap — safety brake so a misclick doesn't scan every
+                POC in the pipeline. Hot leads (by tier) get the budget first. */}
+            {(scanMode === 'deep_dive_x' || scanMode === 'both') && (
+              <div>
+                <Label htmlFor="maxpocs" className="mb-1.5 block">
+                  Max POCs (Deep Dive)
+                  <span className="font-normal text-[10px] text-gray-500 ml-1">
+                    — cost brake, hot leads first
+                  </span>
+                </Label>
+                <select
+                  id="maxpocs"
+                  value={scanMaxPocs}
+                  onChange={e => setScanMaxPocs(Number(e.target.value) as 1 | 3 | 5 | 10 | 25 | 9999)}
+                  className="auth-input w-full"
+                >
+                  <option value={1}>1 POC — smoke test</option>
+                  <option value={3}>3 POCs — quick check</option>
+                  <option value={5}>5 POCs — default</option>
+                  <option value={10}>10 POCs</option>
+                  <option value={25}>25 POCs</option>
+                  <option value={9999}>All ({pocsWithXCount}) — full sweep</option>
+                </select>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  Grok scans in tier order (Reach Out Now → Pre-Token → Research → Watch → Nurture),
+                  so capping at N keeps the highest-value POCs.
+                </p>
+              </div>
+            )}
+
             {/* Cost estimate */}
             {(() => {
               // POC lookup cost range
               const pocLo = enrichModel === 'opus' ? 0.25 : 0.05;
               const pocHi = enrichModel === 'opus' ? 0.75 : 0.15;
               const pocCount = missingPocCount;
-              // Grok deep dive cost range (~$0.10-$0.50 per POC)
+              // Grok deep dive cost range (~$0.10-$0.40 per POC — real runs
+              // observed closer to $0.22)
               const grokLo = 0.10;
               const grokHi = 0.40;
-              const grokCount = pocsWithXCount;
+              // Apply the max_pocs cap — this is what'll actually be scanned.
+              const grokCount = Math.min(pocsWithXCount, scanMaxPocs);
+              const grokSkipped = Math.max(0, pocsWithXCount - grokCount);
 
               let lo = 0, hi = 0, descr = '';
               if (scanMode === 'poc_lookup') {
@@ -1462,8 +1499,12 @@ export default function DiscoveryPanel() {
               } else {
                 lo = pocLo * pocCount + grokLo * grokCount;
                 hi = pocHi * pocCount + grokHi * grokCount;
-                descr = `POC lookup + Grok deep dive`;
+                descr = `POC lookup + Grok deep dive (${grokCount} POC${grokCount !== 1 ? 's' : ''})`;
               }
+
+              // Estimated wall-clock (deep dive is ~110s/POC, sequential)
+              const deepDiveSeconds = grokCount * 110;
+              const showTime = scanMode !== 'poc_lookup' && grokCount > 0;
 
               return (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 text-xs">
@@ -1473,7 +1514,19 @@ export default function DiscoveryPanel() {
                   </p>
                   <p>
                     {descr}: roughly <strong>${lo.toFixed(2)} to ${hi.toFixed(2)}</strong>
+                    {showTime && (
+                      <span className="text-amber-700">
+                        {' · '}
+                        ~{deepDiveSeconds < 60 ? `${deepDiveSeconds}s` : `${Math.round(deepDiveSeconds / 60)}m`}
+                      </span>
+                    )}
                   </p>
+                  {grokSkipped > 0 && (scanMode === 'deep_dive_x' || scanMode === 'both') && (
+                    <p className="text-[10px] text-amber-700 mt-1">
+                      {grokSkipped} POC{grokSkipped !== 1 ? 's' : ''} over the cap won't be scanned.
+                      Raise "Max POCs" to include them.
+                    </p>
+                  )}
                 </div>
               );
             })()}
@@ -1493,7 +1546,15 @@ export default function DiscoveryPanel() {
                       <div>POCs enriched: {lastEnrichResult.enriched} · Failed: {lastEnrichResult.failed ?? 0}</div>
                     )}
                     {lastEnrichResult.pocs_scanned != null && (
-                      <div>POCs deep-scanned: {lastEnrichResult.pocs_scanned} · Signals added: {lastEnrichResult.signals_added ?? 0}</div>
+                      <div>
+                        POCs deep-scanned: {lastEnrichResult.pocs_scanned} · Signals added: {lastEnrichResult.signals_added ?? 0}
+                        {lastEnrichResult.pocs_skipped_due_to_cap > 0 && (
+                          <span className="text-amber-700">
+                            {' · '}
+                            {lastEnrichResult.pocs_skipped_due_to_cap} skipped (cap)
+                          </span>
+                        )}
+                      </div>
                     )}
                     <div>Cost: ${lastEnrichResult.cost_usd?.toFixed(3) ?? '—'} · Duration: {Math.round((lastEnrichResult.duration_ms || 0) / 1000)}s</div>
                   </>
