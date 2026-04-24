@@ -875,26 +875,14 @@ export default function DiscoveryPanel() {
           ))}
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative">
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
-              type="text"
+              placeholder="Search projects by name, symbol, or POC..."
+              className="pl-10 auth-input"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search name, symbol, POC…"
-              className="h-8 w-56 text-xs pl-7"
             />
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-gray-200 text-gray-500"
-                title="Clear search"
-                aria-label="Clear search"
-              >
-                <XCircle className="h-3.5 w-3.5" />
-              </button>
-            )}
           </div>
           <div className="flex items-center gap-2">
             <Switch
