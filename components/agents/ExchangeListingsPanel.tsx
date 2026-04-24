@@ -30,6 +30,22 @@ interface Market {
   is_new: boolean;
 }
 
+interface DetectedListing {
+  id: string;
+  project_name: string;
+  signal_type: 'korea_exchange_listing' | 'korea_exchange_delisting';
+  exchange: string | null;
+  market_pair: string | null;
+  quote_currency: string | null;
+  headline: string;
+  snippet: string | null;
+  source_url: string | null;
+  relevancy_weight: number;
+  detected_at: string;
+  matched_prospect_id: string | null;
+  agent_run_id: string | null;
+}
+
 interface DelistedMarket {
   exchange: string;
   symbol: string;
@@ -82,6 +98,7 @@ function exchangeMarketUrl(exchange: string, market_pair: string, symbol: string
 export default function ExchangeListingsPanel() {
   const { toast } = useToast();
   const [stats, setStats] = useState<Stats | null>(null);
+  const [detected, setDetected] = useState<DetectedListing[]>([]);
   const [markets, setMarkets] = useState<Market[]>([]);
   const [delisted, setDelisted] = useState<DelistedMarket[]>([]);
   const [runs, setRuns] = useState<AgentRun[]>([]);
@@ -102,6 +119,7 @@ export default function ExchangeListingsPanel() {
       if (!res.ok) throw new Error('Failed to load');
       const data = await res.json();
       setStats(data.stats);
+      setDetected(data.detected_listings || []);
       setMarkets(data.recent_markets || []);
       setDelisted(data.delisted_markets || []);
       setRuns(data.recent_runs || []);
@@ -295,6 +313,127 @@ export default function ExchangeListingsPanel() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Detected by scanner — the actual "what's new from scans" view */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5">
+                <Sparkles className="h-4 w-4 text-emerald-600" />
+                Detected by scanner
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Listings (and delistings) the scanner actually fired signals on — not baseline inventory.
+              </p>
+            </div>
+            <Badge variant="outline" className="pointer-events-none">
+              {detected.length} {detected.length === 1 ? 'signal' : 'signals'}
+            </Badge>
+          </div>
+
+          {loading ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+            </div>
+          ) : detected.length === 0 ? (
+            <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
+              <Clock className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-700 font-medium">No new listings detected yet</p>
+              <p className="text-xs text-gray-500 mt-1 max-w-md mx-auto">
+                The scanner runs hourly. When Upbit or Bithumb lists a token not already in our tracker,
+                a signal will appear here. Use <span className="font-semibold">Simulate</span> above to
+                test the pipeline without waiting for a real listing.
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50">
+                  <TableHead>Project</TableHead>
+                  <TableHead>Event</TableHead>
+                  <TableHead>Headline</TableHead>
+                  <TableHead>Weight</TableHead>
+                  <TableHead>Detected</TableHead>
+                  <TableHead>Matched</TableHead>
+                  <TableHead className="text-right">Open</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detected.map(d => {
+                  const isListing = d.signal_type === 'korea_exchange_listing';
+                  return (
+                    <TableRow key={d.id} className="hover:bg-gray-50">
+                      <TableCell className="font-medium">{d.project_name}</TableCell>
+                      <TableCell>
+                        {isListing ? (
+                          <Badge className="bg-emerald-100 text-emerald-700 pointer-events-none text-[10px] uppercase">
+                            Listed
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-red-100 text-red-700 pointer-events-none text-[10px] uppercase">
+                            Delisted
+                          </Badge>
+                        )}
+                        {d.exchange && (
+                          <Badge className={`ml-1 ${EXCHANGE_BADGE[d.exchange]} pointer-events-none text-[10px] uppercase`}>
+                            {d.exchange}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-700 max-w-[300px] truncate" title={d.headline}>
+                        {d.headline}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`text-xs font-semibold ${
+                          isListing ? 'text-emerald-700' : 'text-red-700'
+                        }`}>
+                          {isListing ? '+' : ''}{d.relevancy_weight}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-xs text-gray-500">
+                        {formatDate(d.detected_at)}
+                      </TableCell>
+                      <TableCell>
+                        {d.matched_prospect_id ? (
+                          <Badge className="bg-[#e8f4f5] text-[#3e8692] pointer-events-none text-[10px]">
+                            ✓ prospect
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {d.source_url ? (
+                          <a
+                            href={d.source_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-400 hover:text-gray-900 inline-flex"
+                            title="Open on exchange"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Inventory: all tracked markets (filterable) */}
+      <div>
+        <div className="flex items-center justify-between mb-2 mt-2">
+          <h3 className="font-semibold text-sm text-gray-900">All tracked markets</h3>
+          <span className="text-xs text-gray-500">Showing newest 50 · baseline + detected</span>
+        </div>
       </div>
 
       {/* Markets filter */}

@@ -70,6 +70,17 @@ export async function GET() {
     .select('id', { count: 'exact', head: true })
     .eq('source_name', 'korean_exchange_scanner');
 
+  // Detected listings — the canonical "what did the scanner actually fire?"
+  // list. Pulls directly from prospect_signals so it's impossible to confuse
+  // with baseline/inventory rows.
+  const { data: detectedListings } = await (supabase as any)
+    .from('prospect_signals')
+    .select('id, project_name, signal_type, headline, snippet, source_url, relevancy_weight, metadata, detected_at, prospect_id')
+    .eq('source_name', 'korean_exchange_scanner')
+    .in('signal_type', ['korea_exchange_listing', 'korea_exchange_delisting'])
+    .order('detected_at', { ascending: false })
+    .limit(50);
+
   // Recent agent runs
   const { data: runs } = await (supabase as any)
     .from('agent_runs')
@@ -107,6 +118,23 @@ export async function GET() {
       delisted_at: m.delisted_at,
     }));
 
+  // Shape the detected listings into a clean structure for the UI
+  const detected = (detectedListings ?? []).map((s: any) => ({
+    id: s.id,
+    project_name: s.project_name,
+    signal_type: s.signal_type,
+    exchange: s.metadata?.exchange ?? null,
+    market_pair: s.metadata?.market_pair ?? null,
+    quote_currency: s.metadata?.quote_currency ?? null,
+    headline: s.headline,
+    snippet: s.snippet,
+    source_url: s.source_url,
+    relevancy_weight: s.relevancy_weight,
+    detected_at: s.detected_at,
+    matched_prospect_id: s.prospect_id,
+    agent_run_id: s.metadata?.agent_run_id ?? null,
+  }));
+
   return NextResponse.json({
     stats: {
       total_markets: active.length,
@@ -116,6 +144,7 @@ export async function GET() {
       delisted_last_30d: delistedLast30d,
       total_scanner_signals: signalsCount ?? 0,
     },
+    detected_listings: detected,
     recent_markets: recentMarkets,
     delisted_markets: recentDelisted,
     recent_runs: runs ?? [],
