@@ -45,16 +45,22 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Load triggers (signals with source_name='discovery_claude') for these prospects
+  // Load triggers for these prospects. We include signals from both the
+  // Claude Discovery scan AND the Grok Deep Dive. Previously the filter
+  // was `source_name='discovery_claude'` only, which meant Grok signals
+  // were written to the DB but invisible in the UI.
   const prospectIds = (prospects || []).map((p: any) => p.id);
   let signalsByProspect: Map<string, any[]> = new Map();
+  // Per-prospect last Deep Dive timestamp — used by the UI to show
+  // "scanned Nd ago" and enforce a 24h cooldown on the Deep Dive button.
+  let lastDeepDiveByProspect: Map<string, string> = new Map();
 
   if (prospectIds.length > 0) {
     const { data: signals } = await (supabase as any)
       .from('prospect_signals')
-      .select('id, prospect_id, signal_type, headline, snippet, source_url, relevancy_weight, metadata, detected_at')
+      .select('id, prospect_id, signal_type, headline, snippet, source_url, source_name, relevancy_weight, metadata, detected_at')
       .in('prospect_id', prospectIds)
-      .eq('source_name', 'discovery_claude')
+      .in('source_name', ['discovery_claude', 'grok_x_deep_scan'])
       .eq('is_active', true)
       .order('detected_at', { ascending: false });
 
@@ -63,6 +69,11 @@ export async function GET(request: Request) {
       const arr = signalsByProspect.get(s.prospect_id) || [];
       arr.push(s);
       signalsByProspect.set(s.prospect_id, arr);
+      // First grok signal we see per prospect is the most recent one
+      // (query is ordered by detected_at desc).
+      if (s.source_name === 'grok_x_deep_scan' && !lastDeepDiveByProspect.has(s.prospect_id)) {
+        lastDeepDiveByProspect.set(s.prospect_id, s.detected_at);
+      }
     }
   }
 
@@ -77,11 +88,13 @@ export async function GET(request: Request) {
         headline: s.headline,
         detail: s.snippet,
         source_url: s.source_url,
+        source_name: s.source_name,
         source_type: s.metadata?.source_type ?? null,
         tier: s.metadata?.tier ?? null,
         weight: s.relevancy_weight,
         detected_at: s.detected_at,
       })),
+      last_deep_dive_at: lastDeepDiveByProspect.get(p.id) ?? null,
       // Hoist the commonly-used fields up for easier client consumption
       icp_verdict: snap.icp_verdict ?? null,
       icp_checks: snap.icp_checks ?? null,

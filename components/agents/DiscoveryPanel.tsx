@@ -16,6 +16,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
+  HoverCard, HoverCardTrigger, HoverCardContent,
+} from '@/components/ui/hover-card';
+import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
@@ -23,7 +26,7 @@ import {
   Sparkles, Loader2, ExternalLink, Send, Twitter, Globe,
   ChevronDown, ChevronRight as ChevronRightIcon, CheckCircle, XCircle,
   ArrowRight, AlertTriangle, RefreshCw, UserSearch, Eye, Zap,
-  ArrowUp, ArrowDown, ArrowUpDown, Radar,
+  ArrowUp, ArrowDown, ArrowUpDown, Radar, Search,
 } from 'lucide-react';
 
 interface Trigger {
@@ -32,6 +35,9 @@ interface Trigger {
   headline: string;
   detail?: string | null;
   source_url?: string | null;
+  // Which pipeline produced this signal — used to show a GROK badge on
+  // Grok-sourced triggers in the hover card.
+  source_name?: 'discovery_claude' | 'grok_x_deep_scan' | string | null;
   source_type?: 'tweet' | 'article' | 'other' | null;
   tier?: 'TIER_1' | 'TIER_2' | 'TIER_3' | null;
   weight?: number;
@@ -76,6 +82,9 @@ interface DiscoveryProspect {
   action_tier: string | null;
   outreach_contacts: OutreachContact[];
   triggers: Trigger[];
+  // Most recent Grok Deep Dive timestamp (null if never). Used to show
+  // "scanned Nd ago" + enforce a 24h cooldown on the row button.
+  last_deep_dive_at: string | null;
   // SCOUT-aligned qualification
   icp_verdict: IcpVerdict;
   icp_checks: {
@@ -158,6 +167,24 @@ function formatSignalType(s: string): string {
   return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+/** Compact "Nd ago" / "Nh ago" / "just now" for row-level timestamps. */
+function timeAgo(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  const mins = Math.floor(ms / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const mos = Math.floor(days / 30);
+  return `${mos}mo ago`;
+}
+
+const DEEP_DIVE_COOLDOWN_HOURS = 24;
+
 function formatMoney(n: number | null | undefined): string {
   if (n == null) return '—';
   if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
@@ -173,6 +200,9 @@ export default function DiscoveryPanel() {
   const [statusFilter, setStatusFilter] = useState<string>('needs_review');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [hideSkip, setHideSkip] = useState<boolean>(true);
+  // Free-text filter matching project name, symbol, or any POC name/handle.
+  // Client-side only; the list is already capped at 200 rows.
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Column sort state — cycles through none → asc → desc → none
   type SortField = 'tier' | 'score' | 'funding' | null;
@@ -669,9 +699,26 @@ export default function DiscoveryPanel() {
   // Apply client-side "hide disqualified" filter. We ALWAYS keep disqualified
   // prospects in state so flipping the toggle off shows them immediately
   // (no refetch needed) — satisfies the "show rejects with reason" requirement.
-  const filteredProspectsUnsorted = hideSkip
+  let filteredProspectsUnsorted = hideSkip
     ? prospects.filter(p => p.discovery_action_tier !== 'SKIP')
     : prospects;
+
+  // Free-text search: matches project name, symbol, or any POC name / twitter /
+  // telegram handle. Case-insensitive substring match — intentionally loose so
+  // typos like "phar" still find "Pharos Network".
+  const q = searchQuery.trim().toLowerCase();
+  if (q.length > 0) {
+    filteredProspectsUnsorted = filteredProspectsUnsorted.filter(p => {
+      if (p.name?.toLowerCase().includes(q)) return true;
+      if (p.symbol?.toLowerCase().includes(q)) return true;
+      for (const c of p.outreach_contacts || []) {
+        if (c.name?.toLowerCase().includes(q)) return true;
+        if (c.twitter_handle?.toLowerCase().includes(q)) return true;
+        if (c.telegram_handle?.toLowerCase().includes(q)) return true;
+      }
+      return false;
+    });
+  }
 
   // Apply sort if a column is selected
   const filteredProspects = (() => {
@@ -809,7 +856,7 @@ export default function DiscoveryPanel() {
         </Card>
       </div>
 
-      {/* Status filter tabs + hide-disqualified toggle */}
+      {/* Status filter tabs + search + hide-disqualified toggle */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
           {STATUS_TABS.map(tab => (
@@ -827,18 +874,41 @@ export default function DiscoveryPanel() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <Switch
-            id="hide-disqualified"
-            checked={hideSkip}
-            onCheckedChange={setHideSkip}
-          />
-          <Label htmlFor="hide-disqualified" className="text-xs text-gray-600 cursor-pointer select-none">
-            Hide disqualified
-            {hideSkip && hiddenSkipCount > 0 && (
-              <span className="text-[10px] text-gray-400 ml-1">({hiddenSkipCount})</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative">
+            <Input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search name, symbol, POC…"
+              className="h-8 w-56 text-xs pl-7"
+            />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-gray-200 text-gray-500"
+                title="Clear search"
+                aria-label="Clear search"
+              >
+                <XCircle className="h-3.5 w-3.5" />
+              </button>
             )}
-          </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="hide-disqualified"
+              checked={hideSkip}
+              onCheckedChange={setHideSkip}
+            />
+            <Label htmlFor="hide-disqualified" className="text-xs text-gray-600 cursor-pointer select-none">
+              Hide disqualified
+              {hideSkip && hiddenSkipCount > 0 && (
+                <span className="text-[10px] text-gray-400 ml-1">({hiddenSkipCount})</span>
+              )}
+            </Label>
+          </div>
         </div>
       </div>
 
@@ -985,21 +1055,74 @@ export default function DiscoveryPanel() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1 max-w-[280px]">
-                          {p.triggers.slice(0, 2).map(t => (
-                            <Badge
-                              key={t.id}
-                              variant="outline"
-                              className="text-[10px] pointer-events-none"
-                              title={t.detail || t.headline}
+                        {p.triggers.length === 0 ? (
+                          <span className="text-xs text-gray-400">—</span>
+                        ) : (
+                          <HoverCard openDelay={150} closeDelay={50}>
+                            <HoverCardTrigger asChild>
+                              <div className="flex flex-wrap gap-1 max-w-[280px] cursor-help">
+                                {p.triggers.slice(0, 2).map(t => (
+                                  <Badge
+                                    key={t.id}
+                                    variant="outline"
+                                    className="text-[10px] pointer-events-none"
+                                  >
+                                    {formatSignalType(t.signal_type)}
+                                  </Badge>
+                                ))}
+                                {p.triggers.length > 2 && (
+                                  <span className="text-[10px] text-gray-500">
+                                    +{p.triggers.length - 2} more
+                                  </span>
+                                )}
+                              </div>
+                            </HoverCardTrigger>
+                            <HoverCardContent
+                              align="start"
+                              side="bottom"
+                              className="w-96 p-3"
+                              onClick={e => e.stopPropagation()}
                             >
-                              {formatSignalType(t.signal_type)}
-                            </Badge>
-                          ))}
-                          {p.triggers.length > 2 && (
-                            <span className="text-[10px] text-gray-500">+{p.triggers.length - 2} more</span>
-                          )}
-                        </div>
+                              <div className="text-[11px] font-semibold text-gray-700 mb-2">
+                                Triggers ({p.triggers.length})
+                              </div>
+                              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                                {p.triggers.map(t => (
+                                  <div key={t.id} className="text-[11px] border-b border-gray-100 last:border-0 pb-2 last:pb-0">
+                                    <div className="flex items-center gap-1 flex-wrap mb-0.5">
+                                      <Badge variant="outline" className="text-[9px] pointer-events-none">
+                                        {formatSignalType(t.signal_type)}
+                                      </Badge>
+                                      {t.source_name === 'grok_x_deep_scan' && (
+                                        <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-violet-100 text-violet-700 pointer-events-none">
+                                          GROK
+                                        </span>
+                                      )}
+                                      {t.weight && (
+                                        <span className="text-[9px] text-gray-500">w:{t.weight}</span>
+                                      )}
+                                      {t.source_url && (
+                                        <a
+                                          href={t.source_url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-gray-400 hover:text-gray-700 ml-auto"
+                                          title="View source"
+                                        >
+                                          <ExternalLink className="h-3 w-3" />
+                                        </a>
+                                      )}
+                                    </div>
+                                    <div className="font-medium text-gray-900">{t.headline}</div>
+                                    {t.detail && (
+                                      <p className="text-gray-600 mt-0.5 line-clamp-3">{t.detail}</p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </HoverCardContent>
+                          </HoverCard>
+                        )}
                       </TableCell>
                       <TableCell>
                         {p.discovery_action_tier ? (
@@ -1111,27 +1234,56 @@ export default function DiscoveryPanel() {
                             const isSkip = p.discovery_action_tier === 'SKIP';
                             const isDiving = deepDivingIds.has(p.id);
                             const disabled = xPocCount === 0 || isSkip || isDiving;
+                            // Cooldown: if last deep dive was under 24h ago,
+                            // warn the user via confirm() so they don't pay
+                            // $0.22 to re-scan a fresh prospect by accident.
+                            const lastDiveAgo = timeAgo(p.last_deep_dive_at);
+                            const isRecent = (() => {
+                              if (!p.last_deep_dive_at) return false;
+                              const hrs = (Date.now() - new Date(p.last_deep_dive_at).getTime()) / 3_600_000;
+                              return hrs < DEEP_DIVE_COOLDOWN_HOURS;
+                            })();
                             const title = xPocCount === 0
                               ? 'No POC with X handle — run Find POCs first'
                               : isSkip
                                 ? 'Disqualified — deep dive disabled'
                                 : isDiving
                                   ? 'Deep dive in progress…'
-                                  : `Configure and run Grok deep dive on ${xPocCount} X timeline${xPocCount !== 1 ? 's' : ''}`;
+                                  : isRecent
+                                    ? `Already scanned ${lastDiveAgo}. Click to re-scan (confirm required).`
+                                    : lastDiveAgo
+                                      ? `Scanned ${lastDiveAgo}. Re-run Grok deep dive on ${xPocCount} X timeline${xPocCount !== 1 ? 's' : ''}.`
+                                      : `Configure and run Grok deep dive on ${xPocCount} X timeline${xPocCount !== 1 ? 's' : ''}`;
+                            const handleClick = () => {
+                              if (isRecent) {
+                                const ok = window.confirm(
+                                  `${p.name} was deep-dived ${lastDiveAgo}. Re-scan anyway? Costs ~$${(xPocCount * 0.22).toFixed(2)}.`
+                                );
+                                if (!ok) return;
+                              }
+                              openRowDeepDive(p.id, p.name, xPocCount);
+                            };
                             return (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-xs text-violet-700 border-violet-200 hover:bg-violet-50 disabled:text-gray-300 disabled:border-gray-200"
-                                onClick={() => openRowDeepDive(p.id, p.name, xPocCount)}
-                                disabled={disabled}
-                                title={title}
-                              >
-                                {isDiving
-                                  ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                  : <Radar className="h-3 w-3 mr-1" />}
-                                Deep Dive
-                              </Button>
+                              <div className="flex flex-col items-end gap-0.5">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs text-violet-700 border-violet-200 hover:bg-violet-50 disabled:text-gray-300 disabled:border-gray-200"
+                                  onClick={handleClick}
+                                  disabled={disabled}
+                                  title={title}
+                                >
+                                  {isDiving
+                                    ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                    : <Radar className="h-3 w-3 mr-1" />}
+                                  Deep Dive
+                                </Button>
+                                {lastDiveAgo && !isDiving && (
+                                  <span className={`text-[9px] tabular-nums ${isRecent ? 'text-amber-600' : 'text-gray-400'}`}>
+                                    {isRecent ? '⚠ ' : ''}scanned {lastDiveAgo}
+                                  </span>
+                                )}
+                              </div>
                             );
                           })()}
                           {p.status !== 'promoted' && (

@@ -281,7 +281,22 @@ Use the x_search tool to pull the POC's recent timeline. Return strict JSON per 
 
         // Write findings as prospect_signals
         let findingsWritten = 0;
+        let findingsSkippedAsDupe = 0;
         const cutoffMs = fromDate.getTime();
+
+        // Dedupe: pre-fetch existing active grok signal URLs for this prospect so
+        // re-running Deep Dive on the same prospect doesn't insert the same
+        // tweet 5 times over. Much cheaper than one-by-one existence checks.
+        const { data: existingSignals } = await (supabase as any)
+          .from('prospect_signals')
+          .select('source_url, signal_type')
+          .eq('prospect_id', t.prospect_id)
+          .eq('source_name', 'grok_x_deep_scan')
+          .eq('is_active', true);
+        const existingKeys = new Set(
+          (existingSignals || []).map((s: any) => `${s.signal_type}|${s.source_url}`),
+        );
+
         for (const f of parsed.findings || []) {
           if (!f.tweet_text || !f.tweet_url) continue;
           // Safety: filter anything older than the lookback window
@@ -293,6 +308,13 @@ Use the x_search tool to pull the POC's recent timeline. Return strict JSON per 
             f.type === 'korea_direct_mention' || f.type === 'kbw_attendance' || f.type === 'korean_travel' || f.type === 'korean_partnership' || f.type === 'exchange_mention' || f.type === 'korean_vc'
               ? 'poc_korea_mention'
               : 'poc_asia_mention';
+
+          // Dedupe check: same prospect + same signal_type + same tweet URL
+          const dedupKey = `${signalType}|${f.tweet_url}`;
+          if (existingKeys.has(dedupKey)) {
+            findingsSkippedAsDupe++;
+            continue;
+          }
 
           const weight = CONFIDENCE_WEIGHT[f.confidence] ?? 12;
 
@@ -325,6 +347,7 @@ Use the x_search tool to pull the POC's recent timeline. Return strict JSON per 
             });
           if (!sigErr) {
             findingsWritten++;
+            existingKeys.add(dedupKey); // prevent duplicates within this run too
           }
         }
 
@@ -334,6 +357,7 @@ Use the x_search tool to pull the POC's recent timeline. Return strict JSON per 
           poc_name: t.poc_name,
           findings_count: parsed.findings?.length ?? 0,
           findings_written: findingsWritten,
+          findings_skipped_as_dupe: findingsSkippedAsDupe,
           korea_interest_score: parsed.korea_interest_score,
           summary: parsed.summary,
         });
