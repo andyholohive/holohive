@@ -62,30 +62,49 @@ export class GrokError extends Error {
   }
 }
 
+/**
+ * Calls xAI's /v1/responses endpoint (the Agent Tools API). Chat Completions
+ * live search was deprecated in 2026 — `/v1/responses` is the new path with
+ * built-in tools like `x_search`, `web_search`, `code_interpreter`.
+ *
+ * We preserve the OpenAI-style public interface (messages in, choices out)
+ * by translating in this wrapper:
+ *   messages[role=system].content → `instructions`
+ *   messages[role=user|assistant] → `input` array
+ *   response.output[].content[type=output_text].text → choices[0].message.content
+ *   response.usage.input_tokens / output_tokens → prompt_tokens / completion_tokens
+ */
 export async function grokChatCompletion(req: GrokRequest): Promise<GrokResponse> {
   const apiKey = process.env.GROK_API_KEY;
   if (!apiKey) {
     throw new GrokError('GROK_API_KEY env var not set. Add it to use Grok.', 500);
   }
 
+  // Split the system prompt out (responses API uses `instructions`).
+  const systemMessages = req.messages.filter(m => m.role === 'system').map(m => m.content);
+  const nonSystem = req.messages.filter(m => m.role !== 'system');
+
   const body: any = {
     model: req.model ?? 'grok-4',
-    messages: req.messages,
+    input: nonSystem.map(m => ({ role: m.role, content: m.content })),
     temperature: req.temperature ?? 0.2,
-    max_tokens: req.max_tokens ?? 4000,
+    max_output_tokens: req.max_tokens ?? 4000,
   };
+  if (systemMessages.length > 0) {
+    body.instructions = systemMessages.join('\n\n');
+  }
   if (req.tools) {
     body.tools = req.tools;
   }
 
-  const res = await fetch(`${GROK_BASE_URL}/chat/completions`, {
+  const res = await fetch(`${GROK_BASE_URL}/responses`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(90_000),
+    signal: AbortSignal.timeout(120_000),
   });
 
   if (!res.ok) {
@@ -97,7 +116,44 @@ export async function grokChatCompletion(req: GrokRequest): Promise<GrokResponse
     );
   }
 
-  return res.json();
+  const raw: any = await res.json();
+
+  // Normalize the /v1/responses shape into our legacy chat-completions shape.
+  // The response.output is an array of items; we want the first `message` item
+  // and concatenate all `output_text` content blocks (ignore reasoning blocks).
+  let assistantText = '';
+  const finishReason = raw.status ?? 'stop';
+  const outputArr: any[] = Array.isArray(raw.output) ? raw.output : [];
+  for (const item of outputArr) {
+    if (item?.type !== 'message') continue;
+    const content: any[] = Array.isArray(item.content) ? item.content : [];
+    for (const block of content) {
+      if (block?.type === 'output_text' && typeof block.text === 'string') {
+        assistantText += block.text;
+      }
+    }
+  }
+  // Fallback: some SDKs expose a convenience `output_text` at the top level.
+  if (!assistantText && typeof raw.output_text === 'string') {
+    assistantText = raw.output_text;
+  }
+
+  const usage = raw.usage || {};
+  return {
+    id: raw.id ?? '',
+    choices: [
+      {
+        message: { role: 'assistant', content: assistantText },
+        finish_reason: finishReason,
+      },
+    ],
+    usage: {
+      prompt_tokens: usage.input_tokens ?? 0,
+      completion_tokens: usage.output_tokens ?? 0,
+      total_tokens: usage.total_tokens ?? ((usage.input_tokens ?? 0) + (usage.output_tokens ?? 0)),
+      num_sources_used: usage.num_sources_used,
+    },
+  };
 }
 
 /**
