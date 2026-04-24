@@ -218,8 +218,11 @@ If the handle is private, doesn't exist, or has no relevant content, return an e
 
         const userPrompt = `Analyze X handle: @${t.handle}
 Role context: ${t.poc_name} (${t.poc_role}) at project "${t.project_name}".
-Tweet budget: read up to ${maxTweets} posts from the last ${lookbackDays} days.
-Return strict JSON per the schema in the system prompt.`;
+Tweet budget: read up to ${maxTweets} posts.
+
+STRICT DATE FILTER: only include posts dated ${fromDateISO} or later (i.e. the last ${lookbackDays} days). Ignore anything older, even if it's strongly Korea-related. Each finding MUST include an accurate tweet_date ISO timestamp so this can be verified.
+
+Use the x_search tool to pull the POC's recent timeline. Return strict JSON per the schema in the system prompt.`;
 
         const response = await grokChatCompletion({
           model: 'grok-4',
@@ -229,12 +232,11 @@ Return strict JSON per the schema in the system prompt.`;
           ],
           max_tokens: 4000,
           temperature: 0.2,
-          search_parameters: {
-            mode: 'on',
-            sources: [{ type: 'x' }],
-            from_date: fromDateISO,
-            max_search_results: maxTweets,
-          },
+          // xAI Agent Tools API (replaces the deprecated `search_parameters`
+          // live-search config). No date range option — the lookback window
+          // is enforced via the system prompt and a server-side post-filter
+          // on tweet_date below.
+          tools: [{ type: 'x_search' }],
         });
 
         totalInputTokens += response.usage?.prompt_tokens ?? 0;

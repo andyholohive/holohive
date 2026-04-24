@@ -17,21 +17,25 @@ export interface GrokMessage {
   content: string;
 }
 
-export interface GrokToolUse {
-  /** xAI's live-search tool — pulls from X directly. */
-  mode: 'on' | 'off' | 'auto';
-  sources?: Array<{ type: 'x' | 'web' }>;
-  from_date?: string; // ISO date "YYYY-MM-DD"
-  to_date?: string;   // ISO date
-  max_search_results?: number;
-}
+/**
+ * xAI Agent Tools (per https://docs.x.ai/docs/guides/tools/overview).
+ * Built-in server-side tools are declared as simple type markers.
+ *
+ * Date-range filtering is NOT a built-in option — enforce via prompt
+ * (tell Grok "only consider posts from <date> onward") and via a
+ * server-side post-filter when writing signals.
+ */
+export type GrokBuiltInTool =
+  | { type: 'x_search' }
+  | { type: 'web_search' }
+  | { type: 'code_interpreter' };
 
 export interface GrokRequest {
   model?: string;                    // default 'grok-4'
   messages: GrokMessage[];
   temperature?: number;
   max_tokens?: number;
-  search_parameters?: GrokToolUse;
+  tools?: GrokBuiltInTool[];
 }
 
 export interface GrokResponse {
@@ -70,8 +74,8 @@ export async function grokChatCompletion(req: GrokRequest): Promise<GrokResponse
     temperature: req.temperature ?? 0.2,
     max_tokens: req.max_tokens ?? 4000,
   };
-  if (req.search_parameters) {
-    body.search_parameters = req.search_parameters;
+  if (req.tools) {
+    body.tools = req.tools;
   }
 
   const res = await fetch(`${GROK_BASE_URL}/chat/completions`, {
