@@ -80,24 +80,32 @@ Do not chain more than this. If you can't find POCs in 4 calls, return an empty 
 - "medium" — Telegram handle referenced in second-hand source (directory, podcast notes, old forum posts)
 - "low" — X handle only, no Telegram found. Only return a "low" if nothing better exists.
 
+## HARD RULES — violating these invalidates the entire response
+
+1. **Real names only.** No "Unknown", "TBD", "N/A", "team member", or role-only entries. If you don't have a real name, omit the contact.
+2. **No duplicate X handles.** Each twitter_handle in your response must map to exactly one person. If you see the same handle claimed by two names, only one is real — pick the better-sourced one and drop the other.
+3. **Handle must match the person.** The X handle you return should be visibly tied to that specific person's name/photo/bio at the source URL. Don't pair a real name with a guessed handle.
+4. **source_url must be a real URL** that shows the name + handle together. Not a homepage, not a retweet thread with no attribution.
+5. **Prefer fewer high-quality contacts** over more low-confidence ones. 1 "high" is worth more than 3 "low".
+
 ## OUTPUT
 
 Return strict JSON (no markdown fences, no prose before or after):
 {
   "contacts": [
     {
-      "name": "string — person's real name",
+      "name": "string — person's real name (NOT 'Unknown' or a role)",
       "role": "string — their title at the project",
       "twitter_handle": "string — without @, leave empty if none",
       "telegram_handle": "string — without @, leave empty if none",
-      "source_url": "string — URL where you confirmed this",
+      "source_url": "string — URL where you confirmed name+handle together",
       "confidence": "high" | "medium" | "low",
       "notes": "string — brief context, optional"
     }
   ]
 }
 
-Return 1-3 contacts. Sort contacts WITH telegram_handle first. Empty array is acceptable if nothing credible exists — better than fabricated handles.`;
+Return 0-3 contacts. Sort contacts WITH telegram_handle first. Empty array is the right answer when nothing credible exists — far better than fabricated handles.`;
 
   const userPrompt = `Find the 1-3 best outreach POCs for this crypto project:
 
@@ -122,8 +130,22 @@ Use x_search to scan the project's X account for team members the project intera
   const parsed: GrokPocsResult | null = extractJson(text);
   let contacts: OutreachContact[] = [];
   if (parsed?.contacts && Array.isArray(parsed.contacts)) {
+    // Names we reject as obvious placeholders / hallucinated fillers.
+    const INVALID_NAMES = new Set([
+      'unknown', 'n/a', 'na', 'tbd', 'tba',
+      'team member', 'team', 'contact',
+      'anonymous', 'not available',
+    ]);
+
     contacts = parsed.contacts
       .filter(c => c && c.name && c.role)
+      // Reject placeholder names
+      .filter(c => {
+        const n = c.name.trim().toLowerCase();
+        if (INVALID_NAMES.has(n)) return false;
+        if (n.length < 2) return false;
+        return true;
+      })
       .map(c => ({
         ...c,
         twitter_handle: normalizeHandle(c.twitter_handle),
@@ -131,6 +153,26 @@ Use x_search to scan the project's X account for team members the project intera
       }))
       // Drop contacts with neither handle — useless for outreach
       .filter(c => c.twitter_handle || c.telegram_handle);
+
+    // Dedupe by twitter_handle — if Grok returned the same handle for two
+    // different names, it's hallucinated at least one. Keep the first.
+    const seenHandles = new Set<string>();
+    contacts = contacts.filter(c => {
+      const key = c.twitter_handle?.toLowerCase();
+      if (!key) return true; // telegram-only contact — dedupe separately below
+      if (seenHandles.has(key)) return false;
+      seenHandles.add(key);
+      return true;
+    });
+    // Dedupe by telegram_handle
+    const seenTg = new Set<string>();
+    contacts = contacts.filter(c => {
+      const key = c.telegram_handle?.toLowerCase();
+      if (!key) return true;
+      if (seenTg.has(key)) return false;
+      seenTg.add(key);
+      return true;
+    });
   }
 
   // Sort: Telegram-findable first
