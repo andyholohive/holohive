@@ -27,6 +27,7 @@ import {
   ChevronDown, ChevronRight as ChevronRightIcon, CheckCircle, XCircle,
   ArrowRight, AlertTriangle, RefreshCw, UserSearch, Eye, Zap,
   ArrowUp, ArrowDown, ArrowUpDown, Radar, Search, Info, Trash2,
+  MessageSquare, Copy as CopyIcon,
 } from 'lucide-react';
 
 interface Trigger {
@@ -194,6 +195,63 @@ function timeAgo(iso: string | null | undefined): string | null {
 
 const DEEP_DIVE_COOLDOWN_HOURS = 24;
 
+/**
+ * Build a Telegram DM draft for a single POC using their prospect context
+ * and the strongest available Grok signal. Pure templating — no LLM call,
+ * zero cost, runs client-side so the dialog opens instantly.
+ *
+ * Variants let the user re-roll wording without editing manually.
+ */
+function buildTelegramDraft(
+  prospect: DiscoveryProspect,
+  poc: OutreachContact,
+  variant: 'signal' | 'generic' | 'pretoken' = 'signal',
+): string {
+  const firstName = (poc.name || '').split(/\s+/)[0] || 'there';
+
+  // Pick the most actionable Grok signal — prefer Korea-direct over Asia-generic.
+  const grokTriggers = prospect.triggers.filter(t => t.source_name === 'grok_x_deep_scan');
+  const koreaSignal = grokTriggers.find(t => t.signal_type === 'poc_korea_mention');
+  const asiaSignal = grokTriggers.find(t => t.signal_type === 'poc_asia_mention');
+  const bestSignal = koreaSignal || asiaSignal;
+
+  // Strip the "POC name (role): " prefix from the signal headline so the
+  // hook reads naturally in first person.
+  const cleanHeadline = bestSignal?.headline?.replace(/^[^:]+:\s*/, '') || '';
+
+  const intro = `Hey ${firstName} — Andy from HoloHive, we run Korean KOL + community campaigns for crypto projects (ecosystem clients include L1s, perps DEXs, CEXs).`;
+
+  let hook = '';
+  if (variant === 'signal' && bestSignal && cleanHeadline) {
+    hook = `Saw the recent ${koreaSignal ? 'Korean community activity' : 'Asia presence'} — ${cleanHeadline.toLowerCase().slice(0, 140)}. Korea is the right moment.`;
+  } else if (variant === 'pretoken') {
+    const tier = prospect.discovery_action_tier;
+    if (tier === 'PRE_TOKEN_PRIORITY') {
+      hook = `Pre-TGE is the best window to build Korean KOL momentum — by launch day, the right 8–12 KOLs are already vouching for ${prospect.name}.`;
+    } else {
+      hook = `${prospect.name} looks like a strong fit for the Korean market based on what we're seeing on X.`;
+    }
+  } else {
+    hook = `${prospect.name} caught our radar — looks like a strong fit for Korea based on the team and current traction.`;
+  }
+
+  const valueProp = `We're specifically Korea-first: Upbit/Bithumb relationships, Seoul event coverage (KBW, Token2049-adjacent), and a vetted KOL roster that actually converts. Recent campaigns moved the needle for ${randomClientExample(prospect.id)}.`;
+
+  const cta = `Worth 15 min to walk through what the Korea push could look like? Calendly in my bio, or happy to share a deck first.`;
+
+  return [intro, '', hook, '', valueProp, '', cta, '', '— Andy @ HoloHive'].join('\n');
+}
+
+/** Rotate through a few client name examples deterministically per prospect
+ *  so drafts aren't identical across different prospects (looks templated)
+ *  but are stable across re-draws (doesn't feel random). */
+function randomClientExample(seed: string): string {
+  const examples = ['a recent L1 launch', 'a perps DEX at TGE', 'a CEX listing push'];
+  let h = 0;
+  for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) | 0;
+  return examples[Math.abs(h) % examples.length];
+}
+
 function formatMoney(n: number | null | undefined): string {
   if (n == null) return '—';
   if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
@@ -290,6 +348,25 @@ export default function DiscoveryPanel() {
   // Keyed as `${prospectId}|${pocIndex}` so one POC action doesn't block
   // actions on other POCs or other prospects.
   const [pocActionInFlight, setPocActionInFlight] = useState<Set<string>>(new Set());
+
+  // Telegram DM draft dialog — opened from the per-POC "Draft DM" button
+  // in the expanded row. Generates a templated message using the prospect's
+  // strongest Grok signal; user can re-roll wording or edit before copying.
+  const [dmDialog, setDmDialog] = useState<{
+    open: boolean;
+    prospect: DiscoveryProspect | null;
+    poc: OutreachContact | null;
+    variant: 'signal' | 'generic' | 'pretoken';
+    text: string;
+    copiedAt: number | null;
+  }>({
+    open: false,
+    prospect: null,
+    poc: null,
+    variant: 'signal',
+    text: '',
+    copiedAt: null,
+  });
 
   // Per-prospect Deep Dive dialog — opens when the user clicks the row's
   // Deep Dive button. Lets them pick lookback / shelf-life per-project
@@ -474,6 +551,39 @@ export default function DiscoveryPanel() {
       toast({ title: 'Error', description: err?.message ?? 'Enrichment failed', variant: 'destructive' });
     } finally {
       setEnriching(false);
+    }
+  };
+
+  // Open the Telegram DM draft dialog for a specific POC and generate
+  // an initial message using the 'signal' variant (most specific).
+  const openDmDraft = (prospect: DiscoveryProspect, poc: OutreachContact) => {
+    const text = buildTelegramDraft(prospect, poc, 'signal');
+    setDmDialog({ open: true, prospect, poc, variant: 'signal', text, copiedAt: null });
+  };
+
+  const regenerateDmDraft = (variant: 'signal' | 'generic' | 'pretoken') => {
+    setDmDialog(prev => {
+      if (!prev.prospect || !prev.poc) return prev;
+      return {
+        ...prev,
+        variant,
+        text: buildTelegramDraft(prev.prospect, prev.poc, variant),
+        copiedAt: null,
+      };
+    });
+  };
+
+  const copyDmToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(dmDialog.text);
+      setDmDialog(prev => ({ ...prev, copiedAt: Date.now() }));
+      toast({ title: 'Copied to clipboard', description: 'Paste into Telegram.' });
+    } catch (err: any) {
+      toast({
+        title: 'Copy failed',
+        description: err?.message ?? 'Clipboard API unavailable — select manually and copy.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -777,7 +887,32 @@ export default function DiscoveryPanel() {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      toast({ title: 'Updated', description: `Moved to ${status.replace('_', ' ')}` });
+
+      // Promote can auto-create a crm_opportunities row. Report what
+      // actually happened so the user knows the CRM is in sync.
+      if (status === 'promoted') {
+        if (data.crm_already_existed) {
+          toast({
+            title: 'Promoted',
+            description: 'This project was already in CRM — prospect marked as promoted.',
+          });
+        } else if (data.crm_opportunity_id) {
+          toast({
+            title: 'Promoted + added to CRM',
+            description: 'New opportunity created with discovery context and signals.',
+          });
+        } else if (data.crm_error) {
+          toast({
+            title: 'Promoted (CRM partial)',
+            description: data.crm_error,
+            variant: 'destructive',
+          });
+        } else {
+          toast({ title: 'Promoted', description: 'Moved to promoted.' });
+        }
+      } else {
+        toast({ title: 'Updated', description: `Moved to ${status.replace('_', ' ')}` });
+      }
       fetchProspects();
     } catch (err: any) {
       toast({ title: 'Error', description: err?.message ?? 'Update failed', variant: 'destructive' });
@@ -1620,6 +1755,21 @@ export default function DiscoveryPanel() {
                                               <span className="text-[10px] text-amber-600 italic">No TG found</span>
                                             )}
                                           </div>
+                                          {/* Draft DM — only shown when we have
+                                              a Telegram handle to send to. */}
+                                          {c.telegram_handle && (
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              size="sm"
+                                              className="h-6 mt-1.5 text-[10px] text-[#229ED9] border-[#229ED9]/30 hover:bg-[#e8f4f5]"
+                                              onClick={() => openDmDraft(p, c)}
+                                              title="Generate a Telegram DM draft using the strongest Grok signal"
+                                            >
+                                              <MessageSquare className="h-2.5 w-2.5 mr-1" />
+                                              Draft DM
+                                            </Button>
+                                          )}
                                         </div>
                                         {c.source_url && (
                                           <a
@@ -2499,6 +2649,136 @@ export default function DiscoveryPanel() {
                 {rowDeepDive.running ? 'Running…' : 'Run Deep Dive'}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Telegram DM draft dialog — styled consistently with the other
+          discovery dialogs (brand teal accent, same Label / auth-input,
+          canonical Cancel/primary button pair). */}
+      <Dialog
+        open={dmDialog.open}
+        onOpenChange={o => { if (!o) setDmDialog(prev => ({ ...prev, open: false })); }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Draft Telegram DM</DialogTitle>
+            <DialogDescription>
+              Pre-filled using the strongest Grok signal. Edit freely before copying.
+              {dmDialog.prospect && dmDialog.poc && (
+                <>
+                  {' '}To:{' '}
+                  <span className="font-semibold text-gray-900">
+                    {dmDialog.poc.name}
+                  </span>
+                  {' '}at{' '}
+                  <span className="font-semibold text-gray-900">
+                    {dmDialog.prospect.name}
+                  </span>
+                  {dmDialog.poc.telegram_handle && (
+                    <> · <span className="font-mono text-[#229ED9]">
+                      @{dmDialog.poc.telegram_handle.replace(/^@/, '')}
+                    </span></>
+                  )}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            {/* Variant picker — deterministic re-rolls of the template */}
+            <div>
+              <Label className="mb-1.5 block">
+                Hook style
+                <span className="font-normal text-[10px] text-gray-500 ml-1">
+                  — re-roll without losing your manual edits
+                </span>
+              </Label>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { v: 'signal',    label: 'Signal-led',   help: 'Cites a specific Grok finding' },
+                  { v: 'pretoken',  label: 'Timing-led',   help: 'Pre-TGE urgency hook' },
+                  { v: 'generic',   label: 'Generic',      help: 'No specifics, safest' },
+                ] as const).map(({ v, label, help }) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => regenerateDmDraft(v)}
+                    className={`text-left rounded-lg border p-2.5 transition-colors ${
+                      dmDialog.variant === v
+                        ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="text-xs font-semibold text-gray-900">{label}</div>
+                    <div className="text-[10px] text-gray-600 mt-0.5">{help}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Editable draft */}
+            <div>
+              <Label htmlFor="dm-text" className="mb-1.5 block">Message</Label>
+              <textarea
+                id="dm-text"
+                className="auth-input w-full font-sans text-sm leading-relaxed p-3 resize-y min-h-[240px]"
+                value={dmDialog.text}
+                onChange={e => setDmDialog(prev => ({ ...prev, text: e.target.value, copiedAt: null }))}
+                spellCheck
+              />
+              <div className="flex items-center justify-between mt-1">
+                <p className="text-[10px] text-gray-500">
+                  {dmDialog.text.length} chars · Telegram has no length limit for DMs.
+                </p>
+                {dmDialog.copiedAt && Date.now() - dmDialog.copiedAt < 5000 && (
+                  <p className="text-[10px] text-emerald-600 font-semibold">
+                    ✓ Copied to clipboard
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Friendly reminder card */}
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 text-[11px]">
+              <p className="font-semibold mb-1 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Quick gut-check before sending
+              </p>
+              <ul className="space-y-0.5 list-disc pl-4">
+                <li>Does the hook feel natural in your voice? Rewrite if not.</li>
+                <li>Replace "Andy" if you're DMing as someone else.</li>
+                <li>Double-check the handle — <code>@</code>s can be impersonated.</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDmDialog(prev => ({ ...prev, open: false }))}
+            >
+              Close
+            </Button>
+            {dmDialog.poc?.telegram_handle && (
+              <a
+                href={`https://t.me/${dmDialog.poc.telegram_handle.replace(/^@/, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+              >
+                <Send className="h-4 w-4 mr-2 text-[#229ED9]" />
+                Open in Telegram
+              </a>
+            )}
+            <Button
+              onClick={copyDmToClipboard}
+              style={{ backgroundColor: 'var(--brand)', color: 'white' }}
+              className="hover:opacity-90"
+            >
+              <CopyIcon className="h-4 w-4 mr-2" />
+              Copy
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
