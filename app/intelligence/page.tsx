@@ -2,12 +2,13 @@
 
 import React, { useState } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Globe, Radar, DollarSign, Bot, Sparkles } from 'lucide-react';
+import { Globe, Radar, DollarSign, Bot, Sparkles, Building2 } from 'lucide-react';
 import ProspectsTab from '@/components/agents/ProspectsTab';
 import KoreaSignalsPanel from '@/components/agents/KoreaSignalsPanel';
 import FundingRadarPanel from '@/components/agents/FundingRadarPanel';
 import AgentDashboard from '@/components/agents/AgentDashboard';
 import DiscoveryPanel from '@/components/agents/DiscoveryPanel';
+import ExchangeListingsPanel from '@/components/agents/ExchangeListingsPanel';
 
 export default function IntelligencePage() {
   const [activeTab, setActiveTab] = useState('discovery');
@@ -37,6 +38,10 @@ export default function IntelligencePage() {
             <DollarSign className="h-4 w-4" />
             Funding Radar
           </TabsTrigger>
+          <TabsTrigger value="kr_exchanges" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            KR Exchanges
+          </TabsTrigger>
           <TabsTrigger value="agents" className="flex items-center gap-2">
             <Bot className="h-4 w-4" />
             AI Agents
@@ -57,6 +62,10 @@ export default function IntelligencePage() {
 
         <TabsContent value="funding_radar" className="mt-4">
           <FundingRadarPanel />
+        </TabsContent>
+
+        <TabsContent value="kr_exchanges" className="mt-4">
+          <ExchangeListingsPanel />
         </TabsContent>
 
         <TabsContent value="agents" className="mt-4">
