@@ -1949,18 +1949,23 @@ export default function DiscoveryPanel() {
                                           </div>
                                           {/* Per-POC action row — shown when
                                               we have an actionable handle.
-                                              Draft DM needs TG; Deep Dive
-                                              needs X. Both may be shown. */}
+                                              Draft DM works for either X or
+                                              TG; Deep Dive needs an X handle.
+                                              The DM dialog will hide its
+                                              "Open in Telegram" link when
+                                              no TG is available. */}
                                           {(c.telegram_handle || c.twitter_handle) && (
                                             <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                                              {c.telegram_handle && (
+                                              {(c.telegram_handle || c.twitter_handle) && (
                                                 <Button
                                                   type="button"
                                                   variant="outline"
                                                   size="sm"
                                                   className="h-6 text-[10px] text-[#229ED9] border-[#229ED9]/30 hover:bg-[#e8f4f5]"
                                                   onClick={() => openDmDraft(p, c)}
-                                                  title="Generate a Telegram DM draft using the strongest Grok signal"
+                                                  title={c.telegram_handle
+                                                    ? 'Generate a Telegram DM draft using the strongest Grok signal'
+                                                    : 'Generate a message draft (no TG handle — copy into X DM instead)'}
                                                 >
                                                   <MessageSquare className="h-2.5 w-2.5 mr-1" />
                                                   Draft DM
