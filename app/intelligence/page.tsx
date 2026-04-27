@@ -6,7 +6,6 @@ import { Sparkles, Building2, DollarSign, Activity, Bell } from 'lucide-react';
 import {
   HoverCard, HoverCardTrigger, HoverCardContent,
 } from '@/components/ui/hover-card';
-import { Button } from '@/components/ui/button';
 import DiscoveryPanel from '@/components/agents/DiscoveryPanel';
 import ExchangeListingsPanel from '@/components/agents/ExchangeListingsPanel';
 import RecentSignalsPanel from '@/components/agents/RecentSignalsPanel';
@@ -59,19 +58,25 @@ export default function IntelligencePage() {
         </div>
 
         <div className="flex items-center gap-2">
-        {/* Alerts bell — opens the routing/template config dialog. Color
-            tells you at a glance whether alerts are currently armed. */}
-        <Button
-          variant="outline"
-          size="sm"
+        {/* Alerts indicator — styled identically to the cost badge so they
+            visually pair as a row of "info chips" instead of one button +
+            one card. The dot color encodes state. */}
+        <button
+          type="button"
           onClick={() => setAlertsDialogOpen(true)}
-          className="h-9 gap-1.5"
+          className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 cursor-pointer select-none transition-colors"
           title={alertsConfigured ? 'Alerts ON · click to configure' : 'Alerts OFF · click to set up'}
+          aria-label="Configure intelligence alerts"
         >
-          <Bell className={`h-3.5 w-3.5 ${alertsConfigured ? 'text-[#3e8692]' : 'text-gray-400'}`} />
-          <span className="text-xs">Alerts</span>
-          <span className={`h-1.5 w-1.5 rounded-full ${alertsConfigured ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-        </Button>
+          <Bell className={`h-3.5 w-3.5 ${alertsConfigured ? 'text-[#3e8692]' : 'text-gray-500'}`} />
+          <div className="flex flex-col text-left">
+            <span className="text-[10px] text-gray-500 leading-none">Alerts</span>
+            <span className="text-sm font-semibold text-gray-900 leading-tight">
+              {alertsConfigured ? 'On' : 'Off'}
+            </span>
+          </div>
+          <span className={`h-1.5 w-1.5 rounded-full ml-0.5 ${alertsConfigured ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+        </button>
 
         {/* Weekly cost badge — hovers to reveal per-run-type breakdown.
             Hidden if no runs in the window so the page isn't cluttered by
