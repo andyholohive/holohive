@@ -48,6 +48,15 @@ export async function POST(request: NextRequest) {
       console.log('[Telegram Webhook] Edited message ignored');
     }
 
+    // Handle bot membership changes (added / removed / promoted in a chat).
+    // Without this, a brand-new group only appears in CRM → Telegram once
+    // someone posts a message the bot can see. With it, the row is created
+    // the moment the bot joins — so users see the chat immediately and can
+    // link it to an opportunity before the first message arrives.
+    if (update.my_chat_member) {
+      await handleMyChatMember(update.my_chat_member);
+    }
+
     // Telegram expects a 200 OK response
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -454,9 +463,80 @@ async function handleMessage(message: any) {
 }
 
 /**
+ * Handle a `my_chat_member` update — fires whenever the bot's membership in
+ * a chat changes (added, removed, promoted to admin, restricted, etc.).
+ *
+ * Without this, a brand-new group only registers in `telegram_chats` once
+ * someone posts a message the bot can see. With it, the row is created
+ * the moment the bot joins, so the chat appears in CRM → Telegram
+ * immediately and the team can link it to an opportunity right away.
+ *
+ * Telegram update shape:
+ *   {
+ *     chat: { id, title, type },
+ *     from: { id, ... },        // who changed the membership
+ *     date: <unix>,
+ *     old_chat_member: { user: <bot>, status: 'left' | 'kicked' | ... },
+ *     new_chat_member: { user: <bot>, status: 'member' | 'administrator' | 'left' | 'kicked' | ... }
+ *   }
+ *
+ * We only act on transitions INTO a chat (becoming a member/admin). Bot
+ * removals are logged but the existing row is left intact for history.
+ */
+async function handleMyChatMember(update: any) {
+  try {
+    const chatId = update?.chat?.id?.toString();
+    const chatTitle = update?.chat?.title || null;
+    const chatType = update?.chat?.type || 'unknown';
+    const newStatus: string | undefined = update?.new_chat_member?.status;
+    const oldStatus: string | undefined = update?.old_chat_member?.status;
+
+    if (!chatId) {
+      console.log('[Telegram Webhook] my_chat_member missing chat id, skipping');
+      return;
+    }
+
+    // Statuses where the bot is "in" the chat. Anything else means it
+    // can't post / read until something changes.
+    const ACTIVE = new Set(['member', 'administrator', 'creator', 'restricted']);
+    const wasActive = oldStatus ? ACTIVE.has(oldStatus) : false;
+    const isActive = newStatus ? ACTIVE.has(newStatus) : false;
+
+    if (!wasActive && isActive) {
+      // Bot was just added (or unrestricted). Register the chat so it
+      // shows up in the UI even before anyone posts a message. Don't
+      // bump message_count — no actual message arrived.
+      console.log('[Telegram Webhook] Bot added to chat:', { chatId, chatTitle, chatType, newStatus });
+      await trackChat(chatId, chatTitle, chatType, new Date(), { incrementMessageCount: false });
+    } else if (wasActive && !isActive) {
+      // Bot was removed / left / kicked. Just log — we keep the row so
+      // history stays browsable in the CRM.
+      console.log('[Telegram Webhook] Bot removed from chat:', { chatId, chatTitle, oldStatus, newStatus });
+    } else {
+      console.log('[Telegram Webhook] my_chat_member status change (no-op):', { chatId, oldStatus, newStatus });
+    }
+  } catch (error) {
+    console.error('[Telegram Webhook] Error handling my_chat_member:', error);
+    // Don't throw — Telegram should still get a 200.
+  }
+}
+
+/**
  * Track/update chat info in telegram_chats table
  */
-async function trackChat(chatId: string, title: string | null, chatType: string, messageDate: Date) {
+async function trackChat(
+  chatId: string,
+  title: string | null,
+  chatType: string,
+  messageDate: Date,
+  options: {
+    /** When false, message_count is NOT incremented and last_message_at is
+     *  only set on insert. Use for membership-change events where there's
+     *  no real message. Defaults to true (called from handleMessage). */
+    incrementMessageCount?: boolean;
+  } = {},
+) {
+  const incrementMessageCount = options.incrementMessageCount ?? true;
   try {
     // Check if chat already exists
     const { data: existingChat } = await supabaseAdmin
@@ -466,32 +546,37 @@ async function trackChat(chatId: string, title: string | null, chatType: string,
       .single();
 
     if (existingChat) {
-      // Update existing chat
+      // Update existing chat. Skip message_count + last_message_at bumps
+      // when this came from a non-message event so we don't inflate counters.
+      const update: Record<string, unknown> = {
+        title: title || undefined,
+        chat_type: chatType,
+        updated_at: new Date().toISOString(),
+      };
+      if (incrementMessageCount) {
+        update.last_message_at = messageDate.toISOString();
+        update.message_count = (existingChat.message_count || 0) + 1;
+      }
       await supabaseAdmin
         .from('telegram_chats')
-        .update({
-          title: title || undefined,
-          chat_type: chatType,
-          last_message_at: messageDate.toISOString(),
-          message_count: (existingChat.message_count || 0) + 1,
-          updated_at: new Date().toISOString()
-        })
+        .update(update)
         .eq('id', existingChat.id);
 
-      console.log('[Telegram Webhook] Updated chat tracking:', { chatId, title });
+      console.log('[Telegram Webhook] Updated chat tracking:', { chatId, title, incrementMessageCount });
     } else {
-      // Insert new chat
+      // Insert new chat. message_count starts at 1 if a real message
+      // triggered this, 0 if it was just a membership change.
       await supabaseAdmin
         .from('telegram_chats')
         .insert({
           chat_id: chatId,
           title: title,
           chat_type: chatType,
-          last_message_at: messageDate.toISOString(),
-          message_count: 1
+          last_message_at: incrementMessageCount ? messageDate.toISOString() : null,
+          message_count: incrementMessageCount ? 1 : 0,
         });
 
-      console.log('[Telegram Webhook] New chat discovered:', { chatId, title });
+      console.log('[Telegram Webhook] New chat discovered:', { chatId, title, incrementMessageCount });
     }
   } catch (error) {
     console.error('[Telegram Webhook] Error tracking chat:', error);
