@@ -13,7 +13,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Loader2, AlertTriangle, CheckCircle, XCircle, Clock,
+  Loader2, AlertTriangle, CheckCircle, XCircle, Clock, Play,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -122,6 +122,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [running, setRunning] = useState(false);
   const [schedule, setSchedule] = useState<Schedule | null>(null);
 
   // Edit buffer — separate from `schedule` so unsaved changes can be
@@ -176,6 +177,56 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
       toast({ title: 'Error', description: err?.message ?? 'Save failed', variant: 'destructive' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  /**
+   * Fire the saved schedule manually right now, bypassing cadence and
+   * is_enabled. Useful for verifying a config before relying on the
+   * 09:00 KST cron tomorrow. Uses saved params, NOT the unsaved draft —
+   * we explicitly require Save first so what runs matches what the cron
+   * will run.
+   */
+  const runNow = async () => {
+    if (dirty) {
+      toast({
+        title: 'Save first',
+        description: 'Save your changes so the test run uses the latest params.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setRunning(true);
+    toast({
+      title: 'Running test scan…',
+      description: 'This usually takes 1-3 min for Sonnet, longer for Opus. You can close the dialog; the scan continues server-side.',
+    });
+    try {
+      const res = await fetch('/api/intelligence/schedule/run-now', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        toast({ title: 'Run failed', description: data.error || data.summary?.error || 'Unknown error', variant: 'destructive' });
+      } else if (data.status === 'failed') {
+        toast({
+          title: 'Scan returned failed status',
+          description: data.summary?.error || data.summary?.errors?.[0] || 'Check the schedule dialog for details.',
+          variant: 'destructive',
+        });
+      } else {
+        const found = data.summary?.candidates_found ?? data.summary?.projects_found ?? 0;
+        const inserted = data.summary?.inserted ?? 0;
+        const cost = data.summary?.cost_usd;
+        toast({
+          title: 'Test scan complete',
+          description: `${found} candidates · ${inserted} new · ${typeof cost === 'number' ? '$' + cost.toFixed(3) : '—'}`,
+        });
+      }
+      // Reload to refresh last-run UI regardless of pass/fail
+      load();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err?.message ?? 'Run failed', variant: 'destructive' });
+    } finally {
+      setRunning(false);
     }
   };
 
@@ -383,14 +434,47 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
               </div>
             )}
 
+            {/* Manual trigger — useful for verifying a config without
+                waiting for tomorrow's cron. Bypasses cadence + is_enabled
+                gates but uses the saved params, NOT the unsaved draft, so
+                what runs matches what the cron will run. */}
+            <div className="rounded-lg border border-gray-200 bg-white p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-gray-800">Test the config now</div>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
+                    Fires the scan immediately with the saved params. Costs ~$0.10–$0.80
+                    depending on model and max projects. Result lands in the Last run section below.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs shrink-0"
+                  onClick={runNow}
+                  disabled={running || saving || dirty}
+                  title={dirty ? 'Save your changes first to test the latest params' : 'Run a one-off scan with the saved params'}
+                >
+                  {running ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Play className="h-3 w-3 mr-1" />}
+                  {running ? 'Running…' : 'Run now'}
+                </Button>
+              </div>
+            </div>
+
             {/* Last run */}
             {schedule?.last_run_at && (
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
-                <div className="flex items-center gap-2 font-semibold text-gray-700">
+                <div className="flex items-center gap-2 font-semibold text-gray-700 flex-wrap">
                   Last run
                   <Badge variant="outline" className="text-[10px]">
                     {schedule.last_run_status}
                   </Badge>
+                  {schedule.last_run_summary?.manually_triggered && (
+                    <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">
+                      manual
+                    </Badge>
+                  )}
                   <span className="text-gray-500 font-normal">{relativeTime(schedule.last_run_at)}</span>
                 </div>
                 {schedule.last_run_summary && (
@@ -423,12 +507,12 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving || running}>
             Close
           </Button>
           <Button
             onClick={save}
-            disabled={saving || !dirty || loading}
+            disabled={saving || running || !dirty || loading}
             style={{ backgroundColor: 'var(--brand)', color: 'white' }}
             className="hover:opacity-90"
           >
