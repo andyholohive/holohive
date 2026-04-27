@@ -605,7 +605,7 @@ export default function ExchangeListingsPanel() {
 
       {/* Simulate dialog */}
       <Dialog open={simulateOpen} onOpenChange={setSimulateOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Simulate a new listing</DialogTitle>
             <DialogDescription>

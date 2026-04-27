@@ -2171,7 +2171,7 @@ export default function DiscoveryPanel() {
 
       {/* Scan config dialog */}
       <Dialog open={scanOpen} onOpenChange={setScanOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Run Discovery Scan</DialogTitle>
             <DialogDescription>
@@ -2388,7 +2388,7 @@ export default function DiscoveryPanel() {
         open={rowDeepDive.open}
         onOpenChange={o => { if (!o && !rowDeepDive.running) closeRowDeepDive(); }}
       >
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Deep Dive</DialogTitle>
             <DialogDescription>
@@ -2594,7 +2594,7 @@ export default function DiscoveryPanel() {
         open={dmDialog.open}
         onOpenChange={o => { if (!o) setDmDialog(prev => ({ ...prev, open: false })); }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Draft Telegram DM</DialogTitle>
             <DialogDescription>
