@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getClaudeClient } from '@/lib/claude';
+import { fireIntelligenceAlert } from '@/lib/intelligenceAlerts';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -609,7 +610,7 @@ async function writeProject(
   supabase: any,
   p: DiscoveredProject,
   runId: string | null,
-): Promise<'inserted' | 'updated' | { error: string }> {
+): Promise<{ status: 'inserted' | 'updated'; prospectId: string } | { error: string }> {
   if (!p.name) return { error: 'missing name' };
 
   const { data: existing } = await supabase
@@ -660,14 +661,19 @@ async function writeProject(
   };
 
   if (!existing?.id) {
-    const { error } = await supabase.from('prospects').insert({
-      ...baseFields,
-      outreach_contacts: contacts,
-      source: 'dropstab_discovery',
-      status: 'needs_review',
-      scraped_at: new Date().toISOString(),
-    });
-    return error ? { error: error.message } : 'inserted';
+    const { data: insertedRow, error } = await supabase
+      .from('prospects')
+      .insert({
+        ...baseFields,
+        outreach_contacts: contacts,
+        source: 'dropstab_discovery',
+        status: 'needs_review',
+        scraped_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+    if (error) return { error: error.message };
+    return { status: 'inserted', prospectId: insertedRow.id };
   }
 
   // Merge contacts with existing to preserve manual edits
@@ -707,7 +713,8 @@ async function writeProject(
   if (!p.dropstab_url) delete patch.source_url;
 
   const { error } = await supabase.from('prospects').update(patch).eq('id', existing.id);
-  return error ? { error: error.message } : 'updated';
+  if (error) return { error: error.message };
+  return { status: 'updated', prospectId: existing.id };
 }
 
 async function writeSignals(
@@ -1106,12 +1113,33 @@ export async function POST(request: Request) {
     let signalsAdded = 0;
     const writeErrors: string[] = [];
 
+    // Tier values that trigger a Telegram alert when a NEW prospect is
+    // inserted with that tier. We deliberately gate on 'inserted' (not
+    // 'updated') so a re-scan that re-confirms an existing hot prospect
+    // doesn't re-alert.
+    const HOT_ALERT_TIERS = new Set(['REACH_OUT_NOW', 'PRE_TOKEN_PRIORITY']);
+
     for (const p of projectsToWrite) {
       if (!p.name) continue;
       const result = await writeProject(supabase, p, runId);
-      if (result === 'inserted') inserted++;
-      else if (result === 'updated') updated++;
-      else writeErrors.push(`${p.name}: ${(result as any).error}`);
+      if ('error' in result) {
+        writeErrors.push(`${p.name}: ${result.error}`);
+      } else {
+        if (result.status === 'inserted') inserted++;
+        else updated++;
+
+        // Fire hot-tier alert only on fresh inserts with a hot tier.
+        if (result.status === 'inserted' && p.action_tier && HOT_ALERT_TIERS.has(p.action_tier)) {
+          fireIntelligenceAlert('hot_tier', {
+            project_name: p.name,
+            prospect_id: result.prospectId,
+            tier: p.action_tier,
+            score: p.prospect_score?.total ?? 0,
+            funding_round: p.funding_round ?? null,
+            funding_amount_usd: p.funding_amount_usd ?? null,
+          }).catch(err => console.error('[Discovery scan] alert dispatch failed:', err));
+        }
+      }
 
       signalsAdded += await writeSignals(supabase, p, runId);
     }

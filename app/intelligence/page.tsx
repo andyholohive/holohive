@@ -2,13 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Sparkles, Building2, DollarSign, Activity } from 'lucide-react';
+import { Sparkles, Building2, DollarSign, Activity, Bell } from 'lucide-react';
 import {
   HoverCard, HoverCardTrigger, HoverCardContent,
 } from '@/components/ui/hover-card';
+import { Button } from '@/components/ui/button';
 import DiscoveryPanel from '@/components/agents/DiscoveryPanel';
 import ExchangeListingsPanel from '@/components/agents/ExchangeListingsPanel';
 import RecentSignalsPanel from '@/components/agents/RecentSignalsPanel';
+import IntelligenceAlertsDialog from '@/components/agents/IntelligenceAlertsDialog';
 
 // NOTE: Prospects, Korea Signals, Funding Radar, and AI Agents tabs are
 // temporarily hidden while the team focuses on Discovery + KR Exchanges.
@@ -25,6 +27,8 @@ const RUN_TYPE_LABEL: Record<string, string> = {
 
 export default function IntelligencePage() {
   const [activeTab, setActiveTab] = useState('discovery');
+  const [alertsDialogOpen, setAlertsDialogOpen] = useState(false);
+  const [alertsConfigured, setAlertsConfigured] = useState<boolean>(false);
   const [cost, setCost] = useState<{
     total_cost_usd: number;
     runs: number;
@@ -37,7 +41,14 @@ export default function IntelligencePage() {
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d && typeof d.total_cost_usd === 'number') setCost(d); })
       .catch(() => {});
-  }, []);
+    // Lightweight ping just to check if alerts are enabled — used to color
+    // the bell icon (gray when off, brand-teal when on). The full config
+    // is loaded inside the dialog when opened.
+    fetch('/api/intelligence/alerts/config')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.channel) setAlertsConfigured(!!d.channel.is_enabled); })
+      .catch(() => {});
+  }, [alertsDialogOpen]);
 
   return (
     <div className="space-y-6">
@@ -46,6 +57,21 @@ export default function IntelligencePage() {
           <h2 className="text-2xl font-bold text-gray-900">Intelligence</h2>
           <p className="text-gray-600">Prospect discovery and Korean exchange listings</p>
         </div>
+
+        <div className="flex items-center gap-2">
+        {/* Alerts bell — opens the routing/template config dialog. Color
+            tells you at a glance whether alerts are currently armed. */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setAlertsDialogOpen(true)}
+          className="h-9 gap-1.5"
+          title={alertsConfigured ? 'Alerts ON · click to configure' : 'Alerts OFF · click to set up'}
+        >
+          <Bell className={`h-3.5 w-3.5 ${alertsConfigured ? 'text-[#3e8692]' : 'text-gray-400'}`} />
+          <span className="text-xs">Alerts</span>
+          <span className={`h-1.5 w-1.5 rounded-full ${alertsConfigured ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+        </Button>
 
         {/* Weekly cost badge — hovers to reveal per-run-type breakdown.
             Hidden if no runs in the window so the page isn't cluttered by
@@ -89,6 +115,7 @@ export default function IntelligencePage() {
             </HoverCardContent>
           </HoverCard>
         )}
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -119,6 +146,8 @@ export default function IntelligencePage() {
           <ExchangeListingsPanel />
         </TabsContent>
       </Tabs>
+
+      <IntelligenceAlertsDialog open={alertsDialogOpen} onOpenChange={setAlertsDialogOpen} />
     </div>
   );
 }

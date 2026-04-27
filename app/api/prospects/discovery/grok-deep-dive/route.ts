@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { grokChatCompletion, estimateGrokCost, extractJson, GrokError } from '@/lib/grok';
+import { fireIntelligenceAlert } from '@/lib/intelligenceAlerts';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -395,6 +396,23 @@ Use the x_search tool to pull the POC's recent timeline. Return strict JSON per 
           summary: parsed.summary,
         });
         pocsScanned++;
+
+        // Fire a Telegram alert when this POC scored 70+ AND we wrote at
+        // least one new signal. The findingsWritten gate suppresses
+        // duplicate alerts on re-scans where every signal was a dupe;
+        // a real new burst of Korea content (re-score still 70+) will
+        // legitimately re-alert. Fire-and-forget — never blocks the loop.
+        const koreaScore = Number(parsed.korea_interest_score);
+        if (Number.isFinite(koreaScore) && koreaScore >= 70 && findingsWritten > 0) {
+          fireIntelligenceAlert('grok_hot', {
+            project_name: t.project_name,
+            prospect_id: t.prospect_id,
+            poc_handle: t.handle,
+            poc_name: t.poc_name,
+            korea_score: koreaScore,
+            signal_count: findingsWritten,
+          }).catch(err => console.error('[Deep Dive] alert dispatch failed:', err));
+        }
 
         // Brief throttle between POCs to be kind to xAI rate limits
         await new Promise(r => setTimeout(r, 500));
