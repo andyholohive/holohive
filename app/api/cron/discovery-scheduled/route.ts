@@ -125,6 +125,23 @@ export async function GET(request: Request) {
 
   await recordRun(supabase, status, scanResult);
 
+  // Operational alert on failure. Fire-and-forget — alert dispatch problems
+  // shouldn't cascade into the cron's own response. We only fire on real
+  // failures, never on skipped_cadence/skipped_disabled (those are normal).
+  if (status === 'failed') {
+    try {
+      const { fireIntelligenceAlert } = await import('@/lib/intelligenceAlerts');
+      const errMsg = scanResult?.error || scanResult?.errors?.[0] || 'Scan endpoint returned a failure response.';
+      await fireIntelligenceAlert('cron_failed', {
+        run_type: 'Auto Discovery scan',
+        error_message: typeof errMsg === 'string' ? errMsg.slice(0, 500) : 'Unknown error',
+        triggered_at: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.error('[Discovery cron] failed-alert dispatch failed:', err?.message);
+    }
+  }
+
   return NextResponse.json({
     ran: true,
     status,

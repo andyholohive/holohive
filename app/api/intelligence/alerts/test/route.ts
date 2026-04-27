@@ -26,9 +26,8 @@ export async function POST(request: Request) {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   const body = await request.json().catch(() => ({}));
-  const event = (body?.event === 'grok_hot' || body?.event === 'korea_listing')
-    ? body.event
-    : 'hot_tier';
+  const validEvents = ['hot_tier', 'grok_hot', 'korea_listing', 'cron_failed'] as const;
+  const event = (validEvents as readonly string[]).includes(body?.event) ? body.event : 'hot_tier';
 
   const { data: channel, error: loadErr } = await (supabase as any)
     .from('notification_channels')
@@ -75,8 +74,7 @@ export async function POST(request: Request) {
       signal_plural: 's',
       prospect_url: `${baseUrl}/intelligence/discovery/test-id`,
     });
-  } else {
-    // korea_listing
+  } else if (event === 'korea_listing') {
     rendered = renderTemplate(template, {
       project_name: 'Pharos Network',
       exchange: 'Upbit',
@@ -84,6 +82,16 @@ export async function POST(request: Request) {
       market_pair: 'KRW-PHAR',
       symbol: 'PHAR',
       prospect_url: `${baseUrl}/intelligence/discovery/test-id`,
+    });
+  } else {
+    // cron_failed
+    const now = new Date();
+    rendered = renderTemplate(template, {
+      run_type: 'Auto Discovery scan',
+      error_message: 'fetch failed: AbortError after 280s',
+      triggered_at: now.toLocaleString(),
+      triggered_at_iso: now.toISOString(),
+      intelligence_url: `${baseUrl}/intelligence`,
     });
   }
 

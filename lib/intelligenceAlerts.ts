@@ -19,7 +19,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { TelegramService } from '@/lib/telegramService';
 
-export type IntelligenceAlertEvent = 'hot_tier' | 'grok_hot' | 'korea_listing';
+export type IntelligenceAlertEvent = 'hot_tier' | 'grok_hot' | 'korea_listing' | 'cron_failed';
 
 interface NotificationChannel {
   channel_key: string;
@@ -58,6 +58,12 @@ interface KoreaListingPayload {
   exchange: string;              // 'upbit' | 'bithumb'
   market_pair: string;           // e.g. KRW-PHAR
   symbol: string;                // e.g. PHAR
+}
+
+interface CronFailedPayload {
+  run_type: string;              // human-friendly, e.g. 'Auto Discovery scan'
+  error_message: string;         // raw error from the cron
+  triggered_at?: string;         // ISO timestamp; defaults to now if omitted
 }
 
 const CHANNEL_KEY = 'intelligence_alerts';
@@ -121,7 +127,7 @@ async function getChannel(): Promise<NotificationChannel | null> {
  *  or the Telegram send fails. Never throws. */
 export async function fireIntelligenceAlert(
   event: IntelligenceAlertEvent,
-  payload: HotTierPayload | GrokHotPayload | KoreaListingPayload,
+  payload: HotTierPayload | GrokHotPayload | KoreaListingPayload | CronFailedPayload,
 ): Promise<boolean> {
   try {
     const channel = await getChannel();
@@ -136,7 +142,12 @@ export async function fireIntelligenceAlert(
     }
 
     const baseUrl = getBaseUrl();
-    const prospectUrl = `${baseUrl}/intelligence/discovery/${payload.prospect_id}`;
+    // prospect_url is only meaningful when the payload has a prospect_id.
+    // cron_failed alerts use intelligence_url (the page itself) instead.
+    const prospectUrl = (payload as any).prospect_id
+      ? `${baseUrl}/intelligence/discovery/${(payload as any).prospect_id}`
+      : '';
+    const intelligenceUrl = `${baseUrl}/intelligence`;
 
     let vars: TemplateVars;
     if (event === 'hot_tier') {
@@ -167,8 +178,7 @@ export async function fireIntelligenceAlert(
         signal_plural: g.signal_count === 1 ? '' : 's',
         prospect_url: prospectUrl,
       };
-    } else {
-      // event === 'korea_listing'
+    } else if (event === 'korea_listing') {
       const k = payload as KoreaListingPayload;
       const exchangeLabel = k.exchange === 'upbit' ? 'Upbit' : k.exchange === 'bithumb' ? 'Bithumb' : k.exchange;
       vars = {
@@ -178,6 +188,24 @@ export async function fireIntelligenceAlert(
         market_pair: k.market_pair,
         symbol: k.symbol,
         prospect_url: prospectUrl,
+      };
+    } else {
+      // event === 'cron_failed' — operational alert when a scheduled
+      // background job fails. No prospect involved, so we link to the
+      // Intelligence page itself where the user can open the relevant
+      // settings dialog and inspect last_run_summary.
+      const c = payload as CronFailedPayload;
+      const ts = c.triggered_at || new Date().toISOString();
+      vars = {
+        run_type: c.run_type,
+        error_message: c.error_message,
+        // Pretty timestamp for the message body. Fallback to raw ISO if
+        // anything goes wrong with locale formatting.
+        triggered_at: (() => {
+          try { return new Date(ts).toLocaleString(); } catch { return ts; }
+        })(),
+        triggered_at_iso: ts,
+        intelligence_url: intelligenceUrl,
       };
     }
 

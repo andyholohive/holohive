@@ -39,7 +39,12 @@ interface ChannelConfig {
   channel_key: string;
   telegram_chat_id: string | null;
   is_enabled: boolean;
-  templates: { hot_tier?: string; grok_hot?: string; korea_listing?: string };
+  templates: {
+    hot_tier?: string;
+    grok_hot?: string;
+    korea_listing?: string;
+    cron_failed?: string;
+  };
   last_test_at: string | null;
   last_test_status: string | null;
 }
@@ -63,6 +68,10 @@ const KOREA_LISTING_VARS = [
   '{project_name}', '{exchange}', '{exchange_raw}', '{market_pair}',
   '{symbol}', '{prospect_url}',
 ];
+const CRON_FAILED_VARS = [
+  '{run_type}', '{error_message}', '{triggered_at}',
+  '{triggered_at_iso}', '{intelligence_url}',
+];
 
 export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) {
   const { toast } = useToast();
@@ -70,7 +79,8 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
   const [saving, setSaving] = useState(false);
   const [chats, setChats] = useState<ChatOption[]>([]);
   const [config, setConfig] = useState<ChannelConfig | null>(null);
-  const [testing, setTesting] = useState<'hot_tier' | 'grok_hot' | 'korea_listing' | null>(null);
+  type AlertEvent = 'hot_tier' | 'grok_hot' | 'korea_listing' | 'cron_failed';
+  const [testing, setTesting] = useState<AlertEvent | null>(null);
 
   // Local edit buffer — separate from `config` so unsaved tweaks don't
   // leak into "what we last loaded" when the user cancels or reloads.
@@ -79,6 +89,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
   const [draftHotTier, setDraftHotTier] = useState('');
   const [draftGrokHot, setDraftGrokHot] = useState('');
   const [draftKoreaListing, setDraftKoreaListing] = useState('');
+  const [draftCronFailed, setDraftCronFailed] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,6 +106,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
         setDraftHotTier(data.channel?.templates?.hot_tier ?? '');
         setDraftGrokHot(data.channel?.templates?.grok_hot ?? '');
         setDraftKoreaListing(data.channel?.templates?.korea_listing ?? '');
+        setDraftCronFailed(data.channel?.templates?.cron_failed ?? '');
       }
     } catch (err: any) {
       toast({ title: 'Error', description: err?.message ?? 'Failed to load', variant: 'destructive' });
@@ -111,7 +123,8 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
     draftEnabled !== config.is_enabled ||
     draftHotTier !== (config.templates?.hot_tier ?? '') ||
     draftGrokHot !== (config.templates?.grok_hot ?? '') ||
-    draftKoreaListing !== (config.templates?.korea_listing ?? '')
+    draftKoreaListing !== (config.templates?.korea_listing ?? '') ||
+    draftCronFailed !== (config.templates?.cron_failed ?? '')
   );
 
   const save = async () => {
@@ -123,7 +136,12 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
         body: JSON.stringify({
           telegram_chat_id: draftChatId === '' ? null : draftChatId,
           is_enabled: draftEnabled,
-          templates: { hot_tier: draftHotTier, grok_hot: draftGrokHot, korea_listing: draftKoreaListing },
+          templates: {
+            hot_tier: draftHotTier,
+            grok_hot: draftGrokHot,
+            korea_listing: draftKoreaListing,
+            cron_failed: draftCronFailed,
+          },
         }),
       });
       const data = await res.json();
@@ -143,7 +161,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
     }
   };
 
-  const sendTest = async (event: 'hot_tier' | 'grok_hot' | 'korea_listing') => {
+  const sendTest = async (event: AlertEvent) => {
     if (dirty) {
       toast({ title: 'Save first', description: 'You have unsaved changes — save them so the test uses your latest template.', variant: 'destructive' });
       return;
@@ -163,7 +181,11 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
           variant: 'destructive',
         });
       } else {
-        const label = event === 'hot_tier' ? 'hot tier' : event === 'grok_hot' ? 'Grok-hot' : 'Korea listing';
+        const label =
+          event === 'hot_tier'      ? 'hot tier'
+          : event === 'grok_hot'    ? 'Grok-hot'
+          : event === 'korea_listing' ? 'Korea listing'
+          : 'cron failed';
         toast({ title: 'Test sent', description: `Check the selected Telegram chat for the "[TEST]" ${label} alert.` });
         // Refresh to pick up last_test_at / last_test_status
         load();
@@ -340,6 +362,39 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
               </p>
               <p className="text-[10px] text-gray-500">
                 Fires when an Upbit/Bithumb cron-detected listing matches one of our prospects.
+              </p>
+            </div>
+
+            {/* Cron-failure template */}
+            <div>
+              <div className="flex items-baseline justify-between mb-1">
+                <Label htmlFor="tmpl-cron-failed">Cron failed alert</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => sendTest('cron_failed')}
+                  disabled={!config?.telegram_chat_id || testing !== null || dirty}
+                  title={dirty ? 'Save your changes first to test the latest template' : 'Send a [TEST] message to the configured chat'}
+                >
+                  {testing === 'cron_failed' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Send className="h-3 w-3 mr-1" />}
+                  Send test
+                </Button>
+              </div>
+              <textarea
+                id="tmpl-cron-failed"
+                className="auth-input w-full font-mono text-xs leading-relaxed p-3 resize-y min-h-[100px]"
+                value={draftCronFailed}
+                onChange={e => setDraftCronFailed(e.target.value)}
+                spellCheck={false}
+              />
+              <p className="text-[10px] text-gray-500 mt-1">
+                Variables: {CRON_FAILED_VARS.map(v => <code key={v} className="bg-gray-100 px-1 rounded mr-1">{v}</code>)}
+              </p>
+              <p className="text-[10px] text-gray-500">
+                Fires when a scheduled job (e.g. the daily Auto Discovery scan) returns a failed status.
+                Operational alert — separate from prospect-related alerts above.
               </p>
             </div>
 
