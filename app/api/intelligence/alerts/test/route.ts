@@ -26,7 +26,9 @@ export async function POST(request: Request) {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   const body = await request.json().catch(() => ({}));
-  const event = body?.event === 'grok_hot' ? 'grok_hot' : 'hot_tier';
+  const event = (body?.event === 'grok_hot' || body?.event === 'korea_listing')
+    ? body.event
+    : 'hot_tier';
 
   const { data: channel, error: loadErr } = await (supabase as any)
     .from('notification_channels')
@@ -63,7 +65,7 @@ export async function POST(request: Request) {
       funding_line: ' · Series A $20M',
       prospect_url: `${baseUrl}/intelligence/discovery/test-id`,
     });
-  } else {
+  } else if (event === 'grok_hot') {
     rendered = renderTemplate(template, {
       project_name: 'Pharos Network',
       poc_handle: 'wishlonger',
@@ -71,6 +73,16 @@ export async function POST(request: Request) {
       korea_score: 85,
       signal_count: 5,
       signal_plural: 's',
+      prospect_url: `${baseUrl}/intelligence/discovery/test-id`,
+    });
+  } else {
+    // korea_listing
+    rendered = renderTemplate(template, {
+      project_name: 'Pharos Network',
+      exchange: 'Upbit',
+      exchange_raw: 'upbit',
+      market_pair: 'KRW-PHAR',
+      symbol: 'PHAR',
       prospect_url: `${baseUrl}/intelligence/discovery/test-id`,
     });
   }

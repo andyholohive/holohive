@@ -19,7 +19,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { TelegramService } from '@/lib/telegramService';
 
-export type IntelligenceAlertEvent = 'hot_tier' | 'grok_hot';
+export type IntelligenceAlertEvent = 'hot_tier' | 'grok_hot' | 'korea_listing';
 
 interface NotificationChannel {
   channel_key: string;
@@ -50,6 +50,14 @@ interface GrokHotPayload {
   poc_name?: string | null;
   korea_score: number;           // 0-100
   signal_count: number;
+}
+
+interface KoreaListingPayload {
+  project_name: string;
+  prospect_id: string;
+  exchange: string;              // 'upbit' | 'bithumb'
+  market_pair: string;           // e.g. KRW-PHAR
+  symbol: string;                // e.g. PHAR
 }
 
 const CHANNEL_KEY = 'intelligence_alerts';
@@ -113,7 +121,7 @@ async function getChannel(): Promise<NotificationChannel | null> {
  *  or the Telegram send fails. Never throws. */
 export async function fireIntelligenceAlert(
   event: IntelligenceAlertEvent,
-  payload: HotTierPayload | GrokHotPayload,
+  payload: HotTierPayload | GrokHotPayload | KoreaListingPayload,
 ): Promise<boolean> {
   try {
     const channel = await getChannel();
@@ -148,7 +156,7 @@ export async function fireIntelligenceAlert(
         funding_line: fundingPieces.length > 0 ? ` · ${fundingPieces.join(' ')}` : '',
         prospect_url: prospectUrl,
       };
-    } else {
+    } else if (event === 'grok_hot') {
       const g = payload as GrokHotPayload;
       vars = {
         project_name: g.project_name,
@@ -157,6 +165,18 @@ export async function fireIntelligenceAlert(
         korea_score: g.korea_score,
         signal_count: g.signal_count,
         signal_plural: g.signal_count === 1 ? '' : 's',
+        prospect_url: prospectUrl,
+      };
+    } else {
+      // event === 'korea_listing'
+      const k = payload as KoreaListingPayload;
+      const exchangeLabel = k.exchange === 'upbit' ? 'Upbit' : k.exchange === 'bithumb' ? 'Bithumb' : k.exchange;
+      vars = {
+        project_name: k.project_name,
+        exchange: exchangeLabel,
+        exchange_raw: k.exchange,
+        market_pair: k.market_pair,
+        symbol: k.symbol,
         prospect_url: prospectUrl,
       };
     }

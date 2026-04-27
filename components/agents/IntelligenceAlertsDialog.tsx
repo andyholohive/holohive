@@ -39,7 +39,7 @@ interface ChannelConfig {
   channel_key: string;
   telegram_chat_id: string | null;
   is_enabled: boolean;
-  templates: { hot_tier?: string; grok_hot?: string };
+  templates: { hot_tier?: string; grok_hot?: string; korea_listing?: string };
   last_test_at: string | null;
   last_test_status: string | null;
 }
@@ -59,6 +59,10 @@ const GROK_HOT_VARS = [
   '{project_name}', '{poc_handle}', '{poc_name}', '{korea_score}',
   '{signal_count}', '{signal_plural}', '{prospect_url}',
 ];
+const KOREA_LISTING_VARS = [
+  '{project_name}', '{exchange}', '{exchange_raw}', '{market_pair}',
+  '{symbol}', '{prospect_url}',
+];
 
 export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) {
   const { toast } = useToast();
@@ -66,7 +70,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
   const [saving, setSaving] = useState(false);
   const [chats, setChats] = useState<ChatOption[]>([]);
   const [config, setConfig] = useState<ChannelConfig | null>(null);
-  const [testing, setTesting] = useState<'hot_tier' | 'grok_hot' | null>(null);
+  const [testing, setTesting] = useState<'hot_tier' | 'grok_hot' | 'korea_listing' | null>(null);
 
   // Local edit buffer — separate from `config` so unsaved tweaks don't
   // leak into "what we last loaded" when the user cancels or reloads.
@@ -74,6 +78,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
   const [draftEnabled, setDraftEnabled] = useState(false);
   const [draftHotTier, setDraftHotTier] = useState('');
   const [draftGrokHot, setDraftGrokHot] = useState('');
+  const [draftKoreaListing, setDraftKoreaListing] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,6 +94,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
         setDraftEnabled(!!data.channel?.is_enabled);
         setDraftHotTier(data.channel?.templates?.hot_tier ?? '');
         setDraftGrokHot(data.channel?.templates?.grok_hot ?? '');
+        setDraftKoreaListing(data.channel?.templates?.korea_listing ?? '');
       }
     } catch (err: any) {
       toast({ title: 'Error', description: err?.message ?? 'Failed to load', variant: 'destructive' });
@@ -104,7 +110,8 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
     draftChatId !== (config.telegram_chat_id ?? '') ||
     draftEnabled !== config.is_enabled ||
     draftHotTier !== (config.templates?.hot_tier ?? '') ||
-    draftGrokHot !== (config.templates?.grok_hot ?? '')
+    draftGrokHot !== (config.templates?.grok_hot ?? '') ||
+    draftKoreaListing !== (config.templates?.korea_listing ?? '')
   );
 
   const save = async () => {
@@ -116,7 +123,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
         body: JSON.stringify({
           telegram_chat_id: draftChatId === '' ? null : draftChatId,
           is_enabled: draftEnabled,
-          templates: { hot_tier: draftHotTier, grok_hot: draftGrokHot },
+          templates: { hot_tier: draftHotTier, grok_hot: draftGrokHot, korea_listing: draftKoreaListing },
         }),
       });
       const data = await res.json();
@@ -136,7 +143,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
     }
   };
 
-  const sendTest = async (event: 'hot_tier' | 'grok_hot') => {
+  const sendTest = async (event: 'hot_tier' | 'grok_hot' | 'korea_listing') => {
     if (dirty) {
       toast({ title: 'Save first', description: 'You have unsaved changes — save them so the test uses your latest template.', variant: 'destructive' });
       return;
@@ -156,7 +163,8 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
           variant: 'destructive',
         });
       } else {
-        toast({ title: 'Test sent', description: `Check the selected Telegram chat for the "[TEST]" ${event === 'hot_tier' ? 'hot tier' : 'Grok-hot'} alert.` });
+        const label = event === 'hot_tier' ? 'hot tier' : event === 'grok_hot' ? 'Grok-hot' : 'Korea listing';
+        toast({ title: 'Test sent', description: `Check the selected Telegram chat for the "[TEST]" ${label} alert.` });
         // Refresh to pick up last_test_at / last_test_status
         load();
       }
@@ -300,6 +308,38 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
               />
               <p className="text-[10px] text-gray-500 mt-1">
                 Variables: {GROK_HOT_VARS.map(v => <code key={v} className="bg-gray-100 px-1 rounded mr-1">{v}</code>)}
+              </p>
+            </div>
+
+            {/* Korea-listing template */}
+            <div>
+              <div className="flex items-baseline justify-between mb-1">
+                <Label htmlFor="tmpl-korea-listing">Korea listing alert</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => sendTest('korea_listing')}
+                  disabled={!config?.telegram_chat_id || testing !== null || dirty}
+                  title={dirty ? 'Save your changes first to test the latest template' : 'Send a [TEST] message to the configured chat'}
+                >
+                  {testing === 'korea_listing' ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Send className="h-3 w-3 mr-1" />}
+                  Send test
+                </Button>
+              </div>
+              <textarea
+                id="tmpl-korea-listing"
+                className="auth-input w-full font-mono text-xs leading-relaxed p-3 resize-y min-h-[100px]"
+                value={draftKoreaListing}
+                onChange={e => setDraftKoreaListing(e.target.value)}
+                spellCheck={false}
+              />
+              <p className="text-[10px] text-gray-500 mt-1">
+                Variables: {KOREA_LISTING_VARS.map(v => <code key={v} className="bg-gray-100 px-1 rounded mr-1">{v}</code>)}
+              </p>
+              <p className="text-[10px] text-gray-500">
+                Fires when an Upbit/Bithumb cron-detected listing matches one of our prospects.
               </p>
             </div>
 

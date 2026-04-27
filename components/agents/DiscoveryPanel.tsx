@@ -99,6 +99,13 @@ interface DiscoveryProspect {
   // >= 70 triggers a "Grok-hot" badge for fast triage. Null if never
   // deep-dived.
   grok_korea_score: number | null;
+  // Set by the KR exchanges cron when this prospect just listed on a
+  // Korean exchange. The presence of post_korea_listing_at flips the UI
+  // to show a "LISTED ON UPBIT" badge — they're no longer "no Korea
+  // presence yet" so the BD angle has to change. Null when never listed.
+  post_korea_listing_at: string | null;
+  post_korea_listing_exchange: string | null;   // 'upbit' | 'bithumb'
+  post_korea_listing_market_pair: string | null; // e.g. 'KRW-PHAR'
   // SCOUT-aligned qualification
   icp_verdict: IcpVerdict;
   icp_checks: {
@@ -1580,6 +1587,22 @@ export default function DiscoveryPanel() {
                             >
                               <Radar className="h-2.5 w-2.5" />
                               GROK-HOT {p.grok_korea_score}
+                            </span>
+                          )}
+                          {/* KR-listing badge — set by the KR exchanges cron
+                              when this prospect just listed on Upbit/Bithumb.
+                              Means "no Korea presence yet" no longer holds —
+                              BD needs to change angle or dismiss. Red because
+                              it's a hard ICP-violation signal. */}
+                          {p.post_korea_listing_at && (
+                            <span
+                              className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700 border border-red-200 pointer-events-none"
+                              title={`Listed on ${p.post_korea_listing_exchange} (${p.post_korea_listing_market_pair}) on ${new Date(p.post_korea_listing_at).toLocaleString()}`}
+                            >
+                              📍 LISTED ON {String(p.post_korea_listing_exchange || '').toUpperCase()}
+                              <span className="font-normal text-red-600 ml-0.5">
+                                {timeAgo(p.post_korea_listing_at)}
+                              </span>
                             </span>
                           )}
                         </div>

@@ -241,6 +241,50 @@ export async function GET(request: Request) {
               .update({ listing_signal_fired_at: nowIso })
               .eq('exchange', m.exchange)
               .eq('market_pair', m.market_pair);
+
+            // ── Auto-flag the matched prospect ──
+            // If this listing matched one of our Discovery prospects, stamp
+            // the discovery_snapshot with post_korea_listing_* fields so the
+            // Discovery UI can show a "LISTED ON UPBIT 2d ago" badge and the
+            // BD team knows the ICP rule #3 ("no Korea presence yet") just
+            // got violated. Idempotent because listing_signal_fired_at above
+            // gates re-firing for the same (exchange, market_pair).
+            if (prospect?.id) {
+              try {
+                const { data: current } = await (supabase as any)
+                  .from('prospects')
+                  .select('discovery_snapshot')
+                  .eq('id', prospect.id)
+                  .single();
+                const mergedSnap = {
+                  ...(current?.discovery_snapshot || {}),
+                  post_korea_listing_at: nowIso,
+                  post_korea_listing_exchange: m.exchange,
+                  post_korea_listing_market_pair: m.market_pair,
+                };
+                await (supabase as any)
+                  .from('prospects')
+                  .update({
+                    discovery_snapshot: mergedSnap,
+                    updated_at: nowIso,
+                  })
+                  .eq('id', prospect.id);
+
+                // Fire a Telegram alert. Fire-and-forget — never blocks
+                // the cron loop. Lazy-imported so the cron path doesn't
+                // pull in alert deps when there's no match anyway.
+                const { fireIntelligenceAlert } = await import('@/lib/intelligenceAlerts');
+                fireIntelligenceAlert('korea_listing', {
+                  project_name: prospect.name,
+                  prospect_id: prospect.id,
+                  exchange: m.exchange,
+                  market_pair: m.market_pair,
+                  symbol: m.symbol,
+                }).catch(err => console.error('[KR Cron] alert dispatch failed:', err));
+              } catch (flagErr: any) {
+                console.error('[KR Cron] failed to auto-flag prospect:', flagErr?.message);
+              }
+            }
           }
         } catch (e: any) {
           signalErrors.push(`Listing ${m.exchange}/${m.symbol}: ${e?.message ?? 'unknown'}`);

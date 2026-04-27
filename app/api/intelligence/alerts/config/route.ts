@@ -99,7 +99,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'templates must be an object' }, { status: 400 });
     }
     // Filter the patch to known event types and string-only values.
-    const allowedKeys = ['hot_tier', 'grok_hot'];
+    const allowedKeys = ['hot_tier', 'grok_hot', 'korea_listing'];
     const patch: Record<string, string> = {};
     for (const k of allowedKeys) {
       const v = body.templates[k];

@@ -152,6 +152,13 @@ export async function GET(request: Request) {
       consideration_reason: snap.consideration_reason ?? null,
       fit_reasoning: snap.fit_reasoning ?? null,
       funding: snap.funding ?? null,
+      // KR exchanges cron stamps these onto the snapshot when a matched
+      // prospect lists on Upbit / Bithumb. Used by the UI to render a
+      // "LISTED ON UPBIT" badge — the project's no longer "no Korea
+      // presence yet" so the BD angle has to change.
+      post_korea_listing_at: snap.post_korea_listing_at ?? null,
+      post_korea_listing_exchange: snap.post_korea_listing_exchange ?? null,
+      post_korea_listing_market_pair: snap.post_korea_listing_market_pair ?? null,
     };
   });
 
