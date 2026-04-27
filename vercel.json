@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/korean-exchange-listings",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/discovery-scheduled",
+      "schedule": "0 0 * * *"
     }
   ]
 }

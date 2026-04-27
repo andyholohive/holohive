@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Sparkles, Building2, DollarSign, Activity, Bell } from 'lucide-react';
+import { Sparkles, Building2, DollarSign, Activity, Bell, Clock } from 'lucide-react';
 import {
   HoverCard, HoverCardTrigger, HoverCardContent,
 } from '@/components/ui/hover-card';
@@ -10,6 +10,7 @@ import DiscoveryPanel from '@/components/agents/DiscoveryPanel';
 import ExchangeListingsPanel from '@/components/agents/ExchangeListingsPanel';
 import RecentSignalsPanel from '@/components/agents/RecentSignalsPanel';
 import IntelligenceAlertsDialog from '@/components/agents/IntelligenceAlertsDialog';
+import IntelligenceScheduleDialog from '@/components/agents/IntelligenceScheduleDialog';
 
 // NOTE: Prospects, Korea Signals, Funding Radar, and AI Agents tabs are
 // temporarily hidden while the team focuses on Discovery + KR Exchanges.
@@ -28,6 +29,8 @@ export default function IntelligencePage() {
   const [activeTab, setActiveTab] = useState('discovery');
   const [alertsDialogOpen, setAlertsDialogOpen] = useState(false);
   const [alertsConfigured, setAlertsConfigured] = useState<boolean>(false);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [scheduleEnabled, setScheduleEnabled] = useState<boolean>(false);
   const [cost, setCost] = useState<{
     total_cost_usd: number;
     runs: number;
@@ -47,7 +50,12 @@ export default function IntelligencePage() {
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.channel) setAlertsConfigured(!!d.channel.is_enabled); })
       .catch(() => {});
-  }, [alertsDialogOpen]);
+    // Same pattern for the auto-scan schedule chip — just need is_enabled.
+    fetch('/api/intelligence/schedule/config')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.schedule) setScheduleEnabled(!!d.schedule.is_enabled); })
+      .catch(() => {});
+  }, [alertsDialogOpen, scheduleDialogOpen]);
 
   return (
     <div className="space-y-6">
@@ -58,6 +66,24 @@ export default function IntelligencePage() {
         </div>
 
         <div className="flex items-center gap-2">
+        {/* Schedule indicator — paired with Alerts + Cost as info chips. */}
+        <button
+          type="button"
+          onClick={() => setScheduleDialogOpen(true)}
+          className="flex items-center gap-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg px-3 py-1.5 cursor-pointer select-none transition-colors"
+          title={scheduleEnabled ? 'Auto-scan ON · click to configure' : 'Auto-scan OFF · click to set up'}
+          aria-label="Configure scheduled discovery scan"
+        >
+          <Clock className={`h-3.5 w-3.5 ${scheduleEnabled ? 'text-[#3e8692]' : 'text-gray-500'}`} />
+          <div className="flex flex-col text-left">
+            <span className="text-[10px] text-gray-500 leading-none">Auto-scan</span>
+            <span className="text-sm font-semibold text-gray-900 leading-tight">
+              {scheduleEnabled ? 'On' : 'Off'}
+            </span>
+          </div>
+          <span className={`h-1.5 w-1.5 rounded-full ml-0.5 ${scheduleEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+        </button>
+
         {/* Alerts indicator — styled identically to the cost badge so they
             visually pair as a row of "info chips" instead of one button +
             one card. The dot color encodes state. */}
@@ -153,6 +179,7 @@ export default function IntelligencePage() {
       </Tabs>
 
       <IntelligenceAlertsDialog open={alertsDialogOpen} onOpenChange={setAlertsDialogOpen} />
+      <IntelligenceScheduleDialog open={scheduleDialogOpen} onOpenChange={setScheduleDialogOpen} />
     </div>
   );
 }
