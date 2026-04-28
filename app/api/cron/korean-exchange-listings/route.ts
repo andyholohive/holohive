@@ -140,6 +140,25 @@ export async function GET(request: Request) {
     // ── 3. Diff ───────────────────────────────────────────────────────
     const diff = diffMarkets(live, dbActive);
 
+    // Defensive guard against the bug seen on 2026-04-26 21:00 UTC where
+    // ~355 listing signals fired for markets that had been in the DB for
+    // 85+ hours (Bitcoin, Ethereum, Cardano, etc.). We don't fully know
+    // the root cause — likely a per-exchange diff inconsistency — but the
+    // FIX is to never fire a listing signal for a market we already know
+    // about. dbActive is the authoritative "we already know this" set,
+    // so we just intersect with it: if the proposed newListing is already
+    // in our active DB rows, we silently drop it from this run's signal
+    // list (and log a warning so we can spot recurrences).
+    const knownKey = (e: string, p: string) => `${e}|${p}`;
+    const dbKnownSet = new Set(dbActive.map(r => knownKey(r.exchange, r.market_pair)));
+    const stalePings = diff.newListings.filter(m => dbKnownSet.has(knownKey(m.exchange, m.market_pair)));
+    if (stalePings.length > 0) {
+      console.warn(
+        `[KR Cron] BLOCKED ${stalePings.length} stale newListing signals — these markets were already in dbActive. Sample: ${stalePings.slice(0, 5).map(m => `${m.exchange}/${m.market_pair}`).join(', ')}`,
+      );
+      diff.newListings = diff.newListings.filter(m => !dbKnownSet.has(knownKey(m.exchange, m.market_pair)));
+    }
+
     // ── 4. Upsert all live markets (touch last_seen_at) ──────────────
     const nowIso = new Date().toISOString();
     const upsertRows = live.map(m => ({
