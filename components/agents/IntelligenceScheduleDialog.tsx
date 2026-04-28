@@ -39,6 +39,7 @@ interface Schedule {
   is_enabled: boolean;
   cadence: Cadence;
   weekly_day: number | null;
+  weekly_cost_cap_usd: number | null;
   scan_params: {
     recency_days?: number;
     min_raise_usd?: number;
@@ -124,6 +125,10 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
   const [schedule, setSchedule] = useState<Schedule | null>(null);
+  // Rolling 7-day DISCOVERY spend, fetched from the same endpoint the
+  // top-of-page cost badge uses. Shown next to the cap input so the
+  // user can pick a sensible threshold relative to actual usage.
+  const [currentSpend, setCurrentSpend] = useState<number | null>(null);
 
   // Edit buffer — separate from `schedule` so unsaved changes can be
   // diffed and reverted on Cancel.
@@ -149,6 +154,18 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
 
   useEffect(() => { if (open) load(); }, [open, load]);
 
+  // Pull current weekly spend whenever the dialog opens (independent of
+  // schedule load — this comes from agent_runs, not the schedule row).
+  useEffect(() => {
+    if (!open) return;
+    fetch('/api/agents/cost-summary')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d && typeof d.total_cost_usd === 'number') setCurrentSpend(d.total_cost_usd);
+      })
+      .catch(() => {});
+  }, [open]);
+
   const dirty = !!draft && !!schedule && JSON.stringify(draft) !== JSON.stringify(schedule);
 
   const save = async () => {
@@ -162,6 +179,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
           is_enabled: draft.is_enabled,
           cadence: draft.cadence,
           weekly_day: draft.cadence === 'weekly' ? draft.weekly_day : null,
+          weekly_cost_cap_usd: draft.weekly_cost_cap_usd,
           scan_params: draft.scan_params,
         }),
       });
@@ -433,6 +451,69 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                 )}
               </div>
             )}
+
+            {/* Weekly cost cap (kill switch) */}
+            <div className="rounded-lg border border-gray-200 bg-white p-3">
+              <div className="flex items-baseline justify-between gap-2 mb-2">
+                <Label htmlFor="cost-cap" className="cursor-pointer">
+                  Weekly cost cap
+                  <span className="font-normal text-[10px] text-gray-500 ml-1">
+                    — kill switch
+                  </span>
+                </Label>
+                {currentSpend != null && (
+                  <span className="text-[11px] text-gray-500 tabular-nums">
+                    Current 7d: <span className="font-semibold text-gray-800">${currentSpend.toFixed(2)}</span>
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">$</span>
+                <input
+                  id="cost-cap"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={1000}
+                  step={1}
+                  placeholder="No cap"
+                  value={draft.weekly_cost_cap_usd ?? ''}
+                  onChange={e => {
+                    const v = e.target.value;
+                    if (v === '') {
+                      updateDraft({ weekly_cost_cap_usd: null });
+                    } else {
+                      const n = Number(v);
+                      if (Number.isFinite(n) && n >= 0) updateDraft({ weekly_cost_cap_usd: n });
+                    }
+                  }}
+                  className="auth-input flex-1 max-w-[150px]"
+                />
+                {draft.weekly_cost_cap_usd != null && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-gray-500"
+                    onClick={() => updateDraft({ weekly_cost_cap_usd: null })}
+                    title="Remove the cap (no auto-disable)"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <p className="text-[11px] text-gray-500 mt-2">
+                When the rolling 7-day Discovery spend reaches this amount, the cron
+                auto-disables the schedule and sends a Telegram alert. Manual scans
+                (Run Discovery, Find POCs, Deep Dive, Run-now) <strong>are not capped</strong> —
+                their spend still counts toward the budget though.
+              </p>
+              {currentSpend != null && draft.weekly_cost_cap_usd != null && currentSpend >= draft.weekly_cost_cap_usd && (
+                <p className="text-[11px] text-red-700 mt-1 font-semibold">
+                  ⚠ Already at or over cap — next cron run would disable the schedule.
+                </p>
+              )}
+            </div>
 
             {/* Manual trigger — useful for verifying a config without
                 waiting for tomorrow's cron. Bypasses cadence + is_enabled

@@ -112,6 +112,23 @@ export async function PUT(request: Request) {
     update.weekly_day = v;
   }
 
+  // weekly_cost_cap_usd
+  // Null = no cap. Number must be a sane positive amount; the cron
+  // checks rolling 7-day DISCOVERY spend against this and auto-disables
+  // the schedule if breached. We bound at $1000/week which is well
+  // beyond any real usage scenario but keeps a typo from setting an
+  // effectively-disabled cap.
+  if ('weekly_cost_cap_usd' in body) {
+    const v = body.weekly_cost_cap_usd;
+    if (v === null) {
+      update.weekly_cost_cap_usd = null;
+    } else if (typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= 1000) {
+      update.weekly_cost_cap_usd = v;
+    } else {
+      return NextResponse.json({ error: 'weekly_cost_cap_usd must be a positive number ≤ 1000, or null' }, { status: 400 });
+    }
+  }
+
   // scan_params (merged)
   if ('scan_params' in body) {
     if (!body.scan_params || typeof body.scan_params !== 'object') {

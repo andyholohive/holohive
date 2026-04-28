@@ -91,6 +91,64 @@ export async function GET(request: Request) {
     });
   }
 
+  // ── Cost cap check (kill switch) ──
+  // Sum the rolling 7-day spend across all DISCOVERY agent_runs (manual
+  // scans, deep dives, find-pocs, cron runs — everything counts toward
+  // the budget the user set). If we've reached or exceeded the cap, we:
+  //   1. Auto-disable the schedule (is_enabled=false) so future cron
+  //      runs are no-ops until the user re-enables manually
+  //   2. Record skipped_cap_breached on the row
+  //   3. Fire a cron_failed Telegram alert with explanatory text
+  // This protects against runaway spend if a misconfig (Opus + daily
+  // + max-20 + 4 sources) goes unnoticed for several days.
+  const cap = schedule.weekly_cost_cap_usd as number | null;
+  if (cap != null && cap > 0) {
+    const { data: recent } = await (supabase as any)
+      .from('agent_runs')
+      .select('output_summary')
+      .eq('agent_name', 'DISCOVERY')
+      .eq('status', 'completed')
+      .gte('started_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+    const weekSpend = (recent || []).reduce((sum: number, r: any) => {
+      const c = Number(r.output_summary?.cost_usd);
+      return Number.isFinite(c) ? sum + c : sum;
+    }, 0);
+
+    if (weekSpend >= cap) {
+      // Disable + record + alert. Order is: disable first (defensive —
+      // if the alert dispatch hangs, at least the cron is paused).
+      await (supabase as any)
+        .from('scheduled_scans')
+        .update({
+          is_enabled: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('schedule_key', SCHEDULE_KEY);
+      await recordRun(supabase, 'skipped_cap_breached', {
+        cap_usd: cap,
+        week_spend_usd: Number(weekSpend.toFixed(2)),
+        action: 'auto_disabled',
+      });
+      try {
+        const { fireIntelligenceAlert } = await import('@/lib/intelligenceAlerts');
+        await fireIntelligenceAlert('cron_failed', {
+          run_type: 'Auto Discovery scan (cost cap)',
+          error_message: `Weekly cost cap of $${cap.toFixed(2)} reached ($${weekSpend.toFixed(2)} spent in last 7 days). Auto-scan paused for safety. Re-enable in the schedule dialog when ready.`,
+          triggered_at: new Date().toISOString(),
+        });
+      } catch (err: any) {
+        console.error('[Discovery cron] cap-breached alert dispatch failed:', err?.message);
+      }
+      return NextResponse.json({
+        skipped: true,
+        reason: 'cost cap breached',
+        cap_usd: cap,
+        week_spend_usd: weekSpend,
+        action: 'auto_disabled',
+      });
+    }
+  }
+
   // ── Run the scan ──
   // We POST to our own scan endpoint rather than calling the function
   // directly — keeps a single code path for both cron and manual scans,
@@ -153,7 +211,7 @@ export async function GET(request: Request) {
  *  "last ran 6h ago · ✓" or "last ran 2d ago · failed". */
 async function recordRun(
   supabase: any,
-  status: 'completed' | 'failed' | 'skipped_disabled' | 'skipped_cadence',
+  status: 'completed' | 'failed' | 'skipped_disabled' | 'skipped_cadence' | 'skipped_cap_breached',
   summary: any,
 ) {
   await supabase
