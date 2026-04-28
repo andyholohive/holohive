@@ -59,8 +59,25 @@ export async function POST(request: NextRequest) {
 
     // Telegram expects a 200 OK response
     return NextResponse.json({ ok: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error('[Telegram Webhook] Error processing update:', error);
+    // Fire an operational alert so silent webhook breakage doesn't go
+    // unnoticed. Without this, Telegram thinks every update succeeded
+    // (we always return 200) and the team only finds out something is
+    // wrong when chats stop appearing in CRM. Fire-and-forget — never
+    // block the response or cascade.
+    try {
+      const { fireIntelligenceAlert } = await import('@/lib/intelligenceAlerts');
+      fireIntelligenceAlert('cron_failed', {
+        run_type: 'Telegram webhook',
+        error_message: typeof error?.message === 'string'
+          ? error.message.slice(0, 500)
+          : String(error).slice(0, 500),
+        triggered_at: new Date().toISOString(),
+      }).catch(() => {/* swallow — alert dispatch failure shouldn't cascade */});
+    } catch {
+      // import failure or missing config — log and move on
+    }
     // Still return 200 to prevent Telegram from retrying
     return NextResponse.json({ ok: true });
   }

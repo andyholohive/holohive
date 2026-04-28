@@ -897,9 +897,31 @@ export async function POST(request: Request) {
       .from('crm_opportunities')
       .select('name')
       .range(0, 4999);
+    // Normalize names so "Pharos" matches "Pharos Network", "Web3 Foo Inc."
+    // matches "Web3 Foo", etc. We strip a small set of common boilerplate
+    // suffixes (Network/Labs/Foundation/Protocol/AI/Inc/Ltd) and collapse
+    // non-alphanumeric runs to a single space. The previous exact-match
+    // gate let through ~30% of "we already know them" cases.
+    const normalizeProjectName = (raw: unknown): string => {
+      if (typeof raw !== 'string') return '';
+      const lowered = raw.trim().toLowerCase();
+      // Remove punctuation/symbols, collapse whitespace
+      const cleaned = lowered
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      // Strip trailing boilerplate words. Order matters — strip one at
+      // a time from the end so "Foo Network Labs" → "Foo".
+      const SUFFIXES = ['network', 'labs', 'foundation', 'protocol', 'ai', 'finance', 'capital', 'inc', 'ltd', 'limited', 'llc', 'corp'];
+      let parts = cleaned.split(' ');
+      while (parts.length > 1 && SUFFIXES.includes(parts[parts.length - 1])) {
+        parts.pop();
+      }
+      return parts.join(' ');
+    };
     const crmNameSet = new Set<string>(
       (crmRows || [])
-        .map((c: any) => (typeof c.name === 'string' ? c.name.trim().toLowerCase() : ''))
+        .map((c: any) => normalizeProjectName(c.name))
         .filter(Boolean),
     );
 
@@ -963,8 +985,10 @@ export async function POST(request: Request) {
     const crmFilteredOut: string[] = [];
     const filteredCandidates = stage1Raw.candidates.filter(c => {
       if (!c.name) return false;
-      const key = c.name.trim().toLowerCase();
-      if (crmNameSet.has(key)) {
+      // Use the same normalization as crmNameSet so suffix variants
+      // dedupe correctly ("Pharos" candidate vs "Pharos Network" CRM row).
+      const key = normalizeProjectName(c.name);
+      if (key && crmNameSet.has(key)) {
         crmFilteredOut.push(c.name);
         return false;
       }

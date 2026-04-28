@@ -188,6 +188,29 @@ export async function PUT(request: Request) {
     );
   }
 
+  // Reset stale failure status when the user changes the scan config —
+  // they presumably edited something to fix the failure, so showing
+  // "failed" forever in the dialog is misleading. We only clear when
+  // the previous status was 'failed' or 'skipped_cap_breached' AND the
+  // user is actually changing something meaningful (params, cadence, or
+  // turning enabled back on). Just toggling enabled off doesn't count.
+  const meaningfulChange = (
+    'cadence' in update ||
+    'weekly_day' in update ||
+    'scan_params' in update ||
+    'weekly_cost_cap_usd' in update ||
+    (update.is_enabled === true && existing.is_enabled === false)
+  );
+  const previouslyFailed = existing.last_run_status === 'failed'
+    || existing.last_run_status === 'skipped_cap_breached';
+  if (meaningfulChange && previouslyFailed) {
+    update.last_run_status = null;
+    update.last_run_summary = null;
+    // Note: we don't clear last_run_at — keeping the timestamp gives the
+    // user context ("last attempt was 2d ago") while removing the
+    // misleading "failed" tag.
+  }
+
   const { data: saved, error: saveErr } = await (supabase as any)
     .from('scheduled_scans')
     .update(update)
