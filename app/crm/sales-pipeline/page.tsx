@@ -1412,7 +1412,7 @@ export default function SalesPipelinePage() {
     }
   }, [alertCardFilter, opportunities]);
 
-  const displayedActions = useMemo(() => {
+  const { displayedActions, actionsNameCounts } = useMemo(() => {
     let items = actionPhaseFilter === 'outreach' ? outreachActions
       : actionPhaseFilter === 'closing' ? closingActions
       : actionPhaseFilter === 'orbit' ? orbitActions
@@ -1433,26 +1433,57 @@ export default function SalesPipelinePage() {
       );
     }
 
-    if (actionSort === 'priority' && actionPhaseFilter !== 'non_urgent') return items;
-    const stageIdx: Record<string, number> = {};
-    [...PIPELINE_STAGES, 'orbit', 'nurture', 'v2_closed_lost'].forEach((s, i) => { stageIdx[s] = i; });
+    // Apply primary sort
+    let sorted: typeof items;
+    if (actionSort === 'priority' && actionPhaseFilter !== 'non_urgent') {
+      sorted = items;
+    } else {
+      const stageIdx: Record<string, number> = {};
+      [...PIPELINE_STAGES, 'orbit', 'nurture', 'v2_closed_lost'].forEach((s, i) => { stageIdx[s] = i; });
 
-    return [...items].sort((a, b) => {
-      switch (actionSort) {
-        case 'stage': return (stageIdx[a.opp.stage] ?? 99) - (stageIdx[b.opp.stage] ?? 99);
-        case 'temperature': return (b.opp.temperature_score || 0) - (a.opp.temperature_score || 0);
-        case 'value': return (b.opp.deal_value || 0) - (a.opp.deal_value || 0);
-        case 'name': return (a.opp.name || '').localeCompare(b.opp.name || '');
-        case 'newest': return new Date(b.opp.created_at).getTime() - new Date(a.opp.created_at).getTime();
-        case 'oldest': return new Date(a.opp.created_at).getTime() - new Date(b.opp.created_at).getTime();
-        case 'timing': {
-          const aDate = a.opp.last_bump_date || a.opp.last_contacted_at || a.opp.created_at;
-          const bDate = b.opp.last_bump_date || b.opp.last_contacted_at || b.opp.created_at;
-          return new Date(aDate).getTime() - new Date(bDate).getTime();
+      sorted = [...items].sort((a, b) => {
+        switch (actionSort) {
+          case 'stage': return (stageIdx[a.opp.stage] ?? 99) - (stageIdx[b.opp.stage] ?? 99);
+          case 'temperature': return (b.opp.temperature_score || 0) - (a.opp.temperature_score || 0);
+          case 'value': return (b.opp.deal_value || 0) - (a.opp.deal_value || 0);
+          case 'name': return (a.opp.name || '').localeCompare(b.opp.name || '');
+          case 'newest': return new Date(b.opp.created_at).getTime() - new Date(a.opp.created_at).getTime();
+          case 'oldest': return new Date(a.opp.created_at).getTime() - new Date(b.opp.created_at).getTime();
+          case 'timing': {
+            const aDate = a.opp.last_bump_date || a.opp.last_contacted_at || a.opp.created_at;
+            const bDate = b.opp.last_bump_date || b.opp.last_contacted_at || b.opp.created_at;
+            return new Date(aDate).getTime() - new Date(bDate).getTime();
+          }
+          default: return 0;
         }
-        default: return 0;
-      }
+      });
+    }
+
+    // ── Cluster same-project rows together (mirrors Outreach tab UX) ──
+    // We preserve the user's primary sort but pull all rows with the same
+    // project name adjacent, anchored at the position of the FIRST
+    // occurrence of that name. So "sort by priority" still puts the most
+    // urgent project on top, but its other POCs ride along right below
+    // it instead of being scattered. JS Array.sort is stable since
+    // ES2019 so within-group order is preserved.
+    const firstIdxByName = new Map<string, number>();
+    sorted.forEach((item, i) => {
+      const n = item.opp.name || '';
+      if (!firstIdxByName.has(n)) firstIdxByName.set(n, i);
     });
+    const clustered = [...sorted].sort((a, b) => {
+      const ai = firstIdxByName.get(a.opp.name || '') ?? 0;
+      const bi = firstIdxByName.get(b.opp.name || '') ?? 0;
+      return ai - bi;
+    });
+
+    const counts = new Map<string, number>();
+    clustered.forEach(item => {
+      const n = item.opp.name || '';
+      counts.set(n, (counts.get(n) || 0) + 1);
+    });
+
+    return { displayedActions: clustered, actionsNameCounts: counts };
   }, [actionPhaseFilter, outreachActions, closingActions, orbitActions, actionItems, nonUrgentItems, actionSort, alertCardOppIds, actionsSearch]);
 
   // ============================================
@@ -2881,20 +2912,38 @@ export default function SalesPipelinePage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : currentItems.map(({ opp, action }) => {
+              ) : currentItems.map(({ opp, action }, index) => {
                 const timing = getTimingInfo(opp);
                 const stageColors = STAGE_COLORS[opp.stage as SalesPipelineStage] || STAGE_COLORS.cold_dm;
+                // Project-name grouping (mirrors Outreach tab):
+                //   - Show project name + Building icon only on the first
+                //     row of each same-name run.
+                //   - Drop the top border on continuation rows so the group
+                //     reads as one block; add a thicker bottom border on the
+                //     last row of a multi-row group to visually separate.
+                const prevName = index > 0 ? currentItems[index - 1].opp.name : null;
+                const nextName = index < currentItems.length - 1 ? currentItems[index + 1].opp.name : null;
+                const isFirstInGroup = opp.name !== prevName;
+                const isLastInGroup = opp.name !== nextName;
+                const groupCount = actionsNameCounts.get(opp.name || '') || 1;
                 return (
                   <TableRow
                     key={opp.id}
-                    className={`group hover:bg-gray-50 cursor-pointer ${action.priority === 'urgent' ? 'bg-red-50/40' : ''}`}
+                    className={`group hover:bg-gray-50 cursor-pointer ${action.priority === 'urgent' ? 'bg-red-50/40' : ''} ${!isFirstInGroup ? 'border-t-0' : ''} ${isLastInGroup && groupCount > 1 ? 'border-b-2 border-b-gray-200' : ''}`}
                     onClick={() => openSlideOver(opp)}
                   >
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-gray-400" />
-                        <span className="font-medium">{opp.name}</span>
-                      </div>
+                    <TableCell className={!isFirstInGroup ? 'pt-0' : ''}>
+                      {isFirstInGroup ? (
+                        <div className="flex items-center gap-1.5 whitespace-nowrap overflow-hidden">
+                          <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
+                          <span className="font-medium truncate">{opp.name}</span>
+                          {groupCount > 1 && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium shrink-0 whitespace-nowrap">
+                              {groupCount} POCs
+                            </span>
+                          )}
+                        </div>
+                      ) : null}
                     </TableCell>
                     <TableCell>
                       {opp.poc_handle ? (
