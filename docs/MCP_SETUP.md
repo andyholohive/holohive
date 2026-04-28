@@ -7,16 +7,37 @@ tabs into HoloHive.
 
 ## What Claude can do once connected
 
-Six read-only tools are exposed:
+Thirteen read-only tools are exposed, covering Discovery, the Intelligence
+page, the CRM page, KOLs, and Campaigns:
 
+### Discovery & Intelligence
 | Tool | What you'd ask Claude |
 |------|------------------------|
-| `list_recent_prospects` | "What prospects came in this week with REACH_OUT_NOW tier?" |
+| `list_recent_prospects` | "Show me reviewed-but-not-promoted prospects from CryptoRank in the last 14 days, sorted by Korea score" |
 | `get_prospect_detail` | "Tell me everything about prospect X" |
+| `get_recent_signals` | "Any new poc_korea_mention signals in the last 3 days?" |
+| `get_kr_listings` | "Anything new on Upbit in the last 3 days?" |
+| `get_intelligence_cost_summary` | "How much did Discovery cost this month? Where's the money going?" |
+
+### CRM
+| Tool | What you'd ask Claude |
+|------|------------------------|
+| `list_crm_opportunities` | "What's in my Deals pipeline at proposal or contract stage?" |
+| `get_opportunity_detail` | "Full breakdown on opportunity X — scores, contacts, activity" |
+| `crm_stage_summary` | "Show me my pipeline distribution across all stages" |
+| `crm_followups_due` | "Who haven't I contacted in 7+ days?" |
+
+### Campaigns & KOLs
+| Tool | What you'd ask Claude |
+|------|------------------------|
 | `list_active_campaigns` | "What campaigns are running right now?" |
 | `search_kols` | "Find any KOLs with 'crypto' in their name in Korea" |
-| `get_kr_listings` | "Anything new on Upbit in the last 3 days?" |
-| `summarize_pipeline` | "Give me a snapshot of the Discovery + CRM pipeline" |
+
+### Cross-cutting
+| Tool | What you'd ask Claude |
+|------|------------------------|
+| `summarize_pipeline` | "Give me a high-level snapshot — Discovery + CRM + Campaigns" |
+| `get_promoted_opportunity_for_prospect` | "Did Solayer get promoted? What stage is it in?" |
 
 The connector is **read-only** — Claude cannot create, edit, or delete records.
 

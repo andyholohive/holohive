@@ -15,6 +15,23 @@ import {
   getKrListingsSchema,
   summarizePipeline,
   summarizePipelineSchema,
+  // Intelligence-deep tools
+  getRecentSignals,
+  getRecentSignalsSchema,
+  getIntelligenceCostSummary,
+  getIntelligenceCostSummarySchema,
+  // CRM tools
+  listCrmOpportunities,
+  listCrmOpportunitiesSchema,
+  getOpportunityDetail,
+  getOpportunityDetailSchema,
+  crmStageSummary,
+  crmStageSummarySchema,
+  crmFollowupsDue,
+  crmFollowupsDueSchema,
+  // Cross-link
+  getPromotedOpportunityForProspect,
+  getPromotedOpportunityForProspectSchema,
 } from '@/lib/mcp/tools';
 
 export const dynamic = 'force-dynamic';
@@ -103,6 +120,89 @@ const handler = createMcpHandler(
       async () => {
         const supabase = getServiceClient();
         const text = await summarizePipeline(supabase);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    // ─── Intelligence-deep tools ─────────────────────────────────────
+
+    server.tool(
+      'get_recent_signals',
+      'Fetch recent prospect_signals across the Discovery system. Filter by signal_type (e.g. "korea_intent_exchange", "poc_korea_mention", "korea_exchange_listing"), prospect_id, or minimum relevancy_weight. Use this for the Intelligence > Signals tab questions.',
+      getRecentSignalsSchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await getRecentSignals(supabase, args);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    server.tool(
+      'get_intelligence_cost_summary',
+      'Aggregate Discovery / POC enrichment / Deep Dive spend by run_type over a window. Mirrors the cost chip on the Intelligence page but with finer breakdown — answers "where is the budget going" questions.',
+      getIntelligenceCostSummarySchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await getIntelligenceCostSummary(supabase, args);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    // ─── CRM tools ───────────────────────────────────────────────────
+
+    server.tool(
+      'list_crm_opportunities',
+      'Browse CRM opportunities with filters. stages is a comma-separated list (e.g. "warm,tg_intro,booked" or "proposal,contract"). Useful stages: cold_dm, warm, tg_intro, booked, discovery_done, proposal, contract, closed_won, closed_lost, account_active. Sort by composite_score / deal_value / last_contacted_at / updated_at.',
+      listCrmOpportunitiesSchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await listCrmOpportunities(supabase, args);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    server.tool(
+      'get_opportunity_detail',
+      'Full info on one CRM opportunity by UUID — all 5 scores (composite, ICP, signal, temperature, timing), activity timeline (last contacted/messaged/replied), POC contacts, funding, project context (token status, TGE date, Korea presence, team doxxed), notes.',
+      getOpportunityDetailSchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await getOpportunityDetail(supabase, args);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    server.tool(
+      'crm_stage_summary',
+      'Pipeline distribution: counts of CRM opportunities by stage, grouped into the four canonical pipelines (Outreach, Leads, Booked/Discovery, Deals, Accounts). Plus an account_type breakdown. Use this for "how does my pipeline look" snapshots.',
+      crmStageSummarySchema,
+      async () => {
+        const supabase = getServiceClient();
+        const text = await crmStageSummary(supabase);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    server.tool(
+      'crm_followups_due',
+      'List active CRM opportunities not contacted in the last N days (default 7). Skips closed/dead/churned stages — only returns ones where a follow-up is actually warranted. Sorted by stalest first.',
+      crmFollowupsDueSchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await crmFollowupsDue(supabase, args);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    // ─── Cross-link: Intelligence ↔ CRM ──────────────────────────────
+
+    server.tool(
+      'get_promoted_opportunity_for_prospect',
+      'Given a Discovery prospect UUID, return its linked CRM opportunity (via promoted_opportunity_id). Tells you whether a prospect was promoted, and if so, what stage it landed at. Useful for "did this prospect convert" questions.',
+      getPromotedOpportunityForProspectSchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await getPromotedOpportunityForProspect(supabase, args);
         return { content: [{ type: 'text', text }] };
       },
     );
