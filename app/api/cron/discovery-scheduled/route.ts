@@ -103,11 +103,15 @@ export async function GET(request: Request) {
   // + max-20 + 4 sources) goes unnoticed for several days.
   const cap = schedule.weekly_cost_cap_usd as number | null;
   if (cap != null && cap > 0) {
+    // Include both completed AND failed runs — failed runs still incur
+    // cost up to the failure point (Stage 2 enrichment can spend $0.40
+    // and then time out), so excluding them lets a flapping cron blow
+    // past the cap unnoticed.
     const { data: recent } = await (supabase as any)
       .from('agent_runs')
       .select('output_summary')
       .eq('agent_name', 'DISCOVERY')
-      .eq('status', 'completed')
+      .in('status', ['completed', 'failed'])
       .gte('started_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
     const weekSpend = (recent || []).reduce((sum: number, r: any) => {
       const c = Number(r.output_summary?.cost_usd);

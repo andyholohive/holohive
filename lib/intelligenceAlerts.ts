@@ -81,14 +81,30 @@ function getBaseUrl(): string {
   return 'http://localhost:3000';
 }
 
+/** HTML-escape a value for safe substitution into a parse_mode='HTML' Telegram
+ *  message. Telegram rejects messages with malformed HTML (returns 400), so
+ *  any user-data substitution that happens to contain `&`, `<`, or `>` would
+ *  silently fail without this. We escape only the substituted *value*, never
+ *  the template — template authors put intentional `<b>`, `<a href>` etc. in
+ *  the template body. */
+function escapeHtmlValue(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 /** Render a template by replacing {var} placeholders with values from `vars`.
  *  Missing vars render as empty string so a partial payload doesn't blow up
- *  the message. Curly-brace vars only — no nested objects, no helpers. */
+ *  the message. Substituted values are HTML-escaped (template HTML is not),
+ *  so a project name like "AT&T" or an error message containing `<` won't
+ *  break the Telegram send. Curly-brace vars only — no nested objects, no
+ *  helpers. */
 export function renderTemplate(template: string, vars: TemplateVars): string {
   return template.replace(/\{(\w+)\}/g, (_, key) => {
     const v = vars[key];
     if (v === undefined || v === null) return '';
-    return String(v);
+    return escapeHtmlValue(String(v));
   });
 }
 
@@ -209,7 +225,15 @@ export async function fireIntelligenceAlert(
       };
     }
 
-    const text = renderTemplate(template, vars);
+    let text = renderTemplate(template, vars);
+    // Telegram caps a single message at 4096 chars and rejects oversized
+    // sends with a 400. Our default templates run ~250-400 chars, so this
+    // only kicks in for pathological payloads (huge error_message strings,
+    // very long project names, etc.). Truncate before dispatch so an alert
+    // surfaces at all rather than silently failing.
+    if (text.length > 4000) {
+      text = text.slice(0, 3990) + '\n…[truncated]';
+    }
     const ok = await TelegramService.sendToChat(channel.telegram_chat_id, text, 'HTML');
     if (!ok) {
       console.error('[IntelligenceAlerts] sendToChat returned false', { event, chatId: channel.telegram_chat_id });

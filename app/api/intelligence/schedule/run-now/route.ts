@@ -47,6 +47,38 @@ export async function POST() {
     return NextResponse.json({ error: loadErr?.message || 'Schedule row missing' }, { status: 500 });
   }
 
+  // ── Server-side debounce ──
+  // The dialog's "Run now" button disables itself while a run is in
+  // flight, but that's local component state — multi-tab, browser
+  // refresh-during-run, or a script could bypass it and fire concurrent
+  // scans. Each scan costs $0.10–$0.80, so a few accidental clicks add
+  // up. Reject if the previous run started within the last 60s, which
+  // is well below any legitimate scan duration.
+  if (schedule.last_run_at) {
+    const lastRunMs = Date.parse(schedule.last_run_at);
+    if (Number.isFinite(lastRunMs) && Date.now() - lastRunMs < 60_000) {
+      return NextResponse.json(
+        {
+          error: 'A scan was triggered less than a minute ago. Please wait before running again.',
+          last_run_at: schedule.last_run_at,
+          last_run_status: schedule.last_run_status,
+        },
+        { status: 429 },
+      );
+    }
+  }
+
+  // Stamp last_run_at immediately so a second tab clicking Run-now
+  // within the same second sees the debounce window. The status updates
+  // below replace this stamp with the real outcome.
+  await (supabase as any)
+    .from('scheduled_scans')
+    .update({
+      last_run_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('schedule_key', SCHEDULE_KEY);
+
   // Build scan body from saved params, just like the cron does, but
   // tag it as manually triggered so dashboards can distinguish.
   const scanBody = {

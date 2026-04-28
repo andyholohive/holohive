@@ -39,10 +39,6 @@ export default function IntelligencePage() {
   } | null>(null);
 
   useEffect(() => {
-    fetch('/api/agents/cost-summary')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d && typeof d.total_cost_usd === 'number') setCost(d); })
-      .catch(() => {});
     // Lightweight ping just to check if alerts are enabled — used to color
     // the bell icon (gray when off, brand-teal when on). The full config
     // is loaded inside the dialog when opened.
@@ -56,6 +52,29 @@ export default function IntelligencePage() {
       .then(d => { if (d?.schedule) setScheduleEnabled(!!d.schedule.is_enabled); })
       .catch(() => {});
   }, [alertsDialogOpen, scheduleDialogOpen]);
+
+  // Cost summary: refetch on mount, on tab focus, and every 5 min while
+  // mounted. The previous version fetched once on page load and let the
+  // badge go stale during long sessions — annoying when the user just
+  // ran a scan and the chip still shows yesterday's spend. Tab focus
+  // covers the common "switched tabs, came back" case; the interval
+  // covers leaving the page open in the background.
+  useEffect(() => {
+    const fetchCost = () => {
+      fetch('/api/agents/cost-summary')
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d && typeof d.total_cost_usd === 'number') setCost(d); })
+        .catch(() => {});
+    };
+    fetchCost();
+    const onFocus = () => fetchCost();
+    window.addEventListener('focus', onFocus);
+    const interval = setInterval(fetchCost, 5 * 60 * 1000);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
     <div className="space-y-6">

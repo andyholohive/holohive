@@ -156,9 +156,19 @@ export async function GET(request: Request) {
       // prospect lists on Upbit / Bithumb. Used by the UI to render a
       // "LISTED ON UPBIT" badge — the project's no longer "no Korea
       // presence yet" so the BD angle has to change.
+      //
+      // The non-namespaced trio holds the MOST RECENT listing (across
+      // exchanges). The per-exchange fields preserve history so a
+      // Bithumb listing today doesn't erase the Upbit listing from
+      // last week — important for prospects that listed on multiple
+      // venues (the BD team needs to know the full picture).
       post_korea_listing_at: snap.post_korea_listing_at ?? null,
       post_korea_listing_exchange: snap.post_korea_listing_exchange ?? null,
       post_korea_listing_market_pair: snap.post_korea_listing_market_pair ?? null,
+      post_korea_listing_upbit_at: snap.post_korea_listing_upbit_at ?? null,
+      post_korea_listing_upbit_market_pair: snap.post_korea_listing_upbit_market_pair ?? null,
+      post_korea_listing_bithumb_at: snap.post_korea_listing_bithumb_at ?? null,
+      post_korea_listing_bithumb_market_pair: snap.post_korea_listing_bithumb_market_pair ?? null,
     };
   });
 

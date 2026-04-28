@@ -202,16 +202,40 @@ export async function GET(request: Request) {
     const signalErrors: string[] = [];
 
     if (!isBaselineRun) {
+      // ── Batch prospect lookup ──
+      // Previous version did a per-listing `.or()` query that string-
+      // interpolated exchange-supplied names directly into the PostgREST
+      // filter expression. That's both a PostgREST-injection risk (a name
+      // containing `,` or `(` breaks the filter parse) AND an N+1 (one
+      // query per listing × up to 50 listings = 50 round-trips).
+      //
+      // Fix: pre-batch a single `.in('symbol', […])` for all proposed
+      // listings, build a symbol→prospect map, then look up locally inside
+      // the loop. We also pull `discovery_snapshot` here so the auto-flag
+      // step below doesn't need a second SELECT for the same prospect.
+      //
+      // We dropped the `name.ilike.${koreanName}` half of the previous
+      // query — it was effectively never useful (Korean exchange names
+      // rarely match Discovery prospect names, which are English/canonical),
+      // and it's the part that was injection-prone.
+      const newSymbols = Array.from(new Set(
+        diff.newListings.map(m => m.symbol).filter((s): s is string => typeof s === 'string' && s.length > 0),
+      ));
+      const prospectBySymbol = new Map<string, { id: string; name: string; discovery_snapshot: any }>();
+      if (newSymbols.length > 0) {
+        const { data: matches } = await (supabase as any)
+          .from('prospects')
+          .select('id, name, symbol, discovery_snapshot')
+          .in('symbol', newSymbols);
+        for (const p of (matches || [])) {
+          if (p.symbol) prospectBySymbol.set(p.symbol, p);
+        }
+      }
+
       // New listings → korea_exchange_listing signals
       for (const m of diff.newListings) {
         try {
-          // Look for matching prospect by symbol
-          const { data: prospect } = await (supabase as any)
-            .from('prospects')
-            .select('id, name')
-            .or(`symbol.ilike.${m.symbol},name.ilike.${m.korean_name || m.english_name || m.symbol}`)
-            .limit(1)
-            .maybeSingle();
+          const prospect = prospectBySymbol.get(m.symbol) || null;
 
           const projectName =
             m.english_name || m.korean_name || prospect?.name || m.symbol;
@@ -268,19 +292,31 @@ export async function GET(request: Request) {
             // BD team knows the ICP rule #3 ("no Korea presence yet") just
             // got violated. Idempotent because listing_signal_fired_at above
             // gates re-firing for the same (exchange, market_pair).
+            //
+            // We write BOTH a "most recent listing" set of fields (kept for
+            // backward compat with the existing UI badge) AND per-exchange
+            // namespaced fields (post_korea_listing_upbit_*, _bithumb_*).
+            // Without the namespaced ones, a Bithumb listing today would
+            // overwrite the Upbit listing from last week — losing history
+            // the BD team might need.
             if (prospect?.id) {
               try {
-                const { data: current } = await (supabase as any)
-                  .from('prospects')
-                  .select('discovery_snapshot')
-                  .eq('id', prospect.id)
-                  .single();
-                const mergedSnap = {
-                  ...(current?.discovery_snapshot || {}),
+                // discovery_snapshot was pulled in the batch SELECT above —
+                // no extra round-trip needed here.
+                const exKey = m.exchange === 'upbit' ? 'upbit'
+                  : m.exchange === 'bithumb' ? 'bithumb'
+                  : null;
+                const mergedSnap: Record<string, any> = {
+                  ...(prospect.discovery_snapshot || {}),
+                  // "Most recent listing" fields — feed the existing badge.
                   post_korea_listing_at: nowIso,
                   post_korea_listing_exchange: m.exchange,
                   post_korea_listing_market_pair: m.market_pair,
                 };
+                if (exKey) {
+                  mergedSnap[`post_korea_listing_${exKey}_at`] = nowIso;
+                  mergedSnap[`post_korea_listing_${exKey}_market_pair`] = m.market_pair;
+                }
                 await (supabase as any)
                   .from('prospects')
                   .update({
@@ -310,15 +346,29 @@ export async function GET(request: Request) {
         }
       }
 
+      // ── Batch prospect lookup for delistings ──
+      // Same pattern as new-listings above: pre-batch one `.in()` query
+      // instead of one query per delisting. The previous `.ilike(symbol)`
+      // wasn't injection-prone (PostgREST API, not string interp), but it
+      // was still N round-trips for no reason.
+      const delistingSymbols = Array.from(new Set(
+        diff.delisted.map(d => d.symbol).filter((s): s is string => typeof s === 'string' && s.length > 0),
+      ));
+      const delistingProspectBySymbol = new Map<string, { id: string; name: string }>();
+      if (delistingSymbols.length > 0) {
+        const { data: matches } = await (supabase as any)
+          .from('prospects')
+          .select('id, name, symbol')
+          .in('symbol', delistingSymbols);
+        for (const p of (matches || [])) {
+          if (p.symbol) delistingProspectBySymbol.set(p.symbol, { id: p.id, name: p.name });
+        }
+      }
+
       // Delistings → korea_exchange_delisting signals (negative weight)
       for (const d of diff.delisted) {
         try {
-          const { data: prospect } = await (supabase as any)
-            .from('prospects')
-            .select('id, name')
-            .ilike('symbol', d.symbol)
-            .limit(1)
-            .maybeSingle();
+          const prospect = delistingProspectBySymbol.get(d.symbol) || null;
 
           const exchangeLabel = d.exchange === 'upbit' ? 'Upbit' : 'Bithumb';
           const headline = `${d.symbol} delisted from ${exchangeLabel}`;

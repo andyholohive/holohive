@@ -75,6 +75,12 @@ export async function GET(
       post_korea_listing_at: snap.post_korea_listing_at ?? null,
       post_korea_listing_exchange: snap.post_korea_listing_exchange ?? null,
       post_korea_listing_market_pair: snap.post_korea_listing_market_pair ?? null,
+      // Per-exchange history (non-namespaced fields above hold the most
+      // recent listing only; these preserve the full picture per exchange).
+      post_korea_listing_upbit_at: snap.post_korea_listing_upbit_at ?? null,
+      post_korea_listing_upbit_market_pair: snap.post_korea_listing_upbit_market_pair ?? null,
+      post_korea_listing_bithumb_at: snap.post_korea_listing_bithumb_at ?? null,
+      post_korea_listing_bithumb_market_pair: snap.post_korea_listing_bithumb_market_pair ?? null,
     },
     signals: signals || [],
     runs: runs || [],
