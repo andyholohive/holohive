@@ -32,6 +32,13 @@ const PUBLIC_API_PREFIXES = [
   '/api/webhooks/',              // External integration webhooks
   '/api/forms/submit',           // Public form intake
   '/api/version',                // Trivial liveness/version probe
+  // ── MCP (Claude.ai connector) ──
+  // The MCP route validates its own Bearer token against
+  // mcp_oauth_access_tokens; OAuth endpoints are public by RFC design.
+  // Without these allowed, Claude.ai can't authenticate (no Supabase
+  // session cookie on cross-origin requests from Anthropic's servers).
+  '/api/mcp/',                   // bearer-token-gated by lib/mcp/auth.ts
+  '/api/oauth/',                 // OAuth 2.0 token + DCR endpoints
 ];
 
 function isPublicApi(pathname: string): boolean {
