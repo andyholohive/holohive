@@ -37,6 +37,90 @@ export const maxDuration = 300;
  */
 
 // ────────────────────────────────────────────────────────────────────
+// Retry helper for Anthropic API calls
+// ────────────────────────────────────────────────────────────────────
+
+/**
+ * Wrap anthropic.messages.create() with automatic retry for transient
+ * failures. Two specific failure modes were observed in production
+ * (Apr 22):
+ *
+ *   1. 429 rate_limit_error — Opus + parallel Stage 2 batches can
+ *      exceed the org's 30K input-tokens-per-minute cap. The whole
+ *      scan failed because one batch threw; the retry catches this
+ *      and waits long enough for the bucket to refill.
+ *
+ *   2. The tool wasn't called — model returned text instead of
+ *      invoking submit_candidates / submit_enrichments. Rare, but
+ *      when it happens we silently get 0 candidates from a paid call.
+ *      One automatic retry usually fixes it.
+ *
+ * Exponential backoff: 5s → 15s → 45s. Max 3 attempts. Anything other
+ * than the two known transient cases throws on the first attempt — no
+ * point retrying a 401 or a malformed request.
+ *
+ * `expectToolName` is the name of the tool Claude is supposed to call.
+ * If it's set and the response has no tool_use block with that name,
+ * we retry as if the call had failed.
+ */
+async function callAnthropicWithRetry(
+  anthropic: any,
+  request: any,
+  expectToolName?: string,
+): Promise<any> {
+  const MAX_ATTEMPTS = 3;
+  const BACKOFF_MS = [5_000, 15_000, 45_000];
+  let lastError: any = null;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      const response = await anthropic.messages.create(request);
+
+      // If we expected a specific tool to be called, verify it actually was.
+      // The model occasionally returns plain text instead of a tool_use,
+      // which causes downstream "0 candidates returned" on a paid call.
+      if (expectToolName) {
+        const hasToolCall = (response.content || []).some(
+          (b: any) => b.type === 'tool_use' && b.name === expectToolName,
+        );
+        if (!hasToolCall) {
+          if (attempt < MAX_ATTEMPTS - 1) {
+            console.warn(`[Discovery scan] Model didn't call ${expectToolName} on attempt ${attempt + 1}, retrying in ${BACKOFF_MS[attempt]}ms`);
+            await new Promise(r => setTimeout(r, BACKOFF_MS[attempt]));
+            continue;
+          }
+          // Out of retries — return the response anyway; the caller's
+          // existing fallback (empty list) will still kick in.
+        }
+      }
+
+      return response;
+    } catch (err: any) {
+      lastError = err;
+      // 429 = rate limit. The Anthropic SDK surfaces this as `status: 429`
+      // OR an error message containing "rate_limit". Detect either.
+      const is429 =
+        err?.status === 429 ||
+        /rate.?limit/i.test(String(err?.message ?? ''));
+
+      if (is429 && attempt < MAX_ATTEMPTS - 1) {
+        const wait = BACKOFF_MS[attempt];
+        console.warn(`[Discovery scan] 429 rate-limited on attempt ${attempt + 1}, sleeping ${wait}ms before retry`);
+        await new Promise(r => setTimeout(r, wait));
+        continue;
+      }
+
+      // Anything else (auth, malformed request, etc.) — fail fast.
+      throw err;
+    }
+  }
+
+  // If we fell out of the loop because we ran out of retries on a 429,
+  // re-throw the last error so the caller knows we gave up.
+  throw lastError ?? new Error('callAnthropicWithRetry exhausted retries');
+}
+
+// ────────────────────────────────────────────────────────────────────
 // Types
 // ────────────────────────────────────────────────────────────────────
 
@@ -290,22 +374,30 @@ Call submit_candidates when done.`;
   // source costs ~4 searches (scan + verify a couple of candidates).
   const searchBudget = 10 + (params.sources.length - 1) * 4;
 
-  const response = await anthropic.messages.create({
-    model,
-    max_tokens: 6000,
-    system: [
-      {
-        type: 'text',
-        text: systemPromptText,
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    messages: [{ role: 'user', content: userPrompt }],
-    tools: [
-      { type: 'web_search_20250305', name: 'web_search', max_uses: searchBudget } as any,
-      candidatesTool as any,
-    ],
-  });
+  // Wrapped in retry helper to recover from 429 rate-limits (Opus +
+  // parallel batches can spike past the org token-per-minute cap) and
+  // the rare case where the model returns text instead of calling
+  // submit_candidates. See callAnthropicWithRetry above.
+  const response = await callAnthropicWithRetry(
+    anthropic,
+    {
+      model,
+      max_tokens: 6000,
+      system: [
+        {
+          type: 'text',
+          text: systemPromptText,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [{ role: 'user', content: userPrompt }],
+      tools: [
+        { type: 'web_search_20250305', name: 'web_search', max_uses: searchBudget } as any,
+        candidatesTool as any,
+      ],
+    },
+    'submit_candidates',
+  );
 
   const submitBlock = response.content.find(
     (b: any) => b.type === 'tool_use' && b.name === 'submit_candidates',
@@ -565,28 +657,36 @@ ${candidateList}
 
 Call submit_enrichments when done.`;
 
-  const response = await anthropic.messages.create({
-    model,
-    max_tokens: 8000,
-    system: [
-      {
-        type: 'text',
-        text: ENRICHMENT_SYSTEM_PROMPT,
-        // Ephemeral cache (5 min TTL). Since all parallel batches use the same
-        // system block, the first batch writes the cache and the rest read at
-        // ~10% cost. Across a single scan this is a real saving.
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    messages: [{ role: 'user', content: userPrompt }],
-    tools: [
-      // 12 searches per batch: ~2 for X-account triggers, ~2 for article cross-
-      // check, ~3 for POC discovery (team page + X bios + crypto dirs), ~2 for
-      // the top POC's personal feed check (Korea/Asia mentions), plus slack.
-      { type: 'web_search_20250305', name: 'web_search', max_uses: 12 } as any,
-      enrichmentsTool as any,
-    ],
-  });
+  // Wrapped in retry helper. Stage 2 is the most rate-limit-prone call
+  // because parallel batches all hit Anthropic at the same time — the
+  // Apr 22 429 was on this exact path. callAnthropicWithRetry catches
+  // it, sleeps with exponential backoff, and tries again.
+  const response = await callAnthropicWithRetry(
+    anthropic,
+    {
+      model,
+      max_tokens: 8000,
+      system: [
+        {
+          type: 'text',
+          text: ENRICHMENT_SYSTEM_PROMPT,
+          // Ephemeral cache (5 min TTL). Since all parallel batches use the same
+          // system block, the first batch writes the cache and the rest read at
+          // ~10% cost. Across a single scan this is a real saving.
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [{ role: 'user', content: userPrompt }],
+      tools: [
+        // 12 searches per batch: ~2 for X-account triggers, ~2 for article cross-
+        // check, ~3 for POC discovery (team page + X bios + crypto dirs), ~2 for
+        // the top POC's personal feed check (Korea/Asia mentions), plus slack.
+        { type: 'web_search_20250305', name: 'web_search', max_uses: 12 } as any,
+        enrichmentsTool as any,
+      ],
+    },
+    'submit_enrichments',
+  );
 
   const submitBlock = response.content.find(
     (b: any) => b.type === 'tool_use' && b.name === 'submit_enrichments',
