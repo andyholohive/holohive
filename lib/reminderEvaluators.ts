@@ -232,7 +232,26 @@ async function crmFollowup(
   const threshold = params.threshold_days || 7;
   const cutoff = daysAgo(threshold);
 
-  const closedStages = ['closed_won', 'closed_lost', 'disqualified'];
+  // Mirror the comprehensive closed-stage list used by the
+  // crm_followups_due MCP tool. The previous list (closed_won /
+  // closed_lost / disqualified) missed:
+  //   - v2_closed_won / v2_closed_lost (the v2 sales pipeline stages
+  //     used by ~30+ rows in prod — most "lost" deals live here, not
+  //     in plain "closed_lost")
+  //   - dead, unqualified (Lead pipeline terminal states)
+  //   - account_churned (Account pipeline terminal)
+  // Without these, the daily reminder would over-flag terminal deals
+  // as "needing follow-up" — the exact noise this rule is meant to avoid.
+  const closedStages = [
+    'closed_won',
+    'closed_lost',
+    'v2_closed_won',
+    'v2_closed_lost',
+    'dead',
+    'unqualified',
+    'disqualified',
+    'account_churned',
+  ];
 
   const { data: opps } = await supabase
     .from('crm_opportunities')

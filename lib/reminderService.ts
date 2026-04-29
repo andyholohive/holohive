@@ -215,6 +215,12 @@ export async function runReminders(
     // Skip rules that shouldn't run today (unless testing)
     if (!testRuleType && !shouldRunToday(rule)) continue;
 
+    // Skip unconfigured rules — the seed migration uses PLACEHOLDER_CHAT_ID
+    // for rules the user hasn't routed to a real chat yet. We don't want
+    // to evaluate (or worse, spam Telegram with) these. testRuleType still
+    // runs them so the user can verify the evaluator works locally.
+    if (!testRuleType && (!rule.telegram_chat_id || rule.telegram_chat_id === 'PLACEHOLDER_CHAT_ID')) continue;
+
     const start = Date.now();
     const evaluator = evaluators[rule.rule_type];
 
@@ -253,14 +259,24 @@ export async function runReminders(
       const messages = formatMessage(rule.name, rule.rule_type, result.items, customTemplate);
       let sent = true;
 
-      for (const msg of messages) {
-        const success = await TelegramService.sendToChat(
-          rule.telegram_chat_id,
-          msg,
-          'HTML',
-          rule.telegram_thread_id || undefined
-        );
-        if (!success) sent = false;
+      // PLACEHOLDER_CHAT_ID = unconfigured rule. In test mode (test_rule=...)
+      // we still evaluate so the user can verify the query, but we DON'T
+      // actually call Telegram with a bogus chat_id (which would 400 and
+      // be confusing in the log).
+      const isPlaceholder = !rule.telegram_chat_id || rule.telegram_chat_id === 'PLACEHOLDER_CHAT_ID';
+
+      if (isPlaceholder) {
+        sent = false;
+      } else {
+        for (const msg of messages) {
+          const success = await TelegramService.sendToChat(
+            rule.telegram_chat_id,
+            msg,
+            'HTML',
+            rule.telegram_thread_id || undefined
+          );
+          if (!success) sent = false;
+        }
       }
 
       results.push({
