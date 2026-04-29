@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { mcpAuthStorage } from './context';
 
 /**
  * Tool definitions for the HoloHive MCP server.
@@ -232,7 +233,7 @@ export const searchKolsSchema = {
   region: z.string().optional()
     .describe('Optional region filter (e.g. "Korea", "Global").'),
   tier: z.string().optional()
-    .describe('Optional tier filter (e.g. "S", "A", "B", "C").'),
+    .describe('Optional exact tier filter. Vocabulary: "Tier S", "Tier 1", "Tier 2", "Tier 3".'),
   limit: z.number().int().min(1).max(50).default(20),
 };
 
@@ -823,5 +824,602 @@ export async function getPromotedOpportunityForProspect(
   out.push(`Promoted: ${relTime(opp.created_at)}`);
   out.push('');
   out.push(`Use get_opportunity_detail with id=${opp.id} for the full record.`);
+  return out.join('\n');
+}
+
+// ─── Tool: list_clients (the paying customers) ───────────────────────
+//
+// Distinct from CRM opportunities — clients are the actual contracted
+// customers. An opportunity can be promoted into a campaign for an
+// existing client, but the client roster itself is its own table.
+
+export const listClientsSchema = {
+  active_only: z.boolean().default(true)
+    .describe('When true (default), only return non-archived active clients. Set false to include archived/inactive.'),
+  search: z.string().optional()
+    .describe('Optional case-insensitive name substring search.'),
+  limit: z.number().int().min(1).max(100).default(50),
+};
+
+export async function listClients(
+  supabase: SupabaseClient,
+  args: { active_only: boolean; search?: string; limit: number },
+): Promise<string> {
+  let q = (supabase as any)
+    .from('clients')
+    .select('id, name, email, location, source, is_active, archived_at, onboarding_call_held, onboarding_call_date, created_at')
+    .order('name', { ascending: true })
+    .limit(args.limit);
+
+  if (args.active_only) {
+    q = q.is('archived_at', null).eq('is_active', true);
+  }
+  if (args.search) {
+    q = q.ilike('name', `%${args.search}%`);
+  }
+
+  const { data, error } = await q;
+  if (error) return `Error: ${error.message}`;
+  const rows = (data || []) as any[];
+  if (rows.length === 0) return `No clients match.`;
+
+  const lines = rows.map(c => {
+    const status = !c.is_active ? ' [inactive]' : c.archived_at ? ' [archived]' : '';
+    const onboard = c.onboarding_call_held ? '✓ onboarded' : c.onboarding_call_date ? `onboarding ${c.onboarding_call_date}` : 'not onboarded';
+    return `• ${c.name}${status} — ${c.location || '—'} · ${c.email} · ${onboard}`;
+  });
+  return `${rows.length} client(s):\n\n${lines.join('\n')}`;
+}
+
+// ─── Tool: get_client_detail ──────────────────────────────────────────
+
+export const getClientDetailSchema = {
+  client_id: z.string().uuid().describe('Client UUID (from list_clients).'),
+};
+
+export async function getClientDetail(
+  supabase: SupabaseClient,
+  args: { client_id: string },
+): Promise<string> {
+  const { data: c, error } = await (supabase as any)
+    .from('clients')
+    .select('*')
+    .eq('id', args.client_id)
+    .single();
+  if (error || !c) return `Client not found: ${args.client_id}`;
+
+  // Counts of related entities (cheap aggregates, no row payloads)
+  const [campaignsRes, oppsRes] = await Promise.all([
+    (supabase as any)
+      .from('campaigns')
+      .select('id, name, status', { count: 'exact' })
+      .eq('client_id', args.client_id)
+      .is('archived_at', null),
+    (supabase as any)
+      .from('crm_opportunities')
+      .select('id', { count: 'exact', head: true })
+      .eq('client_id', args.client_id),
+  ]);
+
+  const campaigns = (campaignsRes.data || []) as any[];
+  const oppCount = oppsRes.count ?? 0;
+
+  const out: string[] = [];
+  out.push(`## ${c.name}`);
+  out.push('');
+  out.push(`**Status:** ${c.is_active ? 'Active' : 'Inactive'}${c.archived_at ? ' · archived' : ''}`);
+  out.push(`**Email:** ${c.email}`);
+  if (c.location) out.push(`**Location:** ${c.location}`);
+  if (c.source) out.push(`**Source:** ${c.source}`);
+  if (c.onboarding_call_date) {
+    out.push(`**Onboarding call:** ${c.onboarding_call_date}${c.onboarding_call_held ? ' (held ✓)' : ' (scheduled)'}`);
+  }
+  out.push(`**Created:** ${relTime(c.created_at)}`);
+  out.push('');
+  out.push(`**Active campaigns:** ${campaigns.filter(x => x.status !== 'closed').length} of ${campaigns.length} total`);
+  for (const camp of campaigns.slice(0, 10)) {
+    out.push(`  · ${camp.name} [${camp.status}]`);
+  }
+  out.push('');
+  out.push(`**CRM opportunities linked:** ${oppCount}`);
+  out.push('');
+  out.push(`Use summarize_client(${c.id}) for the full picture (includes campaigns + payments + delivery logs).`);
+  return out.join('\n');
+}
+
+// ─── Tool: summarize_client (the killer multi-surface summary) ────────
+//
+// One-shot answer to "what's the state of <client>?" — pulls campaigns,
+// active opportunities, payment status, and recent delivery log entries
+// in parallel so Claude gets a holistic view in a single tool call.
+
+export const summarizeClientSchema = {
+  client_id: z.string().uuid().describe('Client UUID (from list_clients).'),
+  delivery_log_days: z.number().int().min(1).max(180).default(30)
+    .describe('Look-back window for client_delivery_log entries (default 30 days).'),
+};
+
+export async function summarizeClient(
+  supabase: SupabaseClient,
+  args: { client_id: string; delivery_log_days: number },
+): Promise<string> {
+  const sinceCdl = new Date(Date.now() - args.delivery_log_days * 86_400_000).toISOString();
+
+  // All four fetches in parallel — they're independent.
+  const [clientRes, campaignsRes, oppsRes, deliveryRes] = await Promise.all([
+    (supabase as any).from('clients').select('*').eq('id', args.client_id).single(),
+    (supabase as any).from('campaigns').select('id, name, status, start_date, end_date, total_budget, manager').eq('client_id', args.client_id).is('archived_at', null).order('start_date', { ascending: false }).limit(20),
+    (supabase as any).from('crm_opportunities').select('id, name, stage, deal_value, currency, last_contacted_at, composite_score').eq('client_id', args.client_id).limit(20),
+    (supabase as any).from('client_delivery_log').select('action, work_type, who, method, notes, logged_at').eq('client_id', args.client_id).gte('logged_at', sinceCdl).order('logged_at', { ascending: false }).limit(15),
+  ]);
+
+  const c = clientRes.data;
+  if (!c) return `Client not found: ${args.client_id}`;
+  const campaigns = (campaignsRes.data || []) as any[];
+  const opps = (oppsRes.data || []) as any[];
+  const deliveryLogs = (deliveryRes.data || []) as any[];
+
+  // Pull payment summary across all this client's campaigns in one query
+  const campaignIds = campaigns.map(x => x.id);
+  let paymentSummary: { paid: number; pending: number; total: number } = { paid: 0, pending: 0, total: 0 };
+  if (campaignIds.length > 0) {
+    const { data: payments } = await (supabase as any)
+      .from('payments')
+      .select('amount, payment_date')
+      .in('campaign_id', campaignIds);
+    for (const p of (payments || []) as any[]) {
+      paymentSummary.total += Number(p.amount) || 0;
+      if (p.payment_date) paymentSummary.paid += Number(p.amount) || 0;
+      else paymentSummary.pending += Number(p.amount) || 0;
+    }
+  }
+
+  const out: string[] = [];
+  out.push(`# ${c.name}`);
+  out.push('');
+  out.push(`**Status:** ${c.is_active ? 'Active' : 'Inactive'}${c.archived_at ? ' · archived' : ''}  ·  **Location:** ${c.location || '—'}  ·  **Email:** ${c.email}`);
+  if (c.onboarding_call_date) {
+    out.push(`**Onboarding:** ${c.onboarding_call_date}${c.onboarding_call_held ? ' ✓ held' : ' (scheduled)'}`);
+  }
+  out.push('');
+
+  out.push(`## Campaigns (${campaigns.length})`);
+  if (campaigns.length === 0) {
+    out.push('  No active campaigns.');
+  } else {
+    for (const camp of campaigns) {
+      out.push(`  · ${camp.name} [${camp.status}] — ${formatMoney(camp.total_budget)} · mgr: ${camp.manager || '—'} · ${camp.start_date} → ${camp.end_date || 'open'}`);
+    }
+  }
+  out.push('');
+
+  out.push(`## Payments (across ${campaignIds.length} campaign(s))`);
+  out.push(`  Paid: ${formatMoney(paymentSummary.paid)}  ·  Pending: ${formatMoney(paymentSummary.pending)}  ·  Total: ${formatMoney(paymentSummary.total)}`);
+  out.push('');
+
+  out.push(`## CRM opportunities linked (${opps.length})`);
+  if (opps.length === 0) {
+    out.push('  None.');
+  } else {
+    for (const o of opps.slice(0, 10)) {
+      const value = o.deal_value ? ` · ${formatMoney(o.deal_value)}` : '';
+      const lastContact = o.last_contacted_at ? ` · contacted ${relTime(o.last_contacted_at)}` : ' · never contacted';
+      out.push(`  · ${o.name} [${o.stage}]${value}${lastContact}`);
+    }
+  }
+  out.push('');
+
+  out.push(`## Delivery log — last ${args.delivery_log_days}d (${deliveryLogs.length})`);
+  if (deliveryLogs.length === 0) {
+    out.push('  No delivery log entries in this window.');
+  } else {
+    for (const d of deliveryLogs) {
+      const who = d.who ? ` by ${d.who}` : '';
+      const note = d.notes ? `: ${d.notes.slice(0, 80)}` : '';
+      out.push(`  · ${d.action} (${d.work_type})${who}${note} — ${relTime(d.logged_at)}`);
+    }
+  }
+
+  return out.join('\n');
+}
+
+// ─── Tool: get_campaign_detail ───────────────────────────────────────
+
+export const getCampaignDetailSchema = {
+  campaign_id: z.string().uuid().describe('Campaign UUID (from list_active_campaigns).'),
+};
+
+export async function getCampaignDetail(
+  supabase: SupabaseClient,
+  args: { campaign_id: string },
+): Promise<string> {
+  // Campaign + linked client name + roster size + payment summary in parallel
+  const [campRes, kolsRes, paymentsRes] = await Promise.all([
+    (supabase as any).from('campaigns').select('*, clients(name, email, location)').eq('id', args.campaign_id).single(),
+    (supabase as any).from('campaign_kols').select('id, hh_status, client_status, allocated_budget, paid', { count: 'exact' }).eq('campaign_id', args.campaign_id),
+    (supabase as any).from('payments').select('amount, payment_date').eq('campaign_id', args.campaign_id),
+  ]);
+
+  const c = campRes.data;
+  if (!c) return `Campaign not found: ${args.campaign_id}`;
+  const kols = (kolsRes.data || []) as any[];
+  const payments = (paymentsRes.data || []) as any[];
+
+  // Aggregate KOL roster status
+  const hhStatus: Record<string, number> = {};
+  const clientStatus: Record<string, number> = {};
+  let totalAllocated = 0;
+  let totalPaid = 0;
+  for (const k of kols) {
+    hhStatus[k.hh_status || 'untriaged'] = (hhStatus[k.hh_status || 'untriaged'] || 0) + 1;
+    clientStatus[k.client_status || 'untriaged'] = (clientStatus[k.client_status || 'untriaged'] || 0) + 1;
+    totalAllocated += Number(k.allocated_budget) || 0;
+    totalPaid += Number(k.paid) || 0;
+  }
+
+  // Aggregate payment status
+  let paymentTotal = 0, paymentPaid = 0, paymentPending = 0;
+  for (const p of payments) {
+    paymentTotal += Number(p.amount) || 0;
+    if (p.payment_date) paymentPaid += Number(p.amount) || 0;
+    else paymentPending += Number(p.amount) || 0;
+  }
+
+  const out: string[] = [];
+  out.push(`## ${c.name}`);
+  out.push('');
+  out.push(`**Client:** ${c.clients?.name || '—'} (${c.clients?.location || '—'})`);
+  out.push(`**Status:** ${c.status}  ·  **Region:** ${c.region || '—'}  ·  **Manager:** ${c.manager || '—'}`);
+  out.push(`**Dates:** ${c.start_date} → ${c.end_date || 'open'}`);
+  out.push(`**Budget:** ${formatMoney(c.total_budget)}${Array.isArray(c.budget_type) && c.budget_type.length ? ` (${c.budget_type.join(', ')})` : ''}`);
+  if (c.intro_call != null) out.push(`**Intro call:** ${c.intro_call ? '✓' : '—'}${c.intro_call_date ? ` (${c.intro_call_date})` : ''}`);
+  if (c.nda_signed != null) out.push(`**NDA signed:** ${c.nda_signed ? '✓' : '—'}`);
+  if (c.proposal_sent != null) out.push(`**Proposal sent:** ${c.proposal_sent ? '✓' : '—'}`);
+  out.push('');
+
+  out.push(`## KOL roster (${kols.length})`);
+  out.push(`  Allocated budget: ${formatMoney(totalAllocated)}  ·  Paid: ${formatMoney(totalPaid)}`);
+  if (Object.keys(hhStatus).length > 0) {
+    out.push(`  HH status: ${Object.entries(hhStatus).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+  }
+  if (Object.keys(clientStatus).length > 0) {
+    out.push(`  Client status: ${Object.entries(clientStatus).map(([k, v]) => `${k}=${v}`).join(', ')}`);
+  }
+  out.push('');
+
+  out.push(`## Payments (${payments.length})`);
+  out.push(`  Paid: ${formatMoney(paymentPaid)}  ·  Pending: ${formatMoney(paymentPending)}  ·  Total: ${formatMoney(paymentTotal)}`);
+  out.push('');
+
+  out.push(`Use list_campaign_kols(${c.id}) for the roster, get_campaign_payments(${c.id}) for payment line items.`);
+  if (c.description) {
+    out.push('');
+    out.push(`**Description:** ${c.description}`);
+  }
+  return out.join('\n');
+}
+
+// ─── Tool: list_campaign_kols (roster for one campaign) ──────────────
+
+export const listCampaignKolsSchema = {
+  campaign_id: z.string().uuid().describe('Campaign UUID.'),
+  status_filter: z.enum(['any', 'pending', 'confirmed', 'completed', 'rejected'])
+    .default('any')
+    .describe('Optional hh_status filter — pending/confirmed/etc. "any" returns all.'),
+  limit: z.number().int().min(1).max(100).default(50),
+};
+
+export async function listCampaignKols(
+  supabase: SupabaseClient,
+  args: { campaign_id: string; status_filter: string; limit: number },
+): Promise<string> {
+  let q = (supabase as any)
+    .from('campaign_kols')
+    .select('id, hh_status, client_status, allocated_budget, paid, hidden, master_kols(id, name, tier, region, followers, link, platform)')
+    .eq('campaign_id', args.campaign_id)
+    .order('allocated_budget', { ascending: false, nullsFirst: false })
+    .limit(args.limit);
+
+  if (args.status_filter !== 'any') {
+    q = q.eq('hh_status', args.status_filter);
+  }
+
+  const { data, error } = await q;
+  if (error) return `Error: ${error.message}`;
+  const rows = (data || []) as any[];
+  if (rows.length === 0) return `No KOLs match this filter on the campaign.`;
+
+  const fmtFollowers = (n: number | null) => {
+    if (n == null) return '—';
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+    return String(n);
+  };
+
+  const lines = rows.map(r => {
+    const k = r.master_kols || {};
+    const budget = r.allocated_budget ? ` · ${formatMoney(r.allocated_budget)}` : '';
+    const paid = r.paid ? ` paid:${formatMoney(r.paid)}` : '';
+    const status = `[hh:${r.hh_status || 'untriaged'} · client:${r.client_status || 'untriaged'}]`;
+    const hidden = r.hidden ? ' (hidden)' : '';
+    return `• ${k.name || '?'} — ${k.tier || '?'} tier · ${fmtFollowers(k.followers)} followers · ${k.region || '—'} ${status}${budget}${paid}${hidden}`;
+  });
+  return `${rows.length} KOL(s) in this campaign:\n\n${lines.join('\n')}`;
+}
+
+// ─── Tool: get_campaign_payments ─────────────────────────────────────
+
+export const getCampaignPaymentsSchema = {
+  campaign_id: z.string().uuid().describe('Campaign UUID.'),
+  status: z.enum(['any', 'paid', 'pending']).default('any')
+    .describe('Filter to paid (payment_date set) or pending (payment_date null). "any" returns both.'),
+};
+
+export async function getCampaignPayments(
+  supabase: SupabaseClient,
+  args: { campaign_id: string; status: 'any' | 'paid' | 'pending' },
+): Promise<string> {
+  const { data, error } = await (supabase as any)
+    .from('payments')
+    .select('id, amount, payment_method, payment_category, payment_date, recipient_name, notes, transaction_id, campaign_kol_id, created_at')
+    .eq('campaign_id', args.campaign_id)
+    .order('payment_date', { ascending: false, nullsFirst: true })
+    .limit(100);
+
+  if (error) return `Error: ${error.message}`;
+  let rows = (data || []) as any[];
+  if (args.status === 'paid') rows = rows.filter(r => r.payment_date);
+  else if (args.status === 'pending') rows = rows.filter(r => !r.payment_date);
+  if (rows.length === 0) return `No ${args.status === 'any' ? '' : args.status + ' '}payments found.`;
+
+  let totalPaid = 0, totalPending = 0;
+  for (const r of rows) {
+    if (r.payment_date) totalPaid += Number(r.amount) || 0;
+    else totalPending += Number(r.amount) || 0;
+  }
+
+  const lines = rows.map(r => {
+    const status = r.payment_date ? `✓ paid ${r.payment_date}` : '○ pending';
+    const recipient = r.recipient_name ? ` → ${r.recipient_name}` : '';
+    const method = r.payment_method ? ` · ${r.payment_method}` : '';
+    const cat = r.payment_category ? ` (${r.payment_category})` : '';
+    return `• ${formatMoney(r.amount)}${recipient}${method}${cat} — ${status}`;
+  });
+
+  return `${rows.length} payment(s) — paid ${formatMoney(totalPaid)} · pending ${formatMoney(totalPending)}:\n\n${lines.join('\n')}`;
+}
+
+// ─── Tool: list_top_kols (filtered ranking, no name needed) ──────────
+//
+// Complement to search_kols — search_kols requires a query string.
+// list_top_kols answers "show me the best KOLs matching <criteria>"
+// without needing to know any specific name. Sorted by followers desc.
+
+export const listTopKolsSchema = {
+  region: z.string().optional()
+    .describe('Region filter (e.g. "Korea", "Global"). Case-insensitive substring.'),
+  tier: z.string().optional()
+    .describe('Exact tier match. Vocabulary in this database: "Tier S", "Tier 1", "Tier 2", "Tier 3" (top → bottom).'),
+  niche: z.string().optional()
+    .describe('Niche substring match (e.g. "DeFi", "GameFi", "L1").'),
+  platform: z.string().optional()
+    .describe('Platform substring match (e.g. "twitter", "youtube", "tiktok").'),
+  min_followers: z.number().int().min(0).optional()
+    .describe('Minimum follower count.'),
+  in_house_only: z.boolean().default(false)
+    .describe('When true, only return in-house KOLs (in_house field is set).'),
+  limit: z.number().int().min(1).max(100).default(25),
+};
+
+export async function listTopKols(
+  supabase: SupabaseClient,
+  args: {
+    region?: string; tier?: string; niche?: string; platform?: string;
+    min_followers?: number; in_house_only: boolean; limit: number;
+  },
+): Promise<string> {
+  let q = (supabase as any)
+    .from('master_kols')
+    .select('id, name, region, tier, followers, niche, platform, content_type, in_house, link, pricing, rating')
+    .is('archived_at', null)
+    .order('followers', { ascending: false, nullsFirst: false })
+    .limit(args.limit * 2); // over-fetch to allow client-side niche/platform filtering on array columns
+
+  if (args.region) q = q.ilike('region', `%${args.region}%`);
+  if (args.tier) q = q.eq('tier', args.tier);
+  if (args.min_followers != null) q = q.gte('followers', args.min_followers);
+  if (args.in_house_only) q = q.not('in_house', 'is', null);
+
+  const { data, error } = await q;
+  if (error) return `Error: ${error.message}`;
+  let rows = (data || []) as any[];
+
+  // niche and platform are TEXT[] columns — filter client-side because
+  // PostgREST array containment with ILIKE inside is awkward to express
+  // safely. The over-fetch above absorbs the filter loss.
+  if (args.niche) {
+    const t = args.niche.toLowerCase();
+    rows = rows.filter(r => Array.isArray(r.niche) && r.niche.some((n: string) => n.toLowerCase().includes(t)));
+  }
+  if (args.platform) {
+    const t = args.platform.toLowerCase();
+    rows = rows.filter(r => Array.isArray(r.platform) && r.platform.some((p: string) => p.toLowerCase().includes(t)));
+  }
+  rows = rows.slice(0, args.limit);
+
+  if (rows.length === 0) {
+    const filters = [
+      args.region && `region~"${args.region}"`,
+      args.tier && `tier=${args.tier}`,
+      args.niche && `niche~"${args.niche}"`,
+      args.platform && `platform~"${args.platform}"`,
+      args.min_followers != null && `followers≥${args.min_followers}`,
+      args.in_house_only && 'in-house',
+    ].filter(Boolean).join(', ');
+    return `No KOLs match: ${filters}`;
+  }
+
+  const fmtFollowers = (n: number | null) => {
+    if (n == null) return '—';
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+    return String(n);
+  };
+
+  const lines = rows.map(k => {
+    const niches = Array.isArray(k.niche) && k.niche.length ? ` · ${k.niche.slice(0, 3).join('/')}` : '';
+    const plats = Array.isArray(k.platform) && k.platform.length ? ` · ${k.platform.join('+')}` : '';
+    const inHouse = k.in_house ? ` · in-house: ${k.in_house}` : '';
+    const rating = k.rating != null ? ` · ★${k.rating}` : '';
+    return `• ${k.name} — ${k.tier || '?'} tier · ${fmtFollowers(k.followers)} followers · ${k.region || '—'}${niches}${plats}${inHouse}${rating}`;
+  });
+  return `${rows.length} KOL(s):\n\n${lines.join('\n')}`;
+}
+
+// ─── Tool: get_kol_detail ─────────────────────────────────────────────
+
+export const getKolDetailSchema = {
+  kol_id: z.string().uuid().describe('Master KOL UUID (from list_top_kols or search_kols).'),
+};
+
+export async function getKolDetail(
+  supabase: SupabaseClient,
+  args: { kol_id: string },
+): Promise<string> {
+  const { data: k, error } = await (supabase as any)
+    .from('master_kols')
+    .select('*')
+    .eq('id', args.kol_id)
+    .single();
+  if (error || !k) return `KOL not found: ${args.kol_id}`;
+
+  const fmtFollowers = (n: number | null) => {
+    if (n == null) return '—';
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+    return String(n);
+  };
+
+  const out: string[] = [];
+  out.push(`## ${k.name}`);
+  out.push('');
+  out.push(`**Tier:** ${k.tier || '?'}  ·  **Region:** ${k.region || '—'}  ·  **Followers:** ${fmtFollowers(k.followers)}`);
+  if (k.rating != null) out.push(`**Rating:** ★${k.rating}/10`);
+  if (Array.isArray(k.platform) && k.platform.length) out.push(`**Platforms:** ${k.platform.join(', ')}`);
+  if (Array.isArray(k.niche) && k.niche.length) out.push(`**Niche:** ${k.niche.join(', ')}`);
+  if (Array.isArray(k.content_type) && k.content_type.length) out.push(`**Content type:** ${k.content_type.join(', ')}`);
+  if (Array.isArray(k.creator_type) && k.creator_type.length) out.push(`**Creator type:** ${k.creator_type.join(', ')}`);
+  if (Array.isArray(k.deliverables) && k.deliverables.length) out.push(`**Deliverables:** ${k.deliverables.join(', ')}`);
+  if (k.pricing) out.push(`**Pricing:** ${k.pricing}`);
+  if (k.in_house) out.push(`**In-house:** ${k.in_house}`);
+  if (k.link) out.push(`**Link:** ${k.link}`);
+  if (k.wallet) out.push(`**Wallet:** ${k.wallet}`);
+  if (k.community != null) out.push(`**Has community:** ${k.community ? 'yes' : 'no'}`);
+  if (k.group_chat != null) out.push(`**Group chat:** ${k.group_chat ? 'yes' : 'no'}`);
+  if (k.description) {
+    out.push('');
+    out.push(`**Description:**  ${k.description}`);
+  }
+  return out.join('\n');
+}
+
+// ─── Tool: log_crm_activity (the one write tool) ─────────────────────
+//
+// Logs a CRM activity (call, message, meeting, etc.) on an opportunity
+// AND bumps the opportunity's last_contacted_at so follow-up tools
+// (crm_followups_due) reflect the contact. This is the workflow-changing
+// tool — instead of "I had a call, I'll log it later" → never logs it,
+// the user can dictate from chat in seconds.
+//
+// IMPORTANT for Claude: ALWAYS confirm with the user before calling this
+// tool. Repeat back the opportunity name (not just the ID), the activity
+// type, the title, and any description. Wait for explicit yes. Tool
+// description below repeats this so the model has context.
+
+export const logCrmActivitySchema = {
+  opportunity_id: z.string().uuid().describe('UUID of the CRM opportunity to log against.'),
+  type: z.enum(['call', 'message', 'meeting', 'proposal', 'note', 'bump'])
+    .describe('Activity type. Use call/meeting for live conversations, message for written outreach, proposal when sending a pricing doc, note for general updates, bump for follow-up nudges.'),
+  title: z.string().min(1).max(200)
+    .describe('Short title for the activity (e.g. "Korean DEX integration discussion", "Bump 3 — checking on contract").'),
+  description: z.string().max(2000).optional()
+    .describe('Optional longer body. Use for meeting notes, key takeaways, decisions made.'),
+  outcome: z.string().max(500).optional()
+    .describe('Optional outcome summary (e.g. "Agreed to terms", "Wants to wait until Q3", "Needs to loop in CEO").'),
+  next_step: z.string().max(500).optional()
+    .describe('Optional next-step description (e.g. "Send proposal by Friday", "Schedule follow-up in 2 weeks").'),
+  next_step_date: z.string().optional()
+    .describe('Optional ISO date for the next step (YYYY-MM-DD).'),
+};
+
+export async function logCrmActivity(
+  supabase: SupabaseClient,
+  args: {
+    opportunity_id: string;
+    type: 'call' | 'message' | 'meeting' | 'proposal' | 'note' | 'bump';
+    title: string;
+    description?: string;
+    outcome?: string;
+    next_step?: string;
+    next_step_date?: string;
+  },
+): Promise<string> {
+  // Sanity: confirm the opportunity exists before writing
+  const { data: opp, error: oppErr } = await (supabase as any)
+    .from('crm_opportunities')
+    .select('id, name, stage, last_contacted_at, last_message_at')
+    .eq('id', args.opportunity_id)
+    .single();
+  if (oppErr || !opp) return `Opportunity not found: ${args.opportunity_id}. Refusing to log.`;
+
+  // Pull the calling user's id from the per-request auth context so the
+  // activity is attributed correctly. If somehow the storage isn't set
+  // (e.g., called outside an MCP request) we fall back to null — the
+  // activity still logs, just without owner attribution.
+  const ctx = mcpAuthStorage.getStore();
+  const ownerId = ctx?.user_id ?? null;
+
+  // Insert the activity row
+  const { data: activity, error: actErr } = await (supabase as any)
+    .from('crm_activities')
+    .insert({
+      opportunity_id: args.opportunity_id,
+      type: args.type,
+      title: args.title,
+      description: args.description ?? null,
+      outcome: args.outcome ?? null,
+      next_step: args.next_step ?? null,
+      next_step_date: args.next_step_date ?? null,
+      owner_id: ownerId,
+    })
+    .select('id, created_at')
+    .single();
+  if (actErr) return `Failed to log activity: ${actErr.message}`;
+
+  // Bump the opportunity's last_contacted_at (and last_message_at for
+  // type='message'). Mirrors what the in-app activity log does. Skip
+  // recalc-temperature — that's a derived score the in-app service
+  // computes; for chat-logged activities it's fine to wait until the
+  // next in-app touch to refresh.
+  const update: any = {
+    last_contacted_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  if (args.type === 'message') {
+    update.last_message_at = new Date().toISOString();
+  }
+  await (supabase as any)
+    .from('crm_opportunities')
+    .update(update)
+    .eq('id', args.opportunity_id);
+
+  // Pretty confirmation back to Claude/user
+  const out: string[] = [];
+  out.push(`✓ Logged ${args.type} on **${opp.name}**`);
+  out.push(`  Title: "${args.title}"`);
+  if (args.outcome) out.push(`  Outcome: ${args.outcome}`);
+  if (args.next_step) out.push(`  Next step: ${args.next_step}${args.next_step_date ? ` (by ${args.next_step_date})` : ''}`);
+  out.push(`  last_contacted_at bumped to now${args.type === 'message' ? '; last_message_at also bumped' : ''}.`);
+  out.push(`  Activity id: ${activity.id}`);
   return out.join('\n');
 }

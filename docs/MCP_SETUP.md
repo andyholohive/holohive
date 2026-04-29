@@ -7,8 +7,9 @@ tabs into HoloHive.
 
 ## What Claude can do once connected
 
-Thirteen read-only tools are exposed, covering Discovery, the Intelligence
-page, the CRM page, KOLs, and Campaigns:
+**Twenty-two tools** are exposed, covering Discovery, Intelligence, CRM,
+Clients, Campaigns, KOLs, and one workflow-changing write tool for
+logging CRM activity from chat.
 
 ### Discovery & Intelligence
 | Tool | What you'd ask Claude |
@@ -26,12 +27,29 @@ page, the CRM page, KOLs, and Campaigns:
 | `get_opportunity_detail` | "Full breakdown on opportunity X — scores, contacts, activity" |
 | `crm_stage_summary` | "Show me my pipeline distribution across all stages" |
 | `crm_followups_due` | "Who haven't I contacted in 7+ days?" |
+| `log_crm_activity` ⚠️ **WRITE** | "I just had a call with Liquid — log it. We discussed Korean DEX integration, they're targeting Q3." (Claude will confirm before writing.) |
 
-### Campaigns & KOLs
+### Clients
+| Tool | What you'd ask Claude |
+|------|------------------------|
+| `list_clients` | "What clients are active? Search for 'Galxe'." |
+| `get_client_detail` | "Quick info on this client — campaigns count, opps count" |
+| `summarize_client` | "Give me everything about Galxe — campaigns, payments, opps, recent delivery logs" |
+
+### Campaigns
 | Tool | What you'd ask Claude |
 |------|------------------------|
 | `list_active_campaigns` | "What campaigns are running right now?" |
-| `search_kols` | "Find any KOLs with 'crypto' in their name in Korea" |
+| `get_campaign_detail` | "Pull up the Solayer campaign — status, KOL roster, payments" |
+| `list_campaign_kols` | "Who's signed on to this campaign? Show only confirmed." |
+| `get_campaign_payments` | "Payment status across this campaign — paid vs pending" |
+
+### KOLs
+| Tool | What you'd ask Claude |
+|------|------------------------|
+| `search_kols` | "Find KOLs with 'crypto' in their name in Korea" |
+| `list_top_kols` | "Top Tier 1 Korean DeFi KOLs with 100K+ followers" (no name needed) |
+| `get_kol_detail` | "Full record on KOL X — pricing, niche, deliverables, link" |
 
 ### Cross-cutting
 | Tool | What you'd ask Claude |
@@ -39,7 +57,14 @@ page, the CRM page, KOLs, and Campaigns:
 | `summarize_pipeline` | "Give me a high-level snapshot — Discovery + CRM + Campaigns" |
 | `get_promoted_opportunity_for_prospect` | "Did Solayer get promoted? What stage is it in?" |
 
-The connector is **read-only** — Claude cannot create, edit, or delete records.
+**21 tools are read-only.** The one write tool (`log_crm_activity`) is
+described to Claude with explicit instructions to **always confirm with
+the user before calling**, repeating back the opportunity name, activity
+type, and content. Claude will ask "log a call on Liquid with note 'Q3
+timeline'?" and wait for "yes" before writing. The activity is logged
+into `crm_activities` with you as `owner_id` (recovered from the OAuth
+token's user binding via AsyncLocalStorage), and the opportunity's
+`last_contacted_at` is bumped automatically.
 
 ---
 
