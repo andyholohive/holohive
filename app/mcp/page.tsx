@@ -1,14 +1,10 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Bot, Search, Copy, Check, Sparkles, Target, Building2, Megaphone, Users,
-  GitBranch, ExternalLink, AlertCircle,
+  GitBranch, AlertCircle,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -346,74 +342,134 @@ const PRO_TIPS = [
 
 // ─── Components ─────────────────────────────────────────────────────────
 
-function CopyChip({ value, label = 'Copy' }: { value: string; label?: string }) {
+/**
+ * Copy-to-clipboard button with visual feedback. Used for prompts AND
+ * the connector URL. Two variants:
+ *   - icon-only (label='') for inline use next to prompt lines
+ *   - full button (label='Copy') for prominent copy targets
+ */
+function CopyButton({ value, variant = 'icon' }: { value: string; variant?: 'icon' | 'full' }) {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
-  const handleCopy = async () => {
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       await navigator.clipboard.writeText(value);
       setCopied(true);
-      toast({ title: 'Copied', description: value.length > 60 ? value.slice(0, 60) + '…' : value });
+      toast({ title: 'Copied', description: value.length > 70 ? value.slice(0, 70) + '…' : value });
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast({ title: 'Copy failed', description: 'Clipboard unavailable', variant: 'destructive' });
     }
   };
+
+  if (variant === 'full') {
+    return (
+      <button
+        onClick={handleCopy}
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-gray-200 bg-white text-gray-700 hover:border-[#3e8692] hover:text-[#3e8692] transition-colors"
+        title="Copy to clipboard"
+      >
+        {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    );
+  }
   return (
     <button
       onClick={handleCopy}
-      className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#3e8692] transition-colors shrink-0"
+      className="opacity-0 group-hover:opacity-100 inline-flex items-center justify-center h-7 w-7 rounded-md text-gray-400 hover:bg-gray-100 hover:text-[#3e8692] transition-all shrink-0"
       title="Copy to clipboard"
     >
-      {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
-      {label}
+      {copied ? <Check className="h-3.5 w-3.5 text-emerald-600 opacity-100" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
   );
 }
 
-const COLOR_CLASSES: Record<ToolGroup['color'], { bg: string; text: string; border: string; ring: string }> = {
-  purple:  { bg: 'bg-purple-50',  text: 'text-purple-700',  border: 'border-purple-200',  ring: 'ring-purple-200/50' },
-  sky:     { bg: 'bg-sky-50',     text: 'text-sky-700',     border: 'border-sky-200',     ring: 'ring-sky-200/50' },
-  amber:   { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   ring: 'ring-amber-200/50' },
-  emerald: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', ring: 'ring-emerald-200/50' },
-  rose:    { bg: 'bg-rose-50',    text: 'text-rose-700',    border: 'border-rose-200',    ring: 'ring-rose-200/50' },
-  lime:    { bg: 'bg-lime-50',    text: 'text-lime-700',    border: 'border-lime-200',    ring: 'ring-lime-200/50' },
+/** Color tokens per surface — extracted so accents stay consistent. */
+const COLOR_CLASSES: Record<ToolGroup['color'], { bg: string; text: string; border: string; iconBg: string; accent: string }> = {
+  purple:  { bg: 'bg-purple-50',  text: 'text-purple-700',  border: 'border-purple-200',  iconBg: 'bg-purple-100',  accent: 'bg-purple-500'  },
+  sky:     { bg: 'bg-sky-50',     text: 'text-sky-700',     border: 'border-sky-200',     iconBg: 'bg-sky-100',     accent: 'bg-sky-500'     },
+  amber:   { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-200',   iconBg: 'bg-amber-100',   accent: 'bg-amber-500'   },
+  emerald: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', iconBg: 'bg-emerald-100', accent: 'bg-emerald-500' },
+  rose:    { bg: 'bg-rose-50',    text: 'text-rose-700',    border: 'border-rose-200',    iconBg: 'bg-rose-100',    accent: 'bg-rose-500'    },
+  lime:    { bg: 'bg-lime-50',    text: 'text-lime-700',    border: 'border-lime-200',    iconBg: 'bg-lime-100',    accent: 'bg-lime-500'    },
 };
 
-function ToolCard({ tool, color }: { tool: Tool; color: ToolGroup['color'] }) {
+/**
+ * One tool, with all its example prompts. Single-column layout so prompts
+ * have full width to breathe. Header has the tool name (bigger, code-styled),
+ * a read/write tag, and the description below. Each prompt is a clean
+ * left-bordered quote block with a hover-revealed copy button at the right.
+ */
+function ToolBlock({ tool, color }: { tool: Tool; color: ToolGroup['color'] }) {
   const c = COLOR_CLASSES[color];
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3 mb-2">
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:border-gray-300 transition-colors">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-gray-100">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <code className={`text-sm font-mono font-semibold ${c.text}`}>{tool.name}</code>
+              <code className={`text-base font-mono font-semibold ${c.text}`}>{tool.name}</code>
               {tool.write ? (
-                <Badge variant="outline" className="text-[10px] bg-rose-50 text-rose-700 border-rose-200 font-semibold uppercase tracking-wide">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200">
                   ⚠ Write
-                </Badge>
+                </span>
               ) : (
-                <Badge variant="outline" className="text-[10px] bg-gray-50 text-gray-600 border-gray-200 font-medium">
-                  read
-                </Badge>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium uppercase tracking-wider bg-gray-100 text-gray-500">
+                  Read
+                </span>
               )}
             </div>
-            <p className="text-xs text-gray-600 mt-1">{tool.description}</p>
+            <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">{tool.description}</p>
           </div>
         </div>
+      </div>
 
-        <div className="space-y-1.5 mt-3 border-t border-gray-100 pt-3">
-          {tool.prompts.map((p, i) => (
-            <div key={i} className="flex items-start gap-2 group">
-              <span className="text-gray-300 mt-0.5">›</span>
-              <span className="text-xs text-gray-700 italic flex-1 leading-relaxed">{p}</span>
-              <CopyChip value={p} label="" />
-            </div>
-          ))}
+      {/* Prompts — left-bordered quote blocks with hover-revealed copy */}
+      <div className="px-5 py-4 space-y-2.5 bg-gray-50/40">
+        {tool.prompts.map((p, i) => (
+          <div
+            key={i}
+            className="group flex items-start gap-2 -mx-2 px-2 py-2 rounded-lg hover:bg-white transition-colors"
+          >
+            <div className={`w-0.5 self-stretch rounded-full ${c.accent} opacity-50 shrink-0 my-0.5`} />
+            <p className="text-[13.5px] text-gray-800 leading-relaxed flex-1 italic">
+              &ldquo;{p}&rdquo;
+            </p>
+            <CopyButton value={p} variant="icon" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A whole surface (Discovery, CRM, etc.) with its colored title bar
+ *  and the tool blocks underneath. */
+function SurfaceSection({ group }: { group: ToolGroup }) {
+  const c = COLOR_CLASSES[group.color];
+  const Icon = group.icon;
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className={`h-10 w-10 rounded-xl ${c.iconBg} flex items-center justify-center shrink-0`}>
+          <Icon className={`h-5 w-5 ${c.text}`} />
         </div>
-      </CardContent>
-    </Card>
+        <div>
+          <h2 className={`text-lg font-bold ${c.text}`}>{group.label}</h2>
+          <p className="text-xs text-gray-500">
+            {group.tools.length} {group.tools.length === 1 ? 'tool' : 'tools'}
+          </p>
+        </div>
+      </div>
+      <div className="space-y-3">
+        {group.tools.map((t) => (
+          <ToolBlock key={t.name} tool={t} color={group.color} />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -445,175 +501,211 @@ export default function McpGuidePage() {
   const matchedTools = filteredGroups.reduce((n, g) => n + g.tools.length, 0);
 
   return (
-    <div className="space-y-6">
-      {/* Hero */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Bot className="h-6 w-6 text-[#3e8692]" />
-            Claude MCP Cookbook
-          </h2>
-          <p className="text-gray-600">
-            Example prompts for every HoloHive tool exposed to Claude.ai and Claude Code.
-            Copy any prompt and paste it straight into Claude.
-          </p>
+    <div className="max-w-4xl mx-auto pb-12">
+      {/* ── Hero ───────────────────────────────────────────────────── */}
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="h-12 w-12 rounded-2xl bg-[#3e8692] flex items-center justify-center">
+            <Bot className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Claude Cookbook</h1>
+            <p className="text-sm text-gray-500">HoloHive MCP — example prompts for every tool</p>
+          </div>
+        </div>
+        <p className="text-base text-gray-700 leading-relaxed max-w-2xl">
+          When you connect HoloHive to Claude.ai, you can ask Claude questions about your prospects,
+          campaigns, KOLs, and CRM in plain English. Below are examples to get you started — copy any
+          prompt and paste it into a Claude chat.
+        </p>
+      </div>
+
+      {/* ── Setup card ─────────────────────────────────────────────── */}
+      <div className="mb-10 rounded-2xl bg-gradient-to-br from-[#3e8692]/8 to-[#3e8692]/3 border border-[#3e8692]/20 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[#3e8692] text-white text-xs font-bold">
+            ⚡
+          </span>
+          <h3 className="text-base font-bold text-gray-900">Connect to Claude.ai (one-time setup)</h3>
+        </div>
+
+        <ol className="space-y-3.5 mb-4">
+          {[
+            <>Open <strong>Claude.ai</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Connectors</strong> &rarr; click <strong>Add custom connector</strong>.</>,
+            <>Paste the connector URL below into Claude&rsquo;s input box.</>,
+            <>Click <strong>Connect</strong>, then sign in to HoloHive when prompted, then click <strong>Allow</strong> on the consent screen.</>,
+            <>You&rsquo;re done. Try one of the prompts below in any Claude chat.</>,
+          ].map((line, i) => (
+            <li key={i} className="flex items-start gap-3">
+              <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white border border-[#3e8692]/30 text-[#3e8692] text-xs font-bold shrink-0 mt-0.5">
+                {i + 1}
+              </span>
+              <span className="text-sm text-gray-700 leading-relaxed pt-0.5">{line}</span>
+            </li>
+          ))}
+        </ol>
+
+        {/* Connector URL — prominent, instantly copyable */}
+        <div className="rounded-xl bg-white border border-gray-200 p-3 flex items-center gap-3">
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider shrink-0 hidden sm:inline">URL</span>
+          <code className="text-sm font-mono text-gray-800 flex-1 break-all">{CONNECTOR_URL}</code>
+          <CopyButton value={CONNECTOR_URL} variant="full" />
+        </div>
+
+        <p className="text-xs text-gray-500 mt-3">
+          The same connector works in Claude Code (CLI) and the Claude.ai mobile/desktop apps —
+          all clients share this single MCP server URL.
+        </p>
+      </div>
+
+      {/* ── Sticky filter bar ──────────────────────────────────────── */}
+      <div className="sticky top-0 z-10 -mx-4 px-4 py-3 mb-6 bg-white/95 backdrop-blur border-b border-gray-100">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[260px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder='Search tools or prompts (try "Korean exchange" or "follow-up")…'
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 h-10 text-sm auth-input"
+              />
+            </div>
+            <span className="text-xs text-gray-500 shrink-0">
+              {search
+                ? `${matchedTools} of ${totalTools} tools match`
+                : `${totalTools} tools · ${COMBOS.length} combos`}
+            </span>
+          </div>
+
+          {/* Category pills — flex-wrap because there are 8 of them */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              onClick={() => setActiveCategory('all')}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                activeCategory === 'all'
+                  ? 'bg-[#3e8692] text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              All
+            </button>
+            {TOOL_GROUPS.map((g) => {
+              const Icon = g.icon;
+              const active = activeCategory === g.id;
+              const c = COLOR_CLASSES[g.color];
+              return (
+                <button
+                  key={g.id}
+                  onClick={() => setActiveCategory(g.id)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    active
+                      ? `${c.text} ${c.bg} ring-1 ring-inset ${c.border}`
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <Icon className="h-3 w-3" />
+                  {g.label}
+                  <span className={`text-[10px] ${active ? 'opacity-70' : 'text-gray-400'}`}>{g.tools.length}</span>
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setActiveCategory('combos')}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                activeCategory === 'combos'
+                  ? 'bg-[#3e8692]/10 text-[#3e8692] ring-1 ring-inset ring-[#3e8692]/30'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Sparkles className="h-3 w-3" />
+              Combos
+              <span className={`text-[10px] ${activeCategory === 'combos' ? 'opacity-70' : 'text-gray-400'}`}>{COMBOS.length}</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Setup card */}
-      <Card className="border-[#3e8692]/20 bg-[#3e8692]/5">
-        <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="h-8 w-8 rounded-full bg-[#3e8692] flex items-center justify-center text-white font-bold shrink-0 text-sm">
-              H
+      {/* ── Content ────────────────────────────────────────────────── */}
+      {activeCategory === 'combos' ? (
+        // Combos view — multi-tool prompts
+        <section className="space-y-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-10 w-10 rounded-xl bg-[#3e8692]/10 flex items-center justify-center">
+              <Sparkles className="h-5 w-5 text-[#3e8692]" />
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 mb-1">Connect HoloHive to Claude.ai</p>
-              <ol className="text-xs text-gray-700 space-y-1 list-decimal pl-4">
-                <li>Open Claude.ai → Settings → Connectors → <strong>Add custom connector</strong></li>
-                <li>
-                  Paste this URL:&nbsp;
-                  <code className="bg-white border border-gray-200 rounded px-1.5 py-0.5 text-[11px] font-mono">{CONNECTOR_URL}</code>
-                  <span className="ml-2 inline-block">
-                    <CopyChip value={CONNECTOR_URL} label="copy URL" />
-                  </span>
-                </li>
-                <li>Click <strong>Connect</strong> → sign in to HoloHive if needed → click <strong>Allow</strong> on the consent screen.</li>
-                <li>Done. Try one of the prompts below in any Claude chat.</li>
-              </ol>
-              <p className="text-[11px] text-gray-500 mt-2">
-                The same connector works in Claude Code (CLI) — both clients share the same MCP server URL.
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Multi-tool combos</h2>
+              <p className="text-xs text-gray-500">
+                One prompt → multiple tool calls. Claude figures out the right sequence.
               </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Search + total */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[260px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search tools or prompts (e.g. 'Korean exchange', 'follow-up')..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 h-9 text-sm auth-input"
-          />
-        </div>
-        <span className="text-xs text-gray-500">
-          {search ? `${matchedTools} of ${totalTools} tools` : `${totalTools} tools across ${TOOL_GROUPS.length} surfaces`}
-        </span>
-      </div>
-
-      {/* Category tabs */}
-      <Tabs value={activeCategory} onValueChange={setActiveCategory}>
-        <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="all">All</TabsTrigger>
-          {TOOL_GROUPS.map((g) => {
-            const Icon = g.icon;
-            return (
-              <TabsTrigger key={g.id} value={g.id} className="flex items-center gap-1.5">
-                <Icon className="h-3.5 w-3.5" />
-                {g.label}
-                <span className="text-[10px] text-gray-400 ml-0.5">{g.tools.length}</span>
-              </TabsTrigger>
-            );
-          })}
-          <TabsTrigger value="combos" className="flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5" />
-            Combos
-            <span className="text-[10px] text-gray-400 ml-0.5">{COMBOS.length}</span>
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Tool grid */}
-        <TabsContent value={activeCategory} className="mt-5">
-          {activeCategory === 'combos' ? (
-            <div className="space-y-3">
-              <p className="text-xs text-gray-500 mb-2">
-                Multi-tool prompts — Claude figures out which tools to call and in what order.
-              </p>
-              {COMBOS.map((c, i) => (
-                <Card key={i} className="overflow-hidden border-l-[3px] border-l-[#3e8692]">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Sparkles className="h-3.5 w-3.5 text-[#3e8692]" />
-                      <h4 className="text-sm font-semibold text-gray-900">{c.title}</h4>
-                    </div>
-                    <div className="flex items-start gap-2 mb-2 group">
-                      <span className="text-gray-300 mt-0.5">›</span>
-                      <span className="text-xs text-gray-700 italic flex-1 leading-relaxed">{c.prompt}</span>
-                      <CopyChip value={c.prompt} label="" />
-                    </div>
-                    <div className="flex items-start gap-2 text-[11px] text-gray-500 pl-5">
-                      <span className="font-semibold">Triggers:</span>
-                      <code className="font-mono">{c.triggers}</code>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+          {COMBOS.map((c, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-[#3e8692]" />
+                <h3 className="text-base font-bold text-gray-900">{c.title}</h3>
+              </div>
+              <div className="px-5 py-4 bg-gray-50/40">
+                <div className="group flex items-start gap-2 mb-3 -mx-2 px-2 py-2 rounded-lg hover:bg-white transition-colors">
+                  <div className="w-0.5 self-stretch rounded-full bg-[#3e8692] opacity-50 shrink-0 my-0.5" />
+                  <p className="text-[13.5px] text-gray-800 leading-relaxed flex-1 italic">
+                    &ldquo;{c.prompt}&rdquo;
+                  </p>
+                  <CopyButton value={c.prompt} variant="icon" />
+                </div>
+                <details className="group/details">
+                  <summary className="text-[11px] text-gray-500 cursor-pointer hover:text-gray-700 select-none flex items-center gap-1">
+                    <span className="font-semibold uppercase tracking-wider">What Claude calls</span>
+                    <span className="opacity-50 group-open/details:rotate-90 transition-transform">▶</span>
+                  </summary>
+                  <code className="block mt-2 text-[11px] font-mono text-gray-600 leading-relaxed bg-white border border-gray-200 rounded-lg p-2.5">
+                    {c.triggers}
+                  </code>
+                </details>
+              </div>
+            </div>
+          ))}
+        </section>
+      ) : (
+        // Tool surface view — sectioned by category
+        <div className="space-y-10">
+          {filteredGroups.length === 0 ? (
+            <div className="text-center py-20 text-gray-400">
+              <AlertCircle className="h-10 w-10 mx-auto mb-3 opacity-50" />
+              <p className="text-sm font-medium">No tools match &ldquo;{search}&rdquo;</p>
+              <p className="text-xs mt-1">Try a different keyword or clear the filter.</p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {filteredGroups.length === 0 ? (
-                <div className="text-center py-12 text-gray-400">
-                  <AlertCircle className="h-8 w-8 mx-auto mb-2" />
-                  <p className="text-sm">No tools match your search.</p>
-                </div>
-              ) : filteredGroups.map((g) => {
-                const Icon = g.icon;
-                const c = COLOR_CLASSES[g.color];
-                return (
-                  <div key={g.id}>
-                    <div className={`flex items-center gap-2 px-3 py-2 ${c.bg} ${c.border} border rounded-t-lg`}>
-                      <Icon className={`h-4 w-4 ${c.text}`} />
-                      <h3 className={`text-sm font-semibold ${c.text}`}>{g.label}</h3>
-                      <Badge variant="secondary" className="text-[10px] font-medium">{g.tools.length}</Badge>
-                    </div>
-                    <div className={`grid grid-cols-1 md:grid-cols-2 gap-3 p-3 border ${c.border} border-t-0 rounded-b-lg bg-gray-50/30`}>
-                      {g.tools.map((t) => (
-                        <ToolCard key={t.name} tool={t} color={g.color} />
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            filteredGroups.map((g) => <SurfaceSection key={g.id} group={g} />)
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
 
-      {/* Pro tips */}
-      <Card className="bg-gray-50">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="h-4 w-4 text-[#3e8692]" />
-            <h3 className="text-sm font-semibold text-gray-900">Pro tips</h3>
-          </div>
-          <ul className="space-y-2 text-xs text-gray-700">
-            {PRO_TIPS.map((tip, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <span className="text-[#3e8692] font-bold mt-0.5 shrink-0">•</span>
-                <span>{tip}</span>
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+      {/* ── Pro tips ───────────────────────────────────────────────── */}
+      <div className="mt-12 rounded-2xl bg-gradient-to-br from-gray-50 to-white border border-gray-200 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Sparkles className="h-4 w-4 text-[#3e8692]" />
+          <h3 className="text-base font-bold text-gray-900">Pro tips</h3>
+        </div>
+        <ul className="space-y-3">
+          {PRO_TIPS.map((tip, i) => (
+            <li key={i} className="flex items-start gap-3">
+              <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[#3e8692]/10 text-[#3e8692] text-[10px] font-bold shrink-0 mt-0.5">
+                {i + 1}
+              </span>
+              <span className="text-sm text-gray-700 leading-relaxed">{tip}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
 
-      {/* Footer */}
-      <div className="text-center text-[11px] text-gray-400 pt-2 pb-6">
-        Want a tool that isn&apos;t here? See{' '}
-        <code className="font-mono bg-gray-100 px-1 py-0.5 rounded">docs/MCP_SETUP.md</code>{' '}
-        for how to add new tools.
-        <a
-          href="https://app.holohive.io/api/mcp/mcp"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ml-2 inline-flex items-center gap-1 text-[#3e8692] hover:underline"
-        >
-          Connector URL <ExternalLink className="h-2.5 w-2.5" />
-        </a>
+      {/* ── Footer ─────────────────────────────────────────────────── */}
+      <div className="mt-8 text-center text-xs text-gray-400">
+        Want a tool that isn&apos;t here? Edit{' '}
+        <code className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">app/mcp/page.tsx</code>{' '}
+        and add to <code className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">TOOL_GROUPS</code>.
       </div>
     </div>
   );
