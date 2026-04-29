@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChangelog } from '@/contexts/ChangelogContext';
 import { useGuestPermissions } from '@/hooks/useGuestPermissions';
@@ -699,6 +699,24 @@ export default function Sidebar({ children }: SidebarProps) {
                     <span>
                       <Sliders className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
                       {!isSidebarCollapsed && 'Field Options'}
+                    </span>
+                  </Button>
+                </Link>
+                {/* Claude MCP Cookbook — reference page for the AI connector
+                    (example prompts for every tool). Sits in the Admin
+                    section because it's a settings/help-style item, but
+                    visible to everyone since the connector itself is. */}
+                <Link href="/mcp" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/mcp') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/mcp') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Claude MCP' : undefined}
+                  >
+                    <span>
+                      <Bot className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Claude MCP'}
                     </span>
                   </Button>
                 </Link>
