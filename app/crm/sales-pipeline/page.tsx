@@ -258,7 +258,7 @@ export default function SalesPipelinePage() {
   const [actionGuidance, setActionGuidance] = useState<{ label: string; hint: string } | null>(null);
 
   // Overview tab collapsed state
-  const [overviewSections, setOverviewSections] = useState<{ outreach: boolean; pipeline: boolean; orbit: boolean }>({ outreach: false, pipeline: false, orbit: false });
+  const [overviewSections, setOverviewSections] = useState<{ outreach: boolean; pipeline: boolean; orbit: boolean; nurture: boolean }>({ outreach: false, pipeline: false, orbit: false, nurture: false });
 
   // Templates tab state
   const [templates, setTemplates] = useState<SalesDmTemplate[]>([]);
@@ -624,6 +624,10 @@ export default function SalesPipelinePage() {
   const visiblePipelineStages = (pathFilter === 'closer' ? PATH_A_STAGES : PIPELINE_STAGES).filter(s => s !== 'cold_dm');
 
   const allOrbitOpps = useMemo(() => opportunities.filter(o => o.stage === 'orbit'), [opportunities]);
+  // Nurture opportunities — surfaced in the Overview tab. Without this they
+  // were essentially invisible (hidden everywhere except 2 of 5 Action sub-tabs),
+  // so a deal set to nurture would silently drop out of the daily view.
+  const allNurtureOpps = useMemo(() => opportunities.filter(o => o.stage === 'nurture'), [opportunities]);
   const orbitOpps = useMemo(() => orbitSearch ? allOrbitOpps.filter(o => matchesSearch(o, orbitSearch)) : allOrbitOpps, [allOrbitOpps, orbitSearch]);
   const orbitByReason = useMemo(() => ORBIT_REASONS.map(r => ({
     ...r,
@@ -5720,6 +5724,104 @@ export default function SalesPipelinePage() {
               {overviewSections.orbit && (
                 <div className="border-t border-gray-200">
                   {renderOrbitTab()}
+                </div>
+              )}
+            </div>
+
+            {/* Nurture Section — without this, nurture-stage opportunities
+                are invisible everywhere except 2 of the Actions sub-tabs.
+                This gives them a dedicated spot on Overview alongside Orbit
+                so a deal set to nurture doesn't silently drop out of view. */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setOverviewSections(prev => ({ ...prev, nurture: !prev.nurture }))}
+                className="w-full flex items-center justify-between px-4 py-3 bg-lime-50 hover:bg-lime-100 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-lime-700" />
+                  <h4 className="font-semibold text-lime-700">Nurture</h4>
+                  <Badge variant="secondary" className="text-xs font-medium">{allNurtureOpps.length}</Badge>
+                  <span className="text-[11px] text-lime-600 ml-1">Long-cycle deals — periodic check-ins</span>
+                </div>
+                {overviewSections.nurture ? <ChevronUp className="h-4 w-4 text-lime-500" /> : <ChevronDown className="h-4 w-4 text-lime-500" />}
+              </button>
+              {overviewSections.nurture && (
+                <div className="border-t border-gray-200">
+                  {allNurtureOpps.length === 0 ? (
+                    <div className="text-center text-sm text-gray-400 py-8">
+                      No opportunities in nurture stage.
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-gray-50/50">
+                          <TableHead>Name</TableHead>
+                          <TableHead className="w-[180px]">POC</TableHead>
+                          <TableHead className="w-[140px]">Last Contact</TableHead>
+                          <TableHead className="w-[100px]">Owner</TableHead>
+                          <TableHead className="w-[120px]">Created</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {allNurtureOpps
+                          .slice()
+                          .sort((a, b) => {
+                            // Most-stale first — same logic as crm_followups_due
+                            // (oldest last_contacted_at OR null bubbles to top)
+                            const aT = a.last_contacted_at ? new Date(a.last_contacted_at).getTime() : 0;
+                            const bT = b.last_contacted_at ? new Date(b.last_contacted_at).getTime() : 0;
+                            return aT - bT;
+                          })
+                          .map((opp) => (
+                            <TableRow
+                              key={opp.id}
+                              className="group hover:bg-gray-50 cursor-pointer"
+                              onClick={() => openSlideOver(opp)}
+                            >
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Building2 className="h-4 w-4 text-gray-400" />
+                                  <span className="font-medium">{opp.name}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {opp.poc_handle ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize flex-shrink-0">
+                                      {opp.poc_platform || 'other'}
+                                    </Badge>
+                                    <span className="text-xs text-gray-600 truncate max-w-[120px]">
+                                      {cleanPocHandle(opp.poc_handle)}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-gray-300">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-xs text-gray-600">
+                                  {opp.last_contacted_at
+                                    ? formatDistanceToNow(new Date(opp.last_contacted_at), { addSuffix: true })
+                                    : <span className="text-gray-300">never</span>}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-xs text-gray-600">
+                                  {users.find(u => u.id === opp.owner_id)?.name || '—'}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <span className="text-xs text-gray-500">
+                                  {opp.created_at
+                                    ? formatDistanceToNow(new Date(opp.created_at), { addSuffix: true })
+                                    : '—'}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </div>
               )}
             </div>

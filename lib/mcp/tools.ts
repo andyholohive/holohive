@@ -292,7 +292,7 @@ export async function getKrListings(
     .eq('signal_type', 'korea_exchange_listing')
     .gte('detected_at', since)
     .order('detected_at', { ascending: false })
-    .limit(50);
+    .limit(150); // over-fetch since we'll collapse duplicates below
 
   const { data, error } = await q;
   if (error) return `Error: ${error.message}`;
@@ -300,15 +300,74 @@ export async function getKrListings(
   if (args.exchange !== 'any') {
     rows = rows.filter(r => r.metadata?.exchange === args.exchange);
   }
-  if (rows.length === 0) {
+
+  // Dedup by (symbol, exchange). Each token can list across multiple
+  // market pairs (KRW-X, USDT-X, BTC-X) and each pair fires its own
+  // signal — but for an "any new listings?" question that's noise.
+  // Collapse to one row per (symbol, exchange), preferring the row
+  // with the most prospect-match info and the most recent timestamp.
+  // Original headline + market_pair detail go into a per-row "pairs"
+  // array shown inline.
+  const grouped = new Map<string, {
+    symbol: string;
+    exchange: string;
+    headline: string;
+    detectedAt: string;
+    matched: boolean;
+    pairs: Set<string>;
+  }>();
+  for (const r of rows) {
+    const symbol = (r.metadata?.symbol || r.metadata?.market_pair?.split('-').pop() || '').toUpperCase();
+    const exchange = String(r.metadata?.exchange || '').toLowerCase();
+    if (!symbol || !exchange) continue; // skip malformed signals
+    const key = `${exchange}|${symbol}`;
+    const pair = String(r.metadata?.market_pair || '');
+    const existing = grouped.get(key);
+    if (existing) {
+      // Already seen this (symbol, exchange) — fold the new pair in
+      // and keep the most recent timestamp / matched flag.
+      if (pair) existing.pairs.add(pair);
+      if (r.prospect_id) existing.matched = true;
+      if (new Date(r.detected_at) > new Date(existing.detectedAt)) {
+        existing.detectedAt = r.detected_at;
+        existing.headline = r.headline;
+      }
+    } else {
+      grouped.set(key, {
+        symbol,
+        exchange,
+        headline: r.headline,
+        detectedAt: r.detected_at,
+        matched: !!r.prospect_id,
+        pairs: pair ? new Set([pair]) : new Set(),
+      });
+    }
+  }
+
+  const dedupedRows = Array.from(grouped.values())
+    .sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime());
+
+  if (dedupedRows.length === 0) {
     return `No Korean exchange listings in the last ${args.days} day(s)${args.exchange !== 'any' ? ` on ${args.exchange}` : ''}.`;
   }
 
-  const lines = rows.map(r => {
-    const matched = r.prospect_id ? ' 🎯 (matches a Discovery prospect)' : '';
-    return `• ${r.headline} — ${relTime(r.detected_at)}${matched}`;
+  const lines = dedupedRows.map(r => {
+    const matched = r.matched ? ' 🎯 (matches a Discovery prospect)' : '';
+    const exchangeLabel = r.exchange === 'upbit' ? 'Upbit' : r.exchange === 'bithumb' ? 'Bithumb' : r.exchange;
+    // Show the pair list only if there's more than one — single-pair
+    // listings already include the pair in the headline.
+    const pairList = r.pairs.size > 1
+      ? ` [${Array.from(r.pairs).sort().join(', ')}]`
+      : '';
+    return `• ${r.symbol} listed on ${exchangeLabel}${pairList} — ${relTime(r.detectedAt)}${matched}`;
   });
-  return `${rows.length} new Korean exchange listing(s) in the last ${args.days} day(s):\n\n${lines.join('\n')}`;
+
+  // Note the collapse so users understand why the count differs from
+  // the raw signal count they might see elsewhere.
+  const collapsedNote = rows.length > dedupedRows.length
+    ? ` (collapsed from ${rows.length} per-pair signals)`
+    : '';
+  return `${dedupedRows.length} unique Korean exchange listing(s) in the last ${args.days} day(s)${collapsedNote}:\n\n${lines.join('\n')}`;
 }
 
 // ─── Tool: summarize_pipeline ─────────────────────────────────────────
