@@ -23,7 +23,8 @@ import {
   Plus, Minus, Search, Trash2, X, LayoutGrid, TableIcon, GripVertical, Loader2,
   Target, AlertTriangle, ArrowRight, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronUp,
   Phone, MessageSquare, Calendar, FileText, StickyNote, Zap, RotateCcw, Clock, Edit, Copy, Check, ChevronsUpDown,
-  Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown, Paperclip, Eye, Image
+  Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown, Paperclip, Eye, Image,
+  Sparkles,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -47,6 +48,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { CRMService, CRMAffiliate, OpportunityStage } from '@/lib/crmService';
+import DiscoveryTab from '@/components/sales/DiscoveryTab';
 import { ClientService } from '@/lib/clientService';
 import {
   SalesPipelineService,
@@ -152,7 +154,7 @@ export default function SalesPipelinePage() {
   const [actionsSearch, setActionsSearch] = useState('');
   const [pipelineSearch, setPipelineSearch] = useState('');
   const [orbitSearch, setOrbitSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates'>('actions');
+  const [activeTab, setActiveTab] = useState<'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery'>('actions');
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('table');
   const [pathFilter, setPathFilter] = useState<'all' | 'closer' | 'sdr'>('all');
 
@@ -5528,7 +5530,7 @@ export default function SalesPipelinePage() {
       </Card>
 
       {/* Tabs + Controls */}
-      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'agents' | 'prospects')}>
+      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery')}>
         <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <TabsList>
             <TabsTrigger value="overview" className="flex items-center gap-2">
@@ -5568,6 +5570,10 @@ export default function SalesPipelinePage() {
               {orbitOpps.length > 0 && (
                 <Badge variant="secondary" className="ml-1">{allOrbitOpps.length}</Badge>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="discovery" className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              Discovery
             </TabsTrigger>
             <TabsTrigger value="templates" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
@@ -5718,6 +5724,10 @@ export default function SalesPipelinePage() {
               )}
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="discovery" className="mt-0">
+          <DiscoveryTab onPromoted={() => fetchData()} />
         </TabsContent>
 
         <TabsContent value="templates" className="mt-0">

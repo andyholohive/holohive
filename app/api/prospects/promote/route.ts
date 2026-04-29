@@ -4,9 +4,25 @@ import { createServerClient } from '@/lib/supabase-server';
 export const dynamic = 'force-dynamic';
 
 /**
+ * Allowed sales-pipeline stages a discovery prospect can be promoted into.
+ * Mirrors PIPELINE_STAGES in lib/salesPipelineService.ts. We validate
+ * server-side so the UI can't hand us an invalid stage and we don't have
+ * to trust the client.
+ */
+const ALLOWED_PROMOTE_STAGES = [
+  'cold_dm', 'warm', 'tg_intro', 'booked', 'discovery_done',
+  'proposal_call', 'v2_contract', 'v2_closed_won',
+] as const;
+type PromoteStage = typeof ALLOWED_PROMOTE_STAGES[number];
+
+/**
  * POST /api/prospects/promote — Promote prospect(s) to pipeline opportunities
- * Body: { id: string } — single promote
- * Body: { ids: string[] } — bulk promote
+ * Body: { id: string, stage?: string } — single promote
+ * Body: { ids: string[], stage?: string } — bulk promote (all get same stage)
+ *
+ * `stage` is the target sales-pipeline stage. Defaults to 'cold_dm' for
+ * backward compatibility (the original behavior). Validated against
+ * ALLOWED_PROMOTE_STAGES — anything else returns 400.
  *
  * Uses server-side Supabase client directly (not ProspectsService)
  * to avoid browser-client auth issues in API routes.
@@ -19,24 +35,34 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
+    // Validate stage (if provided). Default to cold_dm to match the
+    // original endpoint behavior so existing callers don't break.
+    const stage: PromoteStage = body.stage ?? 'cold_dm';
+    if (!ALLOWED_PROMOTE_STAGES.includes(stage)) {
+      return NextResponse.json(
+        { error: `Invalid stage '${stage}'. Allowed: ${ALLOWED_PROMOTE_STAGES.join(', ')}` },
+        { status: 400 },
+      );
+    }
+
     // Bulk promote
     if (body.ids && Array.isArray(body.ids)) {
       let promoted = 0, errors = 0;
       for (const id of body.ids) {
         try {
-          await promoteSingle(supabase, id, user.id);
+          await promoteSingle(supabase, id, user.id, stage);
           promoted++;
         } catch {
           errors++;
         }
       }
-      return NextResponse.json({ promoted, errors });
+      return NextResponse.json({ promoted, errors, stage });
     }
 
     // Single promote
     if (body.id) {
-      const oppId = await promoteSingle(supabase, body.id, user.id);
-      return NextResponse.json({ success: true, opportunity_id: oppId });
+      const oppId = await promoteSingle(supabase, body.id, user.id, stage);
+      return NextResponse.json({ success: true, opportunity_id: oppId, stage });
     }
 
     return NextResponse.json({ error: 'id or ids required' }, { status: 400 });
@@ -47,8 +73,9 @@ export async function POST(request: Request) {
 
 /**
  * Promote a single prospect to a pipeline opportunity using the server client.
+ * `stage` is the target sales-pipeline stage (validated by the caller).
  */
-async function promoteSingle(supabase: any, prospectId: string, ownerId: string): Promise<string> {
+async function promoteSingle(supabase: any, prospectId: string, ownerId: string, stage: PromoteStage): Promise<string> {
   // 1. Fetch the prospect
   const { data: prospect, error: fetchError } = await supabase
     .from('prospects')
@@ -76,7 +103,7 @@ async function promoteSingle(supabase: any, prospectId: string, ownerId: string)
     .from('crm_opportunities')
     .insert({
       name: prospect.name,
-      stage: 'cold_dm',
+      stage,
       source: `scraped_${prospect.source}`,
       website_url: prospect.website_url || null,
       owner_id: ownerId,
