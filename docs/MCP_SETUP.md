@@ -7,9 +7,14 @@ tabs into HoloHive.
 
 ## What Claude can do once connected
 
-**Twenty-two tools** are exposed, covering Discovery, Intelligence, CRM,
-Clients, Campaigns, KOLs, and one workflow-changing write tool for
-logging CRM activity from chat.
+**Twenty-five tools** are exposed across Discovery, Intelligence, CRM,
+Clients, Campaigns, KOLs, Tasks, and Forms.
+
+> **Note:** The MCP is intentionally **read-only** as of late April 2026.
+> Claude can query and synthesize anything in the system, but cannot
+> create, edit, or delete records. (A previous `log_crm_activity` write
+> tool was removed.) This is by design — keeps the connector safe to
+> grant to teammates without worrying about misinterpreted writes.
 
 ### Discovery & Intelligence
 | Tool | What you'd ask Claude |
@@ -27,7 +32,6 @@ logging CRM activity from chat.
 | `get_opportunity_detail` | "Full breakdown on opportunity X — scores, contacts, activity" |
 | `crm_stage_summary` | "Show me my pipeline distribution across all stages" |
 | `crm_followups_due` | "Who haven't I contacted in 7+ days?" |
-| `log_crm_activity` ⚠️ **WRITE** | "I just had a call with Liquid — log it. We discussed Korean DEX integration, they're targeting Q3." (Claude will confirm before writing.) |
 
 ### Clients
 | Tool | What you'd ask Claude |
@@ -51,20 +55,32 @@ logging CRM activity from chat.
 | `list_top_kols` | "Top Tier 1 Korean DeFi KOLs with 100K+ followers" (no name needed) |
 | `get_kol_detail` | "Full record on KOL X — pricing, niche, deliverables, link" |
 
+### Tasks
+| Tool | What you'd ask Claude |
+|------|------------------------|
+| `list_team_tasks` | "What's overdue across the team?" / "My open tasks due in the next 7 days" |
+| `get_task_detail` | "Pull up that task — show me the description and latest comment" |
+
+### Forms
+| Tool | What you'd ask Claude |
+|------|------------------------|
+| `list_form_submissions` | "What form submissions came in this week?" |
+| `get_form_submission_detail` | "Show me the answers for that submission" |
+
 ### Cross-cutting
 | Tool | What you'd ask Claude |
 |------|------------------------|
 | `summarize_pipeline` | "Give me a high-level snapshot — Discovery + CRM + Campaigns" |
 | `get_promoted_opportunity_for_prospect` | "Did Solayer get promoted? What stage is it in?" |
 
-**21 tools are read-only.** The one write tool (`log_crm_activity`) is
-described to Claude with explicit instructions to **always confirm with
-the user before calling**, repeating back the opportunity name, activity
-type, and content. Claude will ask "log a call on Liquid with note 'Q3
-timeline'?" and wait for "yes" before writing. The activity is logged
-into `crm_activities` with you as `owner_id` (recovered from the OAuth
-token's user binding via AsyncLocalStorage), and the opportunity's
-`last_contacted_at` is bumped automatically.
+**All 25 tools are read-only.** Claude can query, search, summarize,
+and synthesize anything in the system, but cannot create, edit, or
+delete records. If you need a write tool back (e.g., `log_crm_activity`
+for in-chat activity logging), the AsyncLocalStorage plumbing in
+`lib/mcp/context.ts` is preserved — re-add the
+`mcpAuthStorage.run(ctx, () => handler(req))` wrapper in
+`app/api/mcp/[transport]/route.ts` and register the write tool. See
+the git history for the previous `log_crm_activity` implementation.
 
 ---
 

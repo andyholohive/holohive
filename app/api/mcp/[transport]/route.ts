@@ -1,7 +1,6 @@
 import { createMcpHandler } from 'mcp-handler';
 import { z } from 'zod';
 import { authenticateMcpRequest, unauthorizedResponse } from '@/lib/mcp/auth';
-import { mcpAuthStorage } from '@/lib/mcp/context';
 import {
   getServiceClient,
   listRecentProspects,
@@ -33,7 +32,7 @@ import {
   // Cross-link
   getPromotedOpportunityForProspect,
   getPromotedOpportunityForProspectSchema,
-  // Round 3 — clients & campaigns deeper, KOL filtering, CRM activity logging
+  // Clients, campaigns deeper, KOL filtering
   listClients, listClientsSchema,
   getClientDetail, getClientDetailSchema,
   summarizeClient, summarizeClientSchema,
@@ -42,7 +41,11 @@ import {
   getCampaignPayments, getCampaignPaymentsSchema,
   listTopKols, listTopKolsSchema,
   getKolDetail, getKolDetailSchema,
-  logCrmActivity, logCrmActivitySchema,
+  // Tasks + Forms (read-only)
+  listTeamTasks, listTeamTasksSchema,
+  getTaskDetail, getTaskDetailSchema,
+  listFormSubmissions, listFormSubmissionsSchema,
+  getFormSubmissionDetail, getFormSubmissionDetailSchema,
 } from '@/lib/mcp/tools';
 
 export const dynamic = 'force-dynamic';
@@ -312,27 +315,50 @@ const handler = createMcpHandler(
       },
     );
 
-    // ─── CRM activity logging (the only WRITE tool) ─────────────────
-    //
-    // The tool description below tells Claude to ALWAYS confirm with
-    // the user before calling. This is the safety mechanism — Claude
-    // models follow detailed tool-use instructions reliably, and the
-    // confirmation step prevents misinterpreted "I had a call" from
-    // turning into an unintended log write.
+    // ─── Tasks (read-only) ──────────────────────────────────────────
 
     server.tool(
-      'log_crm_activity',
-      [
-        'Log a CRM activity (call, message, meeting, proposal, note, or bump) on an existing opportunity AND bump the opportunity\'s last_contacted_at timestamp.',
-        '',
-        'CRITICAL: This is a WRITE tool. ALWAYS confirm with the user before calling it. Repeat back the opportunity NAME (not just the ID), the activity type, and the title/description. Wait for explicit "yes" or equivalent before calling. Never auto-log based on inference — only log when the user explicitly says to.',
-        '',
-        'Use list_crm_opportunities or summarize_pipeline to find the opportunity_id first. The tool returns a confirmation with the new activity ID and a note that last_contacted_at was bumped.',
-      ].join('\n'),
-      logCrmActivitySchema,
+      'list_team_tasks',
+      'Browse the team\'s task list. Filter by owner_id (assignee), status (default "open" excludes completed), due_within_days (next N days, includes overdue), or client_id. Sorted by due-date ascending so overdue + soonest-due bubble to top.',
+      listTeamTasksSchema,
       async (args) => {
         const supabase = getServiceClient();
-        const text = await logCrmActivity(supabase, args);
+        const text = await listTeamTasks(supabase, args);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    server.tool(
+      'get_task_detail',
+      'Full info on one task by UUID — name, status, priority, frequency, assignee, due date (with overdue/today/in N days status), linked client, description, latest comment, link.',
+      getTaskDetailSchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await getTaskDetail(supabase, args);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    // ─── Forms (read-only) ──────────────────────────────────────────
+
+    server.tool(
+      'list_form_submissions',
+      'List recent form submissions (form_responses). Default last 7 days, all forms. Optionally filter to one form_id, one client, or change the lookback. Returns a per-form breakdown at the top.',
+      listFormSubmissionsSchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await listFormSubmissions(supabase, args);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    server.tool(
+      'get_form_submission_detail',
+      'Full submission for one response_id — form name + description, submitter, linked client, and pretty-printed answers from response_data (JSONB shape varies per form).',
+      getFormSubmissionDetailSchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await getFormSubmissionDetail(supabase, args);
         return { content: [{ type: 'text', text }] };
       },
     );
@@ -361,14 +387,16 @@ const handler = createMcpHandler(
 // MCP handler. The handler itself is transport-agnostic — it doesn't
 // care that we did auth, it just executes the tool.
 //
-// We wrap handler(req) in mcpAuthStorage.run(ctx, ...) so any tool that
-// needs the calling user's id (currently log_crm_activity for owner
-// attribution) can pull it via mcpAuthStorage.getStore() without
-// changing every tool signature. Read tools just ignore it.
+// (Previously this also wrapped handler(req) in mcpAuthStorage.run()
+// so the log_crm_activity write tool could attribute its insert to
+// the calling user. With the MCP intentionally restricted to read-
+// only tools, that storage plumbing is no longer needed at runtime.
+// lib/mcp/context.ts is kept on disk for when/if write tools come
+// back — re-add the .run() wrapper here at that point.)
 async function authedHandler(req: Request): Promise<Response> {
   const ctx = await authenticateMcpRequest(req);
   if (!ctx) return unauthorizedResponse();
-  return mcpAuthStorage.run(ctx, () => handler(req));
+  return handler(req);
 }
 
 export { authedHandler as GET, authedHandler as POST, authedHandler as DELETE };

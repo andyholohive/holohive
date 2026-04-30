@@ -1,6 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
-import { mcpAuthStorage } from './context';
 
 /**
  * Tool definitions for the HoloHive MCP server.
@@ -1382,103 +1381,224 @@ export async function getKolDetail(
   return out.join('\n');
 }
 
-// ─── Tool: log_crm_activity (the one write tool) ─────────────────────
+// ─── Tool: list_team_tasks ────────────────────────────────────────────
 //
-// Logs a CRM activity (call, message, meeting, etc.) on an opportunity
-// AND bumps the opportunity's last_contacted_at so follow-up tools
-// (crm_followups_due) reflect the contact. This is the workflow-changing
-// tool — instead of "I had a call, I'll log it later" → never logs it,
-// the user can dictate from chat in seconds.
-//
-// IMPORTANT for Claude: ALWAYS confirm with the user before calling this
-// tool. Repeat back the opportunity name (not just the ID), the activity
-// type, the title, and any description. Wait for explicit yes. Tool
-// description below repeats this so the model has context.
+// Browse the team's task list with filters by owner, status, due-date
+// window. Useful for "what's on my plate today" / "what's overdue
+// across the team" / "show me X's tasks for this week" questions.
 
-export const logCrmActivitySchema = {
-  opportunity_id: z.string().uuid().describe('UUID of the CRM opportunity to log against.'),
-  type: z.enum(['call', 'message', 'meeting', 'proposal', 'note', 'bump'])
-    .describe('Activity type. Use call/meeting for live conversations, message for written outreach, proposal when sending a pricing doc, note for general updates, bump for follow-up nudges.'),
-  title: z.string().min(1).max(200)
-    .describe('Short title for the activity (e.g. "Korean DEX integration discussion", "Bump 3 — checking on contract").'),
-  description: z.string().max(2000).optional()
-    .describe('Optional longer body. Use for meeting notes, key takeaways, decisions made.'),
-  outcome: z.string().max(500).optional()
-    .describe('Optional outcome summary (e.g. "Agreed to terms", "Wants to wait until Q3", "Needs to loop in CEO").'),
-  next_step: z.string().max(500).optional()
-    .describe('Optional next-step description (e.g. "Send proposal by Friday", "Schedule follow-up in 2 weeks").'),
-  next_step_date: z.string().optional()
-    .describe('Optional ISO date for the next step (YYYY-MM-DD).'),
+export const listTeamTasksSchema = {
+  owner_id: z.string().uuid().optional()
+    .describe('Filter to one assignee (UUID). Omit for all-owners view.'),
+  status: z.enum(['any', 'open', 'in_progress', 'completed', 'blocked'])
+    .default('open')
+    .describe('Task status filter. Default "open" excludes completed tasks.'),
+  due_within_days: z.number().int().min(1).max(60).optional()
+    .describe('Only show tasks due within the next N days (also includes overdue). Omit for no due-date filter.'),
+  client_id: z.string().uuid().optional()
+    .describe('Filter to tasks linked to one client.'),
+  limit: z.number().int().min(1).max(50).default(25),
 };
 
-export async function logCrmActivity(
+export async function listTeamTasks(
   supabase: SupabaseClient,
   args: {
-    opportunity_id: string;
-    type: 'call' | 'message' | 'meeting' | 'proposal' | 'note' | 'bump';
-    title: string;
-    description?: string;
-    outcome?: string;
-    next_step?: string;
-    next_step_date?: string;
+    owner_id?: string;
+    status: 'any' | 'open' | 'in_progress' | 'completed' | 'blocked';
+    due_within_days?: number;
+    client_id?: string;
+    limit: number;
   },
 ): Promise<string> {
-  // Sanity: confirm the opportunity exists before writing
-  const { data: opp, error: oppErr } = await (supabase as any)
-    .from('crm_opportunities')
-    .select('id, name, stage, last_contacted_at, last_message_at')
-    .eq('id', args.opportunity_id)
-    .single();
-  if (oppErr || !opp) return `Opportunity not found: ${args.opportunity_id}. Refusing to log.`;
+  let q = (supabase as any)
+    .from('tasks')
+    .select('id, task_name, task_type, status, priority, frequency, due_date, assigned_to_name, created_by_name, client_id, latest_comment, link, created_at')
+    .order('due_date', { ascending: true, nullsFirst: false })
+    .limit(args.limit);
 
-  // Pull the calling user's id from the per-request auth context so the
-  // activity is attributed correctly. If somehow the storage isn't set
-  // (e.g., called outside an MCP request) we fall back to null — the
-  // activity still logs, just without owner attribution.
-  const ctx = mcpAuthStorage.getStore();
-  const ownerId = ctx?.user_id ?? null;
-
-  // Insert the activity row
-  const { data: activity, error: actErr } = await (supabase as any)
-    .from('crm_activities')
-    .insert({
-      opportunity_id: args.opportunity_id,
-      type: args.type,
-      title: args.title,
-      description: args.description ?? null,
-      outcome: args.outcome ?? null,
-      next_step: args.next_step ?? null,
-      next_step_date: args.next_step_date ?? null,
-      owner_id: ownerId,
-    })
-    .select('id, created_at')
-    .single();
-  if (actErr) return `Failed to log activity: ${actErr.message}`;
-
-  // Bump the opportunity's last_contacted_at (and last_message_at for
-  // type='message'). Mirrors what the in-app activity log does. Skip
-  // recalc-temperature — that's a derived score the in-app service
-  // computes; for chat-logged activities it's fine to wait until the
-  // next in-app touch to refresh.
-  const update: any = {
-    last_contacted_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-  if (args.type === 'message') {
-    update.last_message_at = new Date().toISOString();
+  if (args.status !== 'any') {
+    q = q.eq('status', args.status);
   }
-  await (supabase as any)
-    .from('crm_opportunities')
-    .update(update)
-    .eq('id', args.opportunity_id);
+  if (args.owner_id) q = q.eq('assigned_to', args.owner_id);
+  if (args.client_id) q = q.eq('client_id', args.client_id);
+  if (args.due_within_days != null) {
+    const cutoff = new Date(Date.now() + args.due_within_days * 86_400_000).toISOString();
+    q = q.lte('due_date', cutoff);
+  }
 
-  // Pretty confirmation back to Claude/user
+  const { data, error } = await q;
+  if (error) return `Error: ${error.message}`;
+  const rows = (data || []) as any[];
+  if (rows.length === 0) return `No tasks match the filter.`;
+
+  const lines = rows.map(t => {
+    const owner = t.assigned_to_name ? ` · ${t.assigned_to_name}` : '';
+    const due = t.due_date
+      ? (() => {
+          const ms = new Date(t.due_date).getTime() - Date.now();
+          const days = Math.round(ms / 86_400_000);
+          if (days < 0) return ` · OVERDUE ${Math.abs(days)}d`;
+          if (days === 0) return ' · due today';
+          if (days <= 3) return ` · due in ${days}d`;
+          return ` · due ${new Date(t.due_date).toISOString().slice(0, 10)}`;
+        })()
+      : '';
+    const priority = t.priority && t.priority !== 'normal' ? ` [${t.priority}]` : '';
+    return `• ${t.task_name} [${t.status}]${priority}${due}${owner}`;
+  });
+  return `${rows.length} task(s):\n\n${lines.join('\n')}`;
+}
+
+// ─── Tool: get_task_detail ────────────────────────────────────────────
+
+export const getTaskDetailSchema = {
+  task_id: z.string().uuid().describe('Task UUID (from list_team_tasks).'),
+};
+
+export async function getTaskDetail(
+  supabase: SupabaseClient,
+  args: { task_id: string },
+): Promise<string> {
+  const { data: t, error } = await (supabase as any)
+    .from('tasks')
+    .select('*, clients(name)')
+    .eq('id', args.task_id)
+    .single();
+  if (error || !t) return `Task not found: ${args.task_id}`;
+
   const out: string[] = [];
-  out.push(`✓ Logged ${args.type} on **${opp.name}**`);
-  out.push(`  Title: "${args.title}"`);
-  if (args.outcome) out.push(`  Outcome: ${args.outcome}`);
-  if (args.next_step) out.push(`  Next step: ${args.next_step}${args.next_step_date ? ` (by ${args.next_step_date})` : ''}`);
-  out.push(`  last_contacted_at bumped to now${args.type === 'message' ? '; last_message_at also bumped' : ''}.`);
-  out.push(`  Activity id: ${activity.id}`);
+  out.push(`## ${t.task_name}`);
+  out.push('');
+  out.push(`**Status:** ${t.status}  ·  **Priority:** ${t.priority}  ·  **Type:** ${t.task_type}`);
+  if (t.frequency && t.frequency !== 'once') out.push(`**Frequency:** ${t.frequency}`);
+  if (t.assigned_to_name) out.push(`**Assigned to:** ${t.assigned_to_name}`);
+  if (t.created_by_name) out.push(`**Created by:** ${t.created_by_name} · ${relTime(t.created_at)}`);
+  if (t.due_date) {
+    const ms = new Date(t.due_date).getTime() - Date.now();
+    const days = Math.round(ms / 86_400_000);
+    const status = days < 0 ? `OVERDUE ${Math.abs(days)}d` : days === 0 ? 'due today' : `due in ${days}d`;
+    out.push(`**Due:** ${t.due_date.slice(0, 10)} (${status})`);
+  }
+  if (t.completed_at) out.push(`**Completed:** ${relTime(t.completed_at)}`);
+  if (t.clients?.name) out.push(`**Client:** ${t.clients.name}`);
+  if (t.link) out.push(`**Link:** ${t.link}`);
+  if (t.description) {
+    out.push('');
+    out.push(`**Description:**  ${t.description}`);
+  }
+  if (t.latest_comment) {
+    out.push('');
+    out.push(`**Latest comment:**  ${t.latest_comment}`);
+  }
+  return out.join('\n');
+}
+
+// ─── Tool: list_form_submissions ──────────────────────────────────────
+//
+// Lists recent form_responses across all forms (or one specific form),
+// optionally within a recency window. Useful for "what came in this week"
+// type questions — you'd already get a Telegram alert per submission, but
+// querying lets you sweep + summarize.
+
+export const listFormSubmissionsSchema = {
+  form_id: z.string().uuid().optional()
+    .describe('Filter to one specific form (UUID). Omit for all forms.'),
+  days: z.number().int().min(1).max(90).default(7)
+    .describe('Look-back window in days (default 7).'),
+  client_id: z.string().uuid().optional()
+    .describe('Filter to submissions linked to one client.'),
+  limit: z.number().int().min(1).max(50).default(25),
+};
+
+export async function listFormSubmissions(
+  supabase: SupabaseClient,
+  args: { form_id?: string; days: number; client_id?: string; limit: number },
+): Promise<string> {
+  const since = new Date(Date.now() - args.days * 86_400_000).toISOString();
+  let q = (supabase as any)
+    .from('form_responses')
+    .select('id, form_id, submitted_at, submitted_by_name, submitted_by_email, client_id, forms(name)')
+    .gte('submitted_at', since)
+    .order('submitted_at', { ascending: false })
+    .limit(args.limit);
+  if (args.form_id) q = q.eq('form_id', args.form_id);
+  if (args.client_id) q = q.eq('client_id', args.client_id);
+
+  const { data, error } = await q;
+  if (error) return `Error: ${error.message}`;
+  const rows = (data || []) as any[];
+  if (rows.length === 0) {
+    return `No form submissions in the last ${args.days} day(s)${args.form_id ? ' for that form' : ''}.`;
+  }
+
+  const lines = rows.map(r => {
+    const who = r.submitted_by_name || r.submitted_by_email || 'anonymous';
+    const formName = r.forms?.name || 'Unknown form';
+    return `• ${formName} — submitted by ${who} · ${relTime(r.submitted_at)}`;
+  });
+
+  // Per-form breakdown helps when many forms in one window
+  const byForm: Record<string, number> = {};
+  for (const r of rows) {
+    const k = r.forms?.name || 'Unknown';
+    byForm[k] = (byForm[k] || 0) + 1;
+  }
+  const breakdown = Object.entries(byForm)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${k}: ${n}`)
+    .join(', ');
+
+  return `${rows.length} form submission(s) in last ${args.days}d (${breakdown}):\n\n${lines.join('\n')}`;
+}
+
+// ─── Tool: get_form_submission_detail ─────────────────────────────────
+//
+// Full submission with all answers in `response_data`. JSONB shape varies
+// per form definition, so we pretty-print the JSON for Claude to interpret.
+
+export const getFormSubmissionDetailSchema = {
+  submission_id: z.string().uuid().describe('Form submission UUID (from list_form_submissions).'),
+};
+
+export async function getFormSubmissionDetail(
+  supabase: SupabaseClient,
+  args: { submission_id: string },
+): Promise<string> {
+  const { data: s, error } = await (supabase as any)
+    .from('form_responses')
+    .select('id, form_id, submitted_at, submitted_by_name, submitted_by_email, response_data, client_id, forms(name, description), clients(name)')
+    .eq('id', args.submission_id)
+    .single();
+  if (error || !s) return `Submission not found: ${args.submission_id}`;
+
+  const out: string[] = [];
+  out.push(`## ${s.forms?.name || 'Form submission'}`);
+  out.push('');
+  out.push(`**Submitted:** ${relTime(s.submitted_at)} · ${new Date(s.submitted_at).toISOString().slice(0, 16).replace('T', ' ')}`);
+  if (s.submitted_by_name || s.submitted_by_email) {
+    out.push(`**By:** ${s.submitted_by_name || ''}${s.submitted_by_email ? ` <${s.submitted_by_email}>` : ''}`);
+  }
+  if (s.clients?.name) out.push(`**Client:** ${s.clients.name}`);
+  if (s.forms?.description) {
+    out.push('');
+    out.push(`**Form description:** ${s.forms.description}`);
+  }
+
+  // Render response_data answers. Shape is form-specific JSONB; usually
+  // a flat object of question label → answer, but can be nested. Pretty-
+  // print as key/value lines for the easy case, fall back to raw JSON.
+  out.push('');
+  out.push('**Answers:**');
+  const rd = s.response_data;
+  if (rd && typeof rd === 'object' && !Array.isArray(rd)) {
+    for (const [key, value] of Object.entries(rd)) {
+      const v = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
+      out.push(`  · ${key}: ${v.length > 200 ? v.slice(0, 200) + '…' : v}`);
+    }
+  } else {
+    out.push('```json');
+    out.push(JSON.stringify(rd, null, 2));
+    out.push('```');
+  }
   return out.join('\n');
 }

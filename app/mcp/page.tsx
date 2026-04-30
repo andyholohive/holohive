@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import {
   Bot, Search, Copy, Check, Sparkles, Target, Building2, Megaphone, Users,
-  GitBranch, AlertCircle,
+  GitBranch, AlertCircle, ListTodo, FileText,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -141,16 +141,6 @@ const TOOL_GROUPS: ToolGroup[] = [
           'Anyone in deal_qualified or contract that\'s gone quiet?',
         ],
       },
-      {
-        name: 'log_crm_activity',
-        write: true,
-        description: 'Log a call/message/meeting/proposal/note/bump on an opportunity. Bumps last_contacted_at.',
-        prompts: [
-          'I just had a call with Liquid. We discussed Korean DEX integration timing, they\'re targeting Q3. Log it.',
-          'Quick note on Galxe — they want to see the proposal by Friday. Set next_step to that.',
-          'Mark Bondex as bumped — sent them a follow-up message this morning.',
-        ],
-      },
     ],
   },
   {
@@ -258,6 +248,57 @@ const TOOL_GROUPS: ToolGroup[] = [
         prompts: [
           'Tell me everything about ETH Apple — pricing, deliverables, contacts.',
           'Full record on Money Bottle.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'tasks',
+    label: 'Tasks',
+    icon: ListTodo,
+    color: 'sky',
+    tools: [
+      {
+        name: 'list_team_tasks',
+        description: 'Browse the team\'s task list. Filter by owner, status, due-date window, or client. Sorted by due-date ascending so overdue / soonest-due bubble to top.',
+        prompts: [
+          'What\'s overdue across the team?',
+          'My open tasks due in the next 7 days.',
+          'Show me all tasks linked to Galxe.',
+          'Anything blocked right now?',
+        ],
+      },
+      {
+        name: 'get_task_detail',
+        description: 'Full info on one task — name, status, priority, frequency, assignee, due date, linked client, description, latest comment.',
+        prompts: [
+          'Pull up that task — show me the description and latest comment.',
+          'Full detail on the recurring CDL task.',
+        ],
+      },
+    ],
+  },
+  {
+    id: 'forms',
+    label: 'Forms',
+    icon: FileText,
+    color: 'amber',
+    tools: [
+      {
+        name: 'list_form_submissions',
+        description: 'List recent form_responses across all forms (or one specific form). Default last 7 days. Returns a per-form breakdown at the top.',
+        prompts: [
+          'What form submissions came in this week?',
+          'Submissions to the prospect intake form in the last 30 days.',
+          'Anything submitted today?',
+        ],
+      },
+      {
+        name: 'get_form_submission_detail',
+        description: 'Full submission for one response_id — form name + description, submitter, linked client, and pretty-printed answers from response_data.',
+        prompts: [
+          'Show me the answers for that submission.',
+          'Pull up the full response from the latest intake form submission.',
         ],
       },
     ],
