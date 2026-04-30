@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChangelog } from '@/contexts/ChangelogContext';
 import { useGuestPermissions } from '@/hooks/useGuestPermissions';
@@ -333,6 +333,23 @@ export default function Sidebar({ children }: SidebarProps) {
                     <span>
                       <Radar className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
                       {!isSidebarCollapsed && 'Intelligence'}
+                    </span>
+                  </Button>
+                </Link>)}
+                {/* Analytics — team dashboard with KPIs, pipeline funnel,
+                    owner workload, recent activity, health alerts. Reads
+                    /api/analytics/dashboard in one call. */}
+                {!guestHide('/analytics') && (<Link href="/analytics" legacyBehavior>
+                  <Button
+                    asChild
+                    variant={pathname.startsWith('/analytics') ? 'default' : 'ghost'}
+                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+                    style={pathname.startsWith('/analytics') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    title={isSidebarCollapsed ? 'Analytics' : undefined}
+                  >
+                    <span>
+                      <BarChart3 className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+                      {!isSidebarCollapsed && 'Analytics'}
                     </span>
                   </Button>
                 </Link>)}
