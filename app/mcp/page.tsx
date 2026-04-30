@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import {
   Bot, Search, Copy, Check, Sparkles, Target, Building2, Megaphone, Users,
-  GitBranch, AlertCircle, ListTodo, FileText,
+  GitBranch, AlertCircle, ListTodo, FileText, BarChart3,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -266,6 +266,8 @@ const TOOL_GROUPS: ToolGroup[] = [
           'My open tasks due in the next 7 days.',
           'Show me all tasks linked to Galxe.',
           'Anything blocked right now?',
+          'High-priority open tasks I haven\'t looked at yet.',
+          'What recurring tasks are due this week?',
         ],
       },
       {
@@ -274,6 +276,7 @@ const TOOL_GROUPS: ToolGroup[] = [
         prompts: [
           'Pull up that task — show me the description and latest comment.',
           'Full detail on the recurring CDL task.',
+          'What\'s the status on the campaign-launch task for Galxe?',
         ],
       },
     ],
@@ -291,6 +294,8 @@ const TOOL_GROUPS: ToolGroup[] = [
           'What form submissions came in this week?',
           'Submissions to the prospect intake form in the last 30 days.',
           'Anything submitted today?',
+          'Submissions linked to Galxe in the last month.',
+          'Which form is getting the most responses lately?',
         ],
       },
       {
@@ -299,6 +304,7 @@ const TOOL_GROUPS: ToolGroup[] = [
         prompts: [
           'Show me the answers for that submission.',
           'Pull up the full response from the latest intake form submission.',
+          'What did that anonymous submitter say in their answers?',
         ],
       },
     ],
@@ -367,9 +373,19 @@ const COMBOS: Combo[] = [
     triggers: 'list_top_kols(region=Korea, niche=DeFi, tier=Tier 1, min_followers=100000) → loops get_kol_detail → cross-references list_campaign_kols',
   },
   {
-    title: 'Meeting log + next-step',
-    prompt: 'Just got off a call with Solayer. They committed to signing the contract by Tuesday. Log the activity AND set the next-step date.',
-    triggers: 'list_crm_opportunities(search=solayer) to get the ID → log_crm_activity(type=call, next_step=\'Sign contract\', next_step_date=\'2026-05-05\')',
+    title: 'My day plan',
+    prompt: 'What\'s on my plate today? My open tasks, my CRM follow-ups, and any urgent prospects I should look at first.',
+    triggers: 'list_team_tasks(owner=me, due_within_days=1) → crm_followups_due(owner=me, threshold=7) → list_recent_prospects(tier=REACH_OUT_NOW, days=3)',
+  },
+  {
+    title: 'Form submission triage',
+    prompt: 'What forms came in this week, and pull up the full responses for the most recent ones so I can decide what to do with them.',
+    triggers: 'list_form_submissions(days=7) → loops get_form_submission_detail for each → synthesizes',
+  },
+  {
+    title: 'Stale task + opportunity sweep',
+    prompt: 'Across the whole team — what\'s overdue in tasks, what\'s stale in CRM (>7d no contact), and which active campaigns have the worst payment lag?',
+    triggers: 'list_team_tasks(status=open, due_within_days=0) → crm_followups_due → list_active_campaigns → loops get_campaign_payments → synthesizes',
   },
 ];
 
@@ -556,9 +572,18 @@ export default function McpGuidePage() {
         </div>
         <p className="text-base text-gray-700 leading-relaxed max-w-2xl">
           When you connect HoloHive to Claude.ai, you can ask Claude questions about your prospects,
-          campaigns, KOLs, and CRM in plain English. Below are examples to get you started — copy any
-          prompt and paste it into a Claude chat.
+          campaigns, KOLs, and CRM in plain English. <strong>25 read-only tools</strong> across 8
+          surfaces — copy any prompt below and paste it into a Claude chat.
         </p>
+
+        {/* Cross-link to the analytics dashboard — same data, dashboard view */}
+        <div className="mt-4 inline-flex items-center gap-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+          <BarChart3 className="h-3.5 w-3.5 text-[#3e8692]" />
+          <span>Want a one-page snapshot instead of asking Claude?</span>
+          <a href="/analytics" className="text-[#3e8692] font-semibold hover:underline">
+            Open Analytics →
+          </a>
+        </div>
       </div>
 
       {/* ── Setup card ─────────────────────────────────────────────── */}
