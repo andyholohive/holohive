@@ -40,6 +40,13 @@ interface Schedule {
   cadence: Cadence;
   weekly_day: number | null;
   weekly_cost_cap_usd: number | null;
+  // Volume controls — top-level on scheduled_scans, NOT inside scan_params.
+  // runs_per_day:  1 = morning only (00:00 UTC). 2 = morning + afternoon
+  //                (also 12:00 UTC = 09:00 ET, catches US-hours news).
+  // cooldown_days: how many days a prospect must NOT be re-scanned. Lower
+  //                = more aggressive re-evaluation; default 14.
+  runs_per_day: number;
+  cooldown_days: number;
   scan_params: {
     recency_days?: number;
     min_raise_usd?: number;
@@ -77,7 +84,21 @@ const MAX_PROJECTS_OPTIONS = [
   { v: 5,  label: '5 — fastest, cheapest' },
   { v: 10, label: '10 (default)' },
   { v: 15, label: '15' },
-  { v: 20, label: '20 — broadest sweep' },
+  { v: 20, label: '20 — broad sweep' },
+  { v: 25, label: '25 — high volume' },
+  { v: 30, label: '30 — very high volume' },
+  { v: 50, label: '50 — max (server cap)' },
+];
+// Volume controls (added Apr 30 2026 to address "not enough prospects daily").
+const RUNS_PER_DAY_OPTIONS = [
+  { v: 1, label: '1× per day (morning, 09:00 KST)' },
+  { v: 2, label: '2× per day (morning + evening, also catches US hours)' },
+];
+const COOLDOWN_OPTIONS = [
+  { v: 3,  label: '3 days — aggressive re-scanning' },
+  { v: 7,  label: '7 days' },
+  { v: 14, label: '14 days (default)' },
+  { v: 30, label: '30 days — conservative' },
 ];
 const SOURCE_OPTIONS: { id: Source; label: string }[] = [
   { id: 'dropstab',   label: 'DropsTab' },
@@ -98,13 +119,21 @@ function relativeTime(iso: string | null): string {
 
 /** Rough monthly cost estimate based on chosen params + cadence.
  *  Pulls from the same per-run cost ranges we've observed in production
- *  ($0.04-0.15 Sonnet per candidate, $0.10-0.30 Opus per candidate). */
+ *  ($0.04-0.15 Sonnet per candidate, $0.10-0.30 Opus per candidate).
+ *  Multiplies by runs_per_day so the user sees the full impact of
+ *  switching morning-only → morning + evening before saving. */
 function estimateMonthlyCost(s: Schedule): { lo: number; hi: number; runsPerMonth: number } {
-  const { cadence, weekly_day, scan_params } = s;
-  let runsPerMonth = 0;
-  if (cadence === 'daily') runsPerMonth = 30.4;
-  else if (cadence === 'weekdays') runsPerMonth = 21.7;
-  else if (cadence === 'weekly') runsPerMonth = weekly_day != null ? 4.3 : 0;
+  const { cadence, weekly_day, scan_params, runs_per_day } = s;
+  let daysPerMonth = 0;
+  if (cadence === 'daily') daysPerMonth = 30.4;
+  else if (cadence === 'weekdays') daysPerMonth = 21.7;
+  else if (cadence === 'weekly') daysPerMonth = weekly_day != null ? 4.3 : 0;
+
+  // Runs per month = days that match cadence × runs_per_day. The
+  // afternoon cron only fires for cadence ∈ {daily, weekdays} since
+  // weekly only matches a single day; for weekly, runs_per_day still
+  // doubles the count when the matching day fires.
+  const runsPerMonth = daysPerMonth * (runs_per_day ?? 1);
 
   const max = scan_params.max_projects ?? 10;
   const isOpus = scan_params.model === 'opus';
@@ -180,6 +209,8 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
           cadence: draft.cadence,
           weekly_day: draft.cadence === 'weekly' ? draft.weekly_day : null,
           weekly_cost_cap_usd: draft.weekly_cost_cap_usd,
+          runs_per_day: draft.runs_per_day,
+          cooldown_days: draft.cooldown_days,
           scan_params: draft.scan_params,
         }),
       });
@@ -433,6 +464,60 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
               <p className="text-[10px] text-gray-500 mt-1">
                 At least one source must stay selected. Adding sources adds ~20% cost per run.
               </p>
+            </div>
+
+            {/* ── Volume controls (added Apr 30 2026) ───────────────── */}
+            <div className="rounded-lg border border-[#3e8692]/20 bg-[#3e8692]/5 p-3 space-y-3">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#3e8692]">
+                  Volume Controls
+                </span>
+                <span className="text-[10px] text-gray-500">— more prospects per day</span>
+              </div>
+
+              {/* Runs per day */}
+              <div>
+                <Label htmlFor="runs-per-day">Runs per day</Label>
+                <Select
+                  value={String(draft.runs_per_day ?? 1)}
+                  onValueChange={v => updateDraft({ runs_per_day: Number(v) })}
+                >
+                  <SelectTrigger id="runs-per-day" className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RUNS_PER_DAY_OPTIONS.map(o => (
+                      <SelectItem key={o.v} value={String(o.v)}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  2× runs catch funding announcements that drop during US business hours.
+                  <strong className="text-gray-700"> Doubles cost.</strong>
+                </p>
+              </div>
+
+              {/* Cooldown days */}
+              <div>
+                <Label htmlFor="cooldown">Re-scan cooldown</Label>
+                <Select
+                  value={String(draft.cooldown_days ?? 14)}
+                  onValueChange={v => updateDraft({ cooldown_days: Number(v) })}
+                >
+                  <SelectTrigger id="cooldown" className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COOLDOWN_OPTIONS.map(o => (
+                      <SelectItem key={o.v} value={String(o.v)}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-gray-500 mt-1">
+                  How many days a prospect must NOT be re-scanned. Lower = catches prospects
+                  whose Korea signal fired AFTER their last scan, but increases re-research cost.
+                </p>
+              </div>
             </div>
 
             {/* Cost estimate */}

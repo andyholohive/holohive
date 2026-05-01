@@ -957,7 +957,11 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}));
     const recencyDays = Math.max(1, Math.min(365, Number(body.recency_days) || 30));
     const minRaise = Math.max(0, Number(body.min_raise_usd) || 1_000_000);
-    const maxProjects = Math.max(1, Math.min(20, Number(body.max_projects) || 10));
+    // Cap raised from 20 → 50 on Apr 30 2026 to support higher-volume
+    // scans. The Stage 2 enrichment parallelizes batches so latency
+    // scales reasonably even at 50; cost scales linearly though, so the
+    // weekly cost cap is the safety net for anyone setting this high.
+    const maxProjects = Math.max(1, Math.min(50, Number(body.max_projects) || 10));
     const categories: string[] = Array.isArray(body.categories) ? body.categories : [];
     const modelAlias = String(body.model || 'opus').toLowerCase();
     const model =
@@ -979,7 +983,10 @@ export async function POST(request: Request) {
     // names in the prompt was crowding Claude's context and causing
     // Stage 1 to return zero candidates — the reason we fought a "scan
     // returns empty" regression for a session.
-    const COOLDOWN_DAYS = Number(body.cooldown_days) || 14;
+    // cooldown_days is now configurable from the schedule dialog.
+    // Bounded 1..60 days defensively in case a caller passes garbage;
+    // the dialog UI restricts to {3, 7, 14, 30}.
+    const COOLDOWN_DAYS = Math.max(1, Math.min(60, Number(body.cooldown_days) || 14));
     const cooldownCutoff = new Date(Date.now() - COOLDOWN_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
     // Source 1: recently-scanned discovery prospects (cooldown window).

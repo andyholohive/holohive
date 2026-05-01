@@ -91,6 +91,33 @@ export async function GET(request: Request) {
     });
   }
 
+  // ── Runs-per-day check ──
+  // vercel.json registers TWO cron entries that hit this endpoint:
+  // 0 0 * * * (00:00 UTC = 09:00 KST, the morning sweep) and 0 12 * * *
+  // (12:00 UTC = 21:00 KST = 09:00 ET, catches US-business-hours funding
+  // announcements). The morning run always fires when shouldRun=true.
+  // The afternoon run only fires when the user has explicitly opted in
+  // by setting runs_per_day=2 in the schedule dialog.
+  //
+  // We detect "which fire is this" by the current UTC hour. The morning
+  // cron lands within the 0:00-0:59 UTC hour, the afternoon within 12:00-
+  // 12:59 UTC. Anything else (e.g. a manual curl from /api/cron/...) is
+  // treated as the morning run for backward compat.
+  const runsPerDay = (schedule.runs_per_day as number | null) ?? 1;
+  const utcHour = now.getUTCHours();
+  const isAfternoonFire = utcHour >= 11 && utcHour <= 13;
+  if (isAfternoonFire && runsPerDay < 2) {
+    await recordRun(supabase, 'skipped_cadence', {
+      reason: 'runs_per_day=1; afternoon cron skipped',
+      runs_per_day: runsPerDay,
+      utc_hour: utcHour,
+    });
+    return NextResponse.json({
+      skipped: true,
+      reason: `runs_per_day=${runsPerDay}, afternoon fire skipped (set to 2 in /reminders... actually /intelligence schedule dialog to enable)`,
+    });
+  }
+
   // ── Cost cap check (kill switch) ──
   // Sum the rolling 7-day spend across all DISCOVERY agent_runs (manual
   // scans, deep dives, find-pocs, cron runs — everything counts toward
@@ -159,10 +186,15 @@ export async function GET(request: Request) {
   // so any improvements (alerts, dedup, CRM filter, etc.) flow through
   // automatically.
   const baseUrl = resolveBaseUrl();
+  // Forward the configured cooldown_days to the scan endpoint. Lives at
+  // the top level of scheduled_scans (not inside scan_params) because
+  // it's a volume control, not a scan parameter.
   const scanBody = {
     ...schedule.scan_params,
-    // Always tag the run so output_summary makes it obvious in the dashboard
+    cooldown_days: schedule.cooldown_days ?? 14,
+    // Tag for the dashboard so AM and PM runs are distinguishable in the UI.
     cron_triggered: true,
+    cron_fire: isAfternoonFire ? 'afternoon' : 'morning',
   };
 
   let scanResult: any = null;
