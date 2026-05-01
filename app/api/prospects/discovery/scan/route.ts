@@ -328,56 +328,80 @@ const candidatesTool = {
   },
 };
 
-async function findCandidates(
+/**
+ * Lightweight name normalizer used for cross-source dedup in Stage 1.
+ * Mirrors the heavier normalizeProjectName() defined inside the POST
+ * handler (used for CRM dedup) — same casing/punctuation rules. Kept
+ * separate to avoid a circular extraction; results match for the
+ * purposes we need here.
+ */
+function normalizeNameForDedup(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Stage 1 call for a SINGLE source. Each source gets its own focused
+ * Claude call with a fresh search budget — that's the whole point of
+ * parallelization. Compared to the old shared-call approach where 4
+ * sources fought over 22 searches (~5.5 each), each source now gets
+ * ~12 searches dedicated to it. That means Claude can actually go
+ * deep on each source instead of skimming.
+ *
+ * Caller is responsible for splitting maxCandidates across sources
+ * before calling this — `perSourceQuota` is the *per-source* quota,
+ * not the total scan quota.
+ */
+async function findCandidatesFromSource(
   anthropic: any,
   model: string,
+  source: DiscoverySource,
   params: {
     recencyDays: number;
     minRaise: number;
-    maxCandidates: number;
+    perSourceQuota: number;   // how many to ask THIS source for
     categories: string[];
-    skipNames: string[];      // projects we've already scanned recently — don't return these
-    cooldownDays: number;     // how old the skip list is, for the prompt
-    sources: DiscoverySource[]; // which sources Claude is allowed to query
+    skipNames: string[];
+    cooldownDays: number;
   },
 ): Promise<{
   candidates: CandidateBasics[];
   inputTokens: number;
   outputTokens: number;
-  stopReason: string | null;
+  source: DiscoverySource;
 }> {
-  // Build the exclusion clause. If the list is long, cap it so we don't
-  // blow the prompt budget on skip-names (Claude doesn't need to see all 500
-  // to get the point — a couple hundred is sufficient context).
   const skipSample = params.skipNames.slice(0, 200);
   const exclusionClause = skipSample.length > 0
     ? `\n\n## ALREADY SCANNED — DO NOT INCLUDE
-The following projects were scanned in the last ${params.cooldownDays} days and are already in our database. DO NOT include them — they'd be wasted research. Go DEEPER on the DropsTab list (scroll past the top entries, open page 2+ if available) to find DIFFERENT projects.
+The following projects were scanned in the last ${params.cooldownDays} days and are already in our database. DO NOT include them — they'd be wasted research. Go DEEPER on the source's listing (scroll past the top entries, open subsequent pages if available) to find DIFFERENT projects.
 
 ${skipSample.map(n => `- ${n}`).join('\n')}${params.skipNames.length > skipSample.length ? `\n  (...and ${params.skipNames.length - skipSample.length} more — same rule applies)` : ''}
 
 If the entire top of the list is in the skip list, that's expected — you need to go further down.`
     : '';
 
-  const userPrompt = `List up to ${params.maxCandidates} crypto projects that appear on DropsTab's raised-funds page and meet these filters:
+  const sourceUrl = SOURCE_DEFS[source].url;
+  const userPrompt = `List up to ${params.perSourceQuota} crypto projects from ${sourceUrl} that meet these filters:
 
 - Raised at least $${params.minRaise.toLocaleString()} USD
 - Announced within the last ${params.recencyDays} days${params.categories.length > 0 ? `\n- Category is one of: ${params.categories.join(', ')}` : ''}
 
-For each, include name, symbol, category, funding amount, round type, date (if visible), lead investors, DropsTab URL, and website URL.${exclusionClause}
+For each, include name, symbol, category, funding amount, round type, date (if visible), lead investors, source URL, and website URL. Set primary_source='${source}'.${exclusionClause}
 
 Call submit_candidates when done.`;
 
-  const systemPromptText = buildCandidatesSystemPrompt(params.sources);
+  // System prompt scoped to this single source — shorter and more
+  // focused than the multi-source version, plus separately cacheable.
+  const systemPromptText = buildCandidatesSystemPrompt([source]);
 
-  // Scale the web_search budget with the number of sources — one extra
-  // source costs ~4 searches (scan + verify a couple of candidates).
-  const searchBudget = 10 + (params.sources.length - 1) * 4;
+  // Each source gets a generous independent budget. 12 searches lets
+  // Claude scan the listing page + verify ~5-8 candidates.
+  const searchBudget = 12;
 
-  // Wrapped in retry helper to recover from 429 rate-limits (Opus +
-  // parallel batches can spike past the org token-per-minute cap) and
-  // the rare case where the model returns text instead of calling
-  // submit_candidates. See callAnthropicWithRetry above.
   const response = await callAnthropicWithRetry(
     anthropic,
     {
@@ -403,13 +427,140 @@ Call submit_candidates when done.`;
     (b: any) => b.type === 'tool_use' && b.name === 'submit_candidates',
   ) as any;
 
-  const candidates: CandidateBasics[] = submitBlock?.input?.candidates ?? [];
+  const rawCandidates: CandidateBasics[] = submitBlock?.input?.candidates ?? [];
+
+  // Force-tag primary_source on each returned candidate. Claude usually
+  // sets this correctly given the prompt, but if it returns null we
+  // know which source actually produced this row.
+  const candidates = rawCandidates.map(c => ({ ...c, primary_source: c.primary_source ?? source }));
 
   return {
     candidates,
     inputTokens: response.usage?.input_tokens ?? 0,
     outputTokens: response.usage?.output_tokens ?? 0,
-    stopReason: response.stop_reason ?? null,
+    source,
+  };
+}
+
+/**
+ * Stage 1 orchestrator — fires one Claude call PER source in parallel,
+ * then merges + dedups the results.
+ *
+ * Replaces the previous single-shared-call architecture where ALL
+ * configured sources had to fit in one Claude brain-shot with a single
+ * 10-22 web_search budget. Observed problem: with 4 sources Claude got
+ * ~5 searches per source — barely enough to scan one list, let alone
+ * verify candidates or page deeper. Result: low candidate counts even
+ * when max_projects was set high.
+ *
+ * Parallel architecture:
+ *   - Each source gets its own dedicated Claude call with 12 searches
+ *   - Per-source quota = ceil(maxCandidates / N) + buffer (absorbs dedup
+ *     loss between sources that catch the same project)
+ *   - Promise.allSettled so a single source failure doesn't kill the
+ *     stage — a Discovery scan with 4 sources still ships if RootData
+ *     is down, just with reduced volume
+ *   - After aggregation: cross-source dedup by normalized name, then
+ *     trim to maxCandidates total
+ *
+ * Cost: this is N times the Stage 1 call cost. With prompt caching the
+ * marginal cost is small (~10% of fresh write after the first call), and
+ * Stage 2 enrichment dominates total cost anyway. Net: ~$0.05-0.20 more
+ * per scan, but 2-3× more candidates → much better cost-per-candidate.
+ */
+async function findCandidates(
+  anthropic: any,
+  model: string,
+  params: {
+    recencyDays: number;
+    minRaise: number;
+    maxCandidates: number;
+    categories: string[];
+    skipNames: string[];
+    cooldownDays: number;
+    sources: DiscoverySource[];
+  },
+): Promise<{
+  candidates: CandidateBasics[];
+  inputTokens: number;
+  outputTokens: number;
+  stopReason: string | null;
+  sourceErrors: string[];
+  perSourceCounts: Record<string, number>;
+}> {
+  // Per-source quota: aim for total maxCandidates after cross-source
+  // dedup. Add +2 buffer to absorb dedup loss when the same project
+  // appears in multiple sources (common — DropsTab and CryptoRank
+  // overlap heavily on top-funded rounds).
+  const perSourceQuota = Math.ceil(params.maxCandidates / params.sources.length) + 2;
+
+  // Single source? Skip the parallelization overhead.
+  if (params.sources.length === 1) {
+    const result = await findCandidatesFromSource(anthropic, model, params.sources[0], {
+      ...params,
+      perSourceQuota: params.maxCandidates,
+    });
+    return {
+      candidates: result.candidates.slice(0, params.maxCandidates),
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      stopReason: null,
+      sourceErrors: [],
+      perSourceCounts: { [result.source]: result.candidates.length },
+    };
+  }
+
+  // Fire all sources in parallel. allSettled so a single failure (e.g.
+  // 429 from one source's call after retries exhausted) doesn't abort
+  // the others — degraded volume is better than zero candidates.
+  const results = await Promise.allSettled(
+    params.sources.map(s =>
+      findCandidatesFromSource(anthropic, model, s, { ...params, perSourceQuota }),
+    ),
+  );
+
+  // Aggregate
+  const allCandidates: CandidateBasics[] = [];
+  let inputTokens = 0;
+  let outputTokens = 0;
+  const sourceErrors: string[] = [];
+  const perSourceCounts: Record<string, number> = {};
+
+  results.forEach((r, idx) => {
+    const sourceName = params.sources[idx];
+    if (r.status === 'fulfilled') {
+      allCandidates.push(...r.value.candidates);
+      inputTokens += r.value.inputTokens;
+      outputTokens += r.value.outputTokens;
+      perSourceCounts[sourceName] = r.value.candidates.length;
+    } else {
+      sourceErrors.push(`${sourceName}: ${r.reason?.message ?? 'unknown error'}`);
+      perSourceCounts[sourceName] = 0;
+    }
+  });
+
+  // Cross-source dedup. The same project (e.g. Solayer) may appear on
+  // both DropsTab and CryptoRank — keep the first occurrence and drop
+  // duplicates. Source order in params.sources determines preference.
+  const seen = new Set<string>();
+  const deduped: CandidateBasics[] = [];
+  for (const c of allCandidates) {
+    const key = normalizeNameForDedup(c.name || '');
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(c);
+  }
+
+  return {
+    candidates: deduped.slice(0, params.maxCandidates),
+    inputTokens,
+    outputTokens,
+    // stopReason isn't meaningful across N parallel calls; preserved
+    // in the return shape for backward compat with callers that
+    // record it on agent_runs.
+    stopReason: null,
+    sourceErrors,
+    perSourceCounts,
   };
 }
 
@@ -1049,15 +1200,6 @@ export async function POST(request: Request) {
     const crmSkipCount = crmNameSet.size;
     const recentSkipCount = (recentProspects || []).length;
 
-    // ── Stage 1 ──────────────────────────────────────────────────────
-    await updateProgress({
-      stage: 'discovering_candidates',
-      message: skipNames.length > 0
-        ? `Finding new candidates on DropsTab (skipping ${skipNames.length}: ${recentSkipCount} recently scanned, ${crmSkipCount} in CRM)...`
-        : 'Finding candidates on DropsTab...',
-      percent: 5,
-    });
-
     // Resolve which sources this scan should query.
     //   - `body.sources` (preferred) is an array like ['dropstab', 'cryptorank']
     //   - legacy `body.experimental_sources: true` means dropstab + cryptorank
@@ -1074,6 +1216,19 @@ export async function POST(request: Request) {
     } else {
       sources = ['dropstab'];
     }
+
+    // ── Stage 1 ──────────────────────────────────────────────────────
+    // Now parallelized — one Claude call per source, fired concurrently.
+    // Progress message reflects the source list so the dialog shows what
+    // we're actually doing.
+    const sourceList = sources.length === 1 ? sources[0] : `${sources.length} sources in parallel`;
+    await updateProgress({
+      stage: 'discovering_candidates',
+      message: skipNames.length > 0
+        ? `Finding new candidates on ${sourceList} (skipping ${skipNames.length}: ${recentSkipCount} recently scanned, ${crmSkipCount} in CRM)...`
+        : `Finding candidates on ${sourceList}...`,
+      percent: 5,
+    });
 
     const stage1Raw = await findCandidates(anthropic, model, {
       recencyDays,
@@ -1282,6 +1437,11 @@ export async function POST(request: Request) {
 
     await finishRun('completed', {
       candidates_found: stage1.candidates.length,
+      // Per-source breakdown — useful for tuning which sources are
+      // pulling weight vs. wasting budget. Comes from the parallel
+      // Stage 1 orchestrator.
+      stage1_per_source: stage1.perSourceCounts,
+      stage1_source_errors: stage1.sourceErrors.length > 0 ? stage1.sourceErrors : undefined,
       batches_run: batches.length,
       batches_failed: batchErrors.length,
       projects_enriched: allProjects.length,
