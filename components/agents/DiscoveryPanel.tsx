@@ -206,6 +206,23 @@ function timeAgo(iso: string | null | undefined): string | null {
 
 const DEEP_DIVE_COOLDOWN_HOURS = 24;
 
+/**
+ * Toggle the prospect score column on/off across the prospect list +
+ * expanded view. Andy asked for the score field to be hidden on the
+ * Intelligence page; flipping this back to true restores it. The
+ * score data still gets persisted from the scan endpoint — we're
+ * only hiding the UI surfaces.
+ *
+ * Surfaces gated by this:
+ *   - Score column header + sort button (table)
+ *   - Score number cell (table row)
+ *   - "Score: X+Y+Z = N/100" chip (expanded row)
+ *
+ * Sort logic for sort.field='score' is left intact — it's just
+ * unreachable while the header is hidden.
+ */
+const SHOW_SCORE_COLUMN = false;
+
 // Discovery source picker — the four sources the Run Discovery scan can
 // query (must match SUPPORTED_SOURCES in app/api/prospects/discovery/scan/route.ts).
 type DiscoverySourceId = 'dropstab' | 'cryptorank' | 'rootdata' | 'ethglobal';
@@ -1385,55 +1402,57 @@ export default function DiscoveryPanel() {
                     )}
                   </button>
                 </TableHead>
-                <TableHead>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => toggleSort('score')}
-                      className="flex items-center gap-1 group hover:text-gray-900"
-                      title="Sort by prospect score"
-                    >
-                      <span>Score</span>
-                      {sort.field === 'score' ? (
-                        sort.direction === 'asc'
-                          ? <ArrowUp className="h-3 w-3" />
-                          : <ArrowDown className="h-3 w-3" />
-                      ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />
-                      )}
-                    </button>
-                    {/* Score rubric — shown on hover. Makes the 60/30 color
-                        thresholds self-documenting instead of folklore. */}
-                    <HoverCard openDelay={100} closeDelay={50}>
-                      <HoverCardTrigger asChild>
-                        <Info className="h-3 w-3 text-gray-400 hover:text-gray-700 cursor-help" />
-                      </HoverCardTrigger>
-                      <HoverCardContent side="bottom" align="start" className="w-72 text-xs">
-                        <div className="font-semibold text-gray-800 mb-1.5">
-                          Prospect score (0–100)
-                        </div>
-                        <div className="text-gray-600 mb-2">
-                          Sum of three components, each 0–33:
-                          ICP fit · Signal strength · Timing.
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex items-baseline gap-2">
-                            <span className="inline-block w-10 text-right text-emerald-700 font-semibold tabular-nums">≥60</span>
-                            <span className="text-gray-700">Strong — prioritize outreach now.</span>
+                {SHOW_SCORE_COLUMN && (
+                  <TableHead>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleSort('score')}
+                        className="flex items-center gap-1 group hover:text-gray-900"
+                        title="Sort by prospect score"
+                      >
+                        <span>Score</span>
+                        {sort.field === 'score' ? (
+                          sort.direction === 'asc'
+                            ? <ArrowUp className="h-3 w-3" />
+                            : <ArrowDown className="h-3 w-3" />
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />
+                        )}
+                      </button>
+                      {/* Score rubric — shown on hover. Makes the 60/30 color
+                          thresholds self-documenting instead of folklore. */}
+                      <HoverCard openDelay={100} closeDelay={50}>
+                        <HoverCardTrigger asChild>
+                          <Info className="h-3 w-3 text-gray-400 hover:text-gray-700 cursor-help" />
+                        </HoverCardTrigger>
+                        <HoverCardContent side="bottom" align="start" className="w-72 text-xs">
+                          <div className="font-semibold text-gray-800 mb-1.5">
+                            Prospect score (0–100)
                           </div>
-                          <div className="flex items-baseline gap-2">
-                            <span className="inline-block w-10 text-right text-amber-700 font-semibold tabular-nums">30–59</span>
-                            <span className="text-gray-700">Borderline — review reasoning before reaching out.</span>
+                          <div className="text-gray-600 mb-2">
+                            Sum of three components, each 0–33:
+                            ICP fit · Signal strength · Timing.
                           </div>
-                          <div className="flex items-baseline gap-2">
-                            <span className="inline-block w-10 text-right text-gray-500 font-semibold tabular-nums">&lt;30</span>
-                            <span className="text-gray-700">Weak — probably nurture or skip.</span>
+                          <div className="space-y-1">
+                            <div className="flex items-baseline gap-2">
+                              <span className="inline-block w-10 text-right text-emerald-700 font-semibold tabular-nums">≥60</span>
+                              <span className="text-gray-700">Strong — prioritize outreach now.</span>
+                            </div>
+                            <div className="flex items-baseline gap-2">
+                              <span className="inline-block w-10 text-right text-amber-700 font-semibold tabular-nums">30–59</span>
+                              <span className="text-gray-700">Borderline — review reasoning before reaching out.</span>
+                            </div>
+                            <div className="flex items-baseline gap-2">
+                              <span className="inline-block w-10 text-right text-gray-500 font-semibold tabular-nums">&lt;30</span>
+                              <span className="text-gray-700">Weak — probably nurture or skip.</span>
+                            </div>
                           </div>
-                        </div>
-                      </HoverCardContent>
-                    </HoverCard>
-                  </div>
-                </TableHead>
+                        </HoverCardContent>
+                      </HoverCard>
+                    </div>
+                  </TableHead>
+                )}
                 <TableHead>POC</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -1607,17 +1626,19 @@ export default function DiscoveryPanel() {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        {p.prospect_score?.total != null ? (
-                          <span className={`text-sm font-semibold ${
-                            p.prospect_score.total >= 60 ? 'text-emerald-700' :
-                            p.prospect_score.total >= 30 ? 'text-amber-700' :
-                            'text-gray-500'
-                          }`}>
-                            {p.prospect_score.total}<span className="text-xs text-gray-400">/100</span>
-                          </span>
-                        ) : <span className="text-xs text-gray-400">—</span>}
-                      </TableCell>
+                      {SHOW_SCORE_COLUMN && (
+                        <TableCell>
+                          {p.prospect_score?.total != null ? (
+                            <span className={`text-sm font-semibold ${
+                              p.prospect_score.total >= 60 ? 'text-emerald-700' :
+                              p.prospect_score.total >= 30 ? 'text-amber-700' :
+                              'text-gray-500'
+                            }`}>
+                              {p.prospect_score.total}<span className="text-xs text-gray-400">/100</span>
+                            </span>
+                          ) : <span className="text-xs text-gray-400">—</span>}
+                        </TableCell>
+                      )}
                       <TableCell>
                         {p.outreach_contacts && p.outreach_contacts.length > 0 ? (
                           <div className="flex flex-col gap-0.5">
@@ -1800,7 +1821,7 @@ export default function DiscoveryPanel() {
                                     ICP: {p.icp_verdict}
                                   </span>
                                 )}
-                                {p.prospect_score && (
+                                {SHOW_SCORE_COLUMN && p.prospect_score && (
                                   <span className="text-[10px] text-gray-600 px-1.5 py-0.5 rounded border border-gray-200 pointer-events-none">
                                     Score: {p.prospect_score.icp_fit}+{p.prospect_score.signal_strength}+{p.prospect_score.timing} = {p.prospect_score.total}/100
                                   </span>
