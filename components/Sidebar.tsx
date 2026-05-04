@@ -115,6 +115,98 @@ export default function Sidebar({ children }: SidebarProps) {
   // Helper: hide items that guests should never see
   const guestHideAlways = guestStillLoading || isGuestUser;
 
+  // ─── Nav-item helpers ──────────────────────────────────────────────
+  // Extract the repeated <Link><Button>...</Button></Link> pattern that
+  // appears 24 times in the main nav and 7 times in the Tasks sub-nav.
+  // Per-item gating (guestHide / role checks) stays at the call site —
+  // these helpers only own rendering, so the gating logic remains
+  // visible and easy to audit.
+  //
+  // Why local closures instead of separate exports: they capture
+  // pathname + isSidebarCollapsed from the parent component scope so
+  // call sites don't have to thread those props through every item.
+  // Sidebar is the only consumer; if we ever build a mobile-drawer
+  // nav, these become a candidate for extraction.
+
+  /** A single top-level nav item. */
+  const NavItem = ({
+    href,
+    icon: Icon,
+    label,
+  }: {
+    href: string;
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+  }) => {
+    const isActive = pathname.startsWith(href);
+    return (
+      <Link href={href} legacyBehavior>
+        <Button
+          asChild
+          variant={isActive ? 'default' : 'ghost'}
+          className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+          style={isActive ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+          title={isSidebarCollapsed ? label : undefined}
+        >
+          <span>
+            <Icon className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+            {!isSidebarCollapsed && label}
+          </span>
+        </Button>
+      </Link>
+    );
+  };
+
+  /** A nested item under a NavItem (currently used by the Tasks
+   *  sub-nav). Smaller, indented, uses 'secondary' variant for active
+   *  state instead of the brand-color default. `exact` matches the
+   *  pathname exactly (for "/tasks") rather than starts-with (for
+   *  "/tasks/admin" etc.). */
+  const SubNavItem = ({
+    href,
+    icon: Icon,
+    label,
+    exact = false,
+  }: {
+    href: string;
+    icon: React.ComponentType<{ className?: string }>;
+    label: string;
+    exact?: boolean;
+  }) => {
+    const isActive = exact ? pathname === href : pathname.startsWith(href);
+    return (
+      <Link href={href} legacyBehavior>
+        <Button
+          asChild
+          variant={isActive ? 'secondary' : 'ghost'}
+          className="w-full justify-start h-7 text-xs"
+        >
+          <span>
+            <Icon className="h-3.5 w-3.5 mr-2" />
+            {label}
+          </span>
+        </Button>
+      </Link>
+    );
+  };
+
+  /** Visual section divider: small icon + horizontal rule. Hidden when
+   *  the sidebar is collapsed (icons-only mode would just show a
+   *  random floating icon, which is noise). */
+  const SectionDivider = ({
+    icon: Icon,
+  }: {
+    icon: React.ComponentType<{ className?: string }>;
+  }) => {
+    if (isSidebarCollapsed) return null;
+    return (
+      <div className="flex items-center space-x-2">
+        <Icon className="h-4 w-4 text-gray-400" />
+        <div className="flex-1 h-px bg-gray-200"></div>
+      </div>
+    );
+  };
+
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
       {/* Header */}
@@ -178,599 +270,116 @@ export default function Sidebar({ children }: SidebarProps) {
                   {[1,2,3,4,5].map(i => <div key={i} className="h-8 bg-gray-100 rounded animate-pulse" />)}
                 </div>
               ) : <>
-              {/* Holo GPT - Top of sidebar — hidden for guests */}
-              {!guestHideAlways && (<div className="space-y-2">
-                <Link href="/chat" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/chat') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/chat') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Holo GPT' : undefined}
-                  >
-                    <span>
-                      <Sparkles className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Holo GPT'}
-                    </span>
-                  </Button>
-                </Link>
-              </div>)}
+              {/* Holo GPT — top of sidebar, hidden for guests */}
+              {!guestHideAlways && (
+                <div className="space-y-2">
+                  <NavItem href="/chat" icon={Sparkles} label="Holo GPT" />
+                </div>
+              )}
 
               {/* People Section */}
-              {!guestHideSection(['/clients']) && <>
-              {!isSidebarCollapsed && (
-                <div className="flex items-center space-x-2">
-                  <User className="h-4 w-4 text-gray-400" />
-                  <div className="flex-1 h-px bg-gray-200"></div>
-                </div>
+              {!guestHideSection(['/clients']) && (
+                <>
+                  <SectionDivider icon={User} />
+                  <div className="space-y-2">
+                    {!isGuest && <NavItem href="/team" icon={Shield} label="Team" />}
+                    {!guestHide('/clients') && <NavItem href="/clients" icon={Users} label="Clients" />}
+                  </div>
+                </>
               )}
-              <div className="space-y-2">
-                {/* Team tab — hidden for guests */}
-                {!isGuest && (<Link href="/team" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/team') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/team') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Team' : undefined}
-                  >
-                    <span>
-                      <Shield className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Team'}
-                    </span>
-                  </Button>
-                </Link>)}
-                {/* Clients tab */}
-                {!guestHide('/clients') && (
-                  <Link href="/clients" legacyBehavior>
-                    <Button
-                      asChild
-                      variant={pathname.startsWith('/clients') ? 'default' : 'ghost'}
-                      className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                      style={pathname.startsWith('/clients') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                      title={isSidebarCollapsed ? 'Clients' : undefined}
-                    >
-                      <span>
-                        <Users className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                        {!isSidebarCollapsed && 'Clients'}
-                      </span>
-                    </Button>
-                  </Link>
-                )}
-              </div>
-              </>}
 
               {/* KOLs Section */}
-              {!guestHideSection(['/kols', '/lists', '/campaigns']) && <>
-              {!isSidebarCollapsed && (
-                <div className="flex items-center space-x-2">
-                  <Crown className="h-4 w-4 text-gray-400" />
-                  <div className="flex-1 h-px bg-gray-200"></div>
-                </div>
+              {!guestHideSection(['/kols', '/lists', '/campaigns']) && (
+                <>
+                  <SectionDivider icon={Crown} />
+                  <div className="space-y-2">
+                    {!guestHide('/kols') && <NavItem href="/kols" icon={Crown} label="KOLs" />}
+                    {!guestHide('/lists') && <NavItem href="/lists" icon={List} label="Lists" />}
+                    {!guestHide('/campaigns') && <NavItem href="/campaigns" icon={Megaphone} label="Campaigns" />}
+                  </div>
+                </>
               )}
-              <div className="space-y-2">
-                {/* KOLs tab */}
-                {!guestHide('/kols') && (<Link href="/kols" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/kols') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/kols') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'KOLs' : undefined}
-                  >
-                    <span>
-                      <Crown className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'KOLs'}
-                    </span>
-                  </Button>
-                </Link>)}
-                {/* Lists tab */}
-                {!guestHide('/lists') && (<Link href="/lists" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/lists') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/lists') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Lists' : undefined}
-                  >
-                    <span>
-                      <List className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Lists'}
-                    </span>
-                  </Button>
-                </Link>)}
-                {/* Campaigns tab */}
-                {!guestHide('/campaigns') && (<Link href="/campaigns" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/campaigns') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/campaigns') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Campaigns' : undefined}
-                  >
-                    <span>
-                      <Megaphone className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Campaigns'}
-                    </span>
-                  </Button>
-                </Link>)}
-              </div>
-              </>}
 
               {/* CRM Section */}
-              {!guestHideSection(['/crm/sales-pipeline', '/intelligence', '/crm/network', '/crm/contacts', '/crm/submissions', '/crm/meetings']) && <>
-              {!isSidebarCollapsed && (
-                <div className="flex items-center space-x-2">
-                  <DollarSign className="h-4 w-4 text-gray-400" />
-                  <div className="flex-1 h-px bg-gray-200"></div>
-                </div>
+              {!guestHideSection(['/crm/sales-pipeline', '/intelligence', '/crm/network', '/crm/contacts', '/crm/submissions', '/crm/meetings']) && (
+                <>
+                  <SectionDivider icon={DollarSign} />
+                  <div className="space-y-2">
+                    {!guestHide('/crm/sales-pipeline') && <NavItem href="/crm/sales-pipeline" icon={Target} label="Sales" />}
+                    {!guestHide('/intelligence') && <NavItem href="/intelligence" icon={Radar} label="Intelligence" />}
+                    {/* Analytics — team dashboard with KPIs, pipeline funnel,
+                        owner workload, recent activity, health alerts.
+                        Reads /api/analytics/dashboard in one call. */}
+                    {!guestHide('/analytics') && <NavItem href="/analytics" icon={BarChart3} label="Analytics" />}
+                    {!guestHide('/crm/network') && <NavItem href="/crm/network" icon={Handshake} label="Network" />}
+                    {!guestHide('/crm/contacts') && <NavItem href="/crm/contacts" icon={UserPlus} label="Contacts" />}
+                    {!guestHide('/crm/submissions') && <NavItem href="/crm/submissions" icon={Inbox} label="Submissions" />}
+                    {!guestHide('/crm/meetings') && <NavItem href="/crm/meetings" icon={Calendar} label="Meetings" />}
+                    {userProfile?.role === 'super_admin' && <NavItem href="/crm/telegram" icon={MessageSquare} label="TG Chats" />}
+                  </div>
+                </>
               )}
-              <div className="space-y-2">
-                {/* Sales Pipeline tab */}
-                {!guestHide('/crm/sales-pipeline') && (<Link href="/crm/sales-pipeline" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/crm/sales-pipeline') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/crm/sales-pipeline') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Sales' : undefined}
-                  >
-                    <span>
-                      <Target className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Sales'}
-                    </span>
-                  </Button>
-                </Link>)}
-                {/* Intelligence tab */}
-                {!guestHide('/intelligence') && (<Link href="/intelligence" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/intelligence') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/intelligence') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Intelligence' : undefined}
-                  >
-                    <span>
-                      <Radar className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Intelligence'}
-                    </span>
-                  </Button>
-                </Link>)}
-                {/* Analytics — team dashboard with KPIs, pipeline funnel,
-                    owner workload, recent activity, health alerts. Reads
-                    /api/analytics/dashboard in one call. */}
-                {!guestHide('/analytics') && (<Link href="/analytics" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/analytics') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/analytics') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Analytics' : undefined}
-                  >
-                    <span>
-                      <BarChart3 className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Analytics'}
-                    </span>
-                  </Button>
-                </Link>)}
-                {/* Network tab */}
-                {!guestHide('/crm/network') && (<Link href="/crm/network" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/crm/network') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/crm/network') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Network' : undefined}
-                  >
-                    <span>
-                      <Handshake className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Network'}
-                    </span>
-                  </Button>
-                </Link>)}
-                {/* Contacts tab */}
-                {!guestHide('/crm/contacts') && (<Link href="/crm/contacts" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/crm/contacts') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/crm/contacts') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Contacts' : undefined}
-                  >
-                    <span>
-                      <UserPlus className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Contacts'}
-                    </span>
-                  </Button>
-                </Link>)}
-                {/* Submissions tab */}
-                {!guestHide('/crm/submissions') && (<Link href="/crm/submissions" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/crm/submissions') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/crm/submissions') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Submissions' : undefined}
-                  >
-                    <span>
-                      <Inbox className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Submissions'}
-                    </span>
-                  </Button>
-                </Link>)}
-                {/* Meetings tab */}
-                {!guestHide('/crm/meetings') && (<Link href="/crm/meetings" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/crm/meetings') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/crm/meetings') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Meetings' : undefined}
-                  >
-                    <span>
-                      <Calendar className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Meetings'}
-                    </span>
-                  </Button>
-                </Link>)}
-                {/* Telegram Chats tab - Super Admin only */}
-                {userProfile?.role === 'super_admin' && (
-                  <Link href="/crm/telegram" legacyBehavior>
-                    <Button
-                      asChild
-                      variant={pathname.startsWith('/crm/telegram') ? 'default' : 'ghost'}
-                      className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                      style={pathname.startsWith('/crm/telegram') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                      title={isSidebarCollapsed ? 'TG Chats' : undefined}
-                    >
-                      <span>
-                        <MessageSquare className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                        {!isSidebarCollapsed && 'TG Chats'}
-                      </span>
-                    </Button>
-                  </Link>
-                )}
-              </div>
-              </>}
 
               {/* Workspace Section */}
               {!guestHideSection(['/daily-standup', '/tasks']) && (
                 <>
-                  {!isSidebarCollapsed && (
-                    <div className="flex items-center space-x-2">
-                      <Briefcase className="h-4 w-4 text-gray-400" />
-                      <div className="flex-1 h-px bg-gray-200"></div>
-                    </div>
-                  )}
+                  <SectionDivider icon={Briefcase} />
                   <div className="space-y-2">
-                    {/* Daily Stand-Up tab */}
-                    <Link href="/daily-standup" legacyBehavior>
-                      <Button
-                        asChild
-                        variant={pathname.startsWith('/daily-standup') ? 'default' : 'ghost'}
-                        className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                        style={pathname.startsWith('/daily-standup') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                        title={isSidebarCollapsed ? 'Daily Stand-Up' : undefined}
-                      >
-                        <span>
-                          <CheckCircle className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                          {!isSidebarCollapsed && 'Daily Stand-Up'}
-                        </span>
-                      </Button>
-                    </Link>
-                    {/* Tasks tab */}
-                    <Link href="/tasks" legacyBehavior>
-                      <Button
-                        asChild
-                        variant={pathname.startsWith('/tasks') ? 'default' : 'ghost'}
-                        className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                        style={pathname.startsWith('/tasks') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                        title={isSidebarCollapsed ? 'Tasks' : undefined}
-                      >
-                        <span>
-                          <ListTodo className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                          {!isSidebarCollapsed && 'Tasks'}
-                        </span>
-                      </Button>
-                    </Link>
-                    {/* Task sub-nav */}
+                    <NavItem href="/daily-standup" icon={CheckCircle} label="Daily Stand-Up" />
+                    <NavItem href="/tasks" icon={ListTodo} label="Tasks" />
+                    {/* Task sub-nav — visible only when expanded AND on a /tasks route */}
                     {!isSidebarCollapsed && pathname.startsWith('/tasks') && (
                       <div className="pl-6 space-y-0.5">
-                        <Link href="/tasks" legacyBehavior>
-                          <Button
-                            asChild
-                            variant={pathname === '/tasks' ? 'secondary' : 'ghost'}
-                            className="w-full justify-start h-7 text-xs"
-                          >
-                            <span>
-                              <ListTodo className="h-3.5 w-3.5 mr-2" />
-                              All Tasks
-                            </span>
-                          </Button>
-                        </Link>
-                        <Link href="/tasks/my-dashboard" legacyBehavior>
-                          <Button
-                            asChild
-                            variant={pathname === '/tasks/my-dashboard' ? 'secondary' : 'ghost'}
-                            className="w-full justify-start h-7 text-xs"
-                          >
-                            <span>
-                              <LayoutDashboard className="h-3.5 w-3.5 mr-2" />
-                              My Dashboard
-                            </span>
-                          </Button>
-                        </Link>
-                        <Link href="/tasks/deliverables" legacyBehavior>
-                          <Button
-                            asChild
-                            variant={pathname.startsWith('/tasks/deliverables') ? 'secondary' : 'ghost'}
-                            className="w-full justify-start h-7 text-xs"
-                          >
-                            <span>
-                              <Target className="h-3.5 w-3.5 mr-2" />
-                              Deliverables
-                            </span>
-                          </Button>
-                        </Link>
+                        <SubNavItem href="/tasks" icon={ListTodo} label="All Tasks" exact />
+                        <SubNavItem href="/tasks/my-dashboard" icon={LayoutDashboard} label="My Dashboard" exact />
+                        <SubNavItem href="/tasks/deliverables" icon={Target} label="Deliverables" />
                         {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                           <>
-                            <Link href="/tasks/admin" legacyBehavior>
-                              <Button
-                                asChild
-                                variant={pathname === '/tasks/admin' ? 'secondary' : 'ghost'}
-                                className="w-full justify-start h-7 text-xs"
-                              >
-                                <span>
-                                  <ShieldCheck className="h-3.5 w-3.5 mr-2" />
-                                  Admin Overview
-                                </span>
-                              </Button>
-                            </Link>
-                            <Link href="/tasks/automations" legacyBehavior>
-                              <Button
-                                asChild
-                                variant={pathname === '/tasks/automations' ? 'secondary' : 'ghost'}
-                                className="w-full justify-start h-7 text-xs"
-                              >
-                                <span>
-                                  <Zap className="h-3.5 w-3.5 mr-2" />
-                                  Automations
-                                </span>
-                              </Button>
-                            </Link>
-                            <Link href="/tasks/templates" legacyBehavior>
-                              <Button
-                                asChild
-                                variant={pathname === '/tasks/templates' ? 'secondary' : 'ghost'}
-                                className="w-full justify-start h-7 text-xs"
-                              >
-                                <span>
-                                  <FileText className="h-3.5 w-3.5 mr-2" />
-                                  Templates
-                                </span>
-                              </Button>
-                            </Link>
-                            <Link href="/tasks/deliverables/templates" legacyBehavior>
-                              <Button
-                                asChild
-                                variant={pathname === '/tasks/deliverables/templates' ? 'secondary' : 'ghost'}
-                                className="w-full justify-start h-7 text-xs"
-                              >
-                                <span>
-                                  <Sliders className="h-3.5 w-3.5 mr-2" />
-                                  Deliverable Templates
-                                </span>
-                              </Button>
-                            </Link>
+                            <SubNavItem href="/tasks/admin" icon={ShieldCheck} label="Admin Overview" exact />
+                            <SubNavItem href="/tasks/automations" icon={Zap} label="Automations" exact />
+                            <SubNavItem href="/tasks/templates" icon={FileText} label="Templates" exact />
+                            <SubNavItem href="/tasks/deliverables/templates" icon={Sliders} label="Deliverable Templates" exact />
                           </>
                         )}
                       </div>
                     )}
-                    {/* Reminders tab */}
-                    <Link href="/reminders" legacyBehavior>
-                      <Button
-                        asChild
-                        variant={pathname.startsWith('/reminders') ? 'default' : 'ghost'}
-                        className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                        style={pathname.startsWith('/reminders') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                        title={isSidebarCollapsed ? 'Reminders' : undefined}
-                      >
-                        <span>
-                          <Bell className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                          {!isSidebarCollapsed && 'Reminders'}
-                        </span>
-                      </Button>
-                    </Link>
+                    <NavItem href="/reminders" icon={Bell} label="Reminders" />
                   </div>
                 </>
               )}
 
               {/* Documents Section */}
-              {!guestHideSection(['/delivery-logs', '/links']) && <>
-              {!isSidebarCollapsed && (
-                <div className="flex items-center space-x-2">
-                  <FileText className="h-4 w-4 text-gray-400" />
-                  <div className="flex-1 h-px bg-gray-200"></div>
-                </div>
+              {!guestHideSection(['/delivery-logs', '/links']) && (
+                <>
+                  <SectionDivider icon={FileText} />
+                  <div className="space-y-2">
+                    {!guestHide('/delivery-logs') && <NavItem href="/delivery-logs" icon={ClipboardList} label="Delivery Logs" />}
+                    {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/mindshare" icon={TrendingUp} label="Mindshare" />}
+                    {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/forms" icon={ClipboardList} label="Forms" />}
+                    {!guestHide('/links') && <NavItem href="/links" icon={Link2} label="Links" />}
+                    {!guestHideAlways && <NavItem href="/templates" icon={MessageSquare} label="Templates" />}
+                    {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/sops" icon={BookOpen} label="SOPs" />}
+                  </div>
+                </>
               )}
-              <div className="space-y-2">
-                {/* Delivery Logs tab */}
-                {!guestHide('/delivery-logs') && (<Link href="/delivery-logs" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/delivery-logs') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/delivery-logs') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Delivery Logs' : undefined}
-                  >
-                    <span>
-                      <ClipboardList className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Delivery Logs'}
-                    </span>
-                  </Button>
-                </Link>)}
-                {/* Mindshare Monitor - Admin only */}
-                {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
-                  <Link href="/mindshare" legacyBehavior>
-                    <Button
-                      asChild
-                      variant={pathname.startsWith('/mindshare') ? 'default' : 'ghost'}
-                      className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                      style={pathname.startsWith('/mindshare') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                      title={isSidebarCollapsed ? 'Mindshare' : undefined}
-                    >
-                      <span>
-                        <TrendingUp className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                        {!isSidebarCollapsed && 'Mindshare'}
-                      </span>
-                    </Button>
-                  </Link>
-                )}
-                {/* Forms tab - Admin only */}
-                {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
-                  <Link href="/forms" legacyBehavior>
-                    <Button
-                      asChild
-                      variant={pathname.startsWith('/forms') ? 'default' : 'ghost'}
-                      className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                      style={pathname.startsWith('/forms') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                      title={isSidebarCollapsed ? 'Forms' : undefined}
-                    >
-                      <span>
-                        <ClipboardList className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                        {!isSidebarCollapsed && 'Forms'}
-                      </span>
-                    </Button>
-                  </Link>
-                )}
-                {/* Links tab */}
-                {!guestHide('/links') && (<Link href="/links" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/links') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/links') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Links' : undefined}
-                  >
-                    <span>
-                      <Link2 className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Links'}
-                    </span>
-                  </Button>
-                </Link>)}
-                {/* Templates tab — hidden for guests */}
-                {!guestHideAlways && (
-                  <Link href="/templates" legacyBehavior>
-                    <Button
-                      asChild
-                      variant={pathname.startsWith('/templates') ? 'default' : 'ghost'}
-                      className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                      style={pathname.startsWith('/templates') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                      title={isSidebarCollapsed ? 'Templates' : undefined}
-                    >
-                      <span>
-                        <MessageSquare className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                        {!isSidebarCollapsed && 'Templates'}
-                      </span>
-                    </Button>
-                  </Link>
-                )}
-                {/* SOPs tab - Admin only */}
-                {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
-                  <Link href="/sops" legacyBehavior>
-                    <Button
-                      asChild
-                      variant={pathname.startsWith('/sops') ? 'default' : 'ghost'}
-                      className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                      style={pathname.startsWith('/sops') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                      title={isSidebarCollapsed ? 'SOPs' : undefined}
-                    >
-                      <span>
-                        <BookOpen className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                        {!isSidebarCollapsed && 'SOPs'}
-                      </span>
-                    </Button>
-                  </Link>
-                )}
-              </div>
-              </>}
 
               {/* Admin Section — hidden for guests */}
-              {!guestHideAlways && (<>
-              {!isSidebarCollapsed && (
-                <div className="flex items-center space-x-2">
-                  <Settings className="h-4 w-4 text-gray-400" />
-                  <div className="flex-1 h-px bg-gray-200"></div>
-                </div>
+              {!guestHideAlways && (
+                <>
+                  <SectionDivider icon={Settings} />
+                  <div className="space-y-2">
+                    <NavItem href="/admin/field-options" icon={Sliders} label="Field Options" />
+                    {/* Claude MCP Cookbook — reference page for the AI
+                        connector (example prompts for every tool). Sits
+                        in the Admin section because it's a settings/help-
+                        style item, but visible to everyone since the
+                        connector itself is. */}
+                    <NavItem href="/mcp" icon={Bot} label="Claude MCP" />
+                    {userProfile?.role === 'super_admin' && <NavItem href="/admin/changelog" icon={Sparkles} label="Changelog" />}
+                    <NavItem href="/archive" icon={Archive} label="Archive" />
+                  </div>
+                </>
               )}
-              <div className="space-y-2">
-                {/* Field Options tab */}
-                <Link href="/admin/field-options" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/admin/field-options') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/admin/field-options') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Field Options' : undefined}
-                  >
-                    <span>
-                      <Sliders className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Field Options'}
-                    </span>
-                  </Button>
-                </Link>
-                {/* Claude MCP Cookbook — reference page for the AI connector
-                    (example prompts for every tool). Sits in the Admin
-                    section because it's a settings/help-style item, but
-                    visible to everyone since the connector itself is. */}
-                <Link href="/mcp" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/mcp') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/mcp') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Claude MCP' : undefined}
-                  >
-                    <span>
-                      <Bot className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Claude MCP'}
-                    </span>
-                  </Button>
-                </Link>
-                {/* Changelog tab - Super Admin only */}
-                {userProfile?.role === 'super_admin' && (
-                  <Link href="/admin/changelog" legacyBehavior>
-                    <Button
-                      asChild
-                      variant={pathname.startsWith('/admin/changelog') ? 'default' : 'ghost'}
-                      className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                      style={pathname.startsWith('/admin/changelog') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                      title={isSidebarCollapsed ? 'Changelog' : undefined}
-                    >
-                      <span>
-                        <Sparkles className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                        {!isSidebarCollapsed && 'Changelog'}
-                      </span>
-                    </Button>
-                  </Link>
-                )}
-                {/* Archive tab */}
-                <Link href="/archive" legacyBehavior>
-                  <Button
-                    asChild
-                    variant={pathname.startsWith('/archive') ? 'default' : 'ghost'}
-                    className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
-                    style={pathname.startsWith('/archive') ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-                    title={isSidebarCollapsed ? 'Archive' : undefined}
-                  >
-                    <span>
-                      <Archive className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
-                      {!isSidebarCollapsed && 'Archive'}
-                    </span>
-                  </Button>
-                </Link>
-              </div>
-              </>)}
 
               </>}
             </nav>
