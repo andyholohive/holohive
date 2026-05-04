@@ -223,9 +223,9 @@ const DEEP_DIVE_COOLDOWN_HOURS = 24;
  */
 const SHOW_SCORE_COLUMN = false;
 
-// Discovery source picker — the four sources the Run Discovery scan can
+// Discovery source picker — the sources the Run Discovery scan can
 // query (must match SUPPORTED_SOURCES in app/api/prospects/discovery/scan/route.ts).
-type DiscoverySourceId = 'dropstab' | 'cryptorank' | 'rootdata' | 'ethglobal';
+type DiscoverySourceId = 'dropstab' | 'cryptorank' | 'rootdata' | 'ethglobal' | 'defillama';
 const DISCOVERY_SOURCE_CARDS: Array<{
   id: DiscoverySourceId;
   title: string;
@@ -255,6 +255,12 @@ const DISCOVERY_SOURCE_CARDS: Array<{
     title: 'ETHGlobal',
     oneLiner: 'Hackathon prize-winners',
     footnote: 'Pre-funding teams · orthogonal signal',
+  },
+  {
+    id: 'defillama',
+    title: 'DeFiLlama',
+    oneLiner: 'DeFi-protocol fundraising tracker',
+    footnote: 'Distinct universe · DEX/perps/lending/RWA/restaking',
   },
 ];
 
@@ -2219,9 +2225,9 @@ export default function DiscoveryPanel() {
           <DialogHeader>
             <DialogTitle>Run Discovery Scan</DialogTitle>
             <DialogDescription>
-              Candidates sourced from DropsTab only. For each, Claude leaves DropsTab to hunt
-              individual POC handles (project team pages, X bios, crypto directories) —
-              Telegram priority, X fallback. Expect 30-90s and ~$0.30-$1 per run.
+              Stage 1 fires one parallel Claude call per selected source, then Stage 2 enriches
+              each candidate (POC hunt with Telegram priority, ICP check, score). Expect 30-90s
+              and ~$0.30-$1 per run depending on source count.
             </DialogDescription>
           </DialogHeader>
 
@@ -2303,10 +2309,12 @@ export default function DiscoveryPanel() {
                 })}
               </div>
               <p className="text-xs text-gray-500 mt-1.5">
-                All sources are public HTML pages Claude reads via web_search.
-                Each extra source adds ~4 web_search calls and ~1.2× cost.
-                RootData is the cleanest addition for broader funding coverage;
-                ETHGlobal is orthogonal (pre-funding hackathon winners).
+                Each source is a public HTML page Claude reads via web_search. Sources fire
+                in PARALLEL — each gets its own 12-search budget so they don&apos;t compete
+                for context. Adding sources adds linear cost (~$0.05-0.20 per source) but
+                widens the candidate pool meaningfully. RootData and DeFiLlama are the best
+                additions for broader funding coverage; ETHGlobal is orthogonal (pre-funding
+                hackathon winners — frequently returns 0 against the $1M+ raise filter).
               </p>
             </div>
 
