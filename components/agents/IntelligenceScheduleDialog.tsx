@@ -32,7 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 
 type Cadence = 'daily' | 'weekdays' | 'weekly';
 type Model = 'sonnet' | 'opus';
-type Source = 'dropstab' | 'rootdata' | 'cryptorank' | 'ethglobal';
+type Source = 'dropstab' | 'rootdata' | 'cryptorank' | 'ethglobal' | 'defillama';
 
 interface Schedule {
   schedule_key: string;
@@ -105,6 +105,7 @@ const SOURCE_OPTIONS: { id: Source; label: string }[] = [
   { id: 'rootdata',   label: 'RootData' },
   { id: 'cryptorank', label: 'CryptoRank' },
   { id: 'ethglobal',  label: 'ETHGlobal' },
+  { id: 'defillama',  label: 'DeFiLlama' },
 ];
 const WEEKDAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 

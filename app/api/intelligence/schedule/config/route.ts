@@ -10,7 +10,7 @@ const SCHEDULE_KEY = 'discovery_default';
  *  accept here is what actually gets used in production. */
 const VALID_CADENCES = ['daily', 'weekdays', 'weekly'] as const;
 const VALID_MODELS = ['sonnet', 'opus'] as const;
-const VALID_SOURCES = ['dropstab', 'rootdata', 'cryptorank', 'ethglobal'] as const;
+const VALID_SOURCES = ['dropstab', 'rootdata', 'cryptorank', 'ethglobal', 'defillama'] as const;
 const VALID_RECENCY = [7, 14, 30, 60, 90] as const;
 const VALID_MIN_RAISE = [500_000, 1_000_000, 2_000_000, 5_000_000, 10_000_000] as const;
 // Bumped from [5,10,15,20] to expose higher-volume tiers. The scan

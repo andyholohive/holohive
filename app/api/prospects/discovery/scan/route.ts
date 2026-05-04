@@ -201,8 +201,8 @@ interface DiscoveredProject extends CandidateBasics {
 
 // Supported discovery sources. Keep the list explicit so the UI and
 // prompt builder agree on what's valid.
-type DiscoverySource = 'dropstab' | 'cryptorank' | 'rootdata' | 'ethglobal';
-const SUPPORTED_SOURCES: DiscoverySource[] = ['dropstab', 'cryptorank', 'rootdata', 'ethglobal'];
+type DiscoverySource = 'dropstab' | 'cryptorank' | 'rootdata' | 'ethglobal' | 'defillama';
+const SUPPORTED_SOURCES: DiscoverySource[] = ['dropstab', 'cryptorank', 'rootdata', 'ethglobal', 'defillama'];
 
 const SOURCE_DEFS: Record<DiscoverySource, { url: string; note: string }> = {
   dropstab: {
@@ -229,6 +229,16 @@ const SOURCE_DEFS: Record<DiscoverySource, { url: string; note: string }> = {
     // builder adds that hint when this source is enabled.
     url: 'https://ethglobal.com/showcase',
     note: 'ETHGlobal hackathon winners. Pre-funding dev teams with working products — orthogonal to funding trackers. Filter to prize-winners only.',
+  },
+  defillama: {
+    // DeFi-native fundraising tracker. Different universe than the
+    // generic crypto trackers — focuses on DeFi protocols, often
+    // catches rounds 1-3 days BEFORE they hit DropsTab/RootData.
+    // Data is structured (table view with name, round, amount, date,
+    // category, investors) and SSR-rendered so web_search reads it
+    // cleanly without JS execution.
+    url: 'https://defillama.com/raises',
+    note: 'DeFi-native funding tracker. Distinct universe from DropsTab/RootData (more DeFi-protocol focus, less infra). Often catches rounds 1-3 days early. Structured table with name, round, amount, valuation, date, category, lead investors. Use the URL with date/category filters when relevant.',
   },
 };
 
@@ -257,6 +267,11 @@ function buildCandidatesSystemPrompt(sources: DiscoverySource[]): string {
   if (sources.includes('rootdata')) {
     perSourceHints.push(
       '- rootdata.com/Fundraising: data is in SSR HTML as a table. Extract rows directly: project name, round stage, amount, valuation, date, lead investors. Examples: "3F Seed $ 4 M Apr 24 Maven 11 * GSR +9" → {name: "3F", funding_round: "Seed", funding_amount_usd: 4000000, funding_date: "2026-04-24", investors: ["Maven 11", "GSR"]}.',
+    );
+  }
+  if (sources.includes('defillama')) {
+    perSourceHints.push(
+      '- defillama.com/raises: data is a structured table — parse rows directly: name, round, amount (in USD millions), valuation, date, category (DeFi sub-sector), lead investors. DeFi-protocol heavy — strong on lending, DEX, perps, restaking, RWA, stablecoins. Use the date filter on the URL when filtering recent rounds. Each project name typically links to its detail page; the website_url usually appears there.',
     );
   }
 
@@ -671,14 +686,34 @@ HoloHive does cold BD via Telegram DM. We want DECISION-MAKERS' personal handles
 3. Head of BD / BD Lead
 4. Community lead (last resort)
 
-Within role priority, prefer contacts with a findable **Telegram handle > X handle**. Crypto founders often put "tg: @handle" in X bio specifically for cold DMs — search for that pattern.
+Within role priority, prefer contacts with a findable **Telegram handle > X handle**.
+
+### Where to hunt for Telegram handles (in order — try the cheaper sources first)
+
+1. **X / Twitter bio** — first stop. Crypto founders often put "tg: @handle", "telegram: @handle", or "t.me/handle" right in their bio for cold DMs. Also check the pinned tweet — many include a "DM me on TG" call-to-action.
+
+2. **Linktree / Bio.link / Beacons / Linkin.bio** — when an X bio links to one of these aggregators (linktr.ee/X, bio.link/X, beacons.ai/X), OPEN it. They're explicitly built for "all my links" and almost always include Telegram alongside Twitter, GitHub, personal site, etc. Easy win that's often missed.
+
+3. **Personal website** — if the founder's X bio links a personal site (e.g. firstnamelastname.xyz, .com, .io), check the contact / footer / about page. Many founders list a TG handle there.
+
+4. **Project's official "Team" page** — the project's website usually has /team or /about with team profiles. Each team member's row often has a TG link icon next to Twitter/LinkedIn. This is high-confidence (verified by the project itself).
+
+5. **Project's job listings** — the project's careers / jobs page often includes a "Contact: @hiringlead_tg" or similar. Even if the role doesn't match, the recruiter contact is sometimes a founder or BD lead.
+
+6. **Crypto-specific directories** — CryptoSlate (crypto teams have profiles with TG), Messari profile pages, RootData team listings (Asian focus, often include TG). Treat as medium confidence.
+
+7. **Conference / event speaker pages** — Token2049, KBW, BUIDL Asia, ETHCC speaker bios sometimes list TG. For projects targeting Korea this is a high-yield channel — Korean event sites often include TG since Korean BD prefers TG over email.
+
+8. **Project's official Telegram group preview** — t.me/<groupname> page (the public web preview) shows the group's admins. The username next to "Admin" or "Owner" badge IS often the founder. Search for the project's TG link on their site, then visit it as a preview URL.
+
+9. **Last resort: pattern-match the X handle** — many founders use the same handle across X and TG (so @stanikulechov on X is often @stanikulechov on TG). Mark this as "low" confidence with a note "inferred from X handle pattern" — let the user verify before outreach.
 
 Per contact: name, role, twitter_handle, telegram_handle, source_url (where you found it), confidence (high/medium/low), optional notes.
 
 Confidence rules:
-- high: Telegram on verified X bio or project team page
-- medium: Telegram on crypto directory or second-hand
-- low: X-only or inferred (include only if no better lead)
+- high: Telegram on the project's official team page, verified X bio, or aggregator (Linktree-style) linked from verified X bio
+- medium: Telegram on crypto directory (CryptoSlate, Messari), conference speaker page, or project's job listing
+- low: X-only, t.me admin preview without confirmation, or pattern-matched from X handle (include only if no better lead and mark with notes explaining the inference)
 
 Return empty outreach_contacts if you can't find anything — better than fabricated.
 
@@ -829,10 +864,18 @@ Call submit_enrichments when done.`;
       ],
       messages: [{ role: 'user', content: userPrompt }],
       tools: [
-        // 12 searches per batch: ~2 for X-account triggers, ~2 for article cross-
-        // check, ~3 for POC discovery (team page + X bios + crypto dirs), ~2 for
-        // the top POC's personal feed check (Korea/Asia mentions), plus slack.
-        { type: 'web_search_20250305', name: 'web_search', max_uses: 12 } as any,
+        // 16 searches per batch (bumped from 12 on May 4 2026 alongside
+        // the expanded TG-finding rubric in the prompt). Allocation:
+        //   ~2 for X-account triggers
+        //   ~2 for article cross-check
+        //   ~5 for POC discovery (team page + X bios + Linktree
+        //     aggregators + crypto dirs + project's TG group preview)
+        //   ~2 for the top POC's personal feed Korea/Asia check
+        //   ~1 for personal-website / job-page TG hunt
+        //   ~4 slack for verification + edge cases
+        // The extra cost is small (~$0.02/batch) but unlocks the
+        // additional TG-finding sources we're now asking Claude to try.
+        { type: 'web_search_20250305', name: 'web_search', max_uses: 16 } as any,
         enrichmentsTool as any,
       ],
     },
