@@ -389,14 +389,31 @@ async function findCandidatesFromSource(
   outputTokens: number;
   source: DiscoverySource;
 }> {
-  const skipSample = params.skipNames.slice(0, 200);
+  // Show Claude only the 50 most-recently-scanned names (instead of 200).
+  // The cooldown logic at the server level still tracks all of them — this
+  // is just about prompt budget. Sending 200 names was crowding Claude's
+  // context and making it harder to find new candidates; trimming to 50
+  // keeps the most-relevant recent ones (since recently-scanned are the
+  // most likely to overlap with what Claude finds at the top of the list)
+  // while leaving room for Claude to actually focus on discovery.
+  // params.skipNames is already ordered most-recent-first by the caller.
+  const SKIP_NAMES_IN_PROMPT = 50;
+  const skipSample = params.skipNames.slice(0, SKIP_NAMES_IN_PROMPT);
   const exclusionClause = skipSample.length > 0
     ? `\n\n## ALREADY SCANNED — DO NOT INCLUDE
-The following projects were scanned in the last ${params.cooldownDays} days and are already in our database. DO NOT include them — they'd be wasted research. Go DEEPER on the source's listing (scroll past the top entries, open subsequent pages if available) to find DIFFERENT projects.
+The following ${skipSample.length} projects were scanned in the last ${params.cooldownDays} days. DO NOT include them — they're already in our database and would be wasted research. ${params.skipNames.length > skipSample.length ? `(${params.skipNames.length - skipSample.length} more older names also tracked server-side; you don't need to memorize them all.)` : ''}
 
-${skipSample.map(n => `- ${n}`).join('\n')}${params.skipNames.length > skipSample.length ? `\n  (...and ${params.skipNames.length - skipSample.length} more — same rule applies)` : ''}
+**STRATEGY**: The top 5-10 entries on every funding source page are the
+most-watched ones, so they're almost always in the skip list. To find
+NEW candidates, scroll DEEPER. Open page 2, page 3 of the listing.
+Look at entries ranked 20+ on the source. Smaller / less-mainstream
+funding rounds often match HoloHive's ICP better than the obvious
+top-of-list announcements anyway.
 
-If the entire top of the list is in the skip list, that's expected — you need to go further down.`
+${skipSample.map(n => `- ${n}`).join('\n')}
+
+If you only return 1-2 candidates because everything else is in the
+skip list, that's a failure — go deeper into the source.`
     : '';
 
   const sourceUrl = SOURCE_DEFS[source].url;
@@ -1192,11 +1209,28 @@ export async function POST(request: Request) {
       .gte('updated_at', cooldownCutoff)
       .limit(500);
 
-    // Source 2: all CRM names. These go into a SET only, used server-side
-    // after Claude returns candidates — not passed to Claude.
+    // Source 2: ACTIVE CRM names only. These go into a SET, used server-side
+    // after Claude returns candidates to drop already-known-active prospects.
+    //
+    // We INTENTIONALLY exclude terminal stages (closed_won, closed_lost,
+    // dead, unqualified, account_churned, etc.) — projects that were
+    // dismissed or lost months ago shouldn't permanently block re-discovery
+    // if they fundraise again or become Korea-relevant. The previous "all
+    // CRM names" filter was rejecting ~35% of candidates and many of those
+    // were stale/dead opps that should have been re-discoverable.
+    //
+    // Active = anything that's still in the pipeline (Outreach, Leads,
+    // Booked, Discovery, Deals, Accounts that aren't churned).
+    const TERMINAL_CRM_STAGES = [
+      'closed_won', 'v2_closed_won',
+      'closed_lost', 'v2_closed_lost',
+      'dead', 'unqualified', 'disqualified',
+      'account_churned',
+    ];
     const { data: crmRows } = await (supabase as any)
       .from('crm_opportunities')
       .select('name')
+      .not('stage', 'in', `(${TERMINAL_CRM_STAGES.join(',')})`)
       .range(0, 4999);
     // Normalize names so "Pharos" matches "Pharos Network", "Web3 Foo Inc."
     // matches "Web3 Foo", etc. We strip a small set of common boilerplate
