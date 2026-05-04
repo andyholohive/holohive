@@ -18,6 +18,7 @@ import { TaskService, Task } from '@/lib/taskService';
 import { ClientService } from '@/lib/clientService';
 import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { DeliverableWizard } from '@/components/tasks/DeliverableWizard';
+import { RecurringConfigEditor } from '@/components/tasks/RecurringConfig';
 import { DeliverableService } from '@/lib/deliverableService';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -40,6 +41,7 @@ import {
   PlayCircle,
   MessageCircle,
   Clock,
+  RefreshCw,
 } from 'lucide-react';
 
 const STALE_DAYS = 7;
@@ -164,10 +166,15 @@ const COL: Record<string, string> = {
   // out of columnOrder before the table maps over it). Same width as
   // dueDate for visual consistency.
   completedAt: 'w-[90px]',
+  // Recurring column. Compact button-trigger that opens a popover with
+  // the RecurringConfigEditor (the same UI from the task detail modal).
+  // Lets users enable/edit "auto-recreate on complete" without opening
+  // the modal.
+  recurring: 'w-[100px]',
   actions: 'w-[60px]',
 };
 
-type ColumnKey = 'taskName' | 'priority' | 'assignee' | 'client' | 'dueDate' | 'comment' | 'frequency' | 'type' | 'link' | 'createdBy' | 'created' | 'completedAt';
+type ColumnKey = 'taskName' | 'priority' | 'assignee' | 'client' | 'dueDate' | 'comment' | 'frequency' | 'recurring' | 'type' | 'link' | 'createdBy' | 'created' | 'completedAt';
 
 const COLUMN_DEFS: { key: ColumnKey; label: string }[] = [
   { key: 'taskName', label: 'Task Name' },
@@ -177,6 +184,10 @@ const COLUMN_DEFS: { key: ColumnKey; label: string }[] = [
   { key: 'dueDate', label: 'Due Date' },
   { key: 'comment', label: 'Comment' },
   { key: 'frequency', label: 'Frequency' },
+  // Recurring auto-recreate config (placed next to Frequency since
+  // they're semantically related). Clicking opens a popover with the
+  // shared RecurringConfigEditor used in the task detail modal.
+  { key: 'recurring', label: 'Recurring' },
   { key: 'type', label: 'Type' },
   { key: 'link', label: 'Link' },
   { key: 'createdBy', label: 'Created By' },
@@ -466,6 +477,22 @@ export default function TasksPage() {
     }
   };
 
+  /**
+   * Save the JSONB recurring_config field. Separate from saveSelectField
+   * because that one assumes string|null values; recurring_config is a
+   * structured object (frequency, day_of_week, end_date, etc.) defined
+   * in lib/taskService. Optimistic local update + server roundtrip.
+   */
+  const saveRecurringConfig = async (taskId: string, config: any | null) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, recurring_config: config, updated_at: new Date().toISOString() } : t));
+    try {
+      await TaskService.updateTask(taskId, { recurring_config: config });
+    } catch (error) {
+      console.error('Error saving recurring_config:', error);
+      await fetchTasks();
+    }
+  };
+
   const saveDateField = async (taskId: string, date: Date | undefined) => {
     if (!date) return;
     const dateStr = toLocalDateString(date);
@@ -617,7 +644,7 @@ export default function TasksPage() {
 
   const colLabel: Record<ColumnKey, string> = {
     taskName: 'Task Name', priority: 'Priority', assignee: 'Assignee', client: 'Client', dueDate: 'Due Date', comment: 'Comment',
-    frequency: 'Frequency', type: 'Type', link: 'Link',
+    frequency: 'Frequency', recurring: 'Recurring', type: 'Type', link: 'Link',
     createdBy: 'Created By', created: 'Created',
     completedAt: 'Completed',
   };
@@ -881,6 +908,43 @@ export default function TasksPage() {
             </Select>
           </td>
         );
+      case 'recurring': {
+        // Auto-recreate-on-completion config (separate from `frequency`,
+        // which is just metadata). Was previously only editable inside
+        // the task detail modal — exposing it here as a popover trigger
+        // so users can toggle it without opening the modal.
+        const isOn = !!task.recurring_config;
+        const cfg = task.recurring_config as any | null;
+        const summary = cfg?.frequency
+          ? cfg.frequency.charAt(0).toUpperCase() + cfg.frequency.slice(1)
+          : null;
+        return (
+          <td key={col} className={`py-3 px-3 ${COL.recurring}`}>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                    isOn
+                      ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
+                      : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100 border border-transparent'
+                  }`}
+                  title={isOn ? `Auto-recreates on complete (${summary})` : 'Click to enable auto-recreate on completion'}
+                >
+                  <RefreshCw className={`h-3 w-3 ${isOn ? 'text-blue-600' : 'text-gray-400'}`} />
+                  {isOn ? summary : 'Off'}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-80 p-3">
+                <RecurringConfigEditor
+                  value={cfg}
+                  onChange={(newConfig) => saveRecurringConfig(task.id, newConfig)}
+                />
+              </PopoverContent>
+            </Popover>
+          </td>
+        );
+      }
       case 'type':
         return (
           <td key={col} className={`py-3 px-3 ${COL.type}`}>
