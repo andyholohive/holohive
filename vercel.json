@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/discovery-scheduled",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/list-access-cleanup",
+      "schedule": "0 8 * * *"
     }
   ]
 }

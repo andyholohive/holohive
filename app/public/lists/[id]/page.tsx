@@ -271,27 +271,51 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
     localStorage.setItem(cacheKey, JSON.stringify(cacheData));
   };
 
-  // Log email view to database
-  const logEmailView = async (userEmail: string, listUuid: string) => {
+  // Track a view or click via the secure /api/lists/[id]/track endpoint.
+  // Replaces the previous direct-supabase insert because the new endpoint
+  // (1) supports event_type='click' for KOL-link tracking, (2) re-validates
+  // the email against approved_emails server-side so a stale browser session
+  // can't record bogus events, and (3) captures IP from x-forwarded-for.
+  const trackEvent = async (
+    userEmail: string,
+    listUuid: string,
+    eventType: 'view' | 'click',
+    clickTarget?: string,
+  ) => {
     try {
-      await supabasePublic
-        .from('list_email_views')
-        .insert({
-          list_id: listUuid,
+      await fetch(`/api/lists/${listUuid}/track`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           email: userEmail,
-          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null
-        });
-      console.log('Email view logged:', userEmail);
+          event_type: eventType,
+          ...(clickTarget ? { click_target: clickTarget } : {}),
+        }),
+      });
     } catch (err) {
-      console.error('Error logging email view:', err);
-      // Don't block authentication if logging fails
+      // Silent fail — tracking shouldn't break the page experience.
+      console.error('[public list] track failed:', err);
     }
   };
+
+  // Friendly expiry-state shown when an email gate REJECTS an email
+  // because the auto-revoke cron pulled them out of approved_emails.
+  // null = no expiry context to show.
+  const [expiryInfo, setExpiryInfo] = useState<{
+    status: 'expired' | 'manually_revoked';
+    revoked_at: string;
+  } | null>(null);
+
+  // The authenticated viewer's expires_at (if their grant has one).
+  // Drives the "your access expires in X days" banner on the list view
+  // when expiry is < 7 days away. null = no expiry / never expires.
+  const [viewerExpiresAt, setViewerExpiresAt] = useState<string | null>(null);
 
   // Handle email submission for authentication
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setEmailError('');
+    setExpiryInfo(null);
 
     const submittedEmail = email.trim().toLowerCase();
 
@@ -309,11 +333,38 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
         saveAuthToCache(submittedEmail);
         console.log('Email authenticated:', submittedEmail);
 
-        // Log the email view
+        // Log the email view via the secure tracking endpoint and pull
+        // the viewer's expires_at so we can show a "your access expires
+        // in N days" banner if the grant is close to expiry. Both fire
+        // in parallel since they're independent.
         if (listUuid) {
-          await logEmailView(submittedEmail, listUuid);
+          trackEvent(submittedEmail, listUuid, 'view');
+          fetch(`/api/lists/${listUuid}/access-check?email=${encodeURIComponent(submittedEmail)}`)
+            .then(r => r.json())
+            .then(data => {
+              if (data?.status === 'approved' && data?.expires_at) {
+                setViewerExpiresAt(data.expires_at);
+              }
+            })
+            .catch(() => {});
         }
       } else {
+        // Not currently approved — but check if this email PREVIOUSLY had
+        // access that was auto-revoked or manually revoked. If so, show
+        // a friendly explanation instead of the generic "not authorized"
+        // error; otherwise fall back to the generic message.
+        if (listUuid) {
+          try {
+            const res = await fetch(`/api/lists/${listUuid}/access-check?email=${encodeURIComponent(submittedEmail)}`);
+            const data = await res.json();
+            if (data?.status === 'expired' || data?.status === 'manually_revoked') {
+              setExpiryInfo({ status: data.status, revoked_at: data.revoked_at });
+              return;
+            }
+          } catch {
+            // Fall through to generic error
+          }
+        }
         setEmailError('This email is not authorized to view this list');
       }
     } else {
@@ -533,6 +584,53 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
 
   // Email gate - show if there are approved emails and user is not authenticated
   if (!loading && listApprovedEmails && listApprovedEmails.length > 0 && !isAuthenticated) {
+    // Special path: if the email gate JUST rejected an email that was
+    // previously granted access (then auto-revoked or manually revoked),
+    // show a friendly explanation instead of the generic "not authorized"
+    // error. Lets the viewer know it's not a typo or broken page — their
+    // access just ended — and gives them a clear next step.
+    if (expiryInfo) {
+      const revokedDate = new Date(expiryInfo.revoked_at).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'long', day: 'numeric',
+      });
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-lg border p-8 max-w-md w-full">
+            <div className="text-center mb-6">
+              <div className="bg-amber-50 p-3 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <Calendar className="h-8 w-8 text-amber-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Access expired</h2>
+              <p className="text-gray-600">
+                Your access to <strong>{list?.name || 'this list'}</strong> ended on{' '}
+                <strong>{revokedDate}</strong>.
+              </p>
+              {expiryInfo.status === 'expired' && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Access to this list expires automatically after a set period.
+                </p>
+              )}
+            </div>
+            <div className="rounded-lg bg-gray-50 border border-gray-200 p-4 text-sm text-gray-700 text-center">
+              To request renewed access, please contact the list owner directly.
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full mt-4"
+              onClick={() => {
+                setExpiryInfo(null);
+                setEmail('');
+                setEmailError('');
+              }}
+            >
+              Try a different email
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-lg border p-8 max-w-md w-full">
@@ -639,6 +737,28 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
       </div>
 
       <div className="w-full px-4 sm:px-6 lg:px-8 py-8">
+        {/* Expiry warning banner — visible only when the viewer's grant
+            has expires_at within the next 7 days. Lets them request
+            renewal proactively rather than discovering expiry mid-meeting. */}
+        {(() => {
+          if (!viewerExpiresAt) return null;
+          const msLeft = new Date(viewerExpiresAt).getTime() - Date.now();
+          const daysLeft = Math.ceil(msLeft / 86_400_000);
+          if (daysLeft > 7 || daysLeft < 0) return null;
+          const expiryStr = new Date(viewerExpiresAt).toLocaleDateString('en-US', {
+            year: 'numeric', month: 'long', day: 'numeric',
+          });
+          return (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-start gap-2.5">
+              <Calendar className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <div className="text-sm text-amber-800 flex-1">
+                <strong>Your access expires {daysLeft === 0 ? 'today' : daysLeft === 1 ? 'tomorrow' : `in ${daysLeft} days`}</strong>
+                <span className="text-amber-700"> ({expiryStr}). Contact the list owner if you need renewed access.</span>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* List Title */}
         <div className="flex items-center space-x-4 mb-6">
           <div className="bg-gray-100 p-2 rounded-lg">
@@ -706,6 +826,13 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-sm text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:ring-offset-1 rounded px-1 py-0.5 transition-all duration-200 whitespace-nowrap"
+                              onClick={() => {
+                                // Fire-and-forget click event tracking. Don't
+                                // await — the link should open immediately.
+                                if (listUuid && email && kol.link) {
+                                  trackEvent(email, listUuid, 'click', kol.link);
+                                }
+                              }}
                             >
                               View Profile
                             </a>

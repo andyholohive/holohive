@@ -15,7 +15,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2, ChevronDown, Star, Copy, ExternalLink, Eye, LayoutGrid, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2, ChevronDown, Star, Copy, ExternalLink, Eye, LayoutGrid, ChevronLeft, ChevronRight, Shield } from 'lucide-react';
+import ListAccessDialog from '@/components/lists/ListAccessDialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/lib/supabase';
 import { KOLService } from '@/lib/kolService';
@@ -193,6 +194,10 @@ export default function ListsPage() {
 
   // Email views dialog state
   const [isEmailViewsDialogOpen, setIsEmailViewsDialogOpen] = useState(false);
+  // New "Access & Activity" dialog (supersedes the legacy Views dialog).
+  // Tracks which list is open + the dialog visibility.
+  const [accessDialogListId, setAccessDialogListId] = useState<string | null>(null);
+  const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false);
   const [emailViewsList, setEmailViewsList] = useState<ListItem | null>(null);
   const [emailViews, setEmailViews] = useState<Array<{
     id: string;
@@ -2018,7 +2023,17 @@ export default function ListsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Email Views Dialog */}
+        {/* New Access & Activity dialog (managed grants + view/click feed) */}
+        <ListAccessDialog
+          listId={accessDialogListId}
+          open={isAccessDialogOpen}
+          onOpenChange={(open) => {
+            setIsAccessDialogOpen(open);
+            if (!open) setAccessDialogListId(null);
+          }}
+        />
+
+        {/* Email Views Dialog (LEGACY — kept temporarily; superseded by ListAccessDialog above) */}
         <Dialog open={isEmailViewsDialogOpen} onOpenChange={setIsEmailViewsDialogOpen}>
           <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden">
             <DialogHeader>
@@ -2382,11 +2397,14 @@ export default function ListsPage() {
                         variant="outline"
                         size="sm"
                         className="flex-1"
-                        onClick={() => handleShowEmailViews(list)}
-                        title="View emails that accessed this list"
+                        onClick={() => {
+                          setAccessDialogListId(list.id);
+                          setIsAccessDialogOpen(true);
+                        }}
+                        title="Manage who has access + see view/click activity"
                       >
-                        <Eye className="h-4 w-4 mr-2" />
-                        Views
+                        <Shield className="h-4 w-4 mr-2" />
+                        Access
                       </Button>
                     </div>
                   </div>
