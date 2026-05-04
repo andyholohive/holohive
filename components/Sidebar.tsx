@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -115,6 +115,31 @@ export default function Sidebar({ children }: SidebarProps) {
   // Helper: hide items that guests should never see
   const guestHideAlways = guestStillLoading || isGuestUser;
 
+  // ─── Auto-scroll active nav item into view ───────────────────────
+  // The sidebar's <nav> overflows scrollable when the nav list is
+  // long. When a user navigates to a page whose link sits below the
+  // current scroll viewport (e.g. Claude MCP, Archive, anything in
+  // the Admin section), the active brand-color highlight ends up
+  // off-screen — they have to scroll down to confirm which page
+  // they're on.
+  //
+  // Fix: on every pathname change, find the element marked
+  // data-nav-active="true" inside the nav and scroll it into view
+  // with `block: 'nearest'` (only scrolls if needed; no-op when
+  // already visible). Smooth behavior so it feels intentional, not
+  // jarring. requestAnimationFrame waits for React to commit the
+  // new active state to the DOM before we measure.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      const active = navRef.current?.querySelector('[data-nav-active="true"]');
+      if (active && active instanceof HTMLElement) {
+        active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [pathname]);
+
   // ─── Nav-item helpers ──────────────────────────────────────────────
   // Extract the repeated <Link><Button>...</Button></Link> pattern that
   // appears 24 times in the main nav and 7 times in the Tasks sub-nav.
@@ -128,7 +153,8 @@ export default function Sidebar({ children }: SidebarProps) {
   // Sidebar is the only consumer; if we ever build a mobile-drawer
   // nav, these become a candidate for extraction.
 
-  /** A single top-level nav item. */
+  /** A single top-level nav item. The data-nav-active marker on the
+   *  inner span is what the scroll-into-view effect queries for. */
   const NavItem = ({
     href,
     icon: Icon,
@@ -148,7 +174,7 @@ export default function Sidebar({ children }: SidebarProps) {
           style={isActive ? { backgroundColor: '#3e8692', color: 'white' } : {}}
           title={isSidebarCollapsed ? label : undefined}
         >
-          <span>
+          <span data-nav-active={isActive ? 'true' : undefined}>
             <Icon className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
             {!isSidebarCollapsed && label}
           </span>
@@ -161,7 +187,12 @@ export default function Sidebar({ children }: SidebarProps) {
    *  sub-nav). Smaller, indented, uses 'secondary' variant for active
    *  state instead of the brand-color default. `exact` matches the
    *  pathname exactly (for "/tasks") rather than starts-with (for
-   *  "/tasks/admin" etc.). */
+   *  "/tasks/admin" etc.).
+   *
+   *  Note: a sub-nav item never sets data-nav-active because the
+   *  parent NavItem already does (its prefix match catches the sub-
+   *  route too). Otherwise we'd scroll twice and the nav would land
+   *  on the sub-item, which buries the parent. */
   const SubNavItem = ({
     href,
     icon: Icon,
@@ -264,7 +295,7 @@ export default function Sidebar({ children }: SidebarProps) {
         <aside className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 flex-shrink-0 transition-all duration-300 ease-in-out`}>
           <div className="flex flex-col h-full">
             {/* Navigation */}
-            <nav className="p-4 space-y-4 flex-1 overflow-y-auto">
+            <nav ref={navRef} className="p-4 space-y-4 flex-1 overflow-y-auto">
               {!userProfile ? (
                 <div className="space-y-3 py-2">
                   {[1,2,3,4,5].map(i => <div key={i} className="h-8 bg-gray-100 rounded animate-pulse" />)}
