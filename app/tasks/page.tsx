@@ -160,10 +160,14 @@ const COL: Record<string, string> = {
   link: 'w-[60px]',
   createdBy: 'w-[90px]',
   created: 'w-[70px]',
+  // Finish-date column. Only rendered when showCompleted=true (filtered
+  // out of columnOrder before the table maps over it). Same width as
+  // dueDate for visual consistency.
+  completedAt: 'w-[90px]',
   actions: 'w-[60px]',
 };
 
-type ColumnKey = 'taskName' | 'priority' | 'assignee' | 'client' | 'dueDate' | 'comment' | 'frequency' | 'type' | 'link' | 'createdBy' | 'created';
+type ColumnKey = 'taskName' | 'priority' | 'assignee' | 'client' | 'dueDate' | 'comment' | 'frequency' | 'type' | 'link' | 'createdBy' | 'created' | 'completedAt';
 
 const COLUMN_DEFS: { key: ColumnKey; label: string }[] = [
   { key: 'taskName', label: 'Task Name' },
@@ -177,6 +181,7 @@ const COLUMN_DEFS: { key: ColumnKey; label: string }[] = [
   { key: 'link', label: 'Link' },
   { key: 'createdBy', label: 'Created By' },
   { key: 'created', label: 'Created' },
+  { key: 'completedAt', label: 'Completed' },
 ];
 
 const DEFAULT_COLUMN_ORDER: ColumnKey[] = COLUMN_DEFS.map(c => c.key);
@@ -193,6 +198,14 @@ export default function TasksPage() {
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [activeTab, setActiveTab] = useState<string>('one-time');
   const [searchTerm, setSearchTerm] = useState('');
+  // Completed tasks are HIDDEN by default — they were cluttering the list.
+  // Persisted in localStorage so the choice survives reloads.
+  const [showCompleted, setShowCompleted] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('tasks_show_completed') === 'true';
+    }
+    return false;
+  });
   const [collapsedUsers, setCollapsedUsers] = useState<Set<string>>(new Set());
 
   // Column order (persisted to localStorage)
@@ -300,19 +313,30 @@ export default function TasksPage() {
     return map;
   }, [teamMembers]);
 
-  // Tab counts
+  // Tab counts. Counts reflect what the user actually SEES on each tab,
+  // so completed tasks are excluded from the totals when the toggle is
+  // off (matches the filtered list rendered below). Otherwise the
+  // count would be larger than the visible row count, which is confusing.
   const deliverableTaskIds = useMemo(() => new Set(Object.keys(deliverableProgress)), [deliverableProgress]);
+  const visibilityFilter = (t: Task) => showCompleted || t.status !== 'complete';
+
   const oneTimeCount = useMemo(() =>
-    tasks.filter(t => t.frequency === 'one-time' && !deliverableTaskIds.has(t.id) && !t.parent_task_id).length,
-    [tasks, deliverableTaskIds]
+    tasks.filter(t => t.frequency === 'one-time' && !deliverableTaskIds.has(t.id) && !t.parent_task_id && visibilityFilter(t)).length,
+    [tasks, deliverableTaskIds, showCompleted]
   );
   const recurringCount = useMemo(() =>
-    tasks.filter(t => t.frequency !== 'one-time' && !deliverableTaskIds.has(t.id) && !t.parent_task_id).length,
-    [tasks, deliverableTaskIds]
+    tasks.filter(t => t.frequency !== 'one-time' && !deliverableTaskIds.has(t.id) && !t.parent_task_id && visibilityFilter(t)).length,
+    [tasks, deliverableTaskIds, showCompleted]
   );
   const deliverableCount = useMemo(() =>
-    tasks.filter(t => deliverableTaskIds.has(t.id)).length,
-    [tasks, deliverableTaskIds]
+    tasks.filter(t => deliverableTaskIds.has(t.id) && visibilityFilter(t)).length,
+    [tasks, deliverableTaskIds, showCompleted]
+  );
+  // How many completed tasks are currently being hidden — surfaced next
+  // to the toggle so the user knows there's stuff in the "vault".
+  const hiddenCompletedCount = useMemo(() =>
+    showCompleted ? 0 : tasks.filter(t => t.status === 'complete' && !t.parent_task_id).length,
+    [tasks, showCompleted]
   );
 
   // Filter tasks by tab + search (exclude subtasks from one-time/recurring — they belong in Deliverables)
@@ -326,6 +350,11 @@ export default function TasksPage() {
       tabFiltered = tasks.filter(t => deliverableTaskIds.has(t.id));
     }
 
+    // Hide completed unless the user has toggled them on.
+    if (!showCompleted) {
+      tabFiltered = tabFiltered.filter(t => t.status !== 'complete');
+    }
+
     if (!searchTerm) return tabFiltered.sort((a, b) => a.sort_order - b.sort_order);
 
     const term = searchTerm.toLowerCase();
@@ -336,7 +365,7 @@ export default function TasksPage() {
       t.task_type.toLowerCase().includes(term) ||
       (t.created_by_name && t.created_by_name.toLowerCase().includes(term))
     ).sort((a, b) => a.sort_order - b.sort_order);
-  }, [tasks, activeTab, searchTerm]);
+  }, [tasks, activeTab, searchTerm, showCompleted]);
 
   // Group filtered tasks by assigned_to
   const groupedByUser = useMemo(() => {
@@ -407,6 +436,27 @@ export default function TasksPage() {
 
   const saveSelectField = async (taskId: string, field: string, value: string, extra?: Record<string, string | null>) => {
     const updates: Record<string, string | null> = { [field]: value || null, ...extra };
+
+    // Auto-stamp completed_at when transitioning to/from 'complete' status.
+    // This is the "finish date" that the row + filter UI needs. We set it
+    // here so all status changes (status dropdown, kanban move, bulk
+    // update, anywhere that calls saveSelectField with field='status')
+    // get the timestamp without separate plumbing per call site.
+    if (field === 'status') {
+      if (value === 'complete') {
+        // Only stamp if it's not already complete — avoid clobbering an
+        // earlier completion timestamp on idempotent updates.
+        const current = tasks.find(t => t.id === taskId);
+        if (current?.status !== 'complete') {
+          updates.completed_at = new Date().toISOString();
+        }
+      } else {
+        // Status moved away from complete — clear the timestamp so the
+        // task isn't surfaced in "completed" views with a stale date.
+        updates.completed_at = null;
+      }
+    }
+
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates, updated_at: new Date().toISOString() } : t));
     try {
       await TaskService.updateTask(taskId, updates);
@@ -569,14 +619,24 @@ export default function TasksPage() {
     taskName: 'Task Name', priority: 'Priority', assignee: 'Assignee', client: 'Client', dueDate: 'Due Date', comment: 'Comment',
     frequency: 'Frequency', type: 'Type', link: 'Link',
     createdBy: 'Created By', created: 'Created',
+    completedAt: 'Completed',
   };
+
+  // Filter columnOrder so the Completed column only appears when the
+  // user has the show-completed toggle on (otherwise it'd be a column
+  // of dashes for every visible row, since hidden rows are the only
+  // ones that have a completed_at value).
+  const visibleColumnOrder = useMemo(
+    () => columnOrder.filter(c => showCompleted || c !== 'completedAt'),
+    [columnOrder, showCompleted],
+  );
 
   const tableHeader = (
     <thead>
       <tr className="border-b border-gray-200 bg-gray-50/80">
         <th className={`text-left py-3 px-3 font-semibold text-gray-600 text-xs uppercase tracking-wider ${COL.reorder}`}></th>
         <th className={`py-3 px-1 ${COL.status}`}></th>
-        {columnOrder.map((col) => (
+        {visibleColumnOrder.map((col) => (
           <th
             key={col}
             className={`text-left py-3 px-3 font-semibold text-gray-600 text-xs uppercase tracking-wider ${COL[col]} cursor-grab select-none`}
@@ -913,6 +973,22 @@ export default function TasksPage() {
             </span>
           </td>
         );
+      case 'completedAt':
+        // The "finish date" — populated by saveSelectField when a task
+        // moves to status='complete'. Only visible when the show-completed
+        // toggle is on (column is filtered out of visibleColumnOrder
+        // otherwise). Shows "—" for tasks that never completed.
+        return (
+          <td key={col} className={`py-3 px-3 whitespace-nowrap ${COL.completedAt}`}>
+            {task.completed_at ? (
+              <span className="text-green-700 text-xs font-medium">
+                {new Date(task.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+            ) : (
+              <span className="text-gray-300 text-xs">—</span>
+            )}
+          </td>
+        );
     }
   };
 
@@ -981,7 +1057,7 @@ export default function TasksPage() {
         </td>
 
         {/* Dynamic columns based on columnOrder */}
-        {columnOrder.map((col) => renderCell(task, col))}
+        {visibleColumnOrder.map((col) => renderCell(task, col))}
 
         {/* Actions - always last */}
         <td className={`py-3 px-3 text-right ${COL.actions}`}>
@@ -1105,7 +1181,7 @@ export default function TasksPage() {
               )}
             </div>
 
-            {/* Search */}
+            {/* Search + Show-completed toggle */}
             <div className="flex flex-wrap items-center gap-3 pt-4">
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -1121,6 +1197,39 @@ export default function TasksPage() {
                   Clear
                 </Button>
               )}
+
+              {/* Show-completed toggle. Persists choice in localStorage so
+                  the user doesn't have to re-toggle every session. The hidden
+                  count next to the label gives a quick "you have N done tasks
+                  in the vault" signal so users notice they exist. */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCompleted(prev => {
+                    const next = !prev;
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('tasks_show_completed', String(next));
+                    }
+                    return next;
+                  });
+                }}
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm border transition-colors ${
+                  showCompleted
+                    ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+                title={showCompleted ? 'Hide completed tasks' : 'Show completed tasks'}
+              >
+                <CheckCircle2 className={`h-4 w-4 ${showCompleted ? 'text-green-600' : 'text-gray-400'}`} />
+                <span className="font-medium">
+                  {showCompleted ? 'Showing completed' : 'Show completed'}
+                </span>
+                {hiddenCompletedCount > 0 && !showCompleted && (
+                  <span className="text-[11px] bg-gray-100 text-gray-600 rounded-full px-1.5 py-0.5 tabular-nums">
+                    {hiddenCompletedCount} hidden
+                  </span>
+                )}
+              </button>
             </div>
           </div>
 
