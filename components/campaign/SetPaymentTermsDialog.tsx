@@ -203,7 +203,7 @@ export default function SetPaymentTermsDialog({
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder="0.00"
-                className="pl-9 auth-input"
+                className="pl-9 focus-brand"
                 autoFocus
                 disabled={saving}
               />

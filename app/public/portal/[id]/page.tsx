@@ -1382,7 +1382,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         {/* Welcome Section */}
         <div className="mb-10">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back, <span className="text-[#3e8692]">{client?.name}</span>
+            Welcome back, <span className="text-brand">{client?.name}</span>
           </h1>
           <p className="text-gray-500 text-lg">
             {welcomeSubtitle}
@@ -1391,10 +1391,10 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
         {/* Onboarding Banner — only in kickoff phase */}
         {portalPhase === 'kickoff' && hasOnboardingResponse === false && onboardingFormSlug && (
-          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10 bg-gradient-to-r from-[#3e8692]/10 to-[#3e8692]/5">
+          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10 bg-gradient-to-r from-brand/10 to-brand/5">
             <CardContent className="flex items-center justify-between py-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                <div className="p-3 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
                   <FileText className="h-6 w-6 text-white" />
                 </div>
                 <div>
@@ -1406,7 +1406,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 onClick={() => {
                   window.open(`${window.location.origin}/public/forms/${onboardingFormSlug}?client=${clientId}`, '_blank');
                 }}
-                className="bg-[#3e8692] hover:bg-[#2d6570] text-white px-6"
+                className="bg-brand hover:bg-[#2d6570] text-white px-6"
               >
                 Fill Out Form
                 <ExternalLink className="h-4 w-4 ml-2" />
@@ -1421,7 +1421,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             <CardContent className="p-6 sm:p-8">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                  <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
                     <Activity className="h-5 w-5 text-white" />
                   </div>
                   <h3 className="text-lg font-bold text-gray-900">Campaign Onboarding</h3>
@@ -1447,12 +1447,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                       <div key={ms.id} className="flex items-center justify-center">
                         {isActive ? (
                           <div className="relative flex items-center justify-center">
-                            <div className="absolute w-6 h-6 rounded-full bg-[#3e8692]/20 animate-ping" style={{ animationDuration: '2s' }} />
-                            <div className="absolute w-5 h-5 rounded-full bg-[#3e8692]/10 animate-pulse" />
-                            <div className="relative w-4 h-4 rounded-full border-[3px] border-[#3e8692] bg-white" />
+                            <div className="absolute w-6 h-6 rounded-full bg-brand/20 animate-ping" style={{ animationDuration: '2s' }} />
+                            <div className="absolute w-5 h-5 rounded-full bg-brand/10 animate-pulse" />
+                            <div className="relative w-4 h-4 rounded-full border-[3px] border-brand bg-white" />
                           </div>
                         ) : (
-                          <div className={`rounded-full ${isComplete ? 'w-3 h-3 bg-[#3e8692]' : 'w-3 h-3 bg-gray-300'}`} />
+                          <div className={`rounded-full ${isComplete ? 'w-3 h-3 bg-brand' : 'w-3 h-3 bg-gray-300'}`} />
                         )}
                       </div>
                     );
@@ -1482,12 +1482,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                         onClick={() => setExpandedMilestoneId(isExpanded ? null : ms.id)}
                       >
                         {isComplete ? (
-                          <div className="w-8 h-8 rounded-full bg-[#3e8692] flex items-center justify-center flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center flex-shrink-0">
                             <CheckCircle2 className="h-5 w-5 text-white" />
                           </div>
                         ) : isActive ? (
-                          <div className="w-8 h-8 rounded-full bg-[#3e8692]/10 border-2 border-[#3e8692] flex items-center justify-center flex-shrink-0">
-                            <div className="w-3 h-3 rounded-full bg-[#3e8692]" />
+                          <div className="w-8 h-8 rounded-full bg-brand/10 border-2 border-brand flex items-center justify-center flex-shrink-0">
+                            <div className="w-3 h-3 rounded-full bg-brand" />
                           </div>
                         ) : (
                           <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
@@ -1498,7 +1498,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                           <p className={`font-semibold ${isUpcoming ? 'text-gray-400' : 'text-gray-900'}`}>{ms.name}</p>
                           {ms.subtitle && <p className={`text-sm ${isUpcoming ? 'text-gray-300' : 'text-gray-500'}`}>{ms.subtitle}</p>}
                         </div>
-                        <span className={`text-xs font-medium px-3 py-1 rounded-full ${isComplete ? 'bg-[#3e8692]/10 text-[#3e8692]' : isActive ? 'bg-orange-100 text-orange-700' : 'text-gray-400'}`}>
+                        <span className={`text-xs font-medium px-3 py-1 rounded-full ${isComplete ? 'bg-brand/10 text-brand' : isActive ? 'bg-orange-100 text-orange-700' : 'text-gray-400'}`}>
                           {isComplete ? 'Complete' : isActive ? 'Action needed' : 'Upcoming'}
                         </span>
                         {isUpcoming ? null : isExpanded ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
@@ -1512,13 +1512,13 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
                               <div>
                                 <div className="flex items-center gap-2 mb-2">
-                                  <div className="w-2 h-2 rounded-full bg-[#3e8692]" />
+                                  <div className="w-2 h-2 rounded-full bg-brand" />
                                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Holo Hive</p>
                                 </div>
                                 <div className="space-y-2">
                                   {oursItems.map(item => (
                                     <div key={item.id} className="flex items-start gap-2.5">
-                                      <div className="w-1.5 h-1.5 rounded-full bg-[#3e8692] flex-shrink-0 mt-[7px]" />
+                                      <div className="w-1.5 h-1.5 rounded-full bg-brand flex-shrink-0 mt-[7px]" />
                                       <span className={`text-sm leading-5 ${item.is_done ? 'line-through text-gray-400' : 'text-gray-700'}`}>{item.text}</span>
                                     </div>
                                   ))}
@@ -1537,7 +1537,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                                       <div>
                                         <span className={`text-sm ${item.is_done ? 'line-through text-gray-400' : 'text-gray-700'}`}>{item.text}</span>
                                         {item.attachment_url && (
-                                          <a href={item.attachment_url} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex items-center gap-1 text-xs text-[#3e8692] hover:underline">
+                                          <a href={item.attachment_url} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex items-center gap-1 text-xs text-brand hover:underline">
                                             <ExternalLink className="h-3 w-3" />
                                             {item.attachment_label || 'View'}
                                           </a>
@@ -1576,7 +1576,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10">
             <CardContent className="p-6 sm:p-8 space-y-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
                   <BarChart3 className="h-5 w-5 text-white" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900">Korean Mindshare Tracker</h3>
@@ -1628,7 +1628,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 {/* Legend */}
                 <div className="flex items-center gap-4 text-xs text-gray-500 mb-2">
                   <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-sm bg-[#3e8692]" />
+                    <div className="w-3 h-3 rounded-sm bg-brand" />
                     <span>{client?.name || 'Client'}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -1652,7 +1652,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                       return (
                         <div key={i} className="flex-1 flex flex-col items-center justify-end h-full">
                           {pct > 0 && (
-                            <div className="w-full max-w-[24px] bg-[#3e8692] rounded-t-sm transition-all duration-500" style={{ height: `${(pct / 110) * 100}%` }} />
+                            <div className="w-full max-w-[24px] bg-brand rounded-t-sm transition-all duration-500" style={{ height: `${(pct / 110) * 100}%` }} />
                           )}
                         </div>
                       );
@@ -1693,7 +1693,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                       return (
                         <div key={i} className="flex-1 flex flex-col items-center justify-end h-full">
                           {count > 0 && (
-                            <div className="w-full max-w-[24px] bg-[#3e8692] rounded-t-sm transition-all duration-500" style={{ height: `${barHeight}%` }} />
+                            <div className="w-full max-w-[24px] bg-brand rounded-t-sm transition-all duration-500" style={{ height: `${barHeight}%` }} />
                           )}
                         </div>
                       );
@@ -1717,12 +1717,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10">
             <CardContent className="p-6 sm:p-8">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
                   <Briefcase className="h-5 w-5 text-white" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900">Engagement Overview</h3>
                 {clientContext?.engagement_type && (
-                  <span className="px-3 py-1 bg-[#e8f4f5] text-[#3e8692] text-sm font-medium rounded-full">{clientContext.engagement_type}</span>
+                  <span className="px-3 py-1 bg-brand-light text-brand text-sm font-medium rounded-full">{clientContext.engagement_type}</span>
                 )}
                 {(() => {
                   const startDate = linkedCRMAccount?.closed_at || linkedCRMAccount?.qualified_at || linkedCRMAccount?.created_at || clientContext?.start_date;
@@ -1762,7 +1762,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   <div className="space-y-2">
                     {clientContext.milestones.split('\n').filter(Boolean).map((milestone, i) => (
                       <div key={i} className="flex items-start gap-3">
-                        <div className="mt-1.5 h-2 w-2 rounded-full bg-[#3e8692] flex-shrink-0" />
+                        <div className="mt-1.5 h-2 w-2 rounded-full bg-brand flex-shrink-0" />
                         <p className="text-sm text-gray-700">{milestone}</p>
                       </div>
                     ))}
@@ -1784,7 +1784,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   )}
                   {clientContext?.holohive_contacts && (
                     <div className="flex items-start gap-3 bg-gray-50 rounded-lg p-3">
-                      <Users className="h-4 w-4 text-[#3e8692] mt-0.5 flex-shrink-0" />
+                      <Users className="h-4 w-4 text-brand mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-0.5">Holo Hive Contacts</p>
                         <p className="text-sm text-gray-700">{clientContext?.holohive_contacts}</p>
@@ -1800,14 +1800,14 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         {/* Stats Cards — discovery & tracker only */}
         {portalPhase !== 'kickoff' && <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-10">
           <Card className="group relative hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-0 shadow-md overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#3e8692]/5 to-[#3e8692]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-brand/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
             <CardContent className="pt-6 pb-5 relative">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-1">Total Campaigns</p>
                   <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
                 </div>
-                <div className="p-3 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                <div className="p-3 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
                   <Megaphone className="h-6 w-6 text-white" />
                 </div>
               </div>
@@ -1897,7 +1897,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
         {/* Weekly Status Section — discovery & tracker only */}
         {portalPhase !== 'kickoff' && weeklyUpdates.length > 0 && (
-          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10 border-l-4 border-l-[#3e8692]">
+          <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10 border-l-4 border-l-brand">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg">
@@ -1918,7 +1918,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                     <ul className="space-y-1">
                       {weeklyUpdates[0].active_initiatives.split('\n').filter(Boolean).map((item, i) => (
                         <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
-                          <span className="text-[#3e8692] mt-0.5">•</span>
+                          <span className="text-brand mt-0.5">•</span>
                           <span>{item.replace(/^[-•]\s*/, '')}</span>
                         </li>
                       ))}
@@ -1943,7 +1943,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   <div>
                     <button
                       onClick={() => setShowPreviousUpdates(!showPreviousUpdates)}
-                      className="flex items-center gap-1 text-sm text-[#3e8692] hover:text-[#2d6570] font-medium"
+                      className="flex items-center gap-1 text-sm text-brand hover:text-[#2d6570] font-medium"
                     >
                       {showPreviousUpdates ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       {showPreviousUpdates ? 'Hide' : 'Show'} Previous Updates ({weeklyUpdates.length - 1})
@@ -2022,7 +2022,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
               <Card id="section-resources" className="border-0 shadow-lg rounded-xl overflow-hidden h-full">
                 <CardHeader className="bg-white border-b border-gray-100 pb-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                    <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
                       <LinkIcon className="h-5 w-5 text-white" />
                     </div>
                     <CardTitle className="text-xl font-bold text-gray-900">Resources</CardTitle>
@@ -2036,16 +2036,16 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                           href={clientContext.telegram_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-[#3e8692]/5 hover:border-[#3e8692]/20 border border-gray-100 transition-all group"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-brand/5 hover:border-brand/20 border border-gray-100 transition-all group"
                         >
                           <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
                             <Send className="h-5 w-5 text-blue-600" />
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-gray-900 group-hover:text-[#3e8692]">Telegram Group</p>
+                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">Telegram Group</p>
                             <p className="text-xs text-gray-500">Open chat</p>
                           </div>
-                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-[#3e8692]" />
+                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
                         </a>
                       )}
                       {clientContext.shared_drive_url && (
@@ -2053,16 +2053,16 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                           href={clientContext.shared_drive_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-[#3e8692]/5 hover:border-[#3e8692]/20 border border-gray-100 transition-all group"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-brand/5 hover:border-brand/20 border border-gray-100 transition-all group"
                         >
                           <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
                             <FolderOpen className="h-5 w-5 text-green-600" />
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-gray-900 group-hover:text-[#3e8692]">Shared Drive</p>
+                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">Shared Drive</p>
                             <p className="text-xs text-gray-500">View files</p>
                           </div>
-                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-[#3e8692]" />
+                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
                         </a>
                       )}
                       {clientContext.gtm_sync_url && (
@@ -2070,16 +2070,16 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                           href={clientContext.gtm_sync_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-[#3e8692]/5 hover:border-[#3e8692]/20 border border-gray-100 transition-all group"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-brand/5 hover:border-brand/20 border border-gray-100 transition-all group"
                         >
                           <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
                             <Globe className="h-5 w-5 text-purple-600" />
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-gray-900 group-hover:text-[#3e8692]">GTM Sync / Tracker</p>
+                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">GTM Sync / Tracker</p>
                             <p className="text-xs text-gray-500">Open tracker</p>
                           </div>
-                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-[#3e8692]" />
+                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
                         </a>
                       )}
                     </div>
@@ -2092,16 +2092,16 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                           href={link.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-[#3e8692]/5 hover:border-[#3e8692]/20 border border-gray-100 transition-all group"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-brand/5 hover:border-brand/20 border border-gray-100 transition-all group"
                         >
-                          <div className="p-2 bg-[#e8f4f5] rounded-lg group-hover:bg-[#d4edef] transition-colors">
-                            <LinkIcon className="h-5 w-5 text-[#3e8692]" />
+                          <div className="p-2 bg-brand-light rounded-lg group-hover:bg-[#d4edef] transition-colors">
+                            <LinkIcon className="h-5 w-5 text-brand" />
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-gray-900 group-hover:text-[#3e8692]">{link.name}</p>
+                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">{link.name}</p>
                             {link.description && <p className="text-xs text-gray-500">{link.description}</p>}
                           </div>
-                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-[#3e8692]" />
+                          <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
                         </a>
                       ))}
                     </div>
@@ -2207,7 +2207,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           <Card id="section-deliverables" className="border-0 shadow-lg rounded-xl overflow-hidden mt-10">
             <CardContent className="p-6 sm:p-8">
               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
                   <ClipboardList className="h-5 w-5 text-white" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900">Active Workflows</h3>
@@ -2269,7 +2269,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   placeholder="Search campaigns..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 auth-input rounded-lg"
+                  className="pl-10 focus-brand rounded-lg"
                 />
               </div>
             </div>
@@ -2325,7 +2325,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                           {/* Campaign Info */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-3 mb-3">
-                              <h3 className="font-bold text-lg text-gray-900 truncate group-hover:text-[#3e8692] transition-colors">
+                              <h3 className="font-bold text-lg text-gray-900 truncate group-hover:text-brand transition-colors">
                                 {campaign.name}
                               </h3>
                               <Badge className={`${getStatusBadge(campaign.status)} font-medium px-2.5 py-0.5 cursor-default pointer-events-none`}>
@@ -2360,7 +2360,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             {campaign.content_count > 0 && (
                               <div className="flex items-center gap-6 text-sm">
                                 <div className="flex items-center gap-2">
-                                  <Eye className="h-4 w-4 text-[#3e8692]" />
+                                  <Eye className="h-4 w-4 text-brand" />
                                   <span className="text-gray-600">
                                     <span className="font-semibold text-gray-900">{formatNumber(campaign.total_impressions)}</span> impressions
                                   </span>
@@ -2380,7 +2380,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             <Button
                               variant="outline"
                               size="sm"
-                              className="rounded-lg border-gray-200 hover:border-[#3e8692] hover:text-[#3e8692] transition-colors"
+                              className="rounded-lg border-gray-200 hover:border-brand hover:text-brand transition-colors"
                               onClick={() => {
                                 const url = campaign.slug
                                   ? `/public/campaigns/${campaign.slug}`
@@ -2400,7 +2400,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                                     : `/public/reports/${campaign.id}`;
                                   window.open(url, '_blank');
                                 }}
-                                className="rounded-lg bg-gradient-to-r from-[#3e8692] to-[#2d6570] hover:from-[#2d6570] hover:to-[#1d4a52] shadow-md hover:shadow-lg transition-all"
+                                className="rounded-lg bg-gradient-to-r from-brand to-[#2d6570] hover:from-[#2d6570] hover:to-[#1d4a52] shadow-md hover:shadow-lg transition-all"
                               >
                                 <FileText className="h-4 w-4 mr-1.5" />
                                 View Report
@@ -2422,7 +2422,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           <Card id="section-kol-roster" className="border-0 shadow-lg rounded-xl overflow-hidden mt-8">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
                   <Users className="h-5 w-5 text-white" />
                 </div>
                 <CardTitle className="text-xl font-bold text-gray-900">KOL Roster</CardTitle>
@@ -2442,7 +2442,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                     {Object.entries(grouped).map(([campaignId, kols]) => (
                       <div key={campaignId}>
                         <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                          <Megaphone className="h-4 w-4 text-[#3e8692]" />
+                          <Megaphone className="h-4 w-4 text-brand" />
                           {kols[0].campaignName}
                           <span className="text-xs text-gray-400 font-normal">({kols.length})</span>
                         </h4>
@@ -2464,7 +2464,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                                 <tr key={kol.id} className="hover:bg-gray-50">
                                   <td className="py-2.5 px-3">
                                     {kol.link ? (
-                                      <a href={kol.link} target="_blank" rel="noopener noreferrer" className="text-[#3e8692] hover:underline font-medium">
+                                      <a href={kol.link} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline font-medium">
                                         {kol.name}
                                       </a>
                                     ) : (
@@ -2482,7 +2482,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                                     {kol.contentLinks.length > 0 ? (
                                       <div className="flex items-center justify-end gap-1">
                                         {kol.contentLinks.slice(0, 3).map((link, i) => (
-                                          <a key={i} href={link} target="_blank" rel="noopener noreferrer" className="text-[#3e8692] hover:text-[#2d6570]">
+                                          <a key={i} href={link} target="_blank" rel="noopener noreferrer" className="text-brand hover:text-[#2d6570]">
                                             <ExternalLink className="h-3.5 w-3.5" />
                                           </a>
                                         ))}
@@ -2515,7 +2515,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           <Card className="border-0 shadow-lg rounded-xl overflow-hidden mt-8">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-[#3e8692] to-[#2d6570] rounded-xl shadow-lg">
+                <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
                   <StickyNote className="h-5 w-5 text-white" />
                 </div>
                 <CardTitle className="text-xl font-bold text-gray-900">Meeting Notes</CardTitle>
@@ -2527,14 +2527,14 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 {meetingNotes.map((note, index) => (
                   <div
                     key={note.id}
-                    className="group bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 overflow-hidden border-l-4 border-l-[#3e8692] cursor-pointer"
+                    className="group bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 overflow-hidden border-l-4 border-l-brand cursor-pointer"
                     style={{ animationDelay: `${index * 50}ms` }}
                     onClick={() => setViewingNote(note)}
                   >
                     <div className="p-5">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-lg text-gray-900 truncate group-hover:text-[#3e8692] transition-colors">
+                          <h3 className="font-bold text-lg text-gray-900 truncate group-hover:text-brand transition-colors">
                             {note.title}
                           </h3>
                           <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
@@ -2547,7 +2547,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                         <Button
                           variant="outline"
                           size="sm"
-                          className="rounded-lg border-gray-200 hover:border-[#3e8692] hover:text-[#3e8692] transition-colors flex-shrink-0 ml-4"
+                          className="rounded-lg border-gray-200 hover:border-brand hover:text-brand transition-colors flex-shrink-0 ml-4"
                           onClick={(e) => { e.stopPropagation(); setViewingNote(note); }}
                         >
                           <ExternalLink className="h-4 w-4 mr-1.5" />
@@ -2564,7 +2564,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
         {/* Meeting Note Detail Dialog */}
         <Dialog open={!!viewingNote} onOpenChange={(open) => { if (!open) setViewingNote(null); }}>
-          <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden border-l-4 border-l-[#3e8692] rounded-xl">
+          <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden border-l-4 border-l-brand rounded-xl">
             <DialogHeader className="pb-4 border-b border-gray-100">
               <DialogTitle className="text-xl font-bold text-gray-900">{viewingNote?.title}</DialogTitle>
               <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
@@ -2655,7 +2655,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             <div className="pointer-events-auto relative mt-3">
               <button
                 onClick={() => setActivityModalOpen(!activityModalOpen)}
-                className="relative w-11 h-11 rounded-full bg-[#3e8692] shadow-lg flex items-center justify-center hover:bg-[#2d6570] transition-colors cursor-pointer"
+                className="relative w-11 h-11 rounded-full bg-brand shadow-lg flex items-center justify-center hover:bg-[#2d6570] transition-colors cursor-pointer"
               >
                 <Bell className="h-5 w-5 text-white" />
                 {totalUnread > 0 && (
@@ -2672,7 +2672,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   <div className="absolute right-0 top-[52px] z-50 w-[380px] bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
                     <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Activity className="h-4 w-4 text-[#3e8692]" />
+                        <Activity className="h-4 w-4 text-brand" />
                         <p className="text-sm font-bold text-gray-900">Recent Activity</p>
                       </div>
                       <span className="text-xs text-gray-400">{totalActivities} total</span>
@@ -2691,7 +2691,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             return new Date(activity.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                           })();
 
-                          const iconColor = activity.activity_type === 'milestone_status' ? 'bg-[#3e8692]'
+                          const iconColor = activity.activity_type === 'milestone_status' ? 'bg-brand'
                             : activity.activity_type === 'campaign_status' ? 'bg-blue-500'
                             : activity.activity_type === 'link_added' ? 'bg-purple-500'
                             : activity.activity_type === 'resource_updated' ? 'bg-green-500'
@@ -2705,7 +2705,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                           return (
                             <div
                               key={activity.id}
-                              className={`flex items-start gap-3 px-3 py-2.5 rounded-lg transition-colors ${!activity.is_read ? 'bg-[#3e8692]/[0.04]' : ''} ${scrollTarget ? 'hover:bg-gray-50 cursor-pointer' : ''}`}
+                              className={`flex items-start gap-3 px-3 py-2.5 rounded-lg transition-colors ${!activity.is_read ? 'bg-brand/[0.04]' : ''} ${scrollTarget ? 'hover:bg-gray-50 cursor-pointer' : ''}`}
                               onClick={async () => {
                                 if (!activity.is_read) {
                                   setRecentActivities(prev => prev.map(a => a.id === activity.id ? { ...a, is_read: true } : a));
@@ -2745,7 +2745,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             setActivityLimit(newLimit);
                             fetchRecentActivities(newLimit);
                           }}
-                          className="text-xs font-medium text-[#3e8692] cursor-pointer"
+                          className="text-xs font-medium text-brand cursor-pointer"
                         >
                           Show more ({totalActivities - recentActivities.length} remaining)
                         </button>

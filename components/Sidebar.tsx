@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3 } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass } from 'lucide-react';
+import { SidebarCustomizeDialog, NAV_BY_HREF, isItemAvailable, type AvailabilityCtx } from '@/components/SidebarCustomize';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChangelog } from '@/contexts/ChangelogContext';
 import { useGuestPermissions } from '@/hooks/useGuestPermissions';
@@ -34,6 +35,80 @@ export default function Sidebar({ children }: SidebarProps) {
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
   const [changelogPage, setChangelogPage] = useState(0);
   const changelogsPerPage = 3;
+
+  // ─── Sidebar customization (bookmarks + hidden) ──────────────────
+  // Per-browser persistence in localStorage. We don't key by user.id
+  // because every other sidebar pref (sidebarCollapsed) follows the
+  // same pattern — if multiple people share a machine, that's already
+  // a bigger problem than misaligned bookmarks.
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+  const [bookmarkedHrefs, setBookmarkedHrefs] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem('sidebar_bookmarks');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [hiddenHrefs, setHiddenHrefs] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem('sidebar_hidden');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Persist on every change. Two effects (not one) because each set is
+  // updated independently; fewer wasted writes than serializing both.
+  useEffect(() => {
+    try { localStorage.setItem('sidebar_bookmarks', JSON.stringify(bookmarkedHrefs)); } catch {}
+  }, [bookmarkedHrefs]);
+  useEffect(() => {
+    try { localStorage.setItem('sidebar_hidden', JSON.stringify(hiddenHrefs)); } catch {}
+  }, [hiddenHrefs]);
+
+  const toggleBookmark = (href: string) => {
+    setBookmarkedHrefs(prev =>
+      prev.includes(href) ? prev.filter(h => h !== href) : [...prev, href],
+    );
+  };
+  const toggleHidden = (href: string) => {
+    setHiddenHrefs(prev =>
+      prev.includes(href) ? prev.filter(h => h !== href) : [...prev, href],
+    );
+  };
+  const resetCustomization = () => {
+    setBookmarkedHrefs([]);
+    setHiddenHrefs([]);
+  };
+
+  // O(1) hidden lookup used inside NavItem render. Set rebuilt only
+  // when the array changes, not on every render.
+  const hiddenSet = React.useMemo(() => new Set(hiddenHrefs), [hiddenHrefs]);
+
+  // ─── Per-section collapse state ──────────────────────────────────
+  // Each top-level group (Bookmarks, People, KOLs, CRM, Workspace,
+  // Documents, Admin) can be independently collapsed by clicking its
+  // header. Default = all expanded so the change is non-disruptive.
+  // Stored as { [sectionId]: true } where presence means collapsed.
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const stored = localStorage.getItem('sidebar_collapsed_sections');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('sidebar_collapsed_sections', JSON.stringify(collapsedSections)); } catch {}
+  }, [collapsedSections]);
+  const toggleSection = (id: string) => {
+    setCollapsedSections(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   // Get changelog data from context (fetched once at app level)
   const { changelogs, latestVersion } = useChangelog();
@@ -154,16 +229,26 @@ export default function Sidebar({ children }: SidebarProps) {
   // nav, these become a candidate for extraction.
 
   /** A single top-level nav item. The data-nav-active marker on the
-   *  inner span is what the scroll-into-view effect queries for. */
+   *  inner span is what the scroll-into-view effect queries for.
+   *
+   *  Returns null when the user has hidden this item via the customize
+   *  dialog. The `force` prop bypasses the hidden check — used by the
+   *  Bookmarks section so a bookmarked item still shows even if its
+   *  original location is hidden. (User intent: bookmark = "I want this
+   *  visible at the top," hide = "I don't want this in its original
+   *  spot." Bookmarks win.) */
   const NavItem = ({
     href,
     icon: Icon,
     label,
+    force = false,
   }: {
     href: string;
     icon: React.ComponentType<{ className?: string }>;
     label: string;
+    force?: boolean;
   }) => {
+    if (!force && hiddenSet.has(href)) return null;
     const isActive = pathname.startsWith(href);
     return (
       <Link href={href} legacyBehavior>
@@ -223,7 +308,11 @@ export default function Sidebar({ children }: SidebarProps) {
 
   /** Visual section divider: small icon + horizontal rule. Hidden when
    *  the sidebar is collapsed (icons-only mode would just show a
-   *  random floating icon, which is noise). */
+   *  random floating icon, which is noise).
+   *
+   *  Kept as a fallback for places that need a non-collapsible divider
+   *  in the future. All current sections route through CollapsibleSection
+   *  below. */
   const SectionDivider = ({
     icon: Icon,
   }: {
@@ -234,6 +323,50 @@ export default function Sidebar({ children }: SidebarProps) {
       <div className="flex items-center space-x-2">
         <Icon className="h-4 w-4 text-gray-400" />
         <div className="flex-1 h-px bg-gray-200"></div>
+      </div>
+    );
+  };
+
+  /** Collapsible section wrapper: clickable header (icon + horizontal
+   *  rule + chevron) that toggles its children's visibility. Used for
+   *  every top-level group in the sidebar.
+   *
+   *  When the whole sidebar is collapsed (`isSidebarCollapsed` = true),
+   *  there's no header — children render as a flat list of icon-only
+   *  items, matching the old SectionDivider behavior. Per-section
+   *  collapse only applies in expanded mode where there's a header to
+   *  click. */
+  const CollapsibleSection = ({
+    id,
+    icon: Icon,
+    children,
+  }: {
+    id: string;
+    icon: React.ComponentType<{ className?: string }>;
+    children: React.ReactNode;
+  }) => {
+    if (isSidebarCollapsed) {
+      // Icons-only mode: no header, no collapse — render items directly.
+      return <div className="space-y-2">{children}</div>;
+    }
+    const isCollapsed = !!collapsedSections[id];
+    return (
+      <div className="space-y-2">
+        <button
+          type="button"
+          onClick={() => toggleSection(id)}
+          className="w-full flex items-center space-x-2 group hover:opacity-80"
+          title={isCollapsed ? 'Expand section' : 'Collapse section'}
+        >
+          <Icon className="h-4 w-4 text-gray-400" />
+          <div className="flex-1 h-px bg-gray-200"></div>
+          <ChevronDown
+            className={`h-3 w-3 text-gray-400 transition-transform duration-200 ${
+              isCollapsed ? '-rotate-90' : ''
+            }`}
+          />
+        </button>
+        {!isCollapsed && children}
       </div>
     );
   };
@@ -250,7 +383,7 @@ export default function Sidebar({ children }: SidebarProps) {
               {latestVersion && (
                 <Badge
                   variant="secondary"
-                  className="ml-2 cursor-pointer bg-[#3e8692]/10 text-[#3e8692] hover:bg-[#3e8692]/20 transition-colors"
+                  className="ml-2 cursor-pointer bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
                   onClick={() => setIsChangelogOpen(true)}
                 >
                   v{latestVersion}
@@ -301,122 +434,164 @@ export default function Sidebar({ children }: SidebarProps) {
                   {[1,2,3,4,5].map(i => <div key={i} className="h-8 bg-gray-100 rounded animate-pulse" />)}
                 </div>
               ) : <>
-              {/* Holo GPT — top of sidebar, hidden for guests */}
-              {!guestHideAlways && (
+              {/* Holo GPT — hidden from sidebar (still reachable at /chat).
+                  Was here, removed at user request 2026-05-05. Restore by
+                  un-commenting; the !guestHideAlways guard is still correct. */}
+              {/* {!guestHideAlways && (
                 <div className="space-y-2">
                   <NavItem href="/chat" icon={Sparkles} label="Holo GPT" />
                 </div>
+              )} */}
+
+              {/* Priority Dashboard — top of sidebar (above bookmarks
+                  even). Company-operating view; anyone with non-guest
+                  access can open it. Added 2026-05-07. */}
+              {!guestHideAlways && (
+                <div className="space-y-2">
+                  <NavItem href="/dashboard" icon={Compass} label="Dashboard" />
+                </div>
               )}
+
+              {/* Bookmarks — user-pinned items at the top. Renders only
+                  when the user has bookmarked anything. Each item is
+                  filtered through isItemAvailable so a user who lost
+                  access (role downgrade, etc.) doesn't see broken links.
+                  Uses force=true on NavItem so a bookmarked item still
+                  appears even if it's also marked hidden. */}
+              {(() => {
+                const ctx: AvailabilityCtx = {
+                  isGuest: isGuestUser,
+                  role: userProfile?.role,
+                  canView,
+                };
+                const visible = bookmarkedHrefs
+                  .map(href => NAV_BY_HREF[href])
+                  .filter(item => item && isItemAvailable(item, ctx));
+                if (visible.length === 0) return null;
+                return (
+                  <CollapsibleSection id="bookmarks" icon={Star}>
+                    {visible.map(item => (
+                      <NavItem
+                        key={item.href}
+                        href={item.href}
+                        icon={item.icon}
+                        label={item.label}
+                        force
+                      />
+                    ))}
+                  </CollapsibleSection>
+                );
+              })()}
 
               {/* People Section */}
               {!guestHideSection(['/clients']) && (
-                <>
-                  <SectionDivider icon={User} />
-                  <div className="space-y-2">
-                    {!isGuest && <NavItem href="/team" icon={Shield} label="Team" />}
-                    {!guestHide('/clients') && <NavItem href="/clients" icon={Users} label="Clients" />}
-                  </div>
-                </>
+                <CollapsibleSection id="people" icon={User}>
+                  {!isGuest && <NavItem href="/team" icon={Shield} label="Team" />}
+                  {!guestHide('/clients') && <NavItem href="/clients" icon={Users} label="Clients" />}
+                </CollapsibleSection>
               )}
 
               {/* KOLs Section */}
               {!guestHideSection(['/kols', '/lists', '/campaigns']) && (
-                <>
-                  <SectionDivider icon={Crown} />
-                  <div className="space-y-2">
-                    {!guestHide('/kols') && <NavItem href="/kols" icon={Crown} label="KOLs" />}
-                    {!guestHide('/lists') && <NavItem href="/lists" icon={List} label="Lists" />}
-                    {!guestHide('/campaigns') && <NavItem href="/campaigns" icon={Megaphone} label="Campaigns" />}
-                  </div>
-                </>
+                <CollapsibleSection id="kols" icon={Crown}>
+                  {!guestHide('/kols') && <NavItem href="/kols" icon={Crown} label="KOLs" />}
+                  {!guestHide('/lists') && <NavItem href="/lists" icon={List} label="Lists" />}
+                  {!guestHide('/campaigns') && <NavItem href="/campaigns" icon={Megaphone} label="Campaigns" />}
+                </CollapsibleSection>
               )}
 
               {/* CRM Section */}
               {!guestHideSection(['/crm/sales-pipeline', '/intelligence', '/crm/network', '/crm/contacts', '/crm/submissions', '/crm/meetings']) && (
-                <>
-                  <SectionDivider icon={DollarSign} />
-                  <div className="space-y-2">
-                    {!guestHide('/crm/sales-pipeline') && <NavItem href="/crm/sales-pipeline" icon={Target} label="Sales" />}
-                    {!guestHide('/intelligence') && <NavItem href="/intelligence" icon={Radar} label="Intelligence" />}
-                    {/* Analytics — team dashboard with KPIs, pipeline funnel,
-                        owner workload, recent activity, health alerts.
-                        Reads /api/analytics/dashboard in one call. */}
-                    {!guestHide('/analytics') && <NavItem href="/analytics" icon={BarChart3} label="Analytics" />}
-                    {!guestHide('/crm/network') && <NavItem href="/crm/network" icon={Handshake} label="Network" />}
-                    {!guestHide('/crm/contacts') && <NavItem href="/crm/contacts" icon={UserPlus} label="Contacts" />}
-                    {!guestHide('/crm/submissions') && <NavItem href="/crm/submissions" icon={Inbox} label="Submissions" />}
-                    {!guestHide('/crm/meetings') && <NavItem href="/crm/meetings" icon={Calendar} label="Meetings" />}
-                    {userProfile?.role === 'super_admin' && <NavItem href="/crm/telegram" icon={MessageSquare} label="TG Chats" />}
-                  </div>
-                </>
+                <CollapsibleSection id="crm" icon={DollarSign}>
+                  {!guestHide('/crm/sales-pipeline') && <NavItem href="/crm/sales-pipeline" icon={Target} label="Sales" />}
+                  {!guestHide('/intelligence') && <NavItem href="/intelligence" icon={Radar} label="Intelligence" />}
+                  {/* Analytics — team dashboard with KPIs, pipeline funnel,
+                      owner workload, recent activity, health alerts.
+                      Reads /api/analytics/dashboard in one call. */}
+                  {!guestHide('/analytics') && <NavItem href="/analytics" icon={BarChart3} label="Analytics" />}
+                  {!guestHide('/crm/network') && <NavItem href="/crm/network" icon={Handshake} label="Network" />}
+                  {!guestHide('/crm/contacts') && <NavItem href="/crm/contacts" icon={UserPlus} label="Contacts" />}
+                  {!guestHide('/crm/submissions') && <NavItem href="/crm/submissions" icon={Inbox} label="Submissions" />}
+                  {!guestHide('/crm/meetings') && <NavItem href="/crm/meetings" icon={Calendar} label="Meetings" />}
+                  {userProfile?.role === 'super_admin' && <NavItem href="/crm/telegram" icon={MessageSquare} label="TG Chats" />}
+                </CollapsibleSection>
               )}
 
               {/* Workspace Section */}
               {!guestHideSection(['/daily-standup', '/tasks']) && (
-                <>
-                  <SectionDivider icon={Briefcase} />
-                  <div className="space-y-2">
-                    <NavItem href="/daily-standup" icon={CheckCircle} label="Daily Stand-Up" />
-                    <NavItem href="/tasks" icon={ListTodo} label="Tasks" />
-                    {/* Task sub-nav — visible only when expanded AND on a /tasks route */}
-                    {!isSidebarCollapsed && pathname.startsWith('/tasks') && (
-                      <div className="pl-6 space-y-0.5">
-                        <SubNavItem href="/tasks" icon={ListTodo} label="All Tasks" exact />
-                        <SubNavItem href="/tasks/my-dashboard" icon={LayoutDashboard} label="My Dashboard" exact />
-                        <SubNavItem href="/tasks/deliverables" icon={Target} label="Deliverables" />
-                        {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
-                          <>
-                            <SubNavItem href="/tasks/admin" icon={ShieldCheck} label="Admin Overview" exact />
-                            <SubNavItem href="/tasks/automations" icon={Zap} label="Automations" exact />
-                            <SubNavItem href="/tasks/templates" icon={FileText} label="Templates" exact />
-                            <SubNavItem href="/tasks/deliverables/templates" icon={Sliders} label="Deliverable Templates" exact />
-                          </>
-                        )}
-                      </div>
-                    )}
-                    <NavItem href="/reminders" icon={Bell} label="Reminders" />
-                  </div>
-                </>
+                <CollapsibleSection id="workspace" icon={Briefcase}>
+                  <NavItem href="/daily-standup" icon={CheckCircle} label="Daily Stand-Up" />
+                  <NavItem href="/tasks" icon={ListTodo} label="Tasks" />
+                  {/* Task sub-nav — visible only when expanded AND on a /tasks route */}
+                  {!isSidebarCollapsed && pathname.startsWith('/tasks') && (
+                    <div className="pl-6 space-y-0.5">
+                      <SubNavItem href="/tasks" icon={ListTodo} label="All Tasks" exact />
+                      <SubNavItem href="/tasks/my-dashboard" icon={LayoutDashboard} label="My Dashboard" exact />
+                      <SubNavItem href="/tasks/deliverables" icon={Target} label="Deliverables" />
+                      {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
+                        <>
+                          <SubNavItem href="/tasks/admin" icon={ShieldCheck} label="Admin Overview" exact />
+                          <SubNavItem href="/tasks/automations" icon={Zap} label="Automations" exact />
+                          <SubNavItem href="/tasks/templates" icon={FileText} label="Templates" exact />
+                          <SubNavItem href="/tasks/deliverables/templates" icon={Sliders} label="Deliverable Templates" exact />
+                        </>
+                      )}
+                    </div>
+                  )}
+                  <NavItem href="/reminders" icon={Bell} label="Reminders" />
+                </CollapsibleSection>
               )}
 
               {/* Documents Section */}
               {!guestHideSection(['/delivery-logs', '/links']) && (
-                <>
-                  <SectionDivider icon={FileText} />
-                  <div className="space-y-2">
-                    {!guestHide('/delivery-logs') && <NavItem href="/delivery-logs" icon={ClipboardList} label="Delivery Logs" />}
-                    {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/mindshare" icon={TrendingUp} label="Mindshare" />}
-                    {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/forms" icon={ClipboardList} label="Forms" />}
-                    {!guestHide('/links') && <NavItem href="/links" icon={Link2} label="Links" />}
-                    {!guestHideAlways && <NavItem href="/templates" icon={MessageSquare} label="Templates" />}
-                    {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/sops" icon={BookOpen} label="SOPs" />}
-                  </div>
-                </>
+                <CollapsibleSection id="documents" icon={FileText}>
+                  {!guestHide('/delivery-logs') && <NavItem href="/delivery-logs" icon={ClipboardList} label="Delivery Logs" />}
+                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/mindshare" icon={TrendingUp} label="Mindshare" />}
+                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/forms" icon={ClipboardList} label="Forms" />}
+                  {!guestHide('/links') && <NavItem href="/links" icon={Link2} label="Links" />}
+                  {!guestHideAlways && <NavItem href="/templates" icon={MessageSquare} label="Templates" />}
+                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/sops" icon={BookOpen} label="SOPs" />}
+                </CollapsibleSection>
               )}
 
               {/* Admin Section — hidden for guests */}
               {!guestHideAlways && (
-                <>
-                  <SectionDivider icon={Settings} />
-                  <div className="space-y-2">
-                    <NavItem href="/admin/field-options" icon={Sliders} label="Field Options" />
-                    {/* Claude MCP Cookbook — reference page for the AI
-                        connector (example prompts for every tool). Sits
-                        in the Admin section because it's a settings/help-
-                        style item, but visible to everyone since the
-                        connector itself is. */}
-                    <NavItem href="/mcp" icon={Bot} label="Claude MCP" />
-                    {userProfile?.role === 'super_admin' && <NavItem href="/admin/changelog" icon={Sparkles} label="Changelog" />}
-                    <NavItem href="/archive" icon={Archive} label="Archive" />
-                  </div>
-                </>
+                <CollapsibleSection id="admin" icon={Settings}>
+                  <NavItem href="/admin/field-options" icon={Sliders} label="Field Options" />
+                  {/* Claude MCP Cookbook — reference page for the AI
+                      connector (example prompts for every tool). Sits
+                      in the Admin section because it's a settings/help-
+                      style item, but visible to everyone since the
+                      connector itself is. */}
+                  <NavItem href="/mcp" icon={Bot} label="Claude MCP" />
+                  {userProfile?.role === 'super_admin' && <NavItem href="/admin/changelog" icon={Sparkles} label="Changelog" />}
+                  <NavItem href="/archive" icon={Archive} label="Archive" />
+                </CollapsibleSection>
               )}
 
               </>}
             </nav>
-            {/* Collapse Button at Bottom */}
+            {/* Bottom controls: customize + collapse. Side-by-side when
+                expanded, stacked when collapsed (icons-only). Customize
+                hidden for guests since they can't meaningfully use it
+                (their nav is permission-gated to a tiny subset). */}
             <div className="p-4 border-t border-gray-200">
-              <div className="flex justify-center">
+              <div className={`flex ${isSidebarCollapsed ? 'flex-col gap-1' : 'justify-center gap-1'}`}>
+                {!guestHideAlways && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsCustomizeOpen(true)}
+                    className="hover:bg-gray-100 w-auto px-2"
+                    title="Customize sidebar"
+                    aria-label="Customize sidebar"
+                  >
+                    {/* Icon-only — text label removed at user request 2026-05-05.
+                        The title attribute provides hover affordance, aria-label
+                        keeps screen readers informed. */}
+                    <SlidersHorizontal className="h-4 w-4 text-gray-600" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -438,6 +613,18 @@ export default function Sidebar({ children }: SidebarProps) {
         <main className="flex-1 overflow-y-auto p-6">{children}</main>
       </div>
 
+      {/* Customize Sidebar Dialog */}
+      <SidebarCustomizeDialog
+        open={isCustomizeOpen}
+        onOpenChange={setIsCustomizeOpen}
+        bookmarkedHrefs={bookmarkedHrefs}
+        hiddenHrefs={hiddenHrefs}
+        onToggleBookmark={toggleBookmark}
+        onToggleHidden={toggleHidden}
+        onReset={resetCustomization}
+        ctx={{ isGuest: isGuestUser, role: userProfile?.role, canView }}
+      />
+
       {/* Changelog History Dialog */}
       <Dialog open={isChangelogOpen} onOpenChange={(open) => {
         setIsChangelogOpen(open);
@@ -446,7 +633,7 @@ export default function Sidebar({ children }: SidebarProps) {
         <DialogContent className="sm:max-w-lg max-h-[80vh]">
           <DialogHeader>
             <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-[#3e8692]" />
+              <Sparkles className="h-5 w-5 text-brand" />
               <DialogTitle className="text-xl">Changelog</DialogTitle>
             </div>
             <DialogDescription>
@@ -462,7 +649,7 @@ export default function Sidebar({ children }: SidebarProps) {
                   <div className="flex items-center gap-2 mb-2">
                     <Badge
                       variant="secondary"
-                      className="bg-[#3e8692]/10 text-[#3e8692]"
+                      className="bg-brand/10 text-brand"
                     >
                       v{changelog.version}
                     </Badge>

@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare } from "lucide-react";
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { KOLService, MasterKOL } from "@/lib/kolService";
@@ -827,60 +828,10 @@ export default function KOLsPage() {
     return 0;
   };
 
-  const KOLTableSkeleton = () => (
-    <div className="border rounded-lg overflow-auto">
-      <Table className="min-w-max whitespace-nowrap">
-        <TableHeader>
-          <TableRow className="bg-gray-50 border-b border-gray-200">
-            <TableHead className="bg-gray-50 text-center whitespace-nowrap sticky left-0 z-20" style={{ width: 48, minWidth: 48, maxWidth: 48 }}>#</TableHead>
-            {visibleColumns.name && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap sticky left-[48px] z-20" style={{ boxShadow: '-1px 0 0 0 #e5e7eb, 2px 0 4px -2px rgba(0,0,0,0.1)' }}>Name</TableHead>}
-            {visibleColumns.link && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Link</TableHead>}
-            {visibleColumns.platform && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Platform</TableHead>}
-            {visibleColumns.followers && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Followers</TableHead>}
-            {visibleColumns.region && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Region</TableHead>}
-            {visibleColumns.creator_type && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Creator Type</TableHead>}
-            {visibleColumns.content_type && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Content Type</TableHead>}
-            {visibleColumns.deliverables && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Deliverables</TableHead>}
-            {visibleColumns.pricing && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>}
-            {visibleColumns.latest_cost && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>}
-            {visibleColumns.rating && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Rating</TableHead>}
-            {visibleColumns.community && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Community</TableHead>}
-            {visibleColumns.group_chat && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Group Chat</TableHead>}
-            {visibleColumns.in_house && <TableHead className={`bg-gray-50 border-r border-gray-200 select-none ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}>In-House</TableHead>}
-            {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Description</TableHead>}
-            {visibleColumns.wallet && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Wallet</TableHead>}
-            {visibleColumns.telegram && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Telegram</TableHead>}
-            <TableHead className="bg-gray-50 whitespace-nowrap">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody className="bg-white">
-          {Array.from({ length: 8 }).map((_, index) => (
-            <TableRow key={index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b border-gray-200`}>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center w-12`}><Skeleton className="h-4 w-6 mx-auto" /></TableCell>
-              {visibleColumns.name && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.link && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.platform && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><div className="flex flex-nowrap gap-1 items-center w-full"><Skeleton className="h-5 w-5 rounded-full" /><Skeleton className="h-5 w-5 rounded-full" /></div></TableCell>}
-              {visibleColumns.followers && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.region && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-28`}><div className="flex items-center gap-1 w-full"><Skeleton className="h-4 w-4 rounded" /><Skeleton className="h-4 w-20" /></div></TableCell>}
-              {visibleColumns.creator_type && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
-              {visibleColumns.content_type && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-20 rounded-md" /></div></TableCell>}
-              {visibleColumns.deliverables && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-18 rounded-md" /><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-14 rounded-md" /></div></TableCell>}
-              {visibleColumns.pricing && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.latest_cost && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.rating && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><div className="flex items-center space-x-1 w-full">{[1, 2, 3, 4, 5].map(star => (<Skeleton key={star} className="h-3 w-3 rounded" />))}</div></TableCell>}
-              {visibleColumns.community && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
-              {visibleColumns.group_chat && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
-              {visibleColumns.in_house && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
-              {visibleColumns.description && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.wallet && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.telegram && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden w-16`}><div className="flex space-x-1 w-full"><Skeleton className="h-8 w-8 rounded" /><Skeleton className="h-8 w-8 rounded" /></div></TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
+  // KOLTableSkeleton extracted to module scope (audit 2026-05-06):
+  // was inline here, re-allocated every render. visibleColumns + the
+  // addingNewOptionForRow flag are passed as props since they live in
+  // this component's state.
 
   // Column resize handlers
   // Remove columnWidths, isResizing, resizingColumn, handleMouseDown, handleMouseMove, handleMouseUp, ResizeHandle
@@ -1071,7 +1022,7 @@ export default function KOLsPage() {
                         value={newOptionValue}
                         onChange={(e) => setNewOptionValue(e.target.value)}
                         placeholder="Enter new option"
-                        className="auth-input h-7 text-xs"
+                        className="focus-brand h-7 text-xs"
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
@@ -1463,7 +1414,7 @@ export default function KOLsPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search KOLs by name, region, or niche..."
-              className="pl-10 auth-input"
+              className="pl-10 focus-brand"
               disabled
             />
           </div>
@@ -1475,7 +1426,7 @@ export default function KOLsPage() {
           <Skeleton className="h-8 w-28 rounded" />
         </div>
 
-        <KOLTableSkeleton />
+        <KOLTableSkeleton visibleColumns={visibleColumns} addingNewOptionForRow={addingNewOptionForRow} />
       </div>
     );
   }
@@ -1829,7 +1780,7 @@ export default function KOLsPage() {
                           value={newOptionValueBulk}
                           onChange={(e) => setNewOptionValueBulk(e.target.value)}
                           placeholder="Enter new option"
-                          className="auth-input"
+                          className="focus-brand"
                           autoFocus
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -1873,7 +1824,7 @@ export default function KOLsPage() {
             <div className="flex gap-3">
               <Button
                 size="sm"
-                className="bg-[#3e8692] hover:bg-[#2d6b75] text-white border-0 shadow-sm"
+                className="bg-brand hover:bg-[#2d6b75] text-white border-0 shadow-sm"
                 disabled={selectedKOLs.length === 0}
                 onClick={async () => {
                   if (selectedKOLs.length === 0) return;
@@ -2184,7 +2135,7 @@ export default function KOLsPage() {
                   type="number"
                   value={filters.followers}
                   onChange={(e) => setFilters(prev => ({ ...prev, followers: e.target.value }))}
-                  className="auth-input h-7 text-xs w-16"
+                  className="focus-brand h-7 text-xs w-16"
                 />
               </div>
             </div>
@@ -2209,7 +2160,7 @@ export default function KOLsPage() {
                   type="number"
                   value={filters.rating}
                   onChange={(e) => setFilters(prev => ({ ...prev, rating: e.target.value }))}
-                  className="auth-input h-7 text-xs w-16"
+                  className="focus-brand h-7 text-xs w-16"
                 />
               </div>
             </div>
@@ -2287,7 +2238,7 @@ export default function KOLsPage() {
                       onCheckedChange={(checked) => {
                         handleColumnVisibilityChange(key as keyof typeof defaultVisibleColumns, checked);
                       }}
-                      className="data-[state=checked]:bg-[#3e8692] data-[state=unchecked]:bg-gray-200"
+                      className="data-[state=checked]:bg-brand data-[state=unchecked]:bg-gray-200"
                     />
                   </label>
                 ))}
@@ -2306,7 +2257,7 @@ export default function KOLsPage() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search KOLs by name, region, or niche..."
-            className="pl-10 auth-input"
+            className="pl-10 focus-brand"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -2318,14 +2269,14 @@ export default function KOLsPage() {
         <TabsList className="bg-gray-100 p-1 h-auto">
           <TabsTrigger
             value="all"
-            className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-sm px-4 py-1.5"
+            className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-1.5"
           >
             All
-            <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full data-[state=active]:bg-[#e8f4f5] data-[state=active]:text-[#3e8692]">{filteredKOLs.length}</span>
+            <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full data-[state=active]:bg-brand-light data-[state=active]:text-brand">{filteredKOLs.length}</span>
           </TabsTrigger>
           <TabsTrigger
             value="need_update"
-            className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-sm px-4 py-1.5"
+            className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-1.5"
           >
             <span className="text-red-500 font-bold mr-1">!</span> Need Update
             <span className="ml-2 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">{needUpdateCount}</span>
@@ -2391,7 +2342,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.platform.length > 0 && (
-                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         {filters.platform.length}
                       </span>
                     )}
@@ -2430,7 +2381,7 @@ export default function KOLsPage() {
                               placeholder="Value"
                               value={filters.followers}
                               onChange={(e) => setFilters(prev => ({ ...prev, followers: e.target.value }))}
-                              className="h-8 text-xs auth-input"
+                              className="h-8 text-xs focus-brand"
                             />
                           </div>
                           {(filters.followersOperator || filters.followers) && (
@@ -2447,7 +2398,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {(filters.followersOperator && filters.followers) && (
-                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         1
                       </span>
                     )}
@@ -2501,7 +2452,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.region.length > 0 && (
-                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         {filters.region.length}
                       </span>
                     )}
@@ -2552,7 +2503,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.creator_type.length > 0 && (
-                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         {filters.creator_type.length}
                       </span>
                     )}
@@ -2603,7 +2554,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.content_type.length > 0 && (
-                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         {filters.content_type.length}
                       </span>
                     )}
@@ -2654,7 +2605,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.deliverables.length > 0 && (
-                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         {filters.deliverables.length}
                       </span>
                     )}
@@ -2705,7 +2656,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.pricing.length > 0 && (
-                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         {filters.pricing.length}
                       </span>
                     )}
@@ -2747,7 +2698,7 @@ export default function KOLsPage() {
                               placeholder="Value"
                               value={filters.rating}
                               onChange={(e) => setFilters(prev => ({ ...prev, rating: e.target.value }))}
-                              className="h-8 text-xs auth-input"
+                              className="h-8 text-xs focus-brand"
                             />
                           </div>
                           {(filters.ratingOperator || filters.rating) && (
@@ -2764,7 +2715,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {(filters.ratingOperator && filters.rating) && (
-                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         1
                       </span>
                     )}
@@ -2812,7 +2763,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.community && (
-                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         1
                       </span>
                     )}
@@ -2860,7 +2811,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.group_chat && (
-                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         1
                       </span>
                     )}
@@ -2911,7 +2862,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.in_house.length > 0 && (
-                      <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         {filters.in_house.length}
                       </span>
                     )}
@@ -3028,7 +2979,7 @@ export default function KOLsPage() {
                     <div className="truncate text-sm">
                       {latestCostMap.has(kol.id) ? (
                         <button
-                          className="text-[#3e8692] hover:underline cursor-pointer"
+                          className="text-brand hover:underline cursor-pointer"
                           onClick={() => {
                             const entry = latestCostMap.get(kol.id)!;
                             if (entry.campaignSlug) {
@@ -3160,18 +3111,21 @@ export default function KOLsPage() {
         </div>
       )}
 
-      {filteredKOLs.length === 0 && (
-        <div className="text-center py-8">
-          <Crown className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-600 mb-2">No KOLs found</p>
-          <p className="text-sm text-gray-500">
-            {searchTerm || Object.values(filters).some(value => 
-              (typeof value === 'string' && value !== '') || 
-              (Array.isArray(value) && value.length > 0)
-            ) ? 'Could not find KOLs with selected filters.' : 'Start by adding your first KOL.'}
-          </p>
-        </div>
-      )}
+      {filteredKOLs.length === 0 && (() => {
+        const hasFilters = searchTerm || Object.values(filters).some(value =>
+          (typeof value === 'string' && value !== '') ||
+          (Array.isArray(value) && value.length > 0)
+        );
+        return (
+          <EmptyState
+            icon={Crown}
+            title={hasFilters ? 'No KOLs found' : 'No KOLs yet'}
+            description={hasFilters
+              ? 'Could not find KOLs with the selected filters. Try clearing them.'
+              : 'Start by adding your first KOL.'}
+          />
+        );
+      })()}
       {/* 4. Add Dialog for single delete at the bottom of the component */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
@@ -3266,4 +3220,76 @@ export default function KOLsPage() {
       )}
     </div>
   );
-} 
+}
+
+// Module-scope skeleton — see comment in main page component for context.
+// Memoized so React's reconciler treats every instance as the same
+// component type across re-renders (no remount on parent re-render).
+//
+// Props mirror the two state values it depends on inside the page:
+//   - visibleColumns: which columns to render skeleton cells for
+//   - addingNewOptionForRow: drives the In-House column's width variant
+type KOLTableSkeletonProps = {
+  visibleColumns: Record<string, boolean>;
+  addingNewOptionForRow: string | null;
+};
+
+const KOLTableSkeleton = React.memo(function KOLTableSkeleton({
+  visibleColumns,
+  addingNewOptionForRow,
+}: KOLTableSkeletonProps) {
+  return (
+    <div className="border rounded-lg overflow-auto">
+      <Table className="min-w-max whitespace-nowrap">
+        <TableHeader>
+          <TableRow className="bg-gray-50 border-b border-gray-200">
+            <TableHead className="bg-gray-50 text-center whitespace-nowrap sticky left-0 z-20" style={{ width: 48, minWidth: 48, maxWidth: 48 }}>#</TableHead>
+            {visibleColumns.name && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap sticky left-[48px] z-20" style={{ boxShadow: '-1px 0 0 0 #e5e7eb, 2px 0 4px -2px rgba(0,0,0,0.1)' }}>Name</TableHead>}
+            {visibleColumns.link && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Link</TableHead>}
+            {visibleColumns.platform && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Platform</TableHead>}
+            {visibleColumns.followers && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Followers</TableHead>}
+            {visibleColumns.region && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Region</TableHead>}
+            {visibleColumns.creator_type && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Creator Type</TableHead>}
+            {visibleColumns.content_type && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Content Type</TableHead>}
+            {visibleColumns.deliverables && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Deliverables</TableHead>}
+            {visibleColumns.pricing && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>}
+            {visibleColumns.latest_cost && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>}
+            {visibleColumns.rating && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Rating</TableHead>}
+            {visibleColumns.community && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Community</TableHead>}
+            {visibleColumns.group_chat && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Group Chat</TableHead>}
+            {visibleColumns.in_house && <TableHead className={`bg-gray-50 border-r border-gray-200 select-none ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}>In-House</TableHead>}
+            {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Description</TableHead>}
+            {visibleColumns.wallet && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Wallet</TableHead>}
+            {visibleColumns.telegram && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Telegram</TableHead>}
+            <TableHead className="bg-gray-50 whitespace-nowrap">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody className="bg-white">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <TableRow key={index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b border-gray-200`}>
+              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center w-12`}><Skeleton className="h-4 w-6 mx-auto" /></TableCell>
+              {visibleColumns.name && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.link && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.platform && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><div className="flex flex-nowrap gap-1 items-center w-full"><Skeleton className="h-5 w-5 rounded-full" /><Skeleton className="h-5 w-5 rounded-full" /></div></TableCell>}
+              {visibleColumns.followers && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.region && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-28`}><div className="flex items-center gap-1 w-full"><Skeleton className="h-4 w-4 rounded" /><Skeleton className="h-4 w-20" /></div></TableCell>}
+              {visibleColumns.creator_type && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
+              {visibleColumns.content_type && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-20 rounded-md" /></div></TableCell>}
+              {visibleColumns.deliverables && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-18 rounded-md" /><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-14 rounded-md" /></div></TableCell>}
+              {visibleColumns.pricing && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.latest_cost && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.rating && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><div className="flex items-center space-x-1 w-full">{[1, 2, 3, 4, 5].map(star => (<Skeleton key={star} className="h-3 w-3 rounded" />))}</div></TableCell>}
+              {visibleColumns.community && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
+              {visibleColumns.group_chat && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
+              {visibleColumns.in_house && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
+              {visibleColumns.description && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.wallet && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.telegram && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
+              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden w-16`}><div className="flex space-x-1 w-full"><Skeleton className="h-8 w-8 rounded" /><Skeleton className="h-8 w-8 rounded" /></div></TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}); 

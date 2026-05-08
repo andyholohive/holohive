@@ -141,7 +141,7 @@ export function ReportTabContent({
                 id="public-report"
                 checked={shareReportPublicly}
                 onCheckedChange={onTogglePublicReport}
-                className="data-[state=checked]:bg-[#3e8692]"
+                className="data-[state=checked]:bg-brand"
               />
             </div>
 
@@ -359,7 +359,7 @@ export function ReportTabContent({
 
             {loadingReportFiles ? (
               <div className="text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e8692]"></div>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-brand"></div>
                 <p className="text-gray-500 mt-3">Loading files...</p>
               </div>
             ) : reportFiles.length > 0 ? (
@@ -400,7 +400,7 @@ export function ReportTabContent({
                         variant="ghost"
                         size="sm"
                         onClick={() => window.open(file.file_url, '_blank')}
-                        className="hover:text-[#3e8692]"
+                        className="hover:text-brand"
                       >
                         <Download className="h-4 w-4" />
                       </Button>

@@ -289,7 +289,7 @@ export default function ExchangeListingsPanel() {
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <Clock className="h-3.5 w-3.5 text-[#3e8692]" />
+              <Clock className="h-3.5 w-3.5 text-brand" />
               <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last Scan</span>
             </div>
             {loading ? <Skeleton className="h-7 w-20" /> : runs[0] ? (
@@ -301,7 +301,7 @@ export default function ExchangeListingsPanel() {
                   {runs[0].status === 'completed' ? (
                     <CheckCircle className="h-3 w-3 text-emerald-600" />
                   ) : runs[0].status === 'running' ? (
-                    <Loader2 className="h-3 w-3 animate-spin text-[#3e8692]" />
+                    <Loader2 className="h-3 w-3 animate-spin text-brand" />
                   ) : (
                     <XCircle className="h-3 w-3 text-red-600" />
                   )}
@@ -397,7 +397,7 @@ export default function ExchangeListingsPanel() {
                       </TableCell>
                       <TableCell>
                         {d.matched_prospect_id ? (
-                          <Badge className="bg-[#e8f4f5] text-[#3e8692] pointer-events-none text-[10px]">
+                          <Badge className="bg-brand-light text-brand pointer-events-none text-[10px]">
                             ✓ prospect
                           </Badge>
                         ) : (
@@ -575,7 +575,7 @@ export default function ExchangeListingsPanel() {
                     {r.status === 'completed' ? (
                       <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                     ) : r.status === 'running' ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-[#3e8692] shrink-0" />
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-brand shrink-0" />
                     ) : (
                       <XCircle className="h-3.5 w-3.5 text-red-600 shrink-0" />
                     )}

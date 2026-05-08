@@ -299,7 +299,7 @@ export default function AutomationsPage() {
                 value={newRule.name}
                 onChange={(e) => setNewRule({ ...newRule, name: e.target.value })}
                 placeholder="e.g., Notify on overdue tasks"
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -307,7 +307,7 @@ export default function AutomationsPage() {
               <div className="grid gap-2">
                 <Label>Trigger</Label>
                 <Select value={newRule.trigger_type} onValueChange={(v) => setNewRule({ ...newRule, trigger_type: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select trigger" /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue placeholder="Select trigger" /></SelectTrigger>
                   <SelectContent>
                     {TRIGGER_TYPES.map(t => (
                       <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
@@ -319,7 +319,7 @@ export default function AutomationsPage() {
               <div className="grid gap-2">
                 <Label>Action</Label>
                 <Select value={newRule.action_type} onValueChange={(v) => setNewRule({ ...newRule, action_type: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select action" /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue placeholder="Select action" /></SelectTrigger>
                   <SelectContent>
                     {ACTION_TYPES.map(a => (
                       <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
@@ -332,7 +332,7 @@ export default function AutomationsPage() {
             <div className="grid gap-2">
               <Label>Scope</Label>
               <Select value={newRule.scope} onValueChange={(v) => setNewRule({ ...newRule, scope: v })}>
-                <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {SCOPE_OPTIONS.map(s => (
                     <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>

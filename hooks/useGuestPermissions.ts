@@ -49,7 +49,10 @@ export function useGuestPermissions() {
         .from('guest_permissions')
         .select('page_key, can_view, can_edit, can_delete')
         .eq('user_id', user.id);
-      setPermissions(data || []);
+      // Cast: DB has can_view/can_edit/can_delete as nullable, interface
+      // narrows to non-null. Permission rows always have these set in
+      // practice (NOT NULL is enforced by application writes).
+      setPermissions((data || []) as Permission[]);
     } catch (err) {
       console.error('Error loading guest permissions:', err);
     } finally {

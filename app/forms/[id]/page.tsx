@@ -398,7 +398,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                 contentEditable
                 suppressContentEditableWarning
                 onInput={(e) => setEditLabel(e.currentTarget.innerHTML)}
-                className="font-semibold text-gray-900 border rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-[#3e8692]"
+                className="font-semibold text-gray-900 border rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-brand"
                 style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
               />
             </div>
@@ -596,7 +596,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                 contentEditable
                 suppressContentEditableWarning
                 onInput={(e) => setEditLabel(e.currentTarget.innerHTML)}
-                className="text-gray-600 border rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-[#3e8692]"
+                className="text-gray-600 border rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-brand"
                 style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
               />
             </div>
@@ -692,7 +692,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
         </div>
       </div>
       {isEditing ? (
-        <div className="space-y-3 p-4 border-2 border-[#3e8692] rounded-lg bg-blue-50/30">
+        <div className="space-y-3 p-4 border-2 border-brand rounded-lg bg-blue-50/30">
           <div>
             <Label className="text-sm text-gray-600">Field Label</Label>
             <div className="flex gap-1 mb-2">
@@ -840,14 +840,14 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
               contentEditable
               suppressContentEditableWarning
               onInput={(e) => setEditLabel(e.currentTarget.innerHTML)}
-              className="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e8692] bg-white"
+              className="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand bg-white"
               style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
             />
           </div>
           <div>
             <Label className="text-sm text-gray-600">Field Type</Label>
             <Select value={editFieldType} onValueChange={(value) => setEditFieldType(value as FieldType)}>
-              <SelectTrigger className="auth-input">
+              <SelectTrigger className="focus-brand">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -928,7 +928,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                   onChange={(e) => setNewOption(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addOption())}
                   placeholder="Add option"
-                  className="auth-input"
+                  className="focus-brand"
                   disabled={editFieldType === 'select' && isYesNoDropdown}
                 />
                 <Button type="button" onClick={addOption} size="sm" style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">Add</Button>
@@ -997,7 +997,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
         <>
           <Input
             placeholder={`Enter ${field.label.replace(/<[^>]*>/g, '').toLowerCase()}...`}
-            className="auth-input"
+            className="focus-brand"
             disabled
           />
           {field.allow_attachments && (
@@ -1015,7 +1015,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
           <Textarea
             rows={4}
             placeholder={`Enter ${field.label.replace(/<[^>]*>/g, '').toLowerCase()}...`}
-            className="auth-input"
+            className="focus-brand"
             disabled
           />
           {field.allow_attachments && (
@@ -1032,7 +1032,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
         <Input
           type="email"
           placeholder="email@example.com"
-          className="auth-input"
+          className="focus-brand"
           disabled
         />
       )}
@@ -1040,16 +1040,16 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
         <Input
           type="number"
           placeholder="Enter number..."
-          className="auth-input"
+          className="focus-brand"
           disabled
         />
       )}
       {field.field_type === 'date' && (
-        <Input type="date" className="auth-input" disabled />
+        <Input type="date" className="focus-brand" disabled />
       )}
       {field.field_type === 'select' && (
         <Select disabled>
-          <SelectTrigger className="auth-input">
+          <SelectTrigger className="focus-brand">
             <SelectValue placeholder="Select an option..." />
           </SelectTrigger>
           <SelectContent>
@@ -2142,17 +2142,17 @@ export default function FormBuilderPage() {
                       <div className="space-y-3">
                         <div>
                           <Label className="text-sm text-gray-600">Form Name</Label>
-                          <Input value={editedName} onChange={(e) => setEditedName(e.target.value)} className="auth-input text-2xl font-bold h-auto py-2" />
+                          <Input value={editedName} onChange={(e) => setEditedName(e.target.value)} className="focus-brand text-2xl font-bold h-auto py-2" />
                         </div>
                         <div>
                           <Label className="text-sm text-gray-600">Description</Label>
-                          <Textarea value={editedDescription} onChange={(e) => setEditedDescription(e.target.value)} rows={2} className="auth-input" />
+                          <Textarea value={editedDescription} onChange={(e) => setEditedDescription(e.target.value)} rows={2} className="focus-brand" />
                         </div>
                         <div className="flex items-center gap-4">
                           <div>
                             <Label className="text-sm text-gray-600">Status</Label>
                             <Select value={editedStatus} onValueChange={(value) => setEditedStatus(value as FormStatus)}>
-                              <SelectTrigger className="auth-input w-[140px]">
+                              <SelectTrigger className="focus-brand w-[140px]">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -2452,7 +2452,7 @@ export default function FormBuilderPage() {
                                 <Input
                                   type={field.field_type}
                                   placeholder={`Enter ${field.label.replace(/<[^>]*>/g, '').toLowerCase()}...`}
-                                  className="auth-input flex-1"
+                                  className="focus-brand flex-1"
                                   disabled
                                 />
                                 <Button
@@ -2468,7 +2468,7 @@ export default function FormBuilderPage() {
                               <Input
                                 type={field.field_type}
                                 placeholder={`Enter ${field.label.replace(/<[^>]*>/g, '').toLowerCase()}...`}
-                                className="auth-input"
+                                className="focus-brand"
                                 disabled
                               />
                             )}
@@ -2496,7 +2496,7 @@ export default function FormBuilderPage() {
                                 <Textarea
                                   rows={4}
                                   placeholder={`Enter ${field.label.replace(/<[^>]*>/g, '').toLowerCase()}...`}
-                                  className="auth-input flex-1"
+                                  className="focus-brand flex-1"
                                   disabled
                                 />
                                 <Button
@@ -2512,7 +2512,7 @@ export default function FormBuilderPage() {
                               <Textarea
                                 rows={4}
                                 placeholder={`Enter ${field.label.replace(/<[^>]*>/g, '').toLowerCase()}...`}
-                                className="auth-input"
+                                className="focus-brand"
                                 disabled
                               />
                             )}
@@ -2536,7 +2536,7 @@ export default function FormBuilderPage() {
                               {field.required && <span className="text-red-500 ml-1">*</span>}
                             </Label>
                             <Select disabled>
-                              <SelectTrigger className="auth-input">
+                              <SelectTrigger className="focus-brand">
                                 <SelectValue placeholder="Select an option..." />
                               </SelectTrigger>
                               <SelectContent>
@@ -2603,7 +2603,7 @@ export default function FormBuilderPage() {
                               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
                               {field.required && <span className="text-red-500 ml-1">*</span>}
                             </Label>
-                            <Input type="date" className="auth-input" disabled />
+                            <Input type="date" className="focus-brand" disabled />
                           </div>
                         );
                       }
@@ -2688,7 +2688,7 @@ export default function FormBuilderPage() {
                           <TableCell>
                             {response.client_name ? (
                               <div className="flex items-center gap-1.5">
-                                <Badge variant="secondary" className="text-xs bg-[#e8f4f5] text-[#3e8692]">
+                                <Badge variant="secondary" className="text-xs bg-brand-light text-brand">
                                   <Building2 className="h-3 w-3 mr-1" />
                                   {response.client_name}
                                 </Badge>
@@ -2699,7 +2699,7 @@ export default function FormBuilderPage() {
                             ) : (
                               <Popover open={linkingResponseId === response.id} onOpenChange={(open) => { if (!open) { setLinkingResponseId(null); } }}>
                                 <PopoverTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="text-xs text-gray-400 hover:text-[#3e8692] h-7 px-2" onClick={() => { setLinkingResponseId(response.id); fetchClients(); }}>
+                                  <Button variant="ghost" size="sm" className="text-xs text-gray-400 hover:text-brand h-7 px-2" onClick={() => { setLinkingResponseId(response.id); fetchClients(); }}>
                                     <LinkIcon className="h-3 w-3 mr-1" />
                                     Link Client
                                   </Button>
@@ -2759,7 +2759,7 @@ export default function FormBuilderPage() {
               <div>
                 <Label>Field Type</Label>
                 <Select value={fieldForm.field_type} onValueChange={(value) => setFieldForm(prev => ({ ...prev, field_type: value as FieldType }))}>
-                  <SelectTrigger className="auth-input">
+                  <SelectTrigger className="focus-brand">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -2913,7 +2913,7 @@ export default function FormBuilderPage() {
                       const text = e.clipboardData.getData('text/plain');
                       document.execCommand('insertText', false, text);
                     }}
-                    className="auth-input p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-[#3e8692] overflow-auto"
+                    className="focus-brand p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-brand overflow-auto"
                     style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}
                   />
                 </div>
@@ -2921,7 +2921,7 @@ export default function FormBuilderPage() {
               <div>
                 <Label>Page</Label>
                 <Select value={String(fieldForm.page_number)} onValueChange={(value) => setFieldForm(prev => ({ ...prev, page_number: parseInt(value) }))}>
-                  <SelectTrigger className="auth-input">
+                  <SelectTrigger className="focus-brand">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -2946,7 +2946,7 @@ export default function FormBuilderPage() {
                     value={fieldForm.options[0] || ''}
                     onChange={(e) => setFieldForm(prev => ({ ...prev, options: [e.target.value] }))}
                     placeholder="https://example.com"
-                    className="auth-input"
+                    className="focus-brand"
                     type="url"
                   />
                   <p className="text-xs text-gray-500 mt-1">The URL this link should point to</p>
@@ -2956,7 +2956,7 @@ export default function FormBuilderPage() {
                 <div>
                   <Label>Options</Label>
                   <div className="flex gap-2 mb-2">
-                    <Input value={optionInput} onChange={(e) => setOptionInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addOption())} placeholder="Add option" className="auth-input" />
+                    <Input value={optionInput} onChange={(e) => setOptionInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addOption())} placeholder="Add option" className="focus-brand" />
                     <Button type="button" onClick={addOption} size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>Add</Button>
                   </div>
                   <div className="space-y-1">
@@ -3014,7 +3014,7 @@ export default function FormBuilderPage() {
                       <Label className="text-xs font-semibold text-gray-600 uppercase">Client</Label>
                       <p className="text-sm font-medium text-gray-900 mt-1">
                         {selectedResponse.client_name ? (
-                          <Badge variant="secondary" className="text-xs bg-[#e8f4f5] text-[#3e8692]">
+                          <Badge variant="secondary" className="text-xs bg-brand-light text-brand">
                             <Building2 className="h-3 w-3 mr-1" />
                             {selectedResponse.client_name}
                           </Badge>
@@ -3177,7 +3177,7 @@ export default function FormBuilderPage() {
                     placeholder="https://forms.yourdomain.com"
                     value={subdomainUrl}
                     onChange={(e) => setSubdomainUrl(e.target.value)}
-                    className="auth-input"
+                    className="focus-brand"
                   />
                   <p className="text-xs text-muted-foreground">
                     Enter the full URL where this form will be accessible.

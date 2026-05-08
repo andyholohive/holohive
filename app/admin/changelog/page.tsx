@@ -242,7 +242,7 @@ export default function ChangelogAdminPage() {
   // Show access denied for non-super_admins
   if (userProfile && !isSuperAdmin) {
     return (
-      <div className="flex flex-col h-full gap-6">
+      <div className="space-y-6">
         <Card>
           <CardContent className="py-12 text-center">
             <ShieldAlert className="h-12 w-12 text-red-400 mx-auto mb-4" />
@@ -258,11 +258,12 @@ export default function ChangelogAdminPage() {
 
   if (loading || !userProfile) {
     return (
-      <div className="flex flex-col h-full gap-6">
+      <div className="space-y-6">
+        {/* Header — real title/subtitle render immediately. */}
         <div className="flex items-center justify-between">
           <div>
-            <Skeleton className="h-8 w-48 mb-2" />
-            <Skeleton className="h-5 w-72" />
+            <h2 className="text-2xl font-bold text-gray-900">Changelog Management</h2>
+            <p className="text-gray-600">Create and manage portal update announcements</p>
           </div>
           <Skeleton className="h-10 w-32" />
         </div>
@@ -276,7 +277,7 @@ export default function ChangelogAdminPage() {
   }
 
   return (
-    <div className="flex flex-col h-full gap-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Changelog Management</h2>
@@ -326,7 +327,7 @@ export default function ChangelogAdminPage() {
                     <div className="flex items-center gap-3 mb-2">
                       <Badge
                         variant="secondary"
-                        className="bg-[#3e8692]/10 text-[#3e8692]"
+                        className="bg-brand/10 text-brand"
                       >
                         v{changelog.version}
                       </Badge>
@@ -411,7 +412,7 @@ export default function ChangelogAdminPage() {
                   value={formData.version}
                   onChange={(e) => setFormData(prev => ({ ...prev, version: e.target.value }))}
                   placeholder="e.g., 1.2.0"
-                  className="auth-input"
+                  className="focus-brand"
                 />
               </div>
               <div className="space-y-2 flex items-end">
@@ -435,7 +436,7 @@ export default function ChangelogAdminPage() {
                 value={formData.title}
                 onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                 placeholder="e.g., New Features & Improvements"
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -452,7 +453,7 @@ Use markdown-like formatting:
 ## Headers with ##
 ### Subheaders with ###"
                 rows={8}
-                className="auth-input"
+                className="focus-brand"
               />
               <p className="text-xs text-gray-500">
                 Supports simple formatting: bullet points (- or *), headers (## or ###)

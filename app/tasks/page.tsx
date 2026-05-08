@@ -21,6 +21,7 @@ import { DeliverableWizard } from '@/components/tasks/DeliverableWizard';
 import { RecurringConfigEditor } from '@/components/tasks/RecurringConfig';
 import { DeliverableService } from '@/lib/deliverableService';
 import { useToast } from '@/hooks/use-toast';
+import { toneClassName, type BadgeTone } from '@/components/ui/status-badge';
 import {
   Plus,
   ListTodo,
@@ -42,6 +43,7 @@ import {
   MessageCircle,
   Clock,
   RefreshCw,
+  ListChecks,
 } from 'lucide-react';
 
 const STALE_DAYS = 7;
@@ -103,30 +105,39 @@ const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color:
   complete: { label: 'Complete', icon: CheckCircle2, color: 'text-green-500', bg: 'hover:bg-green-50' },
 };
 
-const frequencyBadge = (freq: string) => {
-  switch (freq) {
-    case 'one-time': return 'bg-gray-100 text-gray-700';
-    case 'daily': return 'bg-blue-100 text-blue-800';
-    case 'weekly': return 'bg-green-100 text-green-800';
-    case 'monthly': return 'bg-purple-100 text-purple-800';
-    case 'recurring': return 'bg-orange-100 text-orange-800';
-    default: return 'bg-gray-100 text-gray-700';
-  }
+// Map frequency / type values to badge tones from the centralized
+// palette (components/ui/status-badge.tsx). Adding a new value? Pick
+// from the existing tone names — don't add brand-new colors here, the
+// point of consolidating was to stop inventing palettes per page.
+//
+// Note: the original tasks-page typeBadge had cyan / violet / indigo
+// tones that don't exist in the shared palette. Mapped them to the
+// closest neighbors (info / purple / slate) — visually similar, no
+// hidden semantic loss.
+const FREQUENCY_TONES: Record<string, BadgeTone> = {
+  'one-time': 'neutral',
+  daily:      'info',
+  weekly:     'success',
+  monthly:    'purple',
+  recurring:  'warning',
 };
 
-const typeBadge = (type: string) => {
-  switch (type) {
-    case 'Admin & Operations': return 'bg-slate-100 text-slate-700';
-    case 'Finance & Invoicing': return 'bg-emerald-100 text-emerald-800';
-    case 'General': return 'bg-gray-100 text-gray-700';
-    case 'Tech & Tools': return 'bg-blue-100 text-blue-800';
-    case 'Marketing & Sales': return 'bg-pink-100 text-pink-800';
-    case 'Client Delivery': return 'bg-cyan-100 text-cyan-800';
-    case 'Performance Review': return 'bg-violet-100 text-violet-800';
-    case 'Research & Analytics': return 'bg-indigo-100 text-indigo-800';
-    default: return 'bg-gray-100 text-gray-700';
-  }
+const TYPE_TONES: Record<string, BadgeTone> = {
+  'Admin & Operations':    'slate',
+  'Finance & Invoicing':   'success',
+  'General':               'neutral',
+  'Tech & Tools':          'info',
+  'Marketing & Sales':     'pink',
+  'Client Delivery':       'brand',
+  'Performance Review':    'purple',
+  'Research & Analytics':  'slate',
 };
+
+const frequencyBadge = (freq: string) =>
+  toneClassName(FREQUENCY_TONES[freq] ?? 'neutral');
+
+const typeBadge = (type: string) =>
+  toneClassName(TYPE_TONES[type] ?? 'neutral');
 
 const getDueDateColor = (dueDate: string | null) => {
   if (!dueDate) return '';
@@ -278,6 +289,11 @@ export default function TasksPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [deliverableProgress, setDeliverableProgress] = useState<Record<string, { done: number; total: number }>>({}); // taskId -> progress
+  // Per-task checklist progress. Built by a single bulk fetch in
+  // fetchTasks. Used to render a clickable badge on the task row so
+  // checklists become visible from the table view (was previously
+  // hidden inside the detail modal).
+  const [checklistCounts, setChecklistCounts] = useState<Record<string, { done: number; total: number }>>({});
 
   useEffect(() => {
     fetchTasks();
@@ -298,10 +314,16 @@ export default function TasksPage() {
     try {
       const data = await TaskService.getAllTasks();
       setTasks(data);
-      // Load comment counts
+      // Load comment + checklist counts in parallel — each is a single
+      // bulk select. Both maps drive small badges on the task row.
       if (data.length > 0) {
-        const counts = await TaskService.getCommentCounts(data.map(t => t.id));
-        setCommentCounts(counts);
+        const ids = data.map(t => t.id);
+        const [comments, checklists] = await Promise.all([
+          TaskService.getCommentCounts(ids),
+          TaskService.getChecklistCounts(ids),
+        ]);
+        setCommentCounts(comments);
+        setChecklistCounts(checklists);
       }
       // Load deliverable progress for parent tasks
       DeliverableService.getDeliverables().then(dels => {
@@ -710,9 +732,24 @@ export default function TasksPage() {
                     >
                       {task.task_name}
                       {deliverableProgress[task.id] && (
-                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#3e8692]/10 text-[#3e8692] flex-shrink-0">
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand/10 text-brand flex-shrink-0">
                           {deliverableProgress[task.id].done}/{deliverableProgress[task.id].total}
                         </span>
+                      )}
+                      {checklistCounts[task.id] && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); openForm(task); }}
+                          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0 hover:opacity-80 transition-opacity ${
+                            checklistCounts[task.id].done === checklistCounts[task.id].total
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-gray-100 text-gray-700'
+                          }`}
+                          title={`Checklist: ${checklistCounts[task.id].done}/${checklistCounts[task.id].total} done — click to open`}
+                        >
+                          <ListChecks className="h-2.5 w-2.5" />
+                          {checklistCounts[task.id].done}/{checklistCounts[task.id].total}
+                        </button>
                       )}
                       {isTaskStale(task) && (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 flex-shrink-0">
@@ -736,7 +773,7 @@ export default function TasksPage() {
               >
                 {task.task_name}
                 {deliverableProgress[task.id] && (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#3e8692]/10 text-[#3e8692] flex-shrink-0">
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand/10 text-brand flex-shrink-0">
                     {deliverableProgress[task.id].done}/{deliverableProgress[task.id].total}
                   </span>
                 )}
@@ -860,7 +897,7 @@ export default function TasksPage() {
             <div className="flex items-center gap-1.5">
               {count > 0 && (
                 <button
-                  className="inline-flex items-center gap-1 text-xs text-[#3e8692] hover:underline cursor-pointer"
+                  className="inline-flex items-center gap-1 text-xs text-brand hover:underline cursor-pointer"
                   onClick={() => openForm(task)}
                   title="View comments"
                 >
@@ -979,7 +1016,7 @@ export default function TasksPage() {
                 href={task.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[#3e8692] hover:underline inline-flex items-center gap-1 text-xs"
+                className="text-brand hover:underline inline-flex items-center gap-1 text-xs"
                 onDoubleClick={(e) => { e.preventDefault(); startEditing(task.id, 'link', task.link || ''); }}
                 title="Double-click to edit"
               >
@@ -1012,7 +1049,7 @@ export default function TasksPage() {
                           <img src={creatorPhoto} alt={creatorName} className="w-full h-full object-cover" />
                         </div>
                       ) : (
-                        <div className="h-6 w-6 rounded-full bg-gradient-to-br from-[#3e8692] to-[#2d6470] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+                        <div className="h-6 w-6 rounded-full bg-gradient-to-br from-brand to-[#2d6470] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
                           {getUserInitials(creatorName)}
                         </div>
                       )}
@@ -1221,21 +1258,21 @@ export default function TasksPage() {
                   <TabsList className="bg-gray-100 p-1 h-auto flex-wrap">
                     <TabsTrigger
                       value="one-time"
-                      className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-sm px-4 py-2"
+                      className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
                     >
                       One-Time
                       <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{oneTimeCount}</span>
                     </TabsTrigger>
                     <TabsTrigger
                       value="recurring"
-                      className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-sm px-4 py-2"
+                      className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
                     >
                       Recurring
                       <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{recurringCount}</span>
                     </TabsTrigger>
                     <TabsTrigger
                       value="deliverables"
-                      className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-sm px-4 py-2"
+                      className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
                     >
                       Deliverables
                       <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{deliverableCount}</span>
@@ -1251,7 +1288,7 @@ export default function TasksPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Search tasks, assignees, comments..."
-                  className="pl-10 auth-input"
+                  className="pl-10 focus-brand"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -1358,12 +1395,12 @@ export default function TasksPage() {
                                 target.nextElementSibling?.classList.remove('hidden');
                               }}
                             />
-                            <div className="h-7 w-7 bg-gradient-to-br from-[#3e8692] to-[#2d6470] rounded-full flex items-center justify-center absolute top-0 left-0 hidden text-white text-xs font-bold">
+                            <div className="h-7 w-7 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center absolute top-0 left-0 hidden text-white text-xs font-bold">
                               {getUserInitials(group.label)}
                             </div>
                           </div>
                         ) : (
-                          <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[#3e8692] to-[#2d6470] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          <div className="h-7 w-7 rounded-full bg-gradient-to-br from-brand to-[#2d6470] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                             {getUserInitials(group.label)}
                           </div>
                         )}

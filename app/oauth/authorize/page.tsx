@@ -97,7 +97,7 @@ export default async function OAuthAuthorizePage({
     <main className="flex items-center justify-center min-h-screen bg-gray-50 p-6">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 max-w-md w-full p-8">
         <div className="flex items-center gap-3 mb-6">
-          <div className="h-10 w-10 rounded-full bg-[#3e8692] flex items-center justify-center text-white font-bold">
+          <div className="h-10 w-10 rounded-full bg-brand flex items-center justify-center text-white font-bold">
             H
           </div>
           <div>

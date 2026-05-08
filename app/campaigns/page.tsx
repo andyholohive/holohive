@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Copy, ExternalLink, Archive, AlertTriangle, LayoutGrid, List, ChevronLeft, ChevronRight } from "lucide-react";
+import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/AuthContext";
@@ -469,7 +470,7 @@ export default function CampaignsPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search campaigns by name or client..."
-              className="pl-10 auth-input"
+              className="pl-10 focus-brand"
               disabled
             />
           </div>
@@ -546,7 +547,7 @@ export default function CampaignsPage() {
                   <div className="grid gap-2">
                     <Label htmlFor="client">Client <span className="text-red-500">*</span></Label>
                     <Select value={newCampaign.client_id} onValueChange={(value) => setNewCampaign({ ...newCampaign, client_id: value })}>
-                      <SelectTrigger className="auth-input">
+                      <SelectTrigger className="focus-brand">
                         <SelectValue placeholder="Select a client" />
                       </SelectTrigger>
                       <SelectContent>
@@ -570,7 +571,7 @@ export default function CampaignsPage() {
                         }
                       }}
                     >
-                      <SelectTrigger className="auth-input">
+                      <SelectTrigger className="focus-brand">
                         <SelectValue placeholder={isLoadingTemplates ? "Loading templates..." : "Select a template to pre-fill form"} />
                       </SelectTrigger>
                       <SelectContent>
@@ -600,14 +601,14 @@ export default function CampaignsPage() {
                       value={newCampaign.name}
                       onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })}
                       placeholder="Enter campaign name"
-                      className="auth-input"
+                      className="focus-brand"
                       required
                     />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="manager">Campaign Manager</Label>
                     <Select value={newCampaign.manager} onValueChange={(value) => setNewCampaign({ ...newCampaign, manager: value })}>
-                      <SelectTrigger className="auth-input">
+                      <SelectTrigger className="focus-brand">
                         <SelectValue placeholder="Select campaign manager" />
                       </SelectTrigger>
                       <SelectContent>
@@ -623,7 +624,7 @@ export default function CampaignsPage() {
                     <div className="grid gap-2">
                       <Label htmlFor="status">Status</Label>
                       <Select value={newCampaign.status} onValueChange={(value: any) => setNewCampaign({ ...newCampaign, status: value })}>
-                        <SelectTrigger className="auth-input">
+                        <SelectTrigger className="focus-brand">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -642,7 +643,7 @@ export default function CampaignsPage() {
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                            className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                             style={{
                               borderColor: "#e5e7eb",
                               backgroundColor: "white",
@@ -675,7 +676,7 @@ export default function CampaignsPage() {
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                            className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                             style={{
                               borderColor: "#e5e7eb",
                               backgroundColor: "white",
@@ -713,14 +714,14 @@ export default function CampaignsPage() {
                       value={newCampaign.description}
                       onChange={(e) => setNewCampaign({ ...newCampaign, description: e.target.value })}
                       placeholder="Enter campaign description"
-                      className="auth-input"
+                      className="focus-brand"
                       rows={3}
                     />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="region">Region</Label>
                     <Select value={newCampaign.region} onValueChange={(value) => setNewCampaign({ ...newCampaign, region: value })}>
-                      <SelectTrigger className="auth-input">
+                      <SelectTrigger className="focus-brand">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -738,7 +739,7 @@ export default function CampaignsPage() {
                         fetchListKOLs(value);
                       }}
                     >
-                      <SelectTrigger className="auth-input">
+                      <SelectTrigger className="focus-brand">
                         <SelectValue placeholder="Select a list" />
                       </SelectTrigger>
                       <SelectContent>
@@ -834,7 +835,7 @@ export default function CampaignsPage() {
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                            className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                             style={{
                               borderColor: '#e5e7eb',
                               backgroundColor: 'white',
@@ -872,7 +873,7 @@ export default function CampaignsPage() {
                         type="text"
                         inputMode="numeric"
                         pattern="[0-9,]*"
-                        className="auth-input pl-6 w-full"
+                        className="focus-brand pl-6 w-full"
                         value={newCampaign.total_budget ? Number(newCampaign.total_budget.replace(/,/g, '')).toLocaleString('en-US') : ''}
                         onChange={e => {
                           const raw = e.target.value.replace(/[^0-9]/g, '');
@@ -903,7 +904,7 @@ export default function CampaignsPage() {
                                 setNewCampaign({ ...newCampaign, budgetAllocations: newAllocs });
                               }}
                             >
-                              <SelectTrigger className="w-32 auth-input">
+                              <SelectTrigger className="w-32 focus-brand">
                                 <SelectValue placeholder="Select region" />
                               </SelectTrigger>
                               <SelectContent>
@@ -917,7 +918,7 @@ export default function CampaignsPage() {
                                 type="text"
                                 inputMode="numeric"
                                 pattern="[0-9,]*"
-                                className="auth-input pl-6 w-full"
+                                className="focus-brand pl-6 w-full"
                                 value={formattedAmount}
                                 onChange={e => {
                                   const raw = e.target.value.replace(/[^0-9]/g, '');
@@ -984,7 +985,7 @@ export default function CampaignsPage() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="Search campaigns by name or client..."
-            className="pl-10 auth-input"
+            className="pl-10 focus-brand"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -1010,10 +1011,10 @@ export default function CampaignsPage() {
             </TabsTrigger>
             <TabsTrigger
               value="Active"
-              className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm px-4 py-2"
+              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm px-4 py-2"
             >
               Active
-              <span className="ml-2 text-xs bg-[#e8f4f5] text-[#3e8692] px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.Active}</span>
+              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.Active}</span>
             </TabsTrigger>
             <TabsTrigger
               value="Paused"
@@ -1052,15 +1053,15 @@ export default function CampaignsPage() {
         </div>
       </div>
       {filteredCampaigns.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-gray-600">
-            {searchTerm || statusFilter !== "all"
-              ? "No campaigns found matching your filters."
-              : "No campaigns found."}
-          </p>
+        <EmptyState
+          icon={Megaphone}
+          title={searchTerm || statusFilter !== "all"
+            ? "No campaigns match your filters."
+            : "No campaigns yet."}
+        >
           {(userProfile?.role === "super_admin" || userProfile?.role === "admin") && !searchTerm && statusFilter === "all" && (
             <Button
-              className="mt-4 hover:opacity-90"
+              className="hover:opacity-90"
               style={{ backgroundColor: "#3e8692", color: "white" }}
               onClick={() => setIsNewCampaignOpen(true)}
             >
@@ -1068,7 +1069,7 @@ export default function CampaignsPage() {
               Create Your First Campaign
             </Button>
           )}
-        </div>
+        </EmptyState>
       ) : viewMode === "card" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {paginatedCampaigns.map((campaign) => (
@@ -1381,7 +1382,7 @@ export default function CampaignsPage() {
                   id="share-campaign-link"
                   value={`${typeof window !== 'undefined' ? window.location.origin : ''}/public/campaigns/${sharingCampaign?.slug || sharingCampaign?.id}`}
                   readOnly
-                  className="flex-1 auth-input"
+                  className="flex-1 focus-brand"
                 />
                 <Button
                   variant="outline"

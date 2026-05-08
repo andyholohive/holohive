@@ -11,7 +11,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { FieldOptionsService, FieldOption, CreateFieldOptionData } from '@/lib/fieldOptionsService';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Edit, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Edit, Trash2, GripVertical, Sliders } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Skeleton } from '@/components/ui/skeleton';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -262,29 +264,23 @@ export default function FieldOptionsPage() {
     .sort((a, b) => a.display_order - b.display_order);
 
   if (loading) {
+    // Canonical page-shell wrapper (audit 2026-05-06): just space-y-6.
+    // The Sidebar layout already provides bg-gray-50 + min-h.
     return (
-      <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
-        <div className="w-full">
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Field Options</h2>
-                <p className="text-gray-600">Manage dynamic dropdown options for KOL fields</p>
-              </div>
-            </div>
-            <div className="animate-pulse">
-              <div className="h-64 bg-gray-200 rounded"></div>
-            </div>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Field Options</h2>
+            <p className="text-gray-600">Manage dynamic dropdown options for KOL fields</p>
           </div>
         </div>
+        <Skeleton className="h-64" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
-      <div className="w-full">
-        <div className="space-y-6">
+    <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Field Options</h2>
@@ -312,7 +308,7 @@ export default function FieldOptionsPage() {
                       value={newOption.field_name}
                       onChange={(e) => setNewOption(prev => ({ ...prev, field_name: e.target.value }))}
                       disabled
-                      className="auth-input"
+                      className="focus-brand"
                     />
                   </div>
                   <div>
@@ -322,7 +318,7 @@ export default function FieldOptionsPage() {
                       value={newOption.option_value}
                       onChange={(e) => setNewOption(prev => ({ ...prev, option_value: e.target.value }))}
                       placeholder="e.g., Yes, No, Contractor"
-                      className="auth-input"
+                      className="focus-brand"
                     />
                   </div>
                   <div>
@@ -332,7 +328,7 @@ export default function FieldOptionsPage() {
                       type="number"
                       value={newOption.display_order}
                       onChange={(e) => setNewOption(prev => ({ ...prev, display_order: parseInt(e.target.value) || 0 }))}
-                      className="auth-input"
+                      className="focus-brand"
                     />
                   </div>
                 </div>
@@ -397,14 +393,15 @@ export default function FieldOptionsPage() {
               </DndContext>
 
               {inHouseOptions.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  No field options found. Add your first option to get started.
-                </div>
+                <EmptyState
+                  icon={Sliders}
+                  title="No field options yet."
+                  description="Add your first option to get started."
+                  className="py-8"
+                />
               )}
             </CardContent>
           </Card>
-        </div>
-      </div>
     </div>
   );
 }

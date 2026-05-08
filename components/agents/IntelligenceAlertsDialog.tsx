@@ -214,7 +214,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Bell className="h-4 w-4 text-[#3e8692]" />
+            <Bell className="h-4 w-4 text-brand" />
             Intelligence alerts
           </DialogTitle>
           <DialogDescription>
@@ -291,7 +291,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
               </div>
               <textarea
                 id="tmpl-hot-tier"
-                className="auth-input w-full font-mono text-xs leading-relaxed p-3 resize-y min-h-[100px]"
+                className="focus-brand w-full font-mono text-xs leading-relaxed p-3 resize-y min-h-[100px]"
                 value={draftHotTier}
                 onChange={e => setDraftHotTier(e.target.value)}
                 spellCheck={false}
@@ -323,7 +323,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
               </div>
               <textarea
                 id="tmpl-grok-hot"
-                className="auth-input w-full font-mono text-xs leading-relaxed p-3 resize-y min-h-[100px]"
+                className="focus-brand w-full font-mono text-xs leading-relaxed p-3 resize-y min-h-[100px]"
                 value={draftGrokHot}
                 onChange={e => setDraftGrokHot(e.target.value)}
                 spellCheck={false}
@@ -352,7 +352,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
               </div>
               <textarea
                 id="tmpl-korea-listing"
-                className="auth-input w-full font-mono text-xs leading-relaxed p-3 resize-y min-h-[100px]"
+                className="focus-brand w-full font-mono text-xs leading-relaxed p-3 resize-y min-h-[100px]"
                 value={draftKoreaListing}
                 onChange={e => setDraftKoreaListing(e.target.value)}
                 spellCheck={false}
@@ -384,7 +384,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
               </div>
               <textarea
                 id="tmpl-cron-failed"
-                className="auth-input w-full font-mono text-xs leading-relaxed p-3 resize-y min-h-[100px]"
+                className="focus-brand w-full font-mono text-xs leading-relaxed p-3 resize-y min-h-[100px]"
                 value={draftCronFailed}
                 onChange={e => setDraftCronFailed(e.target.value)}
                 spellCheck={false}

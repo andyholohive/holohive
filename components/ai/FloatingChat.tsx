@@ -729,7 +729,7 @@ export default function FloatingChat() {
                   ) : (
                     <Button
                       onClick={createNewSession}
-                      className="w-full bg-gradient-to-r from-[#3e8692] to-[#2d5a63] text-white hover:opacity-90 transition-all duration-200 rounded-xl"
+                      className="w-full bg-gradient-to-r from-brand to-[#2d5a63] text-white hover:opacity-90 transition-all duration-200 rounded-xl"
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       New Chat
@@ -801,7 +801,7 @@ export default function FloatingChat() {
                   <div className="space-y-4">
                     {loading && (
                       <div className="text-center py-4">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#3e8692] mx-auto"></div>
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand mx-auto"></div>
                         <p className="text-xs text-gray-500 mt-2">Loading...</p>
                       </div>
                     )}
@@ -913,7 +913,7 @@ export default function FloatingChat() {
                           <div
                             className={`${isGeneratedMessage ? 'w-full' : msg.role === 'user' ? 'max-w-[85%]' : 'max-w-[90%]'} px-4 py-3 rounded-2xl text-sm message-bubble ${
                               msg.role === 'user'
-                                ? 'bg-gradient-to-r from-[#3e8692] to-[#2d5a63] text-white shadow-md'
+                                ? 'bg-gradient-to-r from-brand to-[#2d5a63] text-white shadow-md'
                                 : 'bg-gray-50 text-gray-900 border border-gray-200 shadow-sm'
                             }`}
                           >
@@ -941,7 +941,7 @@ export default function FloatingChat() {
                                   return (
                                     <div className="mt-3 p-3 bg-white border border-gray-300 rounded-lg relative">
                                       <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs font-semibold text-[#3e8692]">📋 Client Message (Telegram)</span>
+                                        <span className="text-xs font-semibold text-brand">📋 Client Message (Telegram)</span>
                                         <button
                                           onClick={() => {
                                             navigator.clipboard.writeText(generatedMessageContent);
@@ -953,7 +953,7 @@ export default function FloatingChat() {
                                               btn.innerText = originalText;
                                             }, 2000);
                                           }}
-                                          className="text-xs px-2 py-1 bg-[#3e8692] text-white rounded hover:bg-[#2d5a63] transition-colors flex items-center gap-1"
+                                          className="text-xs px-2 py-1 bg-brand text-white rounded hover:bg-[#2d5a63] transition-colors flex items-center gap-1"
                                         >
                                           <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                                             <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
@@ -1031,7 +1031,7 @@ export default function FloatingChat() {
                                         setPendingListKOLs(searchResultKOLIds);
                                         setCreateListDialogOpen(true);
                                       }}
-                                      className="w-full text-xs px-3 py-2 bg-[#3e8692] text-white rounded-lg hover:bg-[#2d5a63] transition-colors flex items-center justify-center gap-2"
+                                      className="w-full text-xs px-3 py-2 bg-brand text-white rounded-lg hover:bg-[#2d5a63] transition-colors flex items-center justify-center gap-2"
                                     >
                                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                         <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
@@ -1145,7 +1145,7 @@ export default function FloatingChat() {
                       onChange={handleMessageChange}
                       onKeyDown={handleKeyPress}
                       disabled={sending}
-                      className="flex-1 text-sm min-h-[60px] max-h-[120px] resize-none auth-input overflow-y-auto"
+                      className="flex-1 text-sm min-h-[60px] max-h-[120px] resize-none focus-brand overflow-y-auto"
                       rows={1}
                     />
                     <Button
@@ -1216,7 +1216,7 @@ export default function FloatingChat() {
                   handleCreateListFromKOLs();
                 }
               }}
-              className="auth-input"
+              className="focus-brand"
               autoFocus
             />
           </div>

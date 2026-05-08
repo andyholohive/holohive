@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Shield, Loader2, UserCheck, UserX, Clock, Ban, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Search, Shield, Loader2, UserCheck, UserX, Clock, Ban, Trash2, ChevronDown, ChevronUp, Link2, X, AlertTriangle, Download } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
@@ -41,6 +42,15 @@ export default function TeamPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [guestPermsOpen, setGuestPermsOpen] = useState<string | null>(null);
   const [guestPerms, setGuestPerms] = useState<Record<string, Record<string, { can_view: boolean; can_edit: boolean; can_delete: boolean }>>>({});
+
+  // Available private DM chats (chat_type='private') with last-seen
+  // timestamp. Used by the super-admin Telegram linking popover on each
+  // team member's card. Loaded once on mount; refetched after linking
+  // to keep the "already linked to X" disabled-state accurate.
+  type TgChatRow = { chat_id: string; title: string | null; last_message_at: string | null };
+  const [tgChats, setTgChats] = useState<TgChatRow[]>([]);
+  const [linkingMemberId, setLinkingMemberId] = useState<string | null>(null);
+
   const { toast } = useToast();
   const { userProfile } = useAuth();
 
@@ -62,7 +72,92 @@ export default function TeamPage() {
   useEffect(() => {
     fetchTeamMembers();
     checkAdminStatus();
+    fetchTgChats();
   }, []);
+
+  // Pull every private DM chat the bot has tracked. Each one is a
+  // potential link target for a team member. The team-member card's
+  // popover filters out chats already linked to OTHER users so a
+  // single chat can only point at one user (matches the unique
+  // semantics of users.telegram_id being one TG user per HoloHive user).
+  const fetchTgChats = async () => {
+    try {
+      const { data } = await (supabase as any)
+        .from('telegram_chats')
+        .select('chat_id, title, last_message_at')
+        .eq('chat_type', 'private')
+        .order('last_message_at', { ascending: false, nullsFirst: false });
+      setTgChats(data || []);
+    } catch (err) {
+      console.error('Error fetching TG chats:', err);
+    }
+  };
+
+  // Backfill a telegram_chats row when a member's telegram_id is set
+  // but no chat row exists. Calls /api/team/backfill-tg-chat which
+  // hits the Telegram getChat API and inserts the result. Most common
+  // use case: a member chatted with the bot before tracking was wired
+  // (or before the row was lost), so the id is real but unrecorded.
+  const [backfillingId, setBackfillingId] = useState<string | null>(null);
+  const handleBackfillTgChat = async (member: TeamMember) => {
+    if (!isSuperAdmin || !member.telegram_id) return;
+    setBackfillingId(member.id);
+    try {
+      const res = await fetch('/api/team/backfill-tg-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: member.id }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || `HTTP ${res.status}`);
+      }
+      toast({
+        title: 'Chat backfilled',
+        description: `Linked ${json.chat.title || member.telegram_id} via Telegram getChat.`,
+      });
+      // Refresh chat list so the popover dropdown reflects the new row.
+      await fetchTgChats();
+    } catch (err: any) {
+      toast({
+        title: 'Backfill failed',
+        description: err?.message ?? 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setBackfillingId(null);
+    }
+  };
+
+  // Link / unlink a team member's Telegram DM. Pass null to clear.
+  // Optimistic — updates local state, then writes via UserService.
+  // Reverts on error.
+  const handleLinkTelegram = async (member: TeamMember, chatId: string | null) => {
+    if (!isSuperAdmin) return;
+    setLinkingMemberId(member.id);
+    const previous = member.telegram_id;
+    setTeamMembers(prev => prev.map(m =>
+      m.id === member.id ? { ...m, telegram_id: chatId } : m
+    ));
+    try {
+      const ok = await UserService.updateUserProfile(member.id, { telegram_id: chatId });
+      if (!ok) throw new Error('Update returned false');
+      toast({
+        title: chatId ? 'Telegram linked' : 'Telegram unlinked',
+        description: chatId
+          ? `${member.name} is now linked to ${tgChats.find(c => c.chat_id === chatId)?.title ?? chatId}`
+          : `${member.name}'s Telegram link cleared`,
+      });
+    } catch (err: any) {
+      // Revert
+      setTeamMembers(prev => prev.map(m =>
+        m.id === member.id ? { ...m, telegram_id: previous } : m
+      ));
+      toast({ title: 'Link failed', description: err?.message ?? 'Unknown error', variant: 'destructive' });
+    } finally {
+      setLinkingMemberId(null);
+    }
+  };
 
   const checkAdminStatus = async () => {
     const isSuper = await UserService.isCurrentUserSuperAdmin();
@@ -344,10 +439,11 @@ export default function TeamPage() {
   };
 
   if (loading) {
+    // Canonical page-shell: just <div className="space-y-6">. The layout
+    // shell (Sidebar) already provides the gray page background — wrapping
+    // again here was double-applying min-h + bg-gray-50 (audit 2026-05-06).
     return (
-      <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
-        <div className="w-full">
-          <div className="space-y-6">
+      <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Team Members</h2>
@@ -357,7 +453,7 @@ export default function TeamPage() {
             <div className="flex items-center justify-between">
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input placeholder="Search team members..." className="pl-10 auth-input" disabled />
+                <Input placeholder="Search team members..." className="pl-10 focus-brand" disabled />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -394,16 +490,12 @@ export default function TeamPage() {
                 </Card>
               ))}
             </div>
-          </div>
-        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
-      <div className="w-full">
-        <div className="space-y-6">
+    <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Team Members</h2>
@@ -416,7 +508,7 @@ export default function TeamPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Search team members..."
-                className="pl-10 auth-input"
+                className="pl-10 focus-brand"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -574,14 +666,14 @@ export default function TeamPage() {
                                 target.nextElementSibling?.classList.remove('hidden');
                               }}
                             />
-                            <div className="w-16 h-16 bg-gradient-to-br from-[#3e8692] to-[#2d6470] rounded-full flex items-center justify-center absolute top-0 left-0 hidden">
+                            <div className="w-16 h-16 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center absolute top-0 left-0 hidden">
                               <span className="text-white font-bold text-xl">
                                 {getUserInitials(member.name || member.email)}
                               </span>
                             </div>
                           </div>
                         ) : (
-                          <div className="w-16 h-16 bg-gradient-to-br from-[#3e8692] to-[#2d6470] rounded-full flex items-center justify-center mb-3">
+                          <div className="w-16 h-16 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center mb-3">
                             <span className="text-white font-bold text-xl">
                               {getUserInitials(member.name || member.email)}
                             </span>
@@ -598,7 +690,7 @@ export default function TeamPage() {
                             <div className="relative">
                               {updatingRoleId === member.id && (
                                 <div className="absolute inset-0 flex items-center justify-center bg-white/80 rounded z-10">
-                                  <Loader2 className="h-4 w-4 animate-spin text-[#3e8692]" />
+                                  <Loader2 className="h-4 w-4 animate-spin text-brand" />
                                 </div>
                               )}
                               <Select
@@ -648,12 +740,160 @@ export default function TeamPage() {
                         </span>
                       </div>
 
-                      {/* Telegram Status */}
+                      {/* Telegram link. Read-only for everyone except
+                          super_admin. Super admin: opens a popover with
+                          a Select of private DM chats. Chats already
+                          linked to OTHER users render disabled with the
+                          owner's name to avoid dupes. The chat's
+                          chat_id IS the user's Telegram user_id (1:1
+                          chats — chat_id equals the other party's user
+                          id), so it goes straight into users.telegram_id. */}
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-gray-600">Telegram</span>
-                        <span className={`font-medium ${member.telegram_id ? 'text-green-600' : 'text-red-600'}`}>
-                          {member.telegram_id ? 'Connected' : 'Disconnected'}
-                        </span>
+                        {(() => {
+                          // Three states for the trigger:
+                          //   linked   — telegram_id set AND a matching telegram_chats row exists. Emerald.
+                          //   orphan   — telegram_id set but NO chat row. Amber. "Backfill" button in popover.
+                          //   unlinked — telegram_id null. Rose.
+                          const matchedChat = member.telegram_id
+                            ? tgChats.find(c => c.chat_id === member.telegram_id)
+                            : null;
+                          const state: 'linked' | 'orphan' | 'unlinked' =
+                            !member.telegram_id ? 'unlinked'
+                              : matchedChat ? 'linked'
+                                : 'orphan';
+
+                          if (!isSuperAdmin) {
+                            return (
+                              <span className={`font-medium ${
+                                state === 'linked' ? 'text-emerald-600'
+                                  : state === 'orphan' ? 'text-amber-600'
+                                  : 'text-rose-600'
+                              }`}>
+                                {state === 'linked' ? 'Connected'
+                                  : state === 'orphan' ? 'ID set, no DM tracked'
+                                  : 'Disconnected'}
+                              </span>
+                            );
+                          }
+
+                          return (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={`h-7 px-2 text-sm font-medium ${
+                                  state === 'linked' ? 'text-emerald-600 hover:text-emerald-700'
+                                    : state === 'orphan' ? 'text-amber-600 hover:text-amber-700'
+                                    : 'text-rose-600 hover:text-rose-700'
+                                }`}
+                                disabled={linkingMemberId === member.id}
+                              >
+                                {linkingMemberId === member.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : state === 'linked' ? (
+                                  <>
+                                    <Link2 className="h-3.5 w-3.5 mr-1" />
+                                    {matchedChat?.title}
+                                  </>
+                                ) : state === 'orphan' ? (
+                                  <>
+                                    <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+                                    No DM tracked
+                                  </>
+                                ) : (
+                                  <>Link…</>
+                                )}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-80 p-4">
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="text-xs font-semibold text-gray-900 uppercase tracking-wider">
+                                    {state === 'orphan' ? 'Backfill' : 'Link'} {member.name}'s Telegram
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {state === 'orphan'
+                                      ? `Telegram ID ${member.telegram_id} is saved but the bot has no DM record. Pull it from Telegram, or pick a different chat below.`
+                                      : 'Pick the private chat the bot has with this person.'}
+                                  </p>
+                                </div>
+
+                                {/* Orphan-state action: backfill via getChat. */}
+                                {state === 'orphan' && (
+                                  <Button
+                                    size="sm"
+                                    className="w-full hover:opacity-90"
+                                    style={{ backgroundColor: '#3e8692', color: 'white' }}
+                                    onClick={() => handleBackfillTgChat(member)}
+                                    disabled={backfillingId === member.id}
+                                  >
+                                    {backfillingId === member.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                    ) : (
+                                      <Download className="h-3.5 w-3.5 mr-1.5" />
+                                    )}
+                                    Backfill chat from bot
+                                  </Button>
+                                )}
+
+                                <Select
+                                  value={member.telegram_id ?? 'none'}
+                                  onValueChange={(v) => handleLinkTelegram(member, v === 'none' ? null : v)}
+                                >
+                                  <SelectTrigger className="focus-brand">
+                                    <SelectValue placeholder="No chat linked" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">— Unlinked</SelectItem>
+                                    {tgChats.map(chat => {
+                                      // A chat already linked to a DIFFERENT user
+                                      // is disabled — keeps the (chat_id → user)
+                                      // mapping unique and surfaces who took it.
+                                      const linkedTo = teamMembers.find(
+                                        m => m.telegram_id === chat.chat_id && m.id !== member.id
+                                      );
+                                      return (
+                                        <SelectItem
+                                          key={chat.chat_id}
+                                          value={chat.chat_id}
+                                          disabled={!!linkedTo}
+                                        >
+                                          {chat.title || '(untitled)'}
+                                          {linkedTo && (
+                                            <span className="text-gray-400 ml-1">
+                                              (linked to {linkedTo.name})
+                                            </span>
+                                          )}
+                                        </SelectItem>
+                                      );
+                                    })}
+                                  </SelectContent>
+                                </Select>
+                                {member.telegram_id && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                                    onClick={() => handleLinkTelegram(member, null)}
+                                  >
+                                    <X className="h-3.5 w-3.5 mr-1.5" />
+                                    Unlink
+                                  </Button>
+                                )}
+                                {tgChats.length === 0 && state === 'unlinked' && (
+                                  <div className="rounded-md bg-amber-50 border border-amber-200 p-2.5">
+                                    <p className="text-xs text-amber-800">
+                                      No private DM chats tracked yet. Ask {member.name} to send a message to the bot first, then refresh.
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                          );
+                        })()}
                       </div>
 
                       {/* X ID */}
@@ -801,8 +1041,6 @@ export default function TeamPage() {
               </div>
             </>
           )}
-        </div>
-      </div>
     </div>
   );
 }

@@ -308,7 +308,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-[#3e8692]" />
+            <Clock className="h-4 w-4 text-brand" />
             Auto Discovery scan
           </DialogTitle>
           <DialogDescription>
@@ -372,7 +372,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                         onClick={() => updateDraft({ weekly_day: day })}
                         className={`text-xs py-2 rounded-md border transition-colors ${
                           selected
-                            ? 'border-[#3e8692] bg-[#e8f4f5] text-gray-900 font-semibold'
+                            ? 'border-brand bg-brand-light text-gray-900 font-semibold'
                             : 'border-gray-200 text-gray-600 hover:border-gray-300'
                         }`}
                       >
@@ -450,11 +450,11 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                       onClick={() => toggleSource(opt.id)}
                       className={`flex items-center gap-2 text-left rounded-lg border p-2 text-xs transition-colors ${
                         selected
-                          ? 'border-[#3e8692] bg-[#e8f4f5] text-gray-900'
+                          ? 'border-brand bg-brand-light text-gray-900'
                           : 'border-gray-200 text-gray-600 hover:border-gray-300'
                       }`}
                     >
-                      <span className={`h-3 w-3 rounded-sm border ${selected ? 'bg-[#3e8692] border-[#3e8692]' : 'border-gray-300'}`}>
+                      <span className={`h-3 w-3 rounded-sm border ${selected ? 'bg-brand border-brand' : 'border-gray-300'}`}>
                         {selected && <CheckCircle className="h-3 w-3 text-white" />}
                       </span>
                       <span className="font-medium">{opt.label}</span>
@@ -468,9 +468,9 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
             </div>
 
             {/* ── Volume controls (added Apr 30 2026) ───────────────── */}
-            <div className="rounded-lg border border-[#3e8692]/20 bg-[#3e8692]/5 p-3 space-y-3">
+            <div className="rounded-lg border border-brand/20 bg-brand/5 p-3 space-y-3">
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-[#3e8692]">
+                <span className="text-xs font-bold uppercase tracking-wider text-brand">
                   Volume Controls
                 </span>
                 <span className="text-[10px] text-gray-500">— more prospects per day</span>
@@ -573,7 +573,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                       if (Number.isFinite(n) && n >= 0) updateDraft({ weekly_cost_cap_usd: n });
                     }
                   }}
-                  className="auth-input flex-1 max-w-[150px]"
+                  className="focus-brand flex-1 max-w-[150px]"
                 />
                 {draft.weekly_cost_cap_usd != null && (
                   <Button

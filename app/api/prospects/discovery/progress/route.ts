@@ -75,12 +75,32 @@ export async function GET() {
       batches_total: out.batches_total ?? null,
       batches_complete: out.batches_complete ?? null,
     },
+    // Rich detail block (added 2026-05-05) — what's actually being
+    // discovered, filtered, and enriched. Pass-through of the scan
+    // route's `detail` object. Shape:
+    //   {
+    //     sources:  { per_source_counts, errors, list },
+    //     filtered: { recent_skipped, crm_skipped_total,
+    //                 crm_filtered_names, candidate_names },
+    //     enriched: [{ name, tier, score, poc_count, icp_verdict }],
+    //     tier_breakdown: { TIER_NAME: count },
+    //     batch_errors: string[]
+    //   }
+    // null until the scan reaches Stage 2 init, or for historical scans
+    // that pre-date this column.
+    detail: out.detail ?? null,
     final: {
       projects_enriched: out.projects_enriched ?? null,
       inserted: out.inserted ?? null,
       updated: out.updated ?? null,
       signals_added: out.signals_added ?? null,
       cost_usd: out.cost_usd ?? null,
+      stage1_per_source: out.stage1_per_source ?? null,
+      skipped_duplicates: out.skipped_duplicates ?? null,
+      skip_list_size: out.skip_list_size ?? null,
+      cooldown_days: out.cooldown_days ?? null,
+      batches_run: out.batches_run ?? null,
+      batches_failed: out.batches_failed ?? null,
     },
     error_message: data.error_message,
   });

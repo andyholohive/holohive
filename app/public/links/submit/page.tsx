@@ -178,6 +178,7 @@ export default function LinkSubmitPage() {
                   url: '',
                   description: '',
                   client: '',
+                  client_id: '',
                   link_types: [],
                   access: 'team'
                 });
@@ -228,7 +229,7 @@ export default function LinkSubmitPage() {
                 value={formData.name}
                 onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 disabled={isSubmitting}
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -241,7 +242,7 @@ export default function LinkSubmitPage() {
                 value={formData.url}
                 onChange={e => setFormData(prev => ({ ...prev, url: e.target.value }))}
                 disabled={isSubmitting}
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -252,7 +253,7 @@ export default function LinkSubmitPage() {
                   <Button
                     variant="outline"
                     role="combobox"
-                    className="w-full justify-between font-normal auth-input"
+                    className="w-full justify-between font-normal focus-brand"
                     disabled={isSubmitting}
                   >
                     {formData.client || 'Select or type client...'}
@@ -300,7 +301,7 @@ export default function LinkSubmitPage() {
                   <Button
                     variant="outline"
                     role="combobox"
-                    className="w-full justify-between font-normal auth-input"
+                    className="w-full justify-between font-normal focus-brand"
                     disabled={isSubmitting}
                   >
                     {formData.link_types.length > 0
@@ -358,7 +359,7 @@ export default function LinkSubmitPage() {
                 onValueChange={(value) => setFormData(prev => ({ ...prev, access: value }))}
                 disabled={isSubmitting}
               >
-                <SelectTrigger className="auth-input">
+                <SelectTrigger className="focus-brand">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -377,7 +378,7 @@ export default function LinkSubmitPage() {
                 value={formData.description}
                 onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 disabled={isSubmitting}
-                className="auth-input"
+                className="focus-brand"
                 rows={2}
               />
             </div>

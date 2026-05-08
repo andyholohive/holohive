@@ -243,7 +243,7 @@ export default function LeadSubmitPage() {
                 value={formData.name}
                 onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 disabled={isSubmitting}
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -254,7 +254,7 @@ export default function LeadSubmitPage() {
                 onValueChange={(value) => setFormData(prev => ({ ...prev, account_type: value }))}
                 disabled={isSubmitting}
               >
-                <SelectTrigger className="auth-input">
+                <SelectTrigger className="focus-brand">
                   <SelectValue placeholder="Select account type..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -272,7 +272,7 @@ export default function LeadSubmitPage() {
                   <Button
                     variant="outline"
                     role="combobox"
-                    className="w-full justify-between font-normal auth-input"
+                    className="w-full justify-between font-normal focus-brand"
                     disabled={isSubmitting}
                   >
                     {formData.scope.length > 0
@@ -333,7 +333,7 @@ export default function LeadSubmitPage() {
                   value={formData.deal_value}
                   onChange={e => setFormData(prev => ({ ...prev, deal_value: e.target.value }))}
                   disabled={isSubmitting}
-                  className="auth-input"
+                  className="focus-brand"
                 />
               </div>
               <div className="space-y-2">
@@ -343,7 +343,7 @@ export default function LeadSubmitPage() {
                   onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value }))}
                   disabled={isSubmitting}
                 >
-                  <SelectTrigger className="auth-input">
+                  <SelectTrigger className="focus-brand">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -362,7 +362,7 @@ export default function LeadSubmitPage() {
                 onValueChange={(value) => setFormData(prev => ({ ...prev, source: value }))}
                 disabled={isSubmitting}
               >
-                <SelectTrigger className="auth-input">
+                <SelectTrigger className="focus-brand">
                   <SelectValue placeholder="How did they find us?" />
                 </SelectTrigger>
                 <SelectContent>
@@ -380,7 +380,7 @@ export default function LeadSubmitPage() {
                   <Button
                     variant="outline"
                     role="combobox"
-                    className="w-full justify-between font-normal auth-input"
+                    className="w-full justify-between font-normal focus-brand"
                     disabled={isSubmitting}
                   >
                     {formData.referrer || 'Select or type referrer...'}
@@ -429,7 +429,7 @@ export default function LeadSubmitPage() {
                 value={formData.gc}
                 onChange={e => setFormData(prev => ({ ...prev, gc: e.target.value }))}
                 disabled={isSubmitting}
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -445,7 +445,7 @@ export default function LeadSubmitPage() {
                     value={formData.contact_name}
                     onChange={e => setFormData(prev => ({ ...prev, contact_name: e.target.value }))}
                     disabled={isSubmitting}
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
 
@@ -458,7 +458,7 @@ export default function LeadSubmitPage() {
                     value={formData.contact_email}
                     onChange={e => setFormData(prev => ({ ...prev, contact_email: e.target.value }))}
                     disabled={isSubmitting}
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
 
@@ -470,7 +470,7 @@ export default function LeadSubmitPage() {
                     value={formData.contact_telegram}
                     onChange={e => setFormData(prev => ({ ...prev, contact_telegram: e.target.value }))}
                     disabled={isSubmitting}
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
               </div>
@@ -484,7 +484,7 @@ export default function LeadSubmitPage() {
                 value={formData.notes}
                 onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                 disabled={isSubmitting}
-                className="auth-input"
+                className="focus-brand"
                 rows={3}
               />
             </div>

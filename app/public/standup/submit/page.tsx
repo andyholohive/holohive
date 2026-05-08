@@ -184,7 +184,7 @@ export default function StandupSubmitPage() {
                 className="rounded-full object-cover h-10 w-10"
               />
             ) : (
-              <div className="h-10 w-10 rounded-full bg-[#3e8692]/10 flex items-center justify-center text-[#3e8692] text-sm font-bold">
+              <div className="h-10 w-10 rounded-full bg-brand/10 flex items-center justify-center text-brand text-sm font-bold">
                 {userName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
               </div>
             )}
@@ -205,7 +205,7 @@ export default function StandupSubmitPage() {
                 onValueChange={(v) => setFormData(prev => ({ ...prev, completed_yesterday: v }))}
                 disabled={isSubmitting}
               >
-                <SelectTrigger className="auth-input">
+                <SelectTrigger className="focus-brand">
                   <SelectValue placeholder="Select..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -223,7 +223,7 @@ export default function StandupSubmitPage() {
                 value={formData.priorities}
                 onChange={e => setFormData(prev => ({ ...prev, priorities: e.target.value }))}
                 disabled={isSubmitting}
-                className="auth-input"
+                className="focus-brand"
                 rows={3}
               />
             </div>
@@ -236,7 +236,7 @@ export default function StandupSubmitPage() {
                 value={formData.output_goal}
                 onChange={e => setFormData(prev => ({ ...prev, output_goal: e.target.value }))}
                 disabled={isSubmitting}
-                className="auth-input"
+                className="focus-brand"
                 rows={2}
               />
             </div>
@@ -249,7 +249,7 @@ export default function StandupSubmitPage() {
                 value={formData.blockers}
                 onChange={e => setFormData(prev => ({ ...prev, blockers: e.target.value }))}
                 disabled={isSubmitting}
-                className="auth-input"
+                className="focus-brand"
                 rows={2}
               />
             </div>

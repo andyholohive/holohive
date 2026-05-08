@@ -89,7 +89,9 @@ export default function DailyStandupPage() {
       .select('*')
       .order('submission_date', { ascending: false })
       .order('submitted_at', { ascending: false });
-    setStandups(data || []);
+    // Cast: DB row has `created_at: string | null` which the local
+    // interface narrows. See archive/page.tsx for long-term fix.
+    setStandups((data || []) as DailyStandup[]);
     setLoading(false);
   };
 
@@ -276,7 +278,7 @@ export default function DailyStandupPage() {
                   <TabsList className="bg-gray-100 p-1 h-auto flex-wrap">
                     <TabsTrigger
                       value="all"
-                      className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-sm px-4 py-2"
+                      className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
                     >
                       All
                       <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{standups.length}</span>
@@ -285,7 +287,7 @@ export default function DailyStandupPage() {
                       <TabsTrigger
                         key={member.id}
                         value={member.id}
-                        className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-sm px-4 py-2"
+                        className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
                       >
                         {member.name}
                       </TabsTrigger>
@@ -301,7 +303,7 @@ export default function DailyStandupPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Search priorities, goals, blockers..."
-                  className="pl-10 auth-input"
+                  className="pl-10 focus-brand"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -369,7 +371,7 @@ export default function DailyStandupPage() {
                                       className="rounded-full object-cover h-9 w-9"
                                     />
                                   ) : (
-                                    <div className="h-9 w-9 rounded-full bg-[#3e8692]/10 flex items-center justify-center text-[#3e8692] text-sm font-bold">
+                                    <div className="h-9 w-9 rounded-full bg-brand/10 flex items-center justify-center text-brand text-sm font-bold">
                                       {entry.user_name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
                                     </div>
                                   )}
@@ -406,7 +408,7 @@ export default function DailyStandupPage() {
                             <div className="px-5 py-4 space-y-4">
                               {/* Priorities */}
                               <div>
-                                <p className="text-xs font-semibold text-[#3e8692] uppercase tracking-wider mb-1.5">Top Priorities</p>
+                                <p className="text-xs font-semibold text-brand uppercase tracking-wider mb-1.5">Top Priorities</p>
                                 <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{entry.priorities}</p>
                               </div>
 
@@ -450,7 +452,7 @@ export default function DailyStandupPage() {
             <div className="grid gap-2">
               <Label>Did you complete yesterday's priorities? <span className="text-red-500">*</span></Label>
               <Select value={form.completed_yesterday} onValueChange={(v) => setForm({ ...form, completed_yesterday: v })}>
-                <SelectTrigger className="auth-input">
+                <SelectTrigger className="focus-brand">
                   <SelectValue placeholder="Select..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -468,7 +470,7 @@ export default function DailyStandupPage() {
                 value={form.priorities}
                 onChange={(e) => setForm({ ...form, priorities: e.target.value })}
                 placeholder="e.g., Send outbound pitch deck to 10 partners"
-                className="auth-input"
+                className="focus-brand"
                 rows={3}
               />
             </div>
@@ -481,7 +483,7 @@ export default function DailyStandupPage() {
                 value={form.output_goal}
                 onChange={(e) => setForm({ ...form, output_goal: e.target.value })}
                 placeholder='e.g., Book 2 calls'
-                className="auth-input"
+                className="focus-brand"
                 rows={2}
               />
             </div>
@@ -494,7 +496,7 @@ export default function DailyStandupPage() {
                 value={form.blockers}
                 onChange={(e) => setForm({ ...form, blockers: e.target.value })}
                 placeholder="Optional — leave blank if none"
-                className="auth-input"
+                className="focus-brand"
                 rows={2}
               />
             </div>

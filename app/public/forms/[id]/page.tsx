@@ -326,7 +326,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                       setMultipleAnswers(prev => ({ ...prev, [field.id]: newAnswers }));
                       handleFieldChange(field.id, newAnswers.filter(a => a.trim()));
                     }}
-                    className={`auth-input flex-1 ${hasError ? 'border-red-500' : ''}`}
+                    className={`focus-brand flex-1 ${hasError ? 'border-red-500' : ''}`}
                   />
                   {index === answers.length - 1 && (
                     <Button
@@ -374,7 +374,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
               type={field.field_type}
               value={formData[field.id] || ''}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
-              className={`auth-input ${hasError ? 'border-red-500' : ''}`}
+              className={`focus-brand ${hasError ? 'border-red-500' : ''}`}
             />
             {field.allow_attachments && (
               <div className="space-y-2">
@@ -382,14 +382,14 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                   className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
                   onDragOver={(e) => {
                     e.preventDefault();
-                    e.currentTarget.classList.add('border-[#3e8692]', 'bg-blue-50');
+                    e.currentTarget.classList.add('border-brand', 'bg-blue-50');
                   }}
                   onDragLeave={(e) => {
-                    e.currentTarget.classList.remove('border-[#3e8692]', 'bg-blue-50');
+                    e.currentTarget.classList.remove('border-brand', 'bg-blue-50');
                   }}
                   onDrop={(e) => {
                     e.preventDefault();
-                    e.currentTarget.classList.remove('border-[#3e8692]', 'bg-blue-50');
+                    e.currentTarget.classList.remove('border-brand', 'bg-blue-50');
                     const files = Array.from(e.dataTransfer.files);
                     if (files.length > 0) {
                       setUploadedFiles(prev => ({
@@ -473,7 +473,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                       handleFieldChange(field.id, newAnswers.filter(a => a.trim()));
                     }}
                     rows={4}
-                    className={`auth-input flex-1 ${hasError ? 'border-red-500' : ''}`}
+                    className={`focus-brand flex-1 ${hasError ? 'border-red-500' : ''}`}
                   />
                   {index === answers.length - 1 && (
                     <Button
@@ -521,7 +521,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
               value={formData[field.id] || ''}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
               rows={4}
-              className={`auth-input ${hasError ? 'border-red-500' : ''}`}
+              className={`focus-brand ${hasError ? 'border-red-500' : ''}`}
             />
             {field.allow_attachments && (
               <div className="space-y-2">
@@ -529,14 +529,14 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                   className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
                   onDragOver={(e) => {
                     e.preventDefault();
-                    e.currentTarget.classList.add('border-[#3e8692]', 'bg-blue-50');
+                    e.currentTarget.classList.add('border-brand', 'bg-blue-50');
                   }}
                   onDragLeave={(e) => {
-                    e.currentTarget.classList.remove('border-[#3e8692]', 'bg-blue-50');
+                    e.currentTarget.classList.remove('border-brand', 'bg-blue-50');
                   }}
                   onDrop={(e) => {
                     e.preventDefault();
-                    e.currentTarget.classList.remove('border-[#3e8692]', 'bg-blue-50');
+                    e.currentTarget.classList.remove('border-brand', 'bg-blue-50');
                     const files = Array.from(e.dataTransfer.files);
                     if (files.length > 0) {
                       setUploadedFiles(prev => ({
@@ -610,7 +610,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className={`auth-input w-full justify-start text-left font-normal ${hasError ? 'border-red-500' : ''}`}
+                  className={`focus-brand w-full justify-start text-left font-normal ${hasError ? 'border-red-500' : ''}`}
                   style={{
                     borderColor: hasError ? '#ef4444' : '#e5e7eb',
                     backgroundColor: 'white',
@@ -680,7 +680,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                 }
               }}
             >
-              <SelectTrigger className={`auth-input ${hasError ? 'border-red-500' : ''}`}>
+              <SelectTrigger className={`focus-brand ${hasError ? 'border-red-500' : ''}`}>
                 <SelectValue placeholder="Select an option" />
               </SelectTrigger>
               <SelectContent>
@@ -704,7 +704,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                   // Store the actual value in formData
                   handleFieldChange(field.id, value);
                 }}
-                className="auth-input mt-2"
+                className="focus-brand mt-2"
               />
             )}
             {showYesReason && (
@@ -715,7 +715,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                   onChange={(e) => {
                     setYesNoReasons(prev => ({ ...prev, [field.id]: e.target.value }));
                   }}
-                  className="auth-input"
+                  className="focus-brand"
                   rows={3}
                 />
               </div>
@@ -728,7 +728,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                   onChange={(e) => {
                     setYesNoReasons(prev => ({ ...prev, [field.id]: e.target.value }));
                   }}
-                  className="auth-input"
+                  className="focus-brand"
                   rows={3}
                 />
               </div>
@@ -867,7 +867,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <Loader className="h-12 w-12 animate-spin text-[#3e8692] mx-auto mb-4" />
+          <Loader className="h-12 w-12 animate-spin text-brand mx-auto mb-4" />
           <p className="text-gray-600 text-lg font-medium">Loading form...</p>
         </div>
       </div>
@@ -937,9 +937,9 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                         key={pageNum}
                         className={`h-2 rounded-full transition-all duration-300 ${
                           pageNum === currentPage
-                            ? 'bg-[#3e8692] w-8'
+                            ? 'bg-brand w-8'
                             : pageNum < currentPage
-                            ? 'bg-[#3e8692] opacity-30 w-2'
+                            ? 'bg-brand opacity-30 w-2'
                             : 'bg-gray-300 w-2'
                         }`}
                       />
@@ -971,7 +971,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                     <Button
                       type="button"
                       onClick={handleNextPage}
-                      className="px-6 h-12 text-base font-medium rounded-lg bg-[#3e8692] hover:bg-[#2d6570] text-white transition-all flex items-center gap-2"
+                      className="px-6 h-12 text-base font-medium rounded-lg bg-brand hover:bg-[#2d6570] text-white transition-all flex items-center gap-2"
                     >
                       Next
                       <ChevronRight className="h-5 w-5" />
@@ -980,7 +980,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                     <Button
                       type="submit"
                       disabled={submitting}
-                      className="px-6 h-12 text-base font-medium rounded-lg bg-[#3e8692] hover:bg-[#2d6570] text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-6 h-12 text-base font-medium rounded-lg bg-brand hover:bg-[#2d6570] text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       {submitting ? (
                         <>

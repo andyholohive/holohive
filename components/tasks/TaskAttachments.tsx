@@ -145,8 +145,8 @@ export function TaskAttachments({ taskId, onAttachmentCountChange }: TaskAttachm
         onClick={() => fileInputRef.current?.click()}
         className={`border border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
           isDragActive
-            ? 'border-[#3e8692] bg-[#3e8692]/5'
-            : 'border-gray-200 hover:border-[#3e8692] hover:bg-gray-50'
+            ? 'border-brand bg-brand/5'
+            : 'border-gray-200 hover:border-brand hover:bg-gray-50'
         }`}
       >
         <input

@@ -73,16 +73,17 @@ export default function MindsharePage() {
         supabase.from('clients').select('id, name').order('name'),
       ]);
 
-      setChannels(channelData || []);
+      // Cast: DB nullable fields vs interface (see archive/page.tsx note).
+      setChannels((channelData || []) as MonitoredChannel[]);
       setClients(clientData || []);
 
       const clientMap = new Map((clientData || []).map(c => [c.id, c.name]));
       setConfigs(
         (configData || []).map(c => ({
           ...c,
-          tracked_keywords: c.tracked_keywords || [],
+          tracked_keywords: (c.tracked_keywords as string[] | null) || [],
           client_name: clientMap.get(c.client_id) || 'Unknown',
-        }))
+        })) as Array<MindshareConfig & { client_name: string }>
       );
     } catch (err) {
       console.error('Error loading mindshare data:', err);
@@ -155,9 +156,14 @@ export default function MindsharePage() {
   }
 
   if (loading) {
+    // Canonical page-shell wrapper. Header renders immediately so the
+    // user sees page context; only the data section below skeletons.
     return (
-      <div className="min-h-[calc(100vh-64px)] bg-gray-50 p-6 space-y-4">
-        <Skeleton className="h-10 w-64" />
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Mindshare Monitor</h2>
+          <p className="text-sm text-gray-500">Manage Telegram channels and client keywords for mindshare tracking</p>
+        </div>
         <div className="grid gap-4">
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 rounded-lg" />)}
         </div>
@@ -166,14 +172,13 @@ export default function MindsharePage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-      <div className="w-full space-y-4">
+    <div className="space-y-6">
         {/* Header */}
         <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="bg-[#e8f4f5] p-2 rounded-lg">
-                <BarChart3 className="h-6 w-6 text-[#3e8692]" />
+              <div className="bg-brand-light p-2 rounded-lg">
+                <BarChart3 className="h-6 w-6 text-brand" />
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Mindshare Monitor</h2>
@@ -195,7 +200,7 @@ export default function MindsharePage() {
             <div className="px-4 py-3 border-b border-gray-100">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <Radio className="h-4 w-4 text-[#3e8692]" />
+                  <Radio className="h-4 w-4 text-brand" />
                   <h3 className="font-semibold text-sm text-gray-900">Monitored Channels</h3>
                   <Badge variant="secondary" className="text-xs">{channels.length}</Badge>
                 </div>
@@ -206,7 +211,7 @@ export default function MindsharePage() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Search channels..."
-                  className="auth-input pl-8"
+                  className="focus-brand pl-8"
                 />
               </div>
             </div>
@@ -248,13 +253,13 @@ export default function MindsharePage() {
                   value={newChannel.name}
                   onChange={(e) => setNewChannel({ ...newChannel, name: e.target.value })}
                   placeholder="Channel name"
-                  className="auth-input"
+                  className="focus-brand"
                 />
                 <Input
                   value={newChannel.username}
                   onChange={(e) => setNewChannel({ ...newChannel, username: e.target.value })}
                   placeholder="@username"
-                  className="auth-input"
+                  className="focus-brand"
                 />
               </div>
               <Button
@@ -273,7 +278,7 @@ export default function MindsharePage() {
           <div className="bg-white border border-gray-200 shadow-sm rounded-lg">
             <div className="px-4 py-3 border-b border-gray-100">
               <div className="flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-[#3e8692]" />
+                <BarChart3 className="h-4 w-4 text-brand" />
                 <h3 className="font-semibold text-sm text-gray-900">Client Keywords</h3>
                 <Badge variant="secondary" className="text-xs">{configs.length} Clients</Badge>
               </div>
@@ -295,9 +300,9 @@ export default function MindsharePage() {
                   {/* Keywords */}
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {config.tracked_keywords.map((kw, i) => (
-                      <span key={i} className="inline-flex items-center gap-1 bg-[#e8f4f5] text-[#3e8692] text-xs px-2 py-0.5 rounded-full">
+                      <span key={i} className="inline-flex items-center gap-1 bg-brand-light text-brand text-xs px-2 py-0.5 rounded-full">
                         {kw}
-                        <button onClick={() => removeKeyword(config.id, kw)} className="text-[#3e8692]/50 cursor-pointer">
+                        <button onClick={() => removeKeyword(config.id, kw)} className="text-brand/50 cursor-pointer">
                           <Trash2 className="h-2.5 w-2.5" />
                         </button>
                       </span>
@@ -315,7 +320,7 @@ export default function MindsharePage() {
                         onChange={(e) => setKeywordInput(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') addKeyword(config.id, config.client_id); }}
                         placeholder="Add keyword..."
-                        className="auth-input flex-1"
+                        className="focus-brand flex-1"
                         autoFocus
                       />
                       <Button size="sm" className="h-7 text-xs px-2" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={() => addKeyword(config.id, config.client_id)} disabled={!keywordInput.trim()}>
@@ -342,7 +347,6 @@ export default function MindsharePage() {
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }

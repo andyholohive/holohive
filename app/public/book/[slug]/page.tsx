@@ -226,7 +226,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <Loader className="h-12 w-12 animate-spin text-[#3e8692] mx-auto mb-4" />
+          <Loader className="h-12 w-12 animate-spin text-brand mx-auto mb-4" />
           <p className="text-gray-600 text-lg font-medium">Loading...</p>
         </div>
       </div>
@@ -267,13 +267,13 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Meeting Booked!</h2>
           <div className="bg-gray-50 rounded-xl p-6 text-left space-y-3 mb-6">
             <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-[#3e8692] flex-shrink-0" />
+              <Calendar className="h-5 w-5 text-brand flex-shrink-0" />
               <span className="text-gray-700 font-medium">
                 {selectedDate && `${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}, ${selectedDate.getFullYear()}`}
               </span>
             </div>
             <div className="flex items-center gap-3">
-              <Clock className="h-5 w-5 text-[#3e8692] flex-shrink-0" />
+              <Clock className="h-5 w-5 text-brand flex-shrink-0" />
               <div>
                 <div className="text-gray-700 font-medium">
                   {startFmt?.local} - {endFmt?.local}
@@ -285,7 +285,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <User className="h-5 w-5 text-[#3e8692] flex-shrink-0" />
+              <User className="h-5 w-5 text-brand flex-shrink-0" />
               <span className="text-gray-700 font-medium">{bookerName}</span>
             </div>
           </div>
@@ -317,7 +317,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
                 <img src={ownerPhoto} alt={ownerName} className="w-full h-full object-cover" />
               </div>
             ) : (
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#3e8692] to-[#2d6470] flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-brand to-[#2d6470] flex items-center justify-center">
                 <span className="text-white font-bold text-xl">
                   {ownerName.split(' ').map(w => w[0]).join('').slice(0, 2)}
                 </span>
@@ -345,8 +345,8 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
               <div
                 key={s}
                 className={`h-2 rounded-full transition-all duration-300 ${
-                  s === step ? 'bg-[#3e8692] w-8' :
-                  ['date', 'time', 'form'].indexOf(step) > i ? 'bg-[#3e8692] opacity-30 w-2' :
+                  s === step ? 'bg-brand w-8' :
+                  ['date', 'time', 'form'].indexOf(step) > i ? 'bg-brand opacity-30 w-2' :
                   'bg-gray-300 w-2'
                 }`}
               />
@@ -428,9 +428,9 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
                           aspect-square rounded-lg flex items-center justify-center text-sm transition-all
                           ${isDisabled
                             ? 'text-gray-300 cursor-not-allowed'
-                            : 'hover:bg-[#3e8692] hover:text-white cursor-pointer border border-gray-200 hover:border-[#3e8692]'
+                            : 'hover:bg-brand hover:text-white cursor-pointer border border-gray-200 hover:border-brand'
                           }
-                          ${isToday ? 'font-bold ring-2 ring-[#3e8692]/30' : ''}
+                          ${isToday ? 'font-bold ring-2 ring-brand/30' : ''}
                         `}
                       >
                         <span className="text-lg">{i + 1}</span>
@@ -475,7 +475,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
 
               {loadingSlots ? (
                 <div className="flex justify-center py-12">
-                  <Loader className="h-8 w-8 animate-spin text-[#3e8692]" />
+                  <Loader className="h-8 w-8 animate-spin text-brand" />
                 </div>
               ) : availableSlots.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
@@ -502,7 +502,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
                       <button
                         key={slot.start}
                         onClick={() => handleSlotSelect(slot)}
-                        className="py-3 px-4 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:border-[#3e8692] hover:bg-[#3e8692] hover:text-white transition-all group"
+                        className="py-3 px-4 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:border-brand hover:bg-brand hover:text-white transition-all group"
                       >
                         <span className="block">{localStart}</span>
                         <span className="block text-[11px] text-gray-400 group-hover:text-white/70 mt-0.5">{slot.start} UTC</span>
@@ -527,11 +527,11 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
               {/* Selected slot summary */}
               <div className="bg-gray-50 rounded-xl p-4 mb-6 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Calendar className="h-4 w-4 text-[#3e8692] flex-shrink-0" />
+                  <Calendar className="h-4 w-4 text-brand flex-shrink-0" />
                   {selectedDate && `${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}, ${selectedDate.getFullYear()}`}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Clock className="h-4 w-4 text-[#3e8692] flex-shrink-0" />
+                  <Clock className="h-4 w-4 text-brand flex-shrink-0" />
                   <span>
                     {selectedSlot && formatSlotLocal(selectedSlot.start)} - {selectedSlot && formatSlotLocal(selectedSlot.end)}
                     <span className="text-gray-400 text-xs ml-1">({getTimezoneLabel(timezone)})</span>
@@ -553,7 +553,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
                       value={bookerName}
                       onChange={e => setBookerName(e.target.value)}
                       placeholder="Enter your name"
-                      className="pl-10 auth-input"
+                      className="pl-10 focus-brand"
                     />
                   </div>
                 </div>
@@ -569,7 +569,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
                       value={bookerEmail}
                       onChange={e => setBookerEmail(e.target.value)}
                       placeholder="Enter your email"
-                      className="pl-10 auth-input"
+                      className="pl-10 focus-brand"
                     />
                   </div>
                 </div>
@@ -584,7 +584,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
                       onChange={e => setNotes(e.target.value)}
                       placeholder="Anything you'd like to discuss?"
                       rows={3}
-                      className="pl-10 auth-input"
+                      className="pl-10 focus-brand"
                     />
                   </div>
                 </div>

@@ -466,7 +466,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e8692] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto mb-4"></div>
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -496,7 +496,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
         <Card className="w-full max-w-md shadow-lg">
           <CardHeader className="space-y-1">
             <div className="flex items-center justify-center mb-4">
-              <div className="bg-[#3e8692] p-3 rounded-full">
+              <div className="bg-brand p-3 rounded-full">
                 <FileText className="h-8 w-8 text-white" />
               </div>
             </div>
@@ -513,14 +513,14 @@ export default function PublicReportPage({ params }: { params: { id: string } })
                   placeholder="your.email@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="auth-input"
+                  className="focus-brand"
                   required
                 />
                 {emailError && (
                   <p className="text-sm text-red-600 mt-2">{emailError}</p>
                 )}
               </div>
-              <Button type="submit" className="w-full bg-[#3e8692] hover:bg-[#2d6570]">
+              <Button type="submit" className="w-full bg-brand hover:bg-[#2d6570]">
                 Access Report
               </Button>
             </form>
@@ -535,7 +535,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#3e8692] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto mb-4"></div>
           <p className="text-gray-600">Loading report...</p>
         </div>
       </div>
@@ -591,7 +591,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
           <div>
             <Button
               onClick={() => window.open(`/public/campaigns/${idOrSlug}`, '_blank')}
-              className="bg-[#3e8692] hover:bg-[#2d6570] text-white"
+              className="bg-brand hover:bg-[#2d6570] text-white"
               size="sm"
             >
               <ExternalLink className="h-4 w-4 mr-2" />
@@ -637,7 +637,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
                   prose-h3:mt-5 prose-h3:mb-2
                   prose-p:my-3 prose-p:leading-relaxed
                   prose-ul:my-3 prose-ol:my-3
-                  prose-li:my-1 prose-a:text-[#3e8692] prose-a:no-underline hover:prose-a:underline
+                  prose-li:my-1 prose-a:text-brand prose-a:no-underline hover:prose-a:underline
                   prose-strong:font-semibold prose-em:italic
                   [&>h2:first-child]:mt-0"
                 dangerouslySetInnerHTML={{ __html: customMessage }}
@@ -837,7 +837,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
                       href={file.file_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-[#3e8692] hover:bg-[#3e8692] hover:text-white border border-[#3e8692] rounded-lg transition-colors"
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-brand hover:bg-brand hover:text-white border border-brand rounded-lg transition-colors"
                     >
                       <Download className="h-4 w-4" />
                       <span>View</span>
@@ -849,7 +849,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
           )}
 
           {/* Calendly CTA Section */}
-          <div className="bg-gradient-to-r from-[#3e8692] to-[#2d6570] p-8 rounded-lg border shadow-lg text-center">
+          <div className="bg-gradient-to-r from-brand to-[#2d6570] p-8 rounded-lg border shadow-lg text-center">
             <h3 className="text-2xl font-bold text-white mb-4">Ready to Launch Your Next Campaign?</h3>
             <p className="text-white/90 mb-6 text-lg">
               Schedule a call with our team to discuss your influencer marketing needs
@@ -859,7 +859,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
                 href="https://yano.holohive.io"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-6 py-3 bg-white text-[#3e8692] font-semibold rounded-lg hover:bg-gray-100 transition-colors shadow-md"
+                className="px-6 py-3 bg-white text-brand font-semibold rounded-lg hover:bg-gray-100 transition-colors shadow-md"
               >
                 Schedule with Yano
               </a>
@@ -867,7 +867,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
                 href="https://jdot.holohive.io"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-6 py-3 bg-white text-[#3e8692] font-semibold rounded-lg hover:bg-gray-100 transition-colors shadow-md"
+                className="px-6 py-3 bg-white text-brand font-semibold rounded-lg hover:bg-gray-100 transition-colors shadow-md"
               >
                 Schedule with Jdot
               </a>

@@ -63,7 +63,18 @@ export type CreateDeliverableConfig = {
   clientId: string | null;
   startDate: string;
   priority: string;
+  /** Default assignment by role — used when stepAssignments doesn't
+   *  override for a given step. Multiple steps can share a role; this
+   *  used to mean "all those steps go to the same person", which the
+   *  team flagged as a bug 2026-05-07 (Client Onboarding has 8 steps
+   *  with the same role → all dumped on one person). The wizard now
+   *  populates stepAssignments instead, so roleAssignments stays for
+   *  back-compat callers but is the FALLBACK, not the primary source. */
   roleAssignments: Record<string, { userId: string; userName: string }>;
+  /** Per-step assignment override, keyed by step.id. Populated by the
+   *  DeliverableWizard so users can pick a different assignee per
+   *  step even when multiple steps share a default_role. */
+  stepAssignments?: Record<string, { userId: string; userName: string }>;
   dueDateOverrides?: Record<number, string>; // stepOrder -> date override
   createdBy: string;
   createdByName: string;
@@ -198,7 +209,13 @@ export class DeliverableService {
           return d.toISOString().split('T')[0];
         })();
 
-      const assignee = config.roleAssignments[step.default_role];
+      // Per-step assignment wins over role-based default (2026-05-07
+      // fix: was assigning all steps with the same role to one person,
+      // which broke for templates like "Client Onboarding - Internal
+      // Setup" where 8 steps share a single role).
+      const assignee =
+        config.stepAssignments?.[step.id] ??
+        config.roleAssignments[step.default_role];
 
       const subtask = await TaskService.createTask({
         task_name: `${step.step_order}. ${step.step_name}`,

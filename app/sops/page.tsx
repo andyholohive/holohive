@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { toneClassName, type BadgeTone } from '@/components/ui/status-badge';
+import { DeliverableWizard } from '@/components/tasks/DeliverableWizard';
 import dynamic from 'next/dynamic';
 
 // Dynamically import ReactQuill to avoid SSR issues
@@ -39,6 +41,10 @@ interface SOP {
   automation_review_requested: boolean;
   automation_review_completed: boolean;
   automation_notes: string | null;
+  /** Optional link to a deliverable_template. When set, the SOP detail
+   *  view shows a "Run this SOP" button that opens the DeliverableWizard
+   *  pre-loaded with the linked template (added 2026-05-07, migration 048). */
+  deliverable_template_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -82,28 +88,35 @@ const CATEGORIES = [
   { value: 'general', label: 'General' },
 ];
 
+// Status + category tone maps. Migrated to centralized StatusBadge palette
+// 2026-05-06 — was inventing yellow/teal/orange tones inline. The palette
+// defined in components/ui/status-badge.tsx is the source of truth; pick
+// the closest existing tone rather than adding new colors here.
+const STATUS_TONES: Record<string, BadgeTone> = {
+  draft:    'warning',  // amber, was bg-yellow-100
+  active:   'success',  // emerald, was bg-green-100
+  inactive: 'neutral',  // gray, unchanged
+};
 const STATUSES = [
-  { value: 'draft', label: 'Draft', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'active', label: 'Active', color: 'bg-green-100 text-green-800' },
-  { value: 'inactive', label: 'Inactive', color: 'bg-gray-100 text-gray-800' },
+  { value: 'draft',    label: 'Draft' },
+  { value: 'active',   label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
 ];
 
-const getStatusColor = (status: string) => {
-  const found = STATUSES.find(s => s.value === status);
-  return found?.color || 'bg-gray-100 text-gray-800';
+const CATEGORY_TONES: Record<string, BadgeTone> = {
+  campaign:   'info',    // sky, was blue
+  onboarding: 'purple',  // unchanged
+  bd:         'warning', // amber, was orange — closest in palette
+  kol:        'pink',    // unchanged
+  client:     'brand',   // brand teal, was teal-100 (same intent, palette token)
+  general:    'neutral', // gray, unchanged
 };
 
-const getCategoryColor = (category: string) => {
-  const colors: { [key: string]: string } = {
-    'campaign': 'bg-blue-100 text-blue-800',
-    'onboarding': 'bg-purple-100 text-purple-800',
-    'bd': 'bg-orange-100 text-orange-800',
-    'kol': 'bg-pink-100 text-pink-800',
-    'client': 'bg-teal-100 text-teal-800',
-    'general': 'bg-gray-100 text-gray-800',
-  };
-  return colors[category] || 'bg-gray-100 text-gray-800';
-};
+const getStatusColor = (status: string) =>
+  toneClassName(STATUS_TONES[status] ?? 'neutral');
+
+const getCategoryColor = (category: string) =>
+  toneClassName(CATEGORY_TONES[category] ?? 'neutral');
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -159,14 +172,51 @@ export default function SOPsPage() {
     owner_id: '',
     category: 'general',
     status: 'draft',
+    deliverable_template_id: '',  // empty string = unlinked (form convention)
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
+  // Deliverable templates dropdown for the "link this SOP to a template"
+  // field. Loaded once on mount alongside the SOP list.
+  const [deliverableTemplates, setDeliverableTemplates] = useState<Array<{ id: string; name: string }>>([]);
+  // Wizard state — opened when user clicks "Run this SOP" on the
+  // detail view. Pre-loaded with the linked template + SOP name.
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardTemplateId, setWizardTemplateId] = useState<string | null>(null);
+  const [wizardInitialTitle, setWizardInitialTitle] = useState<string>('');
+  const [wizardClients, setWizardClients] = useState<Array<{ id: string; name: string }>>([]);
+
   useEffect(() => {
     fetchSOPs();
     fetchTeamMembers();
+    fetchDeliverableTemplatesAndClients();
   }, []);
+
+  // Load deliverable templates (for the link picker) + active clients
+  // (for the wizard's client field). Both are small + rarely change,
+  // so a single load on mount is fine.
+  const fetchDeliverableTemplatesAndClients = async () => {
+    try {
+      const [tmplRes, clientsRes] = await Promise.all([
+        (supabase as any)
+          .from('deliverable_templates')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name'),
+        (supabase as any)
+          .from('clients')
+          .select('id, name')
+          .eq('is_active', true)
+          .is('archived_at', null)
+          .order('name'),
+      ]);
+      setDeliverableTemplates(tmplRes.data || []);
+      setWizardClients(clientsRes.data || []);
+    } catch (err) {
+      console.error('Error loading templates/clients:', err);
+    }
+  };
 
   const fetchSOPs = async () => {
     try {
@@ -278,6 +328,7 @@ export default function SOPsPage() {
       owner_id: user?.id || '',
       category: 'general',
       status: 'draft',
+      deliverable_template_id: '',
     });
     setIsCreateEditOpen(true);
   };
@@ -294,6 +345,7 @@ export default function SOPsPage() {
       owner_id: sop.owner_id || '',
       category: sop.category,
       status: sop.status,
+      deliverable_template_id: sop.deliverable_template_id || '',
     });
     setIsCreateEditOpen(true);
   };
@@ -361,6 +413,7 @@ export default function SOPsPage() {
             owner_id: formData.owner_id || null,
             category: formData.category,
             status: formData.status,
+            deliverable_template_id: formData.deliverable_template_id || null,
           })
           .eq('id', editingSOP.id);
 
@@ -387,6 +440,7 @@ export default function SOPsPage() {
             owner_id: formData.owner_id || null,
             category: formData.category,
             status: formData.status,
+            deliverable_template_id: formData.deliverable_template_id || null,
             created_by: user?.id,
           })
           .select()
@@ -608,13 +662,13 @@ export default function SOPsPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search SOPs..."
-              className="pl-10 auth-input"
+              className="pl-10 focus-brand"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[150px] auth-input">
+            <SelectTrigger className="w-[150px] focus-brand">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
@@ -625,7 +679,7 @@ export default function SOPsPage() {
             </SelectContent>
           </Select>
           <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-            <SelectTrigger className="w-[150px] auth-input">
+            <SelectTrigger className="w-[150px] focus-brand">
               <SelectValue placeholder="Owner" />
             </SelectTrigger>
             <SelectContent>
@@ -660,10 +714,10 @@ export default function SOPsPage() {
             </TabsTrigger>
             <TabsTrigger
               value="active"
-              className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm px-4 py-2"
+              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm px-4 py-2"
             >
               Active
-              <span className="ml-2 text-xs bg-[#e8f4f5] text-[#3e8692] px-2 py-0.5 rounded-full pointer-events-none">
+              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none">
                 {statusCounts.active}
               </span>
             </TabsTrigger>
@@ -719,6 +773,12 @@ export default function SOPsPage() {
                     <Badge variant="outline" className={`pointer-events-none ${getCategoryColor(sop.category)}`}>
                       {CATEGORIES.find(c => c.value === sop.category)?.label || sop.category}
                     </Badge>
+                    {sop.deliverable_template_id && (
+                      <Badge variant="outline" className="bg-brand/10 text-brand border-brand/30 pointer-events-none">
+                        <Play className="h-3 w-3 mr-1" />
+                        Runnable
+                      </Badge>
+                    )}
                     {sop.automation_review_requested && !sop.automation_review_completed && (
                       <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 pointer-events-none">
                         <Clock className="h-3 w-3 mr-1" />
@@ -828,7 +888,7 @@ export default function SOPsPage() {
                   <Label htmlFor="name">SOP Name *</Label>
                   <Input
                     id="name"
-                    className="auth-input"
+                    className="focus-brand"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="e.g., KOL Campaign – From Confirmation to Post Live"
@@ -840,7 +900,7 @@ export default function SOPsPage() {
                     value={formData.category}
                     onValueChange={(value) => setFormData({ ...formData, category: value })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -856,7 +916,7 @@ export default function SOPsPage() {
                     value={formData.status}
                     onValueChange={(value) => setFormData({ ...formData, status: value })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -872,7 +932,7 @@ export default function SOPsPage() {
                     value={formData.owner_id}
                     onValueChange={(value) => setFormData({ ...formData, owner_id: value })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue placeholder="Select owner" />
                     </SelectTrigger>
                     <SelectContent>
@@ -886,7 +946,7 @@ export default function SOPsPage() {
                   <Label htmlFor="clickup_link">ClickUp Template Link</Label>
                   <Input
                     id="clickup_link"
-                    className="auth-input"
+                    className="focus-brand"
                     value={formData.clickup_link}
                     onChange={(e) => setFormData({ ...formData, clickup_link: e.target.value })}
                     placeholder="https://app.clickup.com/..."
@@ -896,17 +956,41 @@ export default function SOPsPage() {
                   <Label htmlFor="documentation_link">Documentation Link</Label>
                   <Input
                     id="documentation_link"
-                    className="auth-input"
+                    className="focus-brand"
                     value={formData.documentation_link}
                     onChange={(e) => setFormData({ ...formData, documentation_link: e.target.value })}
                     placeholder="https://notion.so/... or other documentation"
                   />
                 </div>
+                {/* Linked deliverable template — when set, the SOP detail
+                    view shows a "Run this SOP" button that opens the
+                    DeliverableWizard pre-loaded with this template
+                    (added 2026-05-07, migration 048). */}
+                <div className="col-span-2">
+                  <Label htmlFor="deliverable_template_id">Linked Deliverable Template <span className="text-gray-400 font-normal">(optional)</span></Label>
+                  <Select
+                    value={formData.deliverable_template_id || 'none'}
+                    onValueChange={(value) => setFormData({ ...formData, deliverable_template_id: value === 'none' ? '' : value })}
+                  >
+                    <SelectTrigger className="focus-brand">
+                      <SelectValue placeholder="No linked template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">— No linked template</SelectItem>
+                      {deliverableTemplates.map(t => (
+                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Linking a template adds a &quot;Run this SOP&quot; button to the detail view, which spawns a multi-person task tree from the template.
+                  </p>
+                </div>
                 <div className="col-span-2">
                   <Label htmlFor="trigger">Trigger (What starts this process?)</Label>
                   <Textarea
                     id="trigger"
-                    className="auth-input"
+                    className="focus-brand"
                     value={formData.trigger}
                     onChange={(e) => setFormData({ ...formData, trigger: e.target.value })}
                     placeholder="e.g., New client signs contract"
@@ -917,7 +1001,7 @@ export default function SOPsPage() {
                   <Label htmlFor="outcome">Outcome (What does 'done' mean?)</Label>
                   <Textarea
                     id="outcome"
-                    className="auth-input"
+                    className="focus-brand"
                     value={formData.outcome}
                     onChange={(e) => setFormData({ ...formData, outcome: e.target.value })}
                     placeholder="e.g., All KOL posts are live, links tracked, and performance logged in HHP"
@@ -1040,7 +1124,7 @@ export default function SOPsPage() {
                       href={viewingSOP.clickup_link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-sm text-[#3e8692] hover:underline"
+                      className="inline-flex items-center gap-1 text-sm text-brand hover:underline"
                     >
                       <ExternalLink className="h-4 w-4" />
                       ClickUp Template
@@ -1051,7 +1135,7 @@ export default function SOPsPage() {
                       href={viewingSOP.documentation_link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-sm text-[#3e8692] hover:underline"
+                      className="inline-flex items-center gap-1 text-sm text-brand hover:underline"
                     >
                       <FileText className="h-4 w-4" />
                       Documentation
@@ -1071,6 +1155,26 @@ export default function SOPsPage() {
                     Last updated: {formatDate(viewingSOP.updated_at)}
                   </p>
                   <div className="flex gap-2">
+                    {/* Run this SOP — only when a deliverable template is
+                        linked. Closes the view dialog and opens the
+                        DeliverableWizard pre-loaded with the template +
+                        SOP name as the initial deliverable title. */}
+                    {viewingSOP.deliverable_template_id && (
+                      <Button
+                        size="sm"
+                        className="hover:opacity-90"
+                        style={{ backgroundColor: '#3e8692', color: 'white' }}
+                        onClick={() => {
+                          setWizardTemplateId(viewingSOP.deliverable_template_id);
+                          setWizardInitialTitle(viewingSOP.name);
+                          setIsViewOpen(false);
+                          setWizardOpen(true);
+                        }}
+                      >
+                        <Play className="h-3 w-3 mr-1" />
+                        Run this SOP
+                      </Button>
+                    )}
                     {!viewingSOP.automation_review_requested && (
                       <Button
                         variant="outline"
@@ -1166,6 +1270,33 @@ export default function SOPsPage() {
             )}
           </DialogContent>
         </Dialog>
+
+        {/* Run-this-SOP wizard. Lazy-mounted; only renders when a user
+            clicks "Run this SOP" on a linked SOP. Pre-selects the
+            template + seeds the title with the SOP name. The wizard's
+            existing per-step assignment table handles multi-person
+            assignment (fixed 2026-05-07 in the deliverables flow). */}
+        <DeliverableWizard
+          open={wizardOpen}
+          onOpenChange={setWizardOpen}
+          teamMembers={teamMembers.map(m => ({
+            id: m.id,
+            name: m.name,
+            email: m.email,
+            role: null,
+            profile_photo_url: null,
+          })) as any}
+          clients={wizardClients}
+          onCreated={() => {
+            setWizardOpen(false);
+            toast({
+              title: 'Deliverable created',
+              description: 'Tasks have been generated from the SOP. Open Tasks to view them.',
+            });
+          }}
+          preselectedTemplateId={wizardTemplateId ?? undefined}
+          initialTitle={wizardInitialTitle}
+        />
       </div>
   );
 }

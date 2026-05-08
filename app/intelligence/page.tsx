@@ -93,7 +93,7 @@ export default function IntelligencePage() {
           title={scheduleEnabled ? 'Auto-scan ON · click to configure' : 'Auto-scan OFF · click to set up'}
           aria-label="Configure scheduled discovery scan"
         >
-          <Clock className={`h-3.5 w-3.5 ${scheduleEnabled ? 'text-[#3e8692]' : 'text-gray-500'}`} />
+          <Clock className={`h-3.5 w-3.5 ${scheduleEnabled ? 'text-brand' : 'text-gray-500'}`} />
           <div className="flex flex-col text-left">
             <span className="text-[10px] text-gray-500 leading-none">Auto-scan</span>
             <span className="text-sm font-semibold text-gray-900 leading-tight">
@@ -113,7 +113,7 @@ export default function IntelligencePage() {
           title={alertsConfigured ? 'Alerts ON · click to configure' : 'Alerts OFF · click to set up'}
           aria-label="Configure intelligence alerts"
         >
-          <Bell className={`h-3.5 w-3.5 ${alertsConfigured ? 'text-[#3e8692]' : 'text-gray-500'}`} />
+          <Bell className={`h-3.5 w-3.5 ${alertsConfigured ? 'text-brand' : 'text-gray-500'}`} />
           <div className="flex flex-col text-left">
             <span className="text-[10px] text-gray-500 leading-none">Alerts</span>
             <span className="text-sm font-semibold text-gray-900 leading-tight">

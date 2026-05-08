@@ -188,7 +188,7 @@ export default function ListAccessDialog({ listId, open, onOpenChange }: Props) 
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-[#3e8692]" />
+            <Shield className="h-5 w-5 text-brand" />
             Access &amp; Activity
             {data?.list.name && <span className="text-gray-500 font-normal">— {data.list.name}</span>}
           </DialogTitle>

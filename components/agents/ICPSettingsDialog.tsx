@@ -183,7 +183,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
     return (
       <div className="mt-1.5">
         <Select value="" onValueChange={v => { if (v && !list.includes(v)) setList([...list, v]); }}>
-          <SelectTrigger className="auth-input h-8 text-xs [&>span]:truncate-none [&>span]:line-clamp-none">
+          <SelectTrigger className="focus-brand h-8 text-xs [&>span]:truncate-none [&>span]:line-clamp-none">
             <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
@@ -282,7 +282,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
                   value={mcMin}
                   onChange={e => setMcMin(e.target.value)}
                   placeholder="e.g. 10000000"
-                  className="auth-input"
+                  className="focus-brand"
                 />
                 {mcMin && <span className="text-[10px] text-gray-400">${Number(mcMin).toLocaleString()}</span>}
               </div>
@@ -293,7 +293,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
                   value={mcMax}
                   onChange={e => setMcMax(e.target.value)}
                   placeholder="e.g. 500000000"
-                  className="auth-input"
+                  className="focus-brand"
                 />
                 {mcMax && <span className="text-[10px] text-gray-400">${Number(mcMax).toLocaleString()}</span>}
               </div>
@@ -319,7 +319,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
                   }
                 }}
                 placeholder="e.g. Wrapped, USD, Bridge"
-                className="auth-input h-8 text-xs"
+                className="focus-brand h-8 text-xs"
               />
               <Button
                 variant="outline"

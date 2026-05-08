@@ -114,7 +114,7 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
     return (
       <div key={comment.id} className={`${isReply ? 'ml-8' : ''}`}>
         <div className="flex gap-2.5 group">
-          <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[#3e8692] to-[#2d6470] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mt-0.5">
+          <div className="h-7 w-7 rounded-full bg-gradient-to-br from-brand to-[#2d6470] flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 mt-0.5">
             {initials}
           </div>
           <div className="flex-1 min-w-0">
@@ -130,7 +130,7 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
                 <Textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  className="auth-input text-sm min-h-[60px]"
+                  className="focus-brand text-sm min-h-[60px]"
                   autoFocus
                 />
                 <div className="flex gap-2">
@@ -176,7 +176,7 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
                 value={replyContent}
                 onChange={(e) => setReplyContent(e.target.value)}
                 placeholder="Write a reply..."
-                className="auth-input text-sm min-h-[50px]"
+                className="focus-brand text-sm min-h-[50px]"
                 autoFocus
               />
               <div className="flex gap-2 mt-1.5">
@@ -232,7 +232,7 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
           placeholder="Add a comment..."
-          className="auth-input text-sm min-h-[60px]"
+          className="focus-brand text-sm min-h-[60px]"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddComment();
           }}

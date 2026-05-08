@@ -223,7 +223,8 @@ export default function TelegramChatsPage() {
         .order('last_message_at', { ascending: false, nullsFirst: false });
 
       if (error) throw error;
-      setChats(data || []);
+      // Cast: DB nullable fields vs interface (see archive/page.tsx note).
+      setChats((data || []) as TelegramChat[]);
     } catch (error) {
       console.error('Error fetching chats:', error);
       toast({
@@ -402,7 +403,9 @@ export default function TelegramChatsPage() {
         .order('name');
 
       if (error) throw error;
-      setOpportunities(data || []);
+      // Cast: select() returns 3 fields, the type wants the full
+      // CRMOpportunity. Safe because consumers only use id/name/stage.
+      setOpportunities((data || []) as unknown as CRMOpportunity[]);
     } catch (error) {
       console.error('Error fetching opportunities:', error);
     }
@@ -671,7 +674,8 @@ export default function TelegramChatsPage() {
         .order('command');
 
       if (error) throw error;
-      setCommands(data || []);
+      // Cast: DB nullable fields vs interface (see archive/page.tsx note).
+      setCommands((data || []) as TelegramCommand[]);
     } catch (error) {
       console.error('Error fetching commands:', error);
       toast({
@@ -1003,7 +1007,7 @@ export default function TelegramChatsPage() {
                   placeholder="Search chats..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="auth-input pl-10 w-64"
+                  className="focus-brand pl-10 w-64"
                 />
               </div>
               <Button
@@ -1160,7 +1164,7 @@ export default function TelegramChatsPage() {
                   placeholder="Search leads..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="auth-input pl-10 w-64"
+                  className="focus-brand pl-10 w-64"
                 />
               </div>
               <Button
@@ -1343,7 +1347,7 @@ export default function TelegramChatsPage() {
                   placeholder="Search chats..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="auth-input pl-10 w-64"
+                  className="focus-brand pl-10 w-64"
                 />
               </div>
               {false && (
@@ -1537,7 +1541,7 @@ export default function TelegramChatsPage() {
                   placeholder="Search DMs..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="auth-input pl-10 w-64"
+                  className="focus-brand pl-10 w-64"
                 />
               </div>
               <Button
@@ -1719,7 +1723,7 @@ export default function TelegramChatsPage() {
                   placeholder="Search KOL chats..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="auth-input pl-10 w-64"
+                  className="focus-brand pl-10 w-64"
                 />
               </div>
               <Button
@@ -2226,7 +2230,7 @@ export default function TelegramChatsPage() {
                   placeholder="help"
                   value={commandForm.command}
                   onChange={(e) => setCommandForm({ ...commandForm, command: e.target.value })}
-                  className="auth-input flex-1"
+                  className="focus-brand flex-1"
                 />
               </div>
               <p className="text-xs text-gray-500">
@@ -2241,7 +2245,7 @@ export default function TelegramChatsPage() {
                 placeholder="Shows help information"
                 value={commandForm.description}
                 onChange={(e) => setCommandForm({ ...commandForm, description: e.target.value })}
-                className="auth-input"
+                className="focus-brand"
               />
               <p className="text-xs text-gray-500">
                 A short description of what this command does.
@@ -2255,7 +2259,7 @@ export default function TelegramChatsPage() {
                 placeholder="https://example.com/image.jpg"
                 value={commandForm.image_url}
                 onChange={(e) => setCommandForm({ ...commandForm, image_url: e.target.value })}
-                className="auth-input"
+                className="focus-brand"
               />
               <p className="text-xs text-gray-500">
                 If set, the image will appear above the response text.
@@ -2270,7 +2274,7 @@ export default function TelegramChatsPage() {
                 value={commandForm.response}
                 onChange={(e) => setCommandForm({ ...commandForm, response: e.target.value })}
                 rows={5}
-                className="auth-input"
+                className="focus-brand"
               />
               <p className="text-xs text-gray-500">
                 The message the bot will send when this command is used. Supports HTML formatting.
@@ -2328,7 +2332,7 @@ export default function TelegramChatsPage() {
                 value={messageContent}
                 onChange={(e) => setMessageContent(e.target.value)}
                 rows={5}
-                className="auth-input resize-none"
+                className="focus-brand resize-none"
               />
               {chatToMessage && (
                 <p className="text-xs text-gray-500">

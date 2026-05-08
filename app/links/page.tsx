@@ -11,6 +11,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toneClassName, type BadgeTone } from '@/components/ui/status-badge';
+
+// Access-level tone map. Module-scope so the closure-captured object
+// isn't reallocated each render. See components/ui/status-badge.tsx.
+const ACCESS_TONES: Record<string, BadgeTone> = {
+  public:   'success', // emerald, was green
+  partners: 'info',    // sky, was blue
+  team:     'purple',  // unchanged
+  client:   'warning', // amber, was orange — closest in palette
+};
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -25,6 +35,10 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
+// Field nullability mirrors the Supabase schema. The narrow string-union
+// types on `access` and `status` are kept because they're enforced by
+// the form's Select component — the DB column is broader (any string)
+// but our writes are always one of these values.
 interface Link {
   id: string;
   name: string;
@@ -32,12 +46,12 @@ interface Link {
   description: string | null;
   client: string | null;
   client_id: string | null;
-  link_types: string[];
+  link_types: string[] | null;
   access: 'public' | 'partners' | 'team' | 'client';
   status: 'active' | 'inactive' | 'archived';
   created_by: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 type ClientOption = {
@@ -126,7 +140,10 @@ export default function LinksPage() {
       setClients(clientData || []);
 
       if (error) throw error;
-      setLinks(data || []);
+      // Cast: DB returns access/status as plain strings; our local Link
+      // narrows them to unions enforced by the form Select. Runtime
+      // values are constrained to the union by the write path.
+      setLinks((data || []) as Link[]);
     } catch (error) {
       console.error('Error fetching links:', error);
       toast({
@@ -334,7 +351,7 @@ export default function LinksPage() {
         tabLinks = links.filter(link => link.client === 'Holo Hive');
         break;
       case 'guide':
-        tabLinks = links.filter(link => link.link_types.includes('guide'));
+        tabLinks = links.filter(link => link.link_types?.includes('guide'));
         break;
       case 'clients':
         tabLinks = links.filter(link => link.client && link.client !== 'Holo Hive');
@@ -360,7 +377,7 @@ export default function LinksPage() {
     if (filterAccess !== 'all' && link.access !== filterAccess) return false;
 
     // Type filter
-    if (filterType !== 'all' && !link.link_types.includes(filterType)) return false;
+    if (filterType !== 'all' && !link.link_types?.includes(filterType)) return false;
 
     return true;
   });
@@ -403,15 +420,11 @@ export default function LinksPage() {
     setFilterType('all');
   };
 
-  const getAccessBadgeColor = (access: string) => {
-    switch (access) {
-      case 'public': return 'bg-green-100 text-green-800 hover:bg-green-100';
-      case 'partners': return 'bg-blue-100 text-blue-800 hover:bg-blue-100';
-      case 'team': return 'bg-purple-100 text-purple-800 hover:bg-purple-100';
-      case 'client': return 'bg-orange-100 text-orange-800 hover:bg-orange-100';
-      default: return 'bg-gray-100 text-gray-800 hover:bg-gray-100';
-    }
-  };
+  // Access tones — migrated to centralized palette 2026-05-06.
+  // 'orange' isn't in the shared palette; mapped client → warning (amber)
+  // as the closest visual neighbor.
+  const getAccessBadgeColor = (access: string) =>
+    toneClassName(ACCESS_TONES[access] ?? 'neutral');
 
   const getLinkTypeLabel = (value: string) => {
     const type = LINK_TYPES.find(t => t.value === value);
@@ -431,10 +444,11 @@ export default function LinksPage() {
   if (loading) {
     return (
       <div className="space-y-6">
+        {/* Header — real title/subtitle render immediately. */}
         <div className="flex items-center justify-between">
           <div>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-5 w-48" />
+            <h2 className="text-2xl font-bold text-gray-900">Links</h2>
+            <p className="text-gray-600">Manage all your important links</p>
           </div>
           <Skeleton className="h-10 w-32" />
         </div>
@@ -509,12 +523,12 @@ export default function LinksPage() {
             placeholder="Search links..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 auth-input"
+            className="pl-10 focus-brand"
           />
         </div>
 
         <Select value={filterAccess} onValueChange={setFilterAccess}>
-          <SelectTrigger className="w-[140px] auth-input">
+          <SelectTrigger className="w-[140px] focus-brand">
             <SelectValue placeholder="Access" />
           </SelectTrigger>
           <SelectContent>
@@ -526,7 +540,7 @@ export default function LinksPage() {
         </Select>
 
         <Select value={filterType} onValueChange={setFilterType}>
-          <SelectTrigger className="w-[160px] auth-input">
+          <SelectTrigger className="w-[160px] focus-brand">
             <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent>
@@ -720,7 +734,7 @@ export default function LinksPage() {
                 placeholder="Link name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -731,7 +745,7 @@ export default function LinksPage() {
                 placeholder="https://example.com"
                 value={formData.url}
                 onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -740,7 +754,7 @@ export default function LinksPage() {
                 <Label>Client <span className="text-red-500">*</span></Label>
                 <button
                   type="button"
-                  className="text-xs text-[#3e8692] cursor-pointer"
+                  className="text-xs text-brand cursor-pointer"
                   onClick={() => {
                     setClientInputMode(clientInputMode === 'select' ? 'text' : 'select');
                     setFormData({ ...formData, client_id: '', client: '' });
@@ -761,7 +775,7 @@ export default function LinksPage() {
                     }
                   }}
                 >
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select client" /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue placeholder="Select client" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_holo_hive">Holo Hive (Internal)</SelectItem>
                     {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -772,7 +786,7 @@ export default function LinksPage() {
                   value={formData.client}
                   onChange={(e) => setFormData({ ...formData, client: e.target.value, client_id: '' })}
                   placeholder="Type client or group name..."
-                  className="auth-input"
+                  className="focus-brand"
                 />
               )}
             </div>
@@ -841,7 +855,7 @@ export default function LinksPage() {
                   setFormData({ ...formData, access: value })
                 }
               >
-                <SelectTrigger className="auth-input">
+                <SelectTrigger className="focus-brand">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -859,7 +873,7 @@ export default function LinksPage() {
                 placeholder="Optional description (shown on hover)"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="auth-input"
+                className="focus-brand"
                 rows={2}
               />
             </div>

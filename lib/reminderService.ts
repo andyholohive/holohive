@@ -101,6 +101,15 @@ export const DEFAULT_TEMPLATES: Record<string, { header: string; item: string; f
     item: '\u2022 {{label}} — {{detail}}',
     footer: '',
   },
+  // The dedicated google_meeting_reminder cron sends two distinct
+  // messages (advance + at-start) per event using this template.
+  // {{label}} = event title, {{detail}} = e.g. "in 10 min" or "starting now",
+  // {{meet_link}} is interpolated by the cron, not the standard engine.
+  google_meeting_reminder: {
+    header: '<b>{{emoji}} {{label}}</b>\n<i>{{detail}}</i>',
+    item: '\u{1F517} <a href="{{meet_link}}">Join Meet</a>',
+    footer: '',
+  },
 };
 
 const FALLBACK_TEMPLATE = {

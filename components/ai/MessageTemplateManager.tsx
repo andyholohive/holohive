@@ -174,7 +174,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input placeholder="Search templates by name, content, or tags..." className="pl-10 auth-input" disabled />
+            <Input placeholder="Search templates by name, content, or tags..." className="pl-10 focus-brand" disabled />
           </div>
           <div className="flex gap-2">
             <Select disabled>
@@ -281,7 +281,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
                       value={newTemplate.name}
                       onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
                       placeholder="Enter template name"
-                      className="auth-input"
+                      className="focus-brand"
                       required
                     />
                   </div>
@@ -293,7 +293,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
                       onChange={(e) => setNewTemplate({ ...newTemplate, content: e.target.value })}
                       placeholder="Enter message content (use {placeholder} for dynamic values)"
                       rows={8}
-                      className="auth-input"
+                      className="focus-brand"
                       required
                     />
                   </div>
@@ -304,7 +304,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
                         value={newTemplate.category}
                         onValueChange={(value: any) => setNewTemplate({ ...newTemplate, category: value })}
                       >
-                        <SelectTrigger className="auth-input">
+                        <SelectTrigger className="focus-brand">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -321,7 +321,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
                         value={newTemplate.tone}
                         onValueChange={(value: any) => setNewTemplate({ ...newTemplate, tone: value })}
                       >
-                        <SelectTrigger className="auth-input">
+                        <SelectTrigger className="focus-brand">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -338,7 +338,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
                         value={newTemplate.target_audience}
                         onValueChange={(value: any) => setNewTemplate({ ...newTemplate, target_audience: value })}
                       >
-                        <SelectTrigger className="auth-input">
+                        <SelectTrigger className="focus-brand">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -377,7 +377,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
             placeholder="Search templates by name, content, or tags..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 auth-input"
+            className="pl-10 focus-brand"
           />
         </div>
         <div className="flex gap-2">

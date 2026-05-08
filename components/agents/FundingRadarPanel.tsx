@@ -336,7 +336,7 @@ export default function FundingRadarPanel() {
             <Input
               placeholder="Search projects..."
               onChange={e => handleSearch(e.target.value)}
-              className="pl-8 h-8 text-xs auth-input"
+              className="pl-8 h-8 text-xs focus-brand"
             />
           </div>
         </div>
@@ -508,17 +508,17 @@ export default function FundingRadarPanel() {
                           <div className="font-semibold text-gray-700 mb-1">Links</div>
                           <div className="flex items-center gap-2">
                             {p.website_url && (
-                              <a href={p.website_url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#3e8692] flex items-center gap-1">
+                              <a href={p.website_url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-brand flex items-center gap-1">
                                 <Globe className="w-3 h-3" /> Website
                               </a>
                             )}
                             {p.twitter_url && (
-                              <a href={p.twitter_url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#3e8692] flex items-center gap-1">
+                              <a href={p.twitter_url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-brand flex items-center gap-1">
                                 <span className="font-bold text-[10px]">𝕏</span> Twitter
                               </a>
                             )}
                             {p.source_url && (
-                              <a href={p.source_url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-[#3e8692] flex items-center gap-1">
+                              <a href={p.source_url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-brand flex items-center gap-1">
                                 <ExternalLink className="w-3 h-3" /> Source
                               </a>
                             )}
@@ -618,7 +618,7 @@ export default function FundingRadarPanel() {
 
                     {/* Source link */}
                     {round.source_url && (
-                      <a href={round.source_url} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-[#3e8692] shrink-0">
+                      <a href={round.source_url} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-brand shrink-0">
                         <ExternalLink className="w-3 h-3" />
                       </a>
                     )}

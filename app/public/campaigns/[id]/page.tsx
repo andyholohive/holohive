@@ -690,7 +690,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
           <div className="text-center mb-8">
-            <div className="bg-[#3e8692] rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+            <div className="bg-brand rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
               <Megaphone className="h-8 w-8 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Campaign Access</h1>
@@ -704,7 +704,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
           
           {loadingClientEmail ? (
             <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e8692] mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand mx-auto mb-4"></div>
               <p className="text-gray-600">Verifying campaign access...</p>
             </div>
           ) : (
@@ -719,7 +719,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter the authorized email address"
-                  className="w-full auth-input"
+                  className="w-full focus-brand"
                   required
                 />
                 {emailError && (
@@ -729,7 +729,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
               
               <Button
                 type="submit"
-                className="w-full bg-[#3e8692] hover:bg-[#2d6470] text-white"
+                className="w-full bg-brand hover:bg-[#2d6470] text-white"
               >
                 Access Campaign
               </Button>
@@ -790,7 +790,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                   setError(null);
                   fetchData();
                 }}
-                className="bg-[#3e8692] hover:bg-[#2d6470] text-white"
+                className="bg-brand hover:bg-[#2d6470] text-white"
               >
                 Try Again
               </Button>
@@ -931,7 +931,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <Users className="h-6 w-6 text-white" />
                             </div>
                             <p className="text-sm text-gray-600">Total KOLs in Campaign</p>
@@ -948,7 +948,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
                             <p className="text-sm text-gray-600">Average Followers per KOL</p>
@@ -972,7 +972,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <Globe className="h-6 w-6 text-white" />
                             </div>
                             <p className="text-sm text-gray-600">
@@ -1007,7 +1007,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <Flag className="h-6 w-6 text-white" />
                             </div>
                             <p className="text-sm text-gray-600">
@@ -1244,7 +1244,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <Input
                           placeholder="Search KOLs by name, region, or status..."
-                          className="pl-10 auth-input"
+                          className="pl-10 focus-brand"
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -1305,7 +1305,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   </PopoverContent>
                                 </Popover>
                                 {kolFilters.platform.length > 0 && (
-                                  <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                     {kolFilters.platform.length}
                                   </span>
                                 )}
@@ -1342,7 +1342,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                           placeholder="Value"
                                           value={kolFilters.followers_value}
                                           onChange={(e) => setKolFilters(prev => ({ ...prev, followers_value: e.target.value }))}
-                                          className="h-8 text-xs auth-input"
+                                          className="h-8 text-xs focus-brand"
                                         />
                                       </div>
                                       {(kolFilters.followers_operator || kolFilters.followers_value) && (
@@ -1359,7 +1359,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   </PopoverContent>
                                 </Popover>
                                 {(kolFilters.followers_operator && kolFilters.followers_value) && (
-                                  <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                     1
                                   </span>
                                 )}
@@ -1409,7 +1409,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   </PopoverContent>
                                 </Popover>
                                 {kolFilters.region.length > 0 && (
-                                  <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                     {kolFilters.region.length}
                                   </span>
                                 )}
@@ -1461,7 +1461,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   </PopoverContent>
                                 </Popover>
                                 {kolFilters.hh_status.length > 0 && (
-                                  <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                  <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                     {kolFilters.hh_status.length}
                                   </span>
                                 )}
@@ -1595,7 +1595,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                       <Card key={item.id} className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-4">
                           <div className="flex flex-col items-center text-center">
-                            <div className="w-16 h-16 bg-gradient-to-br from-[#3e8692] to-[#2d6470] rounded-full flex items-center justify-center mb-3">
+                            <div className="w-16 h-16 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center mb-3">
                               <span className="text-white font-bold text-xl">
                                 {item.master_kol.name.charAt(0).toUpperCase()}
                               </span>
@@ -1700,7 +1700,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     <Card className="hover:shadow-lg transition-shadow duration-200">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
-                          <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                          <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                             <Users className="h-6 w-6 text-white" />
                           </div>
                         </div>
@@ -1717,7 +1717,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     <Card className="hover:shadow-lg transition-shadow duration-200">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
-                          <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                          <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                             <BarChart3 className="h-6 w-6 text-white" />
                           </div>
                         </div>
@@ -1737,7 +1737,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                     <Card className="hover:shadow-lg transition-shadow duration-200">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
-                          <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                          <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                             <BarChart3 className="h-6 w-6 text-white" />
                           </div>
                         </div>
@@ -1916,7 +1916,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                           <Input
                             placeholder="Search Contents by KOL, platform, or status..."
-                            className="pl-10 auth-input"
+                            className="pl-10 focus-brand"
                             value={contentsSearchTerm}
                             onChange={e => setContentsSearchTerm(e.target.value)}
                           />
@@ -1972,7 +1972,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     </PopoverContent>
                                   </Popover>
                                   {contentFilters.platform.length > 0 && (
-                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       {contentFilters.platform.length}
                                     </span>
                                   )}
@@ -2019,7 +2019,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     </PopoverContent>
                                   </Popover>
                                   {contentFilters.type.length > 0 && (
-                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       {contentFilters.type.length}
                                     </span>
                                   )}
@@ -2066,7 +2066,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     </PopoverContent>
                                   </Popover>
                                   {contentFilters.status.length > 0 && (
-                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       {contentFilters.status.length}
                                     </span>
                                   )}
@@ -2202,7 +2202,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
                             <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
                               <p className="text-sm text-gray-600">
@@ -2227,7 +2227,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
                             <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
                               <p className="text-sm text-gray-600">
@@ -2252,7 +2252,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
                             <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
                               <p className="text-sm text-gray-600">
@@ -2277,7 +2277,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
                             <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
                               <p className="text-sm text-gray-600">
@@ -2302,7 +2302,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
                             <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
                               <p className="text-sm text-gray-600">
@@ -2329,7 +2329,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <Card className="hover:shadow-lg transition-shadow duration-200">
                           <CardHeader className="pb-3">
                             <div className="flex items-center gap-3">
-                              <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                              <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                                 <BarChart3 className="h-6 w-6 text-white" />
                               </div>
                               <p className="text-sm text-gray-600">

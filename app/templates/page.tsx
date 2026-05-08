@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { MessageSquare, Copy, TrendingUp, Calendar, Info, Star, Sparkles, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -149,90 +150,93 @@ export default function TemplatesPage() {
     }).join(' ');
   };
 
-  if (loading || loadingExamples) {
+  // 2026-05-06 (audit #4): split from `loading || loadingExamples`. The
+  // examples panel has its own loading skeleton at line ~437 — gating
+  // the whole page on `loadingExamples` was blocking first paint of the
+  // templates grid until both loads finished. Now templates render as
+  // soon as `loading=false`; examples panel skeletons in place.
+  if (loading) {
+    // Skeleton mirrors the loaded layout (header → tabs → info card →
+    // 6-card grid). Migrated from hand-rolled `animate-pulse` divs to
+    // shadcn <Skeleton> on 2026-05-07 — was the only page in the app
+    // not using the component, causing a noticeably-different shimmer
+    // animation between pages on slow loads.
     return (
       <div className="space-y-6">
-        {/* Header Skeleton */}
+        {/* Header — real title/subtitle render immediately. */}
         <div className="flex items-center justify-between">
           <div>
-            <div className="h-8 bg-gray-200 rounded w-64 mb-2 animate-pulse"></div>
-            <div className="h-4 bg-gray-100 rounded w-80 animate-pulse"></div>
+            <h2 className="text-2xl font-bold text-gray-900">Client Message Templates</h2>
+            <p className="text-gray-600 mt-1">Pre-built templates and AI learning examples</p>
           </div>
           <div className="flex gap-2">
-            <div className="h-7 bg-gray-200 rounded w-24 animate-pulse"></div>
-            <div className="h-7 bg-gray-200 rounded w-24 animate-pulse"></div>
+            <Skeleton className="h-7 w-24" />
+            <Skeleton className="h-7 w-24" />
           </div>
         </div>
 
-        {/* Tabs Skeleton */}
+        {/* Tabs */}
         <div className="flex gap-2 border-b">
-          <div className="h-10 bg-gray-200 rounded-t w-32 animate-pulse"></div>
-          <div className="h-10 bg-gray-100 rounded-t w-40 animate-pulse"></div>
+          <Skeleton className="h-10 w-32 rounded-t" />
+          <Skeleton className="h-10 w-40 rounded-t" />
         </div>
 
-        {/* Info Card Skeleton */}
-        <Card className="bg-blue-50 border-blue-200">
+        {/* Info card */}
+        <Card>
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
-              <div className="h-5 w-5 bg-blue-200 rounded animate-pulse"></div>
+              <Skeleton className="h-5 w-5 rounded" />
               <div className="flex-1 space-y-2">
-                <div className="h-4 bg-blue-200 rounded w-48 animate-pulse"></div>
-                <div className="h-3 bg-blue-100 rounded w-full animate-pulse"></div>
-                <div className="h-3 bg-blue-100 rounded w-3/4 animate-pulse"></div>
+                <Skeleton className="h-4 w-48" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-3/4" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Cards Grid Skeleton */}
+        {/* Cards grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <Card key={i} className="flex flex-col">
               <CardHeader>
                 <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="h-5 bg-gray-200 rounded w-3/4 mb-3 animate-pulse"></div>
-                    <div className="h-6 bg-gray-200 rounded w-32 animate-pulse"></div>
+                  <div className="flex-1 space-y-3">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-6 w-32" />
                   </div>
-                  <div className="h-5 w-5 bg-gray-200 rounded animate-pulse"></div>
+                  <Skeleton className="h-5 w-5 rounded" />
                 </div>
               </CardHeader>
               <CardContent className="flex flex-col flex-grow">
                 <div className="flex-grow space-y-4">
-                  {/* Content Preview Skeleton */}
                   <div className="bg-gray-50 p-3 rounded border border-gray-200 space-y-2">
-                    <div className="h-3 bg-gray-200 rounded animate-pulse"></div>
-                    <div className="h-3 bg-gray-200 rounded animate-pulse"></div>
-                    <div className="h-3 bg-gray-200 rounded w-5/6 animate-pulse"></div>
-                    <div className="h-3 bg-gray-200 rounded w-4/6 animate-pulse"></div>
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-5/6" />
+                    <Skeleton className="h-3 w-4/6" />
                   </div>
-
-                  {/* Variables Skeleton */}
                   <div className="space-y-2">
-                    <div className="h-3 bg-gray-200 rounded w-20 animate-pulse"></div>
+                    <Skeleton className="h-3 w-20" />
                     <div className="flex gap-1">
-                      <div className="h-5 bg-gray-200 rounded w-16 animate-pulse"></div>
-                      <div className="h-5 bg-gray-200 rounded w-20 animate-pulse"></div>
+                      <Skeleton className="h-5 w-16" />
+                      <Skeleton className="h-5 w-20" />
                     </div>
                   </div>
-
-                  {/* Stats Skeleton */}
                   <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                     <div className="space-y-1">
-                      <div className="h-3 bg-gray-200 rounded w-12 animate-pulse"></div>
-                      <div className="h-4 bg-gray-200 rounded w-8 animate-pulse"></div>
+                      <Skeleton className="h-3 w-12" />
+                      <Skeleton className="h-4 w-8" />
                     </div>
                     <div className="space-y-1">
-                      <div className="h-3 bg-gray-200 rounded w-16 animate-pulse"></div>
-                      <div className="h-3 bg-gray-200 rounded w-12 animate-pulse"></div>
+                      <Skeleton className="h-3 w-16" />
+                      <Skeleton className="h-3 w-12" />
                     </div>
                   </div>
                 </div>
-
-                {/* Buttons Skeleton */}
                 <div className="grid grid-cols-2 gap-2 pt-4 mt-auto">
-                  <div className="h-9 bg-gray-200 rounded animate-pulse"></div>
-                  <div className="h-9 bg-gray-200 rounded animate-pulse"></div>
+                  <Skeleton className="h-9 w-full" />
+                  <Skeleton className="h-9 w-full" />
                 </div>
               </CardContent>
             </Card>
@@ -247,7 +251,7 @@ export default function TemplatesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Client Message Templates</h1>
+          <h2 className="text-2xl font-bold text-gray-900">Client Message Templates</h2>
           <p className="text-gray-600 mt-1">
             Pre-built templates and AI learning examples
           </p>
@@ -437,16 +441,16 @@ export default function TemplatesPage() {
           {loadingExamples ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3].map((i) => (
-                <Card key={i} className="animate-pulse">
-                  <CardHeader>
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                <Card key={i}>
+                  <CardHeader className="space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      <div className="h-3 bg-gray-200 rounded"></div>
-                      <div className="h-3 bg-gray-200 rounded"></div>
-                      <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+                      <Skeleton className="h-3 w-full" />
+                      <Skeleton className="h-3 w-full" />
+                      <Skeleton className="h-3 w-5/6" />
                     </div>
                   </CardContent>
                 </Card>

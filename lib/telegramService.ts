@@ -227,6 +227,50 @@ export class TelegramService {
   }
 
   /**
+   * Fetch a chat's metadata from Telegram given its chat_id. Used to
+   * backfill missing telegram_chats rows when we know the chat_id but
+   * never recorded the chat (e.g. the bot was added to the DM before
+   * the webhook started writing chat rows, or the row was lost).
+   *
+   * For private (1:1) chats, Telegram requires the user to have either
+   * messaged the bot at least once OR have the bot listed as a contact.
+   * If neither is true, the API returns a 400 "chat not found." Surface
+   * that as a clean error string so the UI can prompt the user to send
+   * /start first.
+   *
+   * Returns the parsed Telegram Chat object, or { error } on failure.
+   * See https://core.telegram.org/bots/api#getchat for shape.
+   */
+  static async getChat(chatId: string): Promise<{
+    id: number;
+    type: 'private' | 'group' | 'supergroup' | 'channel';
+    title?: string;
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+    [key: string]: any;
+  } | { error: string }> {
+    if (!this.botToken) {
+      return { error: 'TELEGRAM_BOT_TOKEN not configured' };
+    }
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${this.botToken}/getChat?chat_id=${encodeURIComponent(chatId)}`,
+      );
+      const data = await response.json();
+      if (!data.ok) {
+        // Common error: "Bad Request: chat not found" — happens when
+        // the user has never started a conversation with the bot.
+        return { error: data.description || `getChat failed (${response.status})` };
+      }
+      return data.result;
+    } catch (error) {
+      console.error('[Telegram] Error in getChat:', error);
+      return { error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  /**
    * Send a message to a specific chat (for CRM integration)
    */
   static async sendToChat(

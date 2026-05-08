@@ -1360,7 +1360,7 @@ export default function PipelinePage() {
             onChange={(e) => setEditingValue(e.target.value)}
             onBlur={() => handleInlineUpdate(opp.id, field, editingValue)}
             onKeyDown={(e) => handleKeyDown(e, opp.id, field)}
-            className="h-8 text-sm auth-input"
+            className="h-8 text-sm focus-brand"
             autoFocus
           />
         );
@@ -1387,7 +1387,7 @@ export default function PipelinePage() {
             onChange={(e) => setEditingValue(e.target.value)}
             onBlur={() => handleInlineUpdate(opp.id, field, parseFloat(editingValue) || null)}
             onKeyDown={(e) => handleKeyDown(e, opp.id, field)}
-            className="h-8 text-sm text-right auth-input"
+            className="h-8 text-sm text-right focus-brand"
             autoFocus
           />
         );
@@ -1479,7 +1479,7 @@ export default function PipelinePage() {
                 onChange={(e) => setEditingValue(e.target.value)}
                 onBlur={() => handleInlineUpdate(opp.id, 'name', editingValue)}
                 onKeyDown={(e) => handleKeyDown(e, opp.id, 'name')}
-                className="h-8 text-sm font-medium auth-input"
+                className="h-8 text-sm font-medium focus-brand"
                 autoFocus
               />
             ) : (
@@ -1514,7 +1514,7 @@ export default function PipelinePage() {
               value={opp.owner_id || 'none'}
               onValueChange={(v) => handleInlineUpdate(opp.id, 'owner_id', v === 'none' ? null : v)}
             >
-              <SelectTrigger className="w-32 h-8 text-xs auth-input">
+              <SelectTrigger className="w-32 h-8 text-xs focus-brand">
                 <SelectValue placeholder="Select">
                   {opp.owner_id ? (users.find(u => u.id === opp.owner_id)?.name || users.find(u => u.id === opp.owner_id)?.email || '-') : <span className="text-gray-400">-</span>}
                 </SelectValue>
@@ -1535,7 +1535,7 @@ export default function PipelinePage() {
                 value={opp.account_type || 'none'}
                 onValueChange={(v) => handleInlineUpdate(opp.id, 'account_type', v === 'none' ? null : v)}
               >
-                <SelectTrigger className="w-28 h-8 text-xs auth-input">
+                <SelectTrigger className="w-28 h-8 text-xs focus-brand">
                   <SelectValue placeholder="Select">
                     {opp.account_type ? formatSource(opp.account_type) : <span className="text-gray-400">-</span>}
                   </SelectValue>
@@ -1556,7 +1556,7 @@ export default function PipelinePage() {
               value={opp.source || 'none'}
               onValueChange={(v) => handleInlineUpdate(opp.id, 'source', v === 'none' ? null : v)}
             >
-              <SelectTrigger className="w-32 h-8 text-xs auth-input">
+              <SelectTrigger className="w-32 h-8 text-xs focus-brand">
                 <SelectValue placeholder="Select">
                   {opp.source ? formatSource(opp.source) : <span className="text-gray-400">-</span>}
                 </SelectValue>
@@ -1578,7 +1578,7 @@ export default function PipelinePage() {
                   variant="outline"
                   role="combobox"
                   aria-expanded={affiliatePopoverOpen === opp.id}
-                  className="w-32 h-8 justify-between text-xs auth-input"
+                  className="w-32 h-8 justify-between text-xs focus-brand"
                 >
                   {opp.affiliate ? (
                     <Badge className="text-xs truncate" style={{ backgroundColor: '#3e8692', color: 'white' }}>
@@ -1631,7 +1631,7 @@ export default function PipelinePage() {
                 value={opp.client_id || 'none'}
                 onValueChange={(v) => handleInlineUpdate(opp.id, 'client_id', v === 'none' ? null : v)}
               >
-                <SelectTrigger className="w-32 h-8 text-xs auth-input">
+                <SelectTrigger className="w-32 h-8 text-xs focus-brand">
                   <SelectValue placeholder="Select">
                     {opp.client ? (
                       <span className="truncate">{opp.client.name}</span>
@@ -1657,7 +1657,7 @@ export default function PipelinePage() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-auto min-w-36 h-8 text-xs auth-input justify-between font-normal"
+                    className="w-auto min-w-36 h-8 text-xs focus-brand justify-between font-normal"
                   >
                     <span>
                       {opp.scope ? (
@@ -1878,7 +1878,7 @@ export default function PipelinePage() {
                           onBlur={handleSaveNewRow}
                           onKeyDown={handleNewRowKeyDown}
                           placeholder="Enter opportunity name..."
-                          className="h-8 text-sm font-medium auth-input"
+                          className="h-8 text-sm font-medium focus-brand"
                           autoFocus
                         />
                       </TableCell>
@@ -2057,7 +2057,7 @@ export default function PipelinePage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search opportunities..."
-              className="pl-10 w-64 auth-input"
+              className="pl-10 w-64 focus-brand"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -2168,7 +2168,7 @@ export default function PipelinePage() {
           <span className="text-sm text-gray-600">Filters:</span>
         </div>
         <Select value={filterSource} onValueChange={setFilterSource}>
-          <SelectTrigger className="w-36 h-9 text-sm auth-input">
+          <SelectTrigger className="w-36 h-9 text-sm focus-brand">
             <SelectValue placeholder="Source" />
           </SelectTrigger>
           <SelectContent>
@@ -2179,7 +2179,7 @@ export default function PipelinePage() {
           </SelectContent>
         </Select>
         <Select value={filterAccountType} onValueChange={setFilterAccountType}>
-          <SelectTrigger className="w-40 h-9 text-sm auth-input">
+          <SelectTrigger className="w-40 h-9 text-sm focus-brand">
             <SelectValue placeholder="Account Type" />
           </SelectTrigger>
           <SelectContent>
@@ -2190,7 +2190,7 @@ export default function PipelinePage() {
           </SelectContent>
         </Select>
         <Select value={filterAffiliate} onValueChange={setFilterAffiliate}>
-          <SelectTrigger className="w-36 h-9 text-sm auth-input">
+          <SelectTrigger className="w-36 h-9 text-sm focus-brand">
             <SelectValue placeholder="Affiliate" />
           </SelectTrigger>
           <SelectContent>
@@ -2206,7 +2206,7 @@ export default function PipelinePage() {
           <span className="text-sm text-gray-600">Sort:</span>
         </div>
         <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-40 h-9 text-sm auth-input">
+          <SelectTrigger className="w-40 h-9 text-sm focus-brand">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
           <SelectContent>
@@ -2259,7 +2259,7 @@ export default function PipelinePage() {
             <div className="min-w-[120px] flex flex-col">
               <span className="text-xs text-gray-600 font-semibold mb-1">Stage</span>
               <Select value={bulkEdit.stage || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, stage: v as OpportunityStage }))}>
-                <SelectTrigger className="h-8 text-xs auth-input">
+                <SelectTrigger className="h-8 text-xs focus-brand">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2273,7 +2273,7 @@ export default function PipelinePage() {
             <div className="min-w-[120px] flex flex-col">
               <span className="text-xs text-gray-600 font-semibold mb-1">Owner</span>
               <Select value={bulkEdit.owner_id || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, owner_id: v === 'none' ? null : v }))}>
-                <SelectTrigger className="h-8 text-xs auth-input">
+                <SelectTrigger className="h-8 text-xs focus-brand">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2287,8 +2287,8 @@ export default function PipelinePage() {
             {/* Source */}
             <div className="min-w-[120px] flex flex-col">
               <span className="text-xs text-gray-600 font-semibold mb-1">Source</span>
-              <Select value={bulkEdit.source || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, source: v === 'none' ? null : v }))}>
-                <SelectTrigger className="h-8 text-xs auth-input">
+              <Select value={bulkEdit.source || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, source: v === 'none' ? null : v }) as Partial<CRMOpportunity>)}>
+                <SelectTrigger className="h-8 text-xs focus-brand">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2303,8 +2303,8 @@ export default function PipelinePage() {
             {(activeTab === 'deals' || activeTab === 'accounts') && (
               <div className="min-w-[120px] flex flex-col">
                 <span className="text-xs text-gray-600 font-semibold mb-1">Account Type</span>
-                <Select value={bulkEdit.account_type || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, account_type: v === 'none' ? null : v }))}>
-                  <SelectTrigger className="h-8 text-xs auth-input">
+                <Select value={bulkEdit.account_type || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, account_type: v === 'none' ? null : v }) as Partial<CRMOpportunity>)}>
+                  <SelectTrigger className="h-8 text-xs focus-brand">
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2320,7 +2320,7 @@ export default function PipelinePage() {
             <div className="min-w-[120px] flex flex-col">
               <span className="text-xs text-gray-600 font-semibold mb-1">Affiliate</span>
               <Select value={bulkEdit.affiliate_id || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, affiliate_id: v === 'none' ? null : v }))}>
-                <SelectTrigger className="h-8 text-xs auth-input">
+                <SelectTrigger className="h-8 text-xs focus-brand">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2336,7 +2336,7 @@ export default function PipelinePage() {
               <div className="min-w-[120px] flex flex-col">
                 <span className="text-xs text-gray-600 font-semibold mb-1">Client</span>
                 <Select value={bulkEdit.client_id || ''} onValueChange={(v) => setBulkEdit(prev => ({ ...prev, client_id: v === 'none' ? null : v }))}>
-                  <SelectTrigger className="h-8 text-xs auth-input">
+                  <SelectTrigger className="h-8 text-xs focus-brand">
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2356,7 +2356,7 @@ export default function PipelinePage() {
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className="h-8 text-xs auth-input justify-between font-normal"
+                      className="h-8 text-xs focus-brand justify-between font-normal"
                     >
                       <span className="truncate">
                         {bulkEdit.scope ? (
@@ -2554,7 +2554,7 @@ export default function PipelinePage() {
                   value={opportunityForm.name}
                   onChange={(e) => setOpportunityForm({ ...opportunityForm, name: e.target.value })}
                   placeholder="Company or opportunity name"
-                  className="auth-input"
+                  className="focus-brand"
                   required
                 />
               </div>
@@ -2565,7 +2565,7 @@ export default function PipelinePage() {
                     value={opportunityForm.stage}
                     onValueChange={(v) => setOpportunityForm({ ...opportunityForm, stage: v as OpportunityStage })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -2597,7 +2597,7 @@ export default function PipelinePage() {
                     value={opportunityForm.source || ''}
                     onValueChange={(v) => setOpportunityForm({ ...opportunityForm, source: v as any })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue placeholder="Select source" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2616,7 +2616,7 @@ export default function PipelinePage() {
                   value={opportunityForm.affiliate_id || 'none'}
                   onValueChange={(v) => setOpportunityForm({ ...opportunityForm, affiliate_id: v === 'none' ? undefined : v })}
                 >
-                  <SelectTrigger className="auth-input">
+                  <SelectTrigger className="focus-brand">
                     <SelectValue placeholder="Select affiliate (optional)" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2636,7 +2636,7 @@ export default function PipelinePage() {
                     value={opportunityForm.account_type || ''}
                     onValueChange={(v) => setOpportunityForm({ ...opportunityForm, account_type: v as any })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2656,7 +2656,7 @@ export default function PipelinePage() {
                     value={opportunityForm.client_id || 'none'}
                     onValueChange={(v) => setOpportunityForm({ ...opportunityForm, client_id: v === 'none' ? undefined : v })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue placeholder="Select client" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2677,7 +2677,7 @@ export default function PipelinePage() {
                     value={opportunityForm.scope || 'none'}
                     onValueChange={(v) => setOpportunityForm({ ...opportunityForm, scope: v === 'none' ? undefined : v })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue placeholder="Select scope" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2698,7 +2698,7 @@ export default function PipelinePage() {
                   value={opportunityForm.referrer || ''}
                   onChange={(e) => setOpportunityForm({ ...opportunityForm, referrer: e.target.value })}
                   placeholder="Who referred them?"
-                  className="auth-input"
+                  className="focus-brand"
                 />
               </div>
               <div className="grid gap-2">
@@ -2708,7 +2708,7 @@ export default function PipelinePage() {
                   value={opportunityForm.gc || ''}
                   onChange={(e) => setOpportunityForm({ ...opportunityForm, gc: e.target.value })}
                   placeholder="-1001234567890"
-                  className="auth-input"
+                  className="focus-brand"
                 />
                 <p className="text-xs text-muted-foreground">
                   Enter the Telegram group chat ID to track message activity
@@ -2721,7 +2721,7 @@ export default function PipelinePage() {
                   value={opportunityForm.notes || ''}
                   onChange={(e) => setOpportunityForm({ ...opportunityForm, notes: e.target.value })}
                   placeholder="Additional notes..."
-                  className="auth-input"
+                  className="focus-brand"
                   rows={3}
                 />
               </div>
@@ -2829,7 +2829,7 @@ export default function PipelinePage() {
                     value={selectedContactId}
                     onValueChange={setSelectedContactId}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue placeholder="Select a contact" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2846,7 +2846,7 @@ export default function PipelinePage() {
                     value={contactRole}
                     onChange={(e) => setContactRole(e.target.value)}
                     placeholder="Role (e.g., Decision Maker, Technical Lead)"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -2874,7 +2874,7 @@ export default function PipelinePage() {
                     value={newContactForm.name}
                     onChange={(e) => setNewContactForm({ ...newContactForm, name: e.target.value })}
                     placeholder="Contact name *"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <Input
@@ -2882,20 +2882,20 @@ export default function PipelinePage() {
                       value={newContactForm.email || ''}
                       onChange={(e) => setNewContactForm({ ...newContactForm, email: e.target.value })}
                       placeholder="Email"
-                      className="auth-input"
+                      className="focus-brand"
                     />
                     <Input
                       value={newContactForm.telegram_id || ''}
                       onChange={(e) => setNewContactForm({ ...newContactForm, telegram_id: e.target.value })}
                       placeholder="Telegram @username"
-                      className="auth-input"
+                      className="focus-brand"
                     />
                   </div>
                   <Input
                     value={contactRole}
                     onChange={(e) => setContactRole(e.target.value)}
                     placeholder="Role (e.g., Decision Maker, Technical Lead)"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                   <div className="flex items-center space-x-2">
                     <Checkbox

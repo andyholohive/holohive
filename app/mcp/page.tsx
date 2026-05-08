@@ -424,7 +424,7 @@ function CopyButton({ value, variant = 'icon' }: { value: string; variant?: 'ico
     return (
       <button
         onClick={handleCopy}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-gray-200 bg-white text-gray-700 hover:border-[#3e8692] hover:text-[#3e8692] transition-colors"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-gray-200 bg-white text-gray-700 hover:border-brand hover:text-brand transition-colors"
         title="Copy to clipboard"
       >
         {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
@@ -435,7 +435,7 @@ function CopyButton({ value, variant = 'icon' }: { value: string; variant?: 'ico
   return (
     <button
       onClick={handleCopy}
-      className="opacity-0 group-hover:opacity-100 inline-flex items-center justify-center h-7 w-7 rounded-md text-gray-400 hover:bg-gray-100 hover:text-[#3e8692] transition-all shrink-0"
+      className="opacity-0 group-hover:opacity-100 inline-flex items-center justify-center h-7 w-7 rounded-md text-gray-400 hover:bg-gray-100 hover:text-brand transition-all shrink-0"
       title="Copy to clipboard"
     >
       {copied ? <Check className="h-3.5 w-3.5 text-emerald-600 opacity-100" /> : <Copy className="h-3.5 w-3.5" />}
@@ -562,7 +562,7 @@ export default function McpGuidePage() {
       {/* ── Hero ───────────────────────────────────────────────────── */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-3">
-          <div className="h-12 w-12 rounded-2xl bg-[#3e8692] flex items-center justify-center">
+          <div className="h-12 w-12 rounded-2xl bg-brand flex items-center justify-center">
             <Bot className="h-6 w-6 text-white" />
           </div>
           <div>
@@ -578,18 +578,18 @@ export default function McpGuidePage() {
 
         {/* Cross-link to the analytics dashboard — same data, dashboard view */}
         <div className="mt-4 inline-flex items-center gap-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-          <BarChart3 className="h-3.5 w-3.5 text-[#3e8692]" />
+          <BarChart3 className="h-3.5 w-3.5 text-brand" />
           <span>Want a one-page snapshot instead of asking Claude?</span>
-          <a href="/analytics" className="text-[#3e8692] font-semibold hover:underline">
+          <a href="/analytics" className="text-brand font-semibold hover:underline">
             Open Analytics →
           </a>
         </div>
       </div>
 
       {/* ── Setup card ─────────────────────────────────────────────── */}
-      <div className="mb-10 rounded-2xl bg-gradient-to-br from-[#3e8692]/8 to-[#3e8692]/3 border border-[#3e8692]/20 p-6">
+      <div className="mb-10 rounded-2xl bg-gradient-to-br from-brand/8 to-brand/3 border border-brand/20 p-6">
         <div className="flex items-center gap-2 mb-4">
-          <span className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-[#3e8692] text-white text-xs font-bold">
+          <span className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-brand text-white text-xs font-bold">
             ⚡
           </span>
           <h3 className="text-base font-bold text-gray-900">Connect to Claude.ai (one-time setup)</h3>
@@ -603,7 +603,7 @@ export default function McpGuidePage() {
             <>You&rsquo;re done. Try one of the prompts below in any Claude chat.</>,
           ].map((line, i) => (
             <li key={i} className="flex items-start gap-3">
-              <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white border border-[#3e8692]/30 text-[#3e8692] text-xs font-bold shrink-0 mt-0.5">
+              <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white border border-brand/30 text-brand text-xs font-bold shrink-0 mt-0.5">
                 {i + 1}
               </span>
               <span className="text-sm text-gray-700 leading-relaxed pt-0.5">{line}</span>
@@ -634,7 +634,7 @@ export default function McpGuidePage() {
                 placeholder='Search tools or prompts (try "Korean exchange" or "follow-up")…'
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-10 text-sm auth-input"
+                className="pl-9 h-10 text-sm focus-brand"
               />
             </div>
             <span className="text-xs text-gray-500 shrink-0">
@@ -650,7 +650,7 @@ export default function McpGuidePage() {
               onClick={() => setActiveCategory('all')}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 activeCategory === 'all'
-                  ? 'bg-[#3e8692] text-white'
+                  ? 'bg-brand text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -680,7 +680,7 @@ export default function McpGuidePage() {
               onClick={() => setActiveCategory('combos')}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 activeCategory === 'combos'
-                  ? 'bg-[#3e8692]/10 text-[#3e8692] ring-1 ring-inset ring-[#3e8692]/30'
+                  ? 'bg-brand/10 text-brand ring-1 ring-inset ring-brand/30'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -697,8 +697,8 @@ export default function McpGuidePage() {
         // Combos view — multi-tool prompts
         <section className="space-y-4">
           <div className="flex items-center gap-3 mb-2">
-            <div className="h-10 w-10 rounded-xl bg-[#3e8692]/10 flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-[#3e8692]" />
+            <div className="h-10 w-10 rounded-xl bg-brand/10 flex items-center justify-center">
+              <Sparkles className="h-5 w-5 text-brand" />
             </div>
             <div>
               <h2 className="text-lg font-bold text-gray-900">Multi-tool combos</h2>
@@ -710,12 +710,12 @@ export default function McpGuidePage() {
           {COMBOS.map((c, i) => (
             <div key={i} className="bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-[#3e8692]" />
+                <Sparkles className="h-4 w-4 text-brand" />
                 <h3 className="text-base font-bold text-gray-900">{c.title}</h3>
               </div>
               <div className="px-5 py-4 bg-gray-50/40">
                 <div className="group flex items-start gap-2 mb-3 -mx-2 px-2 py-2 rounded-lg hover:bg-white transition-colors">
-                  <div className="w-0.5 self-stretch rounded-full bg-[#3e8692] opacity-50 shrink-0 my-0.5" />
+                  <div className="w-0.5 self-stretch rounded-full bg-brand opacity-50 shrink-0 my-0.5" />
                   <p className="text-[13.5px] text-gray-800 leading-relaxed flex-1 italic">
                     &ldquo;{c.prompt}&rdquo;
                   </p>
@@ -752,13 +752,13 @@ export default function McpGuidePage() {
       {/* ── Pro tips ───────────────────────────────────────────────── */}
       <div className="mt-12 rounded-2xl bg-gradient-to-br from-gray-50 to-white border border-gray-200 p-6">
         <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="h-4 w-4 text-[#3e8692]" />
+          <Sparkles className="h-4 w-4 text-brand" />
           <h3 className="text-base font-bold text-gray-900">Pro tips</h3>
         </div>
         <ul className="space-y-3">
           {PRO_TIPS.map((tip, i) => (
             <li key={i} className="flex items-start gap-3">
-              <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[#3e8692]/10 text-[#3e8692] text-[10px] font-bold shrink-0 mt-0.5">
+              <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-brand/10 text-brand text-[10px] font-bold shrink-0 mt-0.5">
                 {i + 1}
               </span>
               <span className="text-sm text-gray-700 leading-relaxed">{tip}</span>

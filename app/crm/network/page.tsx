@@ -15,6 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { KpiCard } from '@/components/ui/kpi-card';
 import {
   Plus, Search, Edit, Trash2, Users, Handshake,
   Building2, Mail, MoreHorizontal, History, X, Link as LinkIcon, ArrowRight, MessageSquare,
@@ -980,21 +981,22 @@ export default function NetworkPage() {
   if (loading) {
     return (
       <div className="flex flex-col h-full gap-6">
-        {/* Header skeleton */}
+        {/* Header — real title/subtitle render immediately. */}
         <div className="flex items-center justify-between">
           <div>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-4 w-56" />
+            <h2 className="text-2xl font-bold text-gray-900">Network</h2>
+            <p className="text-gray-600">Manage your partners and affiliates</p>
           </div>
           <div className="flex items-center gap-4">
             <Skeleton className="h-10 w-64" />
             <Skeleton className="h-10 w-32" />
           </div>
         </div>
-        {/* Stats cards skeleton */}
+        {/* Stats cards skeleton — rounded-xl matches the loaded
+            KpiCard radius (audit 2026-05-06; was rounded-lg). */}
         <div className="grid grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-lg" />
+            <Skeleton key={i} className="h-24 rounded-xl" />
           ))}
         </div>
         {/* Filters skeleton */}
@@ -1034,7 +1036,7 @@ export default function NetworkPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search..."
-              className="pl-10 w-64 auth-input"
+              className="pl-10 w-64 focus-brand"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -1071,60 +1073,36 @@ export default function NetworkPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards — flat KpiCard baseline (was 4 ad-hoc gradient cards
+          before 2026-05-06; replaced for visual consistency with /analytics
+          and /crm/contacts). Brand teal goes to the most operationally
+          interesting metric (Active Partners); other tones differentiate
+          partner vs affiliate categories without inventing new colors. */}
       <div className="grid grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-100">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-600">Active Partners</p>
-                <p className="text-2xl font-bold text-gray-900">{partners.filter(p => p.status === 'active').length}</p>
-              </div>
-              <div className="p-2.5 bg-blue-100 rounded-lg">
-                <Handshake className="h-5 w-5 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-gray-50 to-white border-gray-100">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Partners</p>
-                <p className="text-2xl font-bold text-gray-900">{partners.length}</p>
-              </div>
-              <div className="p-2.5 bg-gray-100 rounded-lg">
-                <Building2 className="h-5 w-5 text-gray-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-100">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-600">Active Affiliates</p>
-                <p className="text-2xl font-bold text-gray-900">{affiliates.filter(a => a.status === 'active').length}</p>
-              </div>
-              <div className="p-2.5 bg-purple-100 rounded-lg">
-                <Users className="h-5 w-5 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-green-50 to-white border-green-100">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600">Total Affiliates</p>
-                <p className="text-2xl font-bold text-gray-900">{affiliates.length}</p>
-              </div>
-              <div className="p-2.5 bg-green-100 rounded-lg">
-                <Users className="h-5 w-5 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <KpiCard
+          icon={Handshake}
+          label="Active Partners"
+          value={partners.filter(p => p.status === 'active').length}
+          accent="brand"
+        />
+        <KpiCard
+          icon={Building2}
+          label="Total Partners"
+          value={partners.length}
+          accent="gray"
+        />
+        <KpiCard
+          icon={Users}
+          label="Active Affiliates"
+          value={affiliates.filter(a => a.status === 'active').length}
+          accent="purple"
+        />
+        <KpiCard
+          icon={Users}
+          label="Total Affiliates"
+          value={affiliates.length}
+          accent="emerald"
+        />
       </div>
 
       {/* Filters and Sort */}
@@ -1136,7 +1114,7 @@ export default function NetworkPage() {
         {activeTab === 'partners' && (
           <>
             <Select value={filterPartnerStatus} onValueChange={setFilterPartnerStatus}>
-              <SelectTrigger className="w-36 h-9 text-sm auth-input">
+              <SelectTrigger className="w-36 h-9 text-sm focus-brand">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -1146,7 +1124,7 @@ export default function NetworkPage() {
               </SelectContent>
             </Select>
             <Select value={filterPartnerCategory} onValueChange={setFilterPartnerCategory}>
-              <SelectTrigger className="w-40 h-9 text-sm auth-input">
+              <SelectTrigger className="w-40 h-9 text-sm focus-brand">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
@@ -1161,7 +1139,7 @@ export default function NetworkPage() {
         )}
         {activeTab === 'affiliates' && (
           <Select value={filterAffiliateStatus} onValueChange={setFilterAffiliateStatus}>
-            <SelectTrigger className="w-36 h-9 text-sm auth-input">
+            <SelectTrigger className="w-36 h-9 text-sm focus-brand">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -1178,7 +1156,7 @@ export default function NetworkPage() {
           <span className="text-sm text-gray-600">Sort:</span>
         </div>
         <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-40 h-9 text-sm auth-input">
+          <SelectTrigger className="w-40 h-9 text-sm focus-brand">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
           <SelectContent>
@@ -1266,7 +1244,7 @@ export default function NetworkPage() {
                 <div className="min-w-[120px] flex flex-col">
                   <span className="text-xs text-gray-600 font-semibold mb-1">Status</span>
                   <Select value={bulkPartnerEdit.status || ''} onValueChange={(v) => setBulkPartnerEdit(prev => ({ ...prev, status: v as PartnerStatus }))}>
-                    <SelectTrigger className="h-8 text-xs auth-input">
+                    <SelectTrigger className="h-8 text-xs focus-brand">
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1278,8 +1256,8 @@ export default function NetworkPage() {
                 {/* Category */}
                 <div className="min-w-[140px] flex flex-col">
                   <span className="text-xs text-gray-600 font-semibold mb-1">Category</span>
-                  <Select value={bulkPartnerEdit.category || ''} onValueChange={(v) => setBulkPartnerEdit(prev => ({ ...prev, category: v === 'none' ? null : v }))}>
-                    <SelectTrigger className="h-8 text-xs auth-input">
+                  <Select value={bulkPartnerEdit.category || ''} onValueChange={(v) => setBulkPartnerEdit(prev => ({ ...prev, category: v === 'none' ? null : v }) as Partial<CRMPartner>)}>
+                    <SelectTrigger className="h-8 text-xs focus-brand">
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1294,7 +1272,7 @@ export default function NetworkPage() {
                 <div className="min-w-[140px] flex flex-col">
                   <span className="text-xs text-gray-600 font-semibold mb-1">Focus</span>
                   <Select value={bulkPartnerEdit.focus || ''} onValueChange={(v) => setBulkPartnerEdit(prev => ({ ...prev, focus: v === 'none' ? null : v }))}>
-                    <SelectTrigger className="h-8 text-xs auth-input">
+                    <SelectTrigger className="h-8 text-xs focus-brand">
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1311,7 +1289,7 @@ export default function NetworkPage() {
                 <div className="min-w-[140px] flex flex-col">
                   <span className="text-xs text-gray-600 font-semibold mb-1">Owner</span>
                   <Select value={bulkPartnerEdit.owner_id || ''} onValueChange={(v) => setBulkPartnerEdit(prev => ({ ...prev, owner_id: v === 'none' ? null : v }))}>
-                    <SelectTrigger className="h-8 text-xs auth-input">
+                    <SelectTrigger className="h-8 text-xs focus-brand">
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1431,7 +1409,7 @@ export default function NetworkPage() {
                                 onChange={(e) => setEditingValue(e.target.value)}
                                 onBlur={() => handlePartnerInlineUpdate(partner.id, 'name', editingValue)}
                                 onKeyDown={(e) => handleKeyDown(e, partner.id, 'name', 'partner')}
-                                className="h-8 text-sm font-medium auth-input"
+                                className="h-8 text-sm font-medium focus-brand"
                                 autoFocus
                               />
                             ) : (
@@ -1463,7 +1441,7 @@ export default function NetworkPage() {
                               value={partner.category || 'none'}
                               onValueChange={(v) => handlePartnerInlineUpdate(partner.id, 'category', v === 'none' ? null : v)}
                             >
-                              <SelectTrigger className="w-36 h-8 text-xs auth-input capitalize">
+                              <SelectTrigger className="w-36 h-8 text-xs focus-brand capitalize">
                                 <SelectValue placeholder="Select">
                                   {partner.category ? formatCategory(partner.category) : <span className="text-gray-400">-</span>}
                                 </SelectValue>
@@ -1481,7 +1459,7 @@ export default function NetworkPage() {
                               value={partner.focus || 'none'}
                               onValueChange={(v) => handlePartnerInlineUpdate(partner.id, 'focus', v === 'none' ? null : v)}
                             >
-                              <SelectTrigger className="w-32 h-8 text-xs auth-input">
+                              <SelectTrigger className="w-32 h-8 text-xs focus-brand">
                                 <SelectValue placeholder="Select">
                                   {partner.focus ? formatFocusLabel(partner.focus) : <span className="text-gray-400">-</span>}
                                 </SelectValue>
@@ -1501,7 +1479,7 @@ export default function NetworkPage() {
                               value={partner.owner_id || 'none'}
                               onValueChange={(v) => handlePartnerInlineUpdate(partner.id, 'owner_id', v === 'none' ? null : v)}
                             >
-                              <SelectTrigger className="w-32 h-8 text-xs auth-input">
+                              <SelectTrigger className="w-32 h-8 text-xs focus-brand">
                                 <SelectValue placeholder="Select">
                                   {partner.owner_id ? (users.find(u => u.id === partner.owner_id)?.name || users.find(u => u.id === partner.owner_id)?.email || '-') : <span className="text-gray-400">-</span>}
                                 </SelectValue>
@@ -1783,7 +1761,7 @@ export default function NetworkPage() {
                 <div className="min-w-[120px] flex flex-col">
                   <span className="text-xs text-gray-600 font-semibold mb-1">Status</span>
                   <Select value={bulkAffiliateEdit.status || ''} onValueChange={(v) => setBulkAffiliateEdit(prev => ({ ...prev, status: v as AffiliateStatus }))}>
-                    <SelectTrigger className="h-8 text-xs auth-input">
+                    <SelectTrigger className="h-8 text-xs focus-brand">
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1797,7 +1775,7 @@ export default function NetworkPage() {
                 <div className="min-w-[140px] flex flex-col">
                   <span className="text-xs text-gray-600 font-semibold mb-1">Commission</span>
                   <Select value={bulkAffiliateEdit.commission_model || ''} onValueChange={(v) => setBulkAffiliateEdit(prev => ({ ...prev, commission_model: v === 'none' ? null : v }))}>
-                    <SelectTrigger className="h-8 text-xs auth-input">
+                    <SelectTrigger className="h-8 text-xs focus-brand">
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1812,7 +1790,7 @@ export default function NetworkPage() {
                 <div className="min-w-[140px] flex flex-col">
                   <span className="text-xs text-gray-600 font-semibold mb-1">Owner</span>
                   <Select value={bulkAffiliateEdit.owner_id || ''} onValueChange={(v) => setBulkAffiliateEdit(prev => ({ ...prev, owner_id: v === 'none' ? null : v }))}>
-                    <SelectTrigger className="h-8 text-xs auth-input">
+                    <SelectTrigger className="h-8 text-xs focus-brand">
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1931,7 +1909,7 @@ export default function NetworkPage() {
                                 onChange={(e) => setEditingValue(e.target.value)}
                                 onBlur={() => handleAffiliateInlineUpdate(affiliate.id, 'name', editingValue)}
                                 onKeyDown={(e) => handleKeyDown(e, affiliate.id, 'name', 'affiliate')}
-                                className="h-8 text-sm font-medium auth-input"
+                                className="h-8 text-sm font-medium focus-brand"
                                 autoFocus
                               />
                             ) : (
@@ -1964,7 +1942,7 @@ export default function NetworkPage() {
                               value={affiliate.category || 'none'}
                               onValueChange={(v) => handleAffiliateInlineUpdate(affiliate.id, 'category', v === 'none' ? null : v)}
                             >
-                              <SelectTrigger className="w-40 h-8 text-xs auth-input">
+                              <SelectTrigger className="w-40 h-8 text-xs focus-brand">
                                 <SelectValue placeholder="Select">
                                   {affiliate.category ? (
                                     affiliate.category === 'service_provider' ? 'Service Provider' :
@@ -1987,7 +1965,7 @@ export default function NetworkPage() {
                               value={affiliate.affiliation || 'none'}
                               onValueChange={(v) => handleAffiliateInlineUpdate(affiliate.id, 'affiliation', v === 'none' ? null : v)}
                             >
-                              <SelectTrigger className="w-36 h-8 text-xs auth-input">
+                              <SelectTrigger className="w-36 h-8 text-xs focus-brand">
                                 <SelectValue placeholder="Select">
                                   {affiliate.affiliation ? formatAffiliation(affiliate.affiliation) : <span className="text-gray-400">-</span>}
                                 </SelectValue>
@@ -2005,7 +1983,7 @@ export default function NetworkPage() {
                               value={affiliate.owner_id || 'none'}
                               onValueChange={(v) => handleAffiliateInlineUpdate(affiliate.id, 'owner_id', v === 'none' ? null : v)}
                             >
-                              <SelectTrigger className="w-32 h-8 text-xs auth-input">
+                              <SelectTrigger className="w-32 h-8 text-xs focus-brand">
                                 <SelectValue placeholder="Select">
                                   {affiliate.owner_id ? (users.find(u => u.id === affiliate.owner_id)?.name || users.find(u => u.id === affiliate.owner_id)?.email || '-') : <span className="text-gray-400">-</span>}
                                 </SelectValue>
@@ -2251,7 +2229,7 @@ export default function NetworkPage() {
                   value={partnerForm.name}
                   onChange={(e) => setPartnerForm({ ...partnerForm, name: e.target.value })}
                   placeholder="Partner name"
-                  className="auth-input"
+                  className="focus-brand"
                   required
                 />
               </div>
@@ -2262,7 +2240,7 @@ export default function NetworkPage() {
                     value={partnerForm.category || ''}
                     onValueChange={(v) => setPartnerForm({ ...partnerForm, category: v as any })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2278,7 +2256,7 @@ export default function NetworkPage() {
                     value={partnerForm.status}
                     onValueChange={(v) => setPartnerForm({ ...partnerForm, status: v as any })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -2294,7 +2272,7 @@ export default function NetworkPage() {
                   value={partnerForm.focus || 'none'}
                   onValueChange={(v) => setPartnerForm({ ...partnerForm, focus: v === 'none' ? undefined : v })}
                 >
-                  <SelectTrigger className="auth-input">
+                  <SelectTrigger className="focus-brand">
                     <SelectValue placeholder="Select focus area" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2314,7 +2292,7 @@ export default function NetworkPage() {
                   value={partnerForm.owner_id || 'none'}
                   onValueChange={(v) => setPartnerForm({ ...partnerForm, owner_id: v === 'none' ? undefined : v })}
                 >
-                  <SelectTrigger className="auth-input">
+                  <SelectTrigger className="focus-brand">
                     <SelectValue placeholder="Select owner" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2365,7 +2343,7 @@ export default function NetworkPage() {
                       is_affiliate: v !== 'none'
                     })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue placeholder="Select affiliate (optional)" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2383,13 +2361,13 @@ export default function NetworkPage() {
                       value={newAffiliateInPartnerDialog.name}
                       onChange={(e) => setNewAffiliateInPartnerDialog({ ...newAffiliateInPartnerDialog, name: e.target.value })}
                       placeholder="Affiliate name *"
-                      className="auth-input"
+                      className="focus-brand"
                     />
                     <Select
                       value={newAffiliateInPartnerDialog.commission_model || ''}
                       onValueChange={(value) => setNewAffiliateInPartnerDialog({ ...newAffiliateInPartnerDialog, commission_model: value })}
                     >
-                      <SelectTrigger className="auth-input">
+                      <SelectTrigger className="focus-brand">
                         <SelectValue placeholder="Commission model" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2447,7 +2425,7 @@ export default function NetworkPage() {
                       value={selectedContactInPartnerDialog || 'none'}
                       onValueChange={(v) => setSelectedContactInPartnerDialog(v === 'none' ? '' : v)}
                     >
-                      <SelectTrigger className="auth-input">
+                      <SelectTrigger className="focus-brand">
                         <SelectValue placeholder="Select a contact" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2463,7 +2441,7 @@ export default function NetworkPage() {
                       value={contactRoleInPartnerDialog}
                       onChange={(e) => setContactRoleInPartnerDialog(e.target.value)}
                       placeholder="Role (e.g., Account Manager)"
-                      className="auth-input"
+                      className="focus-brand"
                     />
                     <div className="flex items-center space-x-2">
                       <Checkbox
@@ -2484,7 +2462,7 @@ export default function NetworkPage() {
                       value={newContactInPartnerDialog.name}
                       onChange={(e) => setNewContactInPartnerDialog({ ...newContactInPartnerDialog, name: e.target.value })}
                       placeholder="Contact name *"
-                      className="auth-input"
+                      className="focus-brand"
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <Input
@@ -2492,20 +2470,20 @@ export default function NetworkPage() {
                         value={newContactInPartnerDialog.email || ''}
                         onChange={(e) => setNewContactInPartnerDialog({ ...newContactInPartnerDialog, email: e.target.value })}
                         placeholder="Email"
-                        className="auth-input"
+                        className="focus-brand"
                       />
                       <Input
                         value={newContactInPartnerDialog.telegram_id || ''}
                         onChange={(e) => setNewContactInPartnerDialog({ ...newContactInPartnerDialog, telegram_id: e.target.value })}
                         placeholder="Telegram @username"
-                        className="auth-input"
+                        className="focus-brand"
                       />
                     </div>
                     <Input
                       value={contactRoleInPartnerDialog}
                       onChange={(e) => setContactRoleInPartnerDialog(e.target.value)}
                       placeholder="Role (e.g., Account Manager)"
-                      className="auth-input"
+                      className="focus-brand"
                     />
                     <div className="flex items-center space-x-2">
                       <Checkbox
@@ -2527,7 +2505,7 @@ export default function NetworkPage() {
                   value={partnerForm.notes || ''}
                   onChange={(e) => setPartnerForm({ ...partnerForm, notes: e.target.value })}
                   placeholder="Additional notes..."
-                  className="auth-input"
+                  className="focus-brand"
                   rows={3}
                 />
               </div>
@@ -2567,7 +2545,7 @@ export default function NetworkPage() {
                   value={affiliateForm.name}
                   onChange={(e) => setAffiliateForm({ ...affiliateForm, name: e.target.value })}
                   placeholder="Affiliate name"
-                  className="auth-input"
+                  className="focus-brand"
                   required
                 />
               </div>
@@ -2578,7 +2556,7 @@ export default function NetworkPage() {
                     value={affiliateForm.affiliation || 'none'}
                     onValueChange={(v) => setAffiliateForm({ ...affiliateForm, affiliation: v === 'none' ? undefined : v })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue placeholder="Select affiliation" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2595,7 +2573,7 @@ export default function NetworkPage() {
                     value={affiliateForm.status}
                     onValueChange={(v) => setAffiliateForm({ ...affiliateForm, status: v as any })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -2612,7 +2590,7 @@ export default function NetworkPage() {
                   value={affiliateForm.category || 'none'}
                   onValueChange={(v) => setAffiliateForm({ ...affiliateForm, category: v === 'none' ? undefined : v })}
                 >
-                  <SelectTrigger className="auth-input">
+                  <SelectTrigger className="focus-brand">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2629,7 +2607,7 @@ export default function NetworkPage() {
                   value={affiliateForm.owner_id || 'none'}
                   onValueChange={(v) => setAffiliateForm({ ...affiliateForm, owner_id: v === 'none' ? undefined : v })}
                 >
-                  <SelectTrigger className="auth-input">
+                  <SelectTrigger className="focus-brand">
                     <SelectValue placeholder="Select owner" />
                   </SelectTrigger>
                   <SelectContent>
@@ -2651,7 +2629,7 @@ export default function NetworkPage() {
                       value={affiliateForm.commission_model || 'none'}
                       onValueChange={(v) => setAffiliateForm({ ...affiliateForm, commission_model: v === 'none' ? undefined : v })}
                     >
-                      <SelectTrigger className="auth-input">
+                      <SelectTrigger className="focus-brand">
                         <SelectValue placeholder="Select model" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2668,7 +2646,7 @@ export default function NetworkPage() {
                       value={affiliateForm.terms_of_interest || 'none'}
                       onValueChange={(v) => setAffiliateForm({ ...affiliateForm, terms_of_interest: v === 'none' ? undefined : v })}
                     >
-                      <SelectTrigger className="auth-input">
+                      <SelectTrigger className="focus-brand">
                         <SelectValue placeholder="Select terms" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2688,7 +2666,7 @@ export default function NetworkPage() {
                   value={affiliateForm.notes || ''}
                   onChange={(e) => setAffiliateForm({ ...affiliateForm, notes: e.target.value })}
                   placeholder="Additional notes..."
-                  className="auth-input"
+                  className="focus-brand"
                   rows={3}
                 />
               </div>
@@ -2792,7 +2770,7 @@ export default function NetworkPage() {
                     value={selectedContactId}
                     onValueChange={setSelectedContactId}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue placeholder="Select a contact" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2809,7 +2787,7 @@ export default function NetworkPage() {
                     value={contactRole}
                     onChange={(e) => setContactRole(e.target.value)}
                     placeholder="Role (e.g., Account Manager, BD Lead)"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -2837,7 +2815,7 @@ export default function NetworkPage() {
                     value={newContactForm.name}
                     onChange={(e) => setNewContactForm({ ...newContactForm, name: e.target.value })}
                     placeholder="Contact name *"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <Input
@@ -2845,20 +2823,20 @@ export default function NetworkPage() {
                       value={newContactForm.email || ''}
                       onChange={(e) => setNewContactForm({ ...newContactForm, email: e.target.value })}
                       placeholder="Email"
-                      className="auth-input"
+                      className="focus-brand"
                     />
                     <Input
                       value={newContactForm.telegram_id || ''}
                       onChange={(e) => setNewContactForm({ ...newContactForm, telegram_id: e.target.value })}
                       placeholder="Telegram @username"
-                      className="auth-input"
+                      className="focus-brand"
                     />
                   </div>
                   <Input
                     value={contactRole}
                     onChange={(e) => setContactRole(e.target.value)}
                     placeholder="Role (e.g., Account Manager, BD Lead)"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -2967,7 +2945,7 @@ export default function NetworkPage() {
                     value={selectedAffiliateForPartner}
                     onValueChange={setSelectedAffiliateForPartner}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue placeholder="Select an affiliate" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2994,13 +2972,13 @@ export default function NetworkPage() {
                     value={newAffiliateFormForPartner.name}
                     onChange={(e) => setNewAffiliateFormForPartner({ ...newAffiliateFormForPartner, name: e.target.value })}
                     placeholder="Affiliate name *"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                   <Select
                     value={newAffiliateFormForPartner.commission_model || ''}
                     onValueChange={(value) => setNewAffiliateFormForPartner({ ...newAffiliateFormForPartner, commission_model: value })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue placeholder="Commission model" />
                     </SelectTrigger>
                     <SelectContent>
@@ -3013,7 +2991,7 @@ export default function NetworkPage() {
                     value={newAffiliateFormForPartner.notes || ''}
                     onChange={(e) => setNewAffiliateFormForPartner({ ...newAffiliateFormForPartner, notes: e.target.value })}
                     placeholder="Notes"
-                    className="auth-input"
+                    className="focus-brand"
                     rows={2}
                   />
                   <Button
@@ -3119,7 +3097,7 @@ export default function NetworkPage() {
                     value={selectedContactId}
                     onValueChange={setSelectedContactId}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue placeholder="Select a contact" />
                     </SelectTrigger>
                     <SelectContent>
@@ -3136,7 +3114,7 @@ export default function NetworkPage() {
                     value={contactRole}
                     onChange={(e) => setContactRole(e.target.value)}
                     placeholder="Role (e.g., Account Manager, Point of Contact)"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -3164,7 +3142,7 @@ export default function NetworkPage() {
                     value={newContactForm.name}
                     onChange={(e) => setNewContactForm({ ...newContactForm, name: e.target.value })}
                     placeholder="Contact name *"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <Input
@@ -3172,20 +3150,20 @@ export default function NetworkPage() {
                       value={newContactForm.email || ''}
                       onChange={(e) => setNewContactForm({ ...newContactForm, email: e.target.value })}
                       placeholder="Email"
-                      className="auth-input"
+                      className="focus-brand"
                     />
                     <Input
                       value={newContactForm.telegram_id || ''}
                       onChange={(e) => setNewContactForm({ ...newContactForm, telegram_id: e.target.value })}
                       placeholder="Telegram @username"
-                      className="auth-input"
+                      className="focus-brand"
                     />
                   </div>
                   <Input
                     value={contactRole}
                     onChange={(e) => setContactRole(e.target.value)}
                     placeholder="Role (e.g., Account Manager, Point of Contact)"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                   <div className="flex items-center space-x-2">
                     <Checkbox

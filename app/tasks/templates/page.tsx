@@ -240,7 +240,7 @@ export default function TemplatesPage() {
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="e.g., Monthly Client Report"
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -250,7 +250,7 @@ export default function TemplatesPage() {
                 value={form.task_name_template}
                 onChange={(e) => setForm({ ...form, task_name_template: e.target.value })}
                 placeholder="e.g., Prepare {{client_name}} monthly report"
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -261,7 +261,7 @@ export default function TemplatesPage() {
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="Optional description..."
                 rows={3}
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -269,7 +269,7 @@ export default function TemplatesPage() {
               <div className="grid gap-2">
                 <Label className="text-xs">Task Type</Label>
                 <Select value={form.task_type} onValueChange={(v) => setForm({ ...form, task_type: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {TASK_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
@@ -279,7 +279,7 @@ export default function TemplatesPage() {
               <div className="grid gap-2">
                 <Label className="text-xs">Frequency</Label>
                 <Select value={form.frequency} onValueChange={(v) => setForm({ ...form, frequency: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {FREQUENCIES.map(f => <SelectItem key={f} value={f}>{FREQUENCY_LABELS[f]}</SelectItem>)}
                   </SelectContent>
@@ -289,7 +289,7 @@ export default function TemplatesPage() {
               <div className="grid gap-2">
                 <Label className="text-xs">Priority</Label>
                 <Select value={form.priority} onValueChange={(v) => setForm({ ...form, priority: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {PRIORITIES.map(p => <SelectItem key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</SelectItem>)}
                   </SelectContent>

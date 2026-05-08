@@ -74,7 +74,7 @@ export function RecurringConfigEditor({ value, onChange }: RecurringConfigProps)
         <div className="grid gap-1">
           <Label className="text-xs text-gray-600">Frequency</Label>
           <Select value={value.frequency} onValueChange={(v) => update({ frequency: v as any })}>
-            <SelectTrigger className="auth-input">
+            <SelectTrigger className="focus-brand">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -93,7 +93,7 @@ export function RecurringConfigEditor({ value, onChange }: RecurringConfigProps)
               value={value.day_of_week?.toString() ?? ''}
               onValueChange={(v) => update({ day_of_week: parseInt(v) })}
             >
-              <SelectTrigger className="auth-input">
+              <SelectTrigger className="focus-brand">
                 <SelectValue placeholder="Any" />
               </SelectTrigger>
               <SelectContent>
@@ -115,7 +115,7 @@ export function RecurringConfigEditor({ value, onChange }: RecurringConfigProps)
               max={31}
               value={value.day_of_month || ''}
               onChange={(e) => update({ day_of_month: parseInt(e.target.value) || undefined })}
-              className="auth-input"
+              className="focus-brand"
               placeholder="1-31"
             />
           </div>
@@ -129,7 +129,7 @@ export function RecurringConfigEditor({ value, onChange }: RecurringConfigProps)
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="auth-input justify-start text-left font-normal"
+              className="focus-brand justify-start text-left font-normal"
               style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: endDate ? '#111827' : '#9ca3af' }}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />

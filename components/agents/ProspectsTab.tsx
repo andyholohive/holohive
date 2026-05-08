@@ -169,7 +169,7 @@ function KoreaScoreCard({ prospectId, score, signalCount }: { prospectId: string
                             href={s.source_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[10px] text-[#3e8692] hover:underline flex items-center gap-0.5"
+                            className="text-[10px] text-brand hover:underline flex items-center gap-0.5"
                             onClick={e => e.stopPropagation()}
                           >
                             Source <ExternalLink className="w-2.5 h-2.5" />
@@ -497,7 +497,7 @@ export default function ProspectsTab() {
     if (!url) return null;
     return (
       <a href={url} target="_blank" rel="noopener noreferrer" title={label}
-         className="text-gray-400 hover:text-[#3e8692] transition-colors"
+         className="text-gray-400 hover:text-brand transition-colors"
          onClick={e => e.stopPropagation()}>
         <Icon className="w-3.5 h-3.5" />
       </a>
@@ -603,18 +603,18 @@ export default function ProspectsTab() {
           <Input
             placeholder="Search prospects..."
             onChange={e => handleSearch(e.target.value)}
-            className="pl-9 h-9 text-sm auth-input"
+            className="pl-9 h-9 text-sm focus-brand"
           />
         </div>
         <Select value={categoryFilter || 'all'} onValueChange={v => { setCategoryFilter(v === 'all' ? '' : v); setPage(1); setSelected([]); }}>
-          <SelectTrigger className="h-9 w-auto text-sm auth-input [&>span]:truncate-none [&>span]:line-clamp-none"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-9 w-auto text-sm focus-brand [&>span]:truncate-none [&>span]:line-clamp-none"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
             {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={sortBy} onValueChange={v => { setSortBy(v); setPage(1); }}>
-          <SelectTrigger className="h-9 w-auto text-sm auth-input [&>span]:truncate-none [&>span]:line-clamp-none"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-9 w-auto text-sm focus-brand [&>span]:truncate-none [&>span]:line-clamp-none"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="icp_score">ICP Score</SelectItem>
             <SelectItem value="korea_relevancy_score">Korea Relevancy</SelectItem>
@@ -798,7 +798,7 @@ export default function ProspectsTab() {
                         <LinkIcon url={p.telegram_url} icon={() => <span className="text-xs">TG</span>} label="Telegram" />
                         {p.source_url && (
                           <a href={p.source_url} target="_blank" rel="noopener noreferrer" title="View on DropsTab"
-                             className="text-gray-400 hover:text-[#3e8692]" onClick={e => e.stopPropagation()}>
+                             className="text-gray-400 hover:text-brand" onClick={e => e.stopPropagation()}>
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
                         )}
@@ -981,7 +981,7 @@ export default function ProspectsTab() {
                   {DROPSTAB_TABS.map(t => (
                     <label
                       key={t.value}
-                      className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md cursor-pointer hover:bg-gray-50 ${scraperTabs.includes(t.value) ? 'bg-[#3e8692]/5' : ''}`}
+                      className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md cursor-pointer hover:bg-gray-50 ${scraperTabs.includes(t.value) ? 'bg-brand/5' : ''}`}
                     >
                       <Checkbox
                         checked={scraperTabs.includes(t.value)}
@@ -990,7 +990,7 @@ export default function ProspectsTab() {
                           else setScraperTabs(prev => prev.filter(v => v !== t.value));
                         }}
                         disabled={scraperRunning}
-                        className="data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]"
+                        className="data-[state=checked]:bg-brand data-[state=checked]:border-brand"
                       />
                       <span className="text-sm flex-1">{t.label}</span>
                       <span className="text-xs text-gray-400">{t.description}</span>
@@ -1009,7 +1009,7 @@ export default function ProspectsTab() {
               <div className="grid gap-2">
                 <Label>Category <span className="font-normal text-gray-400">(optional)</span></Label>
                 <Select value={scraperCategory} onValueChange={setScraperCategory} disabled={scraperRunning}>
-                  <SelectTrigger className="auth-input [&>span]:truncate-none [&>span]:line-clamp-none"><SelectValue placeholder="All Coins" /></SelectTrigger>
+                  <SelectTrigger className="focus-brand [&>span]:truncate-none [&>span]:line-clamp-none"><SelectValue placeholder="All Coins" /></SelectTrigger>
                   <SelectContent>
                     {COINGECKO_CATEGORIES.map(c => <SelectItem key={c.value || 'all'} value={c.value || 'all-coins'}>{c.label}</SelectItem>)}
                   </SelectContent>
@@ -1022,7 +1022,7 @@ export default function ProspectsTab() {
               <div className="grid gap-2">
                 <Label>Category <span className="font-normal text-gray-400">(optional)</span></Label>
                 <Select value={scraperCategory} onValueChange={setScraperCategory} disabled={scraperRunning}>
-                  <SelectTrigger className="auth-input [&>span]:truncate-none [&>span]:line-clamp-none"><SelectValue placeholder="All Protocols" /></SelectTrigger>
+                  <SelectTrigger className="focus-brand [&>span]:truncate-none [&>span]:line-clamp-none"><SelectValue placeholder="All Protocols" /></SelectTrigger>
                   <SelectContent>
                     {DEFILLAMA_CATEGORIES.map(c => <SelectItem key={c.value || 'all'} value={c.value || 'all-protocols'}>{c.label}</SelectItem>)}
                   </SelectContent>
@@ -1037,7 +1037,7 @@ export default function ProspectsTab() {
                 type="number"
                 value={scraperCount}
                 onChange={e => setScraperCount(e.target.value)}
-                className="auth-input"
+                className="focus-brand"
                 disabled={scraperRunning}
                 max={scraperSource === 'dropstab' ? 100 : undefined}
               />
@@ -1051,7 +1051,7 @@ export default function ProspectsTab() {
                   checked={scraperWithLinks}
                   onCheckedChange={(v) => setScraperWithLinks(v === true)}
                   disabled={scraperRunning}
-                  className="data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]"
+                  className="data-[state=checked]:bg-brand data-[state=checked]:border-brand"
                 />
                 <Label htmlFor="withLinks" className="text-sm text-gray-600 cursor-pointer font-normal">
                   Fetch social links (slower — visits each project page)

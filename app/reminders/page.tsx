@@ -30,6 +30,7 @@ const RULE_TYPES: Record<string, { label: string; description: string }> = {
   payment_reminder: { label: 'Payment Reminder', description: 'Unpaid payments for published content' },
   new_kol_no_gc: { label: 'New KOL - No GC', description: 'New KOLs without group chat connected' },
   new_crm_no_gc: { label: 'New CRM Opp - No GC', description: 'New CRM opps without group chat' },
+  google_meeting_reminder: { label: 'Google Meeting Reminders', description: 'DM each connected user before their Google Meet calls' },
 };
 
 const SCHEDULE_TYPES: Record<string, { label: string; description: string }> = {
@@ -52,6 +53,7 @@ const RULE_EMOJI: Record<string, string> = {
   payment_reminder: '\u{1F4B0}',
   new_kol_no_gc: '\u{1F517}',
   new_crm_no_gc: '\u{1F517}',
+  google_meeting_reminder: '\u{1F4F9}',
 };
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -272,7 +274,7 @@ export default function RemindersPage() {
             <Label>Threshold (days)</Label>
             <Input
               type="number"
-              className="auth-input"
+              className="focus-brand"
               value={params.threshold_days ?? 90}
               onChange={(e) => setParam('threshold_days', parseInt(e.target.value) || 90)}
             />
@@ -285,7 +287,7 @@ export default function RemindersPage() {
             <Label>Advance notice (days)</Label>
             <Input
               type="number"
-              className="auth-input"
+              className="focus-brand"
               value={params.advance_days ?? 1}
               onChange={(e) => setParam('advance_days', parseInt(e.target.value) || 1)}
             />
@@ -298,7 +300,7 @@ export default function RemindersPage() {
             <Label>Threshold (days)</Label>
             <Input
               type="number"
-              className="auth-input"
+              className="focus-brand"
               value={params.threshold_days ?? 14}
               onChange={(e) => setParam('threshold_days', parseInt(e.target.value) || 14)}
             />
@@ -328,7 +330,7 @@ export default function RemindersPage() {
             <Label>Threshold (days)</Label>
             <Input
               type="number"
-              className="auth-input"
+              className="focus-brand"
               value={params.threshold_days ?? 7}
               onChange={(e) => setParam('threshold_days', parseInt(e.target.value) || 7)}
             />
@@ -341,7 +343,7 @@ export default function RemindersPage() {
             <Label>Follow-up threshold (days)</Label>
             <Input
               type="number"
-              className="auth-input"
+              className="focus-brand"
               value={params.threshold_days ?? 7}
               onChange={(e) => setParam('threshold_days', parseInt(e.target.value) || 7)}
             />
@@ -353,7 +355,7 @@ export default function RemindersPage() {
           <div>
             <Label>Exclude campaign patterns</Label>
             <Input
-              className="auth-input"
+              className="focus-brand"
               value={(params.exclude_campaign_patterns || []).join(', ')}
               onChange={(e) => setParam('exclude_campaign_patterns', e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean))}
             />
@@ -367,7 +369,7 @@ export default function RemindersPage() {
             <Label>Lookback (days)</Label>
             <Input
               type="number"
-              className="auth-input"
+              className="focus-brand"
               value={params.lookback_days ?? 7}
               onChange={(e) => setParam('lookback_days', parseInt(e.target.value) || 7)}
             />
@@ -378,6 +380,85 @@ export default function RemindersPage() {
         return (
           <p className="text-sm text-gray-500">This rule is event-driven. It routes form submission notifications to the configured chatroom.</p>
         );
+      case 'google_meeting_reminder': {
+        // advance_minutes is an array of positive ints — render as a
+        // comma-separated string for the input, parse back on change.
+        // Strips zero/negative values; "0 (at start)" is controlled by
+        // the send_at_start switch below to avoid two ways to express it.
+        const adv: number[] = Array.isArray(params.advance_minutes)
+          ? params.advance_minutes.filter((n: any) => typeof n === 'number' && n > 0)
+          : (typeof params.advance_minutes === 'number' && params.advance_minutes > 0
+              ? [params.advance_minutes]
+              : []);
+        const advText = adv.join(', ');
+
+        const lookahead = params.lookahead_minutes ?? 60;
+        const maxAdv = Math.max(...adv, 0);
+        const lookaheadTooSmall = maxAdv > 0 && lookahead < maxAdv + 5;
+
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label>Advance reminders (minutes before meeting)</Label>
+              <Input
+                className="focus-brand"
+                defaultValue={advText}
+                placeholder="e.g. 30, 10, 5"
+                onBlur={(e) => {
+                  // Parse on blur so the user can type freely without
+                  // each keystroke re-rendering the list.
+                  const parts = e.target.value
+                    .split(',')
+                    .map((s) => parseInt(s.trim(), 10))
+                    .filter((n) => Number.isFinite(n) && n > 0);
+                  // De-dup + sort descending (30 → 10 → 5 reads naturally).
+                  const unique = Array.from(new Set(parts)).sort((a, b) => b - a);
+                  setParam('advance_minutes', unique);
+                }}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Comma-separated list. Each entry sends one DM that many minutes before each Meet. Example: <code className="bg-gray-100 px-1 rounded">30, 10, 5</code> sends three DMs (30, 10, 5 min before).
+                {adv.length > 0 && (
+                  <> Currently configured: <span className="font-medium text-gray-700">{adv.map((n) => `${n} min`).join(', ')}</span>.</>
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={params.send_at_start !== false}
+                onCheckedChange={(v) => setParam('send_at_start', v)}
+              />
+              <div>
+                <Label className="text-sm">Also DM at meeting start</Label>
+                <p className="text-xs text-gray-500">Send an additional DM the moment the meeting begins.</p>
+              </div>
+            </div>
+            <div>
+              <Label>Lookahead window (minutes)</Label>
+              <Input
+                type="number"
+                className="focus-brand"
+                value={lookahead}
+                onChange={(e) => setParam('lookahead_minutes', parseInt(e.target.value) || 60)}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                How far ahead the cron looks at each user&apos;s calendar. Should be at least <strong>(largest advance + 5)</strong>.
+                {lookaheadTooSmall && (
+                  <span className="text-amber-700 font-medium"> Currently too small for your largest advance ({maxAdv} min) — bump to at least {maxAdv + 10}.</span>
+                )}
+              </p>
+            </div>
+            <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2">
+              <p className="text-xs text-amber-800">
+                <strong>Setup:</strong> This rule is event-driven and runs on a dedicated 5-minute cron, not the daily one. Each user must connect Google Calendar from their <a href="/settings" className="underline">Settings</a> page and have their Telegram DM linked on the <a href="/team" className="underline">Team</a> page.
+              </p>
+              <p className="text-xs text-amber-800 mt-1">
+                The <strong>Telegram Chat</strong> and <strong>Message Template</strong> fields below are unused for this rule — reminders are DM&apos;d to each connected user&apos;s own Telegram with a fixed format (event title + countdown + Join Meet link).
+              </p>
+            </div>
+          </div>
+        );
+      }
       default:
         return null;
     }
@@ -473,7 +554,7 @@ export default function RemindersPage() {
                     <h3 className="font-semibold text-gray-900 truncate">{rule.name}</h3>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Badge className={`pointer-events-none ${rule.is_active ? 'bg-[#e8f4f5] text-[#3e8692]' : 'bg-gray-100 text-gray-800'}`}>
+                    <Badge className={`pointer-events-none ${rule.is_active ? 'bg-brand-light text-brand' : 'bg-gray-100 text-gray-800'}`}>
                       {rule.is_active ? 'Active' : 'Disabled'}
                     </Badge>
                     <Switch
@@ -596,7 +677,7 @@ export default function RemindersPage() {
                 value={formData.name}
                 onChange={(e) => setFormData((f) => ({ ...f, name: e.target.value }))}
                 placeholder="KOL Stats Stale 90+ Days"
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -623,7 +704,7 @@ export default function RemindersPage() {
                 value={formData.description}
                 onChange={(e) => setFormData((f) => ({ ...f, description: e.target.value }))}
                 placeholder="Short description of what this reminder does"
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -657,7 +738,7 @@ export default function RemindersPage() {
                     value={formData.telegram_chat_id}
                     onChange={(e) => setFormData((f) => ({ ...f, telegram_chat_id: e.target.value }))}
                     placeholder="-100123456789"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 )}
               </div>
@@ -667,7 +748,7 @@ export default function RemindersPage() {
                   value={formData.telegram_thread_id}
                   onChange={(e) => setFormData((f) => ({ ...f, telegram_thread_id: e.target.value }))}
                   placeholder="12345"
-                  className="auth-input"
+                  className="focus-brand"
                 />
               </div>
             </div>
@@ -725,7 +806,7 @@ export default function RemindersPage() {
                       },
                     }))}
                     rows={2}
-                    className="auth-input font-mono text-xs"
+                    className="focus-brand font-mono text-xs"
                     placeholder="<b>{{emoji}} {{name}}</b>"
                   />
                 </div>
@@ -743,7 +824,7 @@ export default function RemindersPage() {
                         },
                       },
                     }))}
-                    className="auth-input font-mono text-xs"
+                    className="focus-brand font-mono text-xs"
                     placeholder="\u2022 {{label}} — {{detail}}"
                   />
                 </div>
@@ -761,7 +842,7 @@ export default function RemindersPage() {
                         },
                       },
                     }))}
-                    className="auth-input font-mono text-xs"
+                    className="focus-brand font-mono text-xs"
                     placeholder="Optional footer text"
                   />
                 </div>

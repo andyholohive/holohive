@@ -395,7 +395,32 @@ export default function DiscoveryPanel() {
   };
   const [lastScanResult, setLastScanResult] = useState<any>(null);
 
-  // Live progress (polled from /api/prospects/discovery/progress while scanning)
+  // Live progress (polled from /api/prospects/discovery/progress while scanning).
+  // `detail` is the rich block added 2026-05-05 — per-source counts, what got
+  // filtered out, and the rolling list of enriched projects as Stage 2 batches
+  // settle. See progress endpoint comments for the full shape.
+  type ScanDetail = {
+    sources?: {
+      per_source_counts?: Record<string, number>;
+      errors?: string[];
+      list?: string[];
+    };
+    filtered?: {
+      recent_skipped?: number;
+      crm_skipped_total?: number;
+      crm_filtered_names?: { items: string[]; truncated: number };
+      candidate_names?: { items: string[]; truncated: number };
+    };
+    enriched?: Array<{
+      name: string;
+      tier: string | null;
+      score: number | null;
+      poc_count: number;
+      icp_verdict: string | null;
+    }>;
+    tier_breakdown?: Record<string, number>;
+    batch_errors?: string[];
+  };
   const [scanProgress, setScanProgress] = useState<{
     stage: string | null;
     message: string | null;
@@ -403,7 +428,11 @@ export default function DiscoveryPanel() {
     candidates_found: number | null;
     batches_total: number | null;
     batches_complete: number | null;
+    detail?: ScanDetail | null;
   } | null>(null);
+  // Whether the user has expanded the "Show details" panel under the
+  // progress bar. Default collapsed so the dialog isn't tall by default.
+  const [progressDetailOpen, setProgressDetailOpen] = useState(false);
   const progressPollRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Defaults for Deep Dive runs (previously user-tunable via the batch
@@ -530,7 +559,12 @@ export default function DiscoveryPanel() {
         // Allow 5s grace because the server inserts the row after the POST arrives.
         const rowStartMs = data.started_at ? new Date(data.started_at).getTime() : 0;
         if (rowStartMs < scanStartedAt - 5000) return;
-        if (data.progress) setScanProgress(data.progress);
+        // Merge progress + detail. The progress endpoint sends them as
+        // sibling fields; we flatten so the UI can read them off one
+        // state object instead of plumbing two.
+        if (data.progress) {
+          setScanProgress({ ...data.progress, detail: data.detail ?? null });
+        }
         if (data.status === 'completed' || data.status === 'failed') {
           stopProgressPolling();
         }
@@ -577,14 +611,35 @@ export default function DiscoveryPanel() {
       const data = await res.json();
       setLastScanResult(data);
       stopProgressPolling();
-      setScanProgress({
-        stage: res.ok && !data.error ? 'done' : 'failed',
-        message: res.ok && !data.error ? 'Scan complete' : (data.error || 'Scan failed'),
-        percent: 100,
-        candidates_found: data.candidates_found ?? null,
-        batches_total: data.batches_run ?? null,
-        batches_complete: data.batches_run ?? null,
-      });
+      // One last fetch so the final detail block (with tier_breakdown,
+      // batch_errors, etc.) lands in the UI. Without this the panel
+      // would still show the next-to-last batch's mid-flight state.
+      try {
+        const finalRes = await fetch('/api/prospects/discovery/progress', { cache: 'no-store' });
+        if (finalRes.ok) {
+          const finalData = await finalRes.json();
+          setScanProgress(prev => ({
+            stage: res.ok && !data.error ? 'done' : 'failed',
+            message: res.ok && !data.error ? 'Scan complete' : (data.error || 'Scan failed'),
+            percent: 100,
+            candidates_found: data.candidates_found ?? prev?.candidates_found ?? null,
+            batches_total: data.batches_run ?? prev?.batches_total ?? null,
+            batches_complete: data.batches_run ?? prev?.batches_complete ?? null,
+            detail: finalData.detail ?? prev?.detail ?? null,
+          }));
+        }
+      } catch {
+        // Fallback: keep whatever detail we already have from polling
+        setScanProgress(prev => ({
+          stage: res.ok && !data.error ? 'done' : 'failed',
+          message: res.ok && !data.error ? 'Scan complete' : (data.error || 'Scan failed'),
+          percent: 100,
+          candidates_found: data.candidates_found ?? null,
+          batches_total: data.batches_run ?? null,
+          batches_complete: data.batches_run ?? null,
+          detail: prev?.detail ?? null,
+        }));
+      }
 
       if (!res.ok || data.error) {
         toast({ title: 'Scan failed', description: data.error || 'Unknown error', variant: 'destructive' });
@@ -1237,7 +1292,7 @@ export default function DiscoveryPanel() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search projects by name, symbol, or POC..."
-              className="pl-10 auth-input"
+              className="pl-10 focus-brand"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
@@ -1260,11 +1315,11 @@ export default function DiscoveryPanel() {
 
       {/* Bulk actions toolbar — appears only when rows are selected */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 bg-[#e8f4f5] border border-[#3e8692]/40 rounded-lg px-3 py-2">
+        <div className="flex items-center gap-3 bg-brand-light border border-brand/40 rounded-lg px-3 py-2">
           <div className="text-sm font-semibold text-gray-800">
             {selectedIds.size} selected
           </div>
-          <div className="h-4 w-px bg-[#3e8692]/30" />
+          <div className="h-4 w-px bg-brand/30" />
           <div className="flex items-center gap-1.5 flex-wrap">
             <Button
               type="button"
@@ -1486,7 +1541,7 @@ export default function DiscoveryPanel() {
                           <a
                             href={`/intelligence/discovery/${p.id}`}
                             onClick={e => e.stopPropagation()}
-                            className="font-medium text-gray-900 hover:underline hover:text-[#3e8692]"
+                            className="font-medium text-gray-900 hover:underline hover:text-brand"
                             title="Open prospect detail page"
                           >
                             {p.name}
@@ -2158,7 +2213,7 @@ export default function DiscoveryPanel() {
                                               <Badge
                                                 variant="outline"
                                                 className={`text-[10px] pointer-events-none ${
-                                                  t.source_type === 'tweet' ? 'bg-[#e8f4f5] text-[#1DA1F2]' : ''
+                                                  t.source_type === 'tweet' ? 'bg-brand-light text-[#1DA1F2]' : ''
                                                 }`}
                                               >
                                                 {t.source_type === 'tweet' ? 'X' : t.source_type}
@@ -2240,7 +2295,7 @@ export default function DiscoveryPanel() {
                   type="number"
                   value={scanParams.recency_days}
                   onChange={e => setScanParams(p => ({ ...p, recency_days: e.target.value }))}
-                  className="auth-input mt-1"
+                  className="focus-brand mt-1"
                 />
               </div>
               <div>
@@ -2250,7 +2305,7 @@ export default function DiscoveryPanel() {
                   type="number"
                   value={scanParams.min_raise_usd}
                   onChange={e => setScanParams(p => ({ ...p, min_raise_usd: e.target.value }))}
-                  className="auth-input mt-1"
+                  className="focus-brand mt-1"
                 />
               </div>
             </div>
@@ -2261,7 +2316,7 @@ export default function DiscoveryPanel() {
                 type="number"
                 value={scanParams.max_projects}
                 onChange={e => setScanParams(p => ({ ...p, max_projects: e.target.value }))}
-                className="auth-input mt-1"
+                className="focus-brand mt-1"
               />
               <p className="text-xs text-gray-500 mt-1">Higher = more coverage, more cost. 20 is a good default.</p>
             </div>
@@ -2271,7 +2326,7 @@ export default function DiscoveryPanel() {
                 id="cats"
                 value={scanParams.categories}
                 onChange={e => setScanParams(p => ({ ...p, categories: e.target.value }))}
-                className="auth-input mt-1"
+                className="focus-brand mt-1"
                 placeholder="DeFi, Gaming, AI"
               />
               <p className="text-xs text-gray-500 mt-1">Comma-separated. Leave blank to scan all.</p>
@@ -2294,13 +2349,13 @@ export default function DiscoveryPanel() {
                       onClick={() => toggleScanSource(card.id)}
                       className={`text-left rounded-lg border p-2.5 transition-colors ${
                         selected
-                          ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                          ? 'border-brand bg-brand-light ring-1 ring-brand'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
                       <div className="text-xs font-semibold text-gray-900 flex items-center gap-1">
                         {card.title}
-                        {selected && <CheckCircle className="h-3 w-3 text-[#3e8692]" />}
+                        {selected && <CheckCircle className="h-3 w-3 text-brand" />}
                       </div>
                       <div className="text-[10px] text-gray-600 mt-0.5">{card.oneLiner}</div>
                       <div className="text-[10px] text-gray-500 mt-0.5">{card.footnote}</div>
@@ -2326,7 +2381,7 @@ export default function DiscoveryPanel() {
                   onClick={() => setScanParams(p => ({ ...p, model: 'opus' }))}
                   className={`text-left rounded-lg border p-2.5 transition-colors ${
                     scanParams.model === 'opus'
-                      ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                      ? 'border-brand bg-brand-light ring-1 ring-brand'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -2339,7 +2394,7 @@ export default function DiscoveryPanel() {
                   onClick={() => setScanParams(p => ({ ...p, model: 'sonnet' }))}
                   className={`text-left rounded-lg border p-2.5 transition-colors ${
                     scanParams.model === 'sonnet'
-                      ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                      ? 'border-brand bg-brand-light ring-1 ring-brand'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -2353,12 +2408,23 @@ export default function DiscoveryPanel() {
               </p>
             </div>
 
-            {/* Live progress (while scanning) */}
-            {scanning && scanProgress && (
-              <div className="rounded-lg border border-[#3e8692]/40 bg-[#e8f4f5] p-3 text-xs space-y-2">
+            {/* Live progress (while scanning, AND for the post-scan
+                summary so users see the final detail block). When
+                `scanning` is false but `scanProgress.detail` is set,
+                the dialog still renders the panel — useful for "what
+                did the last scan actually find" without scrolling
+                back to a separate Last scan card. */}
+            {scanProgress && (
+              <div className="rounded-lg border border-brand/40 bg-brand-light p-3 text-xs space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <Loader2 className="h-3.5 w-3.5 text-[#3e8692] animate-spin shrink-0" />
+                    {scanning ? (
+                      <Loader2 className="h-3.5 w-3.5 text-brand animate-spin shrink-0" />
+                    ) : scanProgress.stage === 'failed' ? (
+                      <AlertTriangle className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                    ) : (
+                      <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    )}
                     <span className="font-semibold text-gray-800">
                       {scanProgress.message || 'Scanning...'}
                     </span>
@@ -2377,16 +2443,156 @@ export default function DiscoveryPanel() {
                     }}
                   />
                 </div>
-                {/* Sub-details */}
+
+                {/* Top-line stats — always visible. Shows running totals
+                    so the user has a number to track without expanding. */}
                 {(scanProgress.candidates_found != null || scanProgress.batches_total != null) && (
-                  <div className="text-[10px] text-gray-600 flex items-center gap-3">
+                  <div className="text-[10px] text-gray-600 flex items-center gap-3 flex-wrap">
                     {scanProgress.candidates_found != null && (
-                      <span>Candidates: {scanProgress.candidates_found}</span>
+                      <span><span className="text-gray-400">Candidates:</span> <span className="font-semibold text-gray-800">{scanProgress.candidates_found}</span></span>
                     )}
                     {scanProgress.batches_total != null && (
-                      <span>Batches: {scanProgress.batches_complete ?? 0} / {scanProgress.batches_total}</span>
+                      <span><span className="text-gray-400">Batches:</span> <span className="font-semibold text-gray-800">{scanProgress.batches_complete ?? 0} / {scanProgress.batches_total}</span></span>
+                    )}
+                    {scanProgress.detail?.enriched && scanProgress.detail.enriched.length > 0 && (
+                      <span><span className="text-gray-400">Enriched:</span> <span className="font-semibold text-gray-800">{scanProgress.detail.enriched.length}</span></span>
                     )}
                   </div>
+                )}
+
+                {/* Per-source mini-chips — appear as soon as Stage 1 settles.
+                    Tells the user where candidates came from at a glance,
+                    e.g. "DropsTab 7 · DefiLlama 4 · ETHGlobal 0". */}
+                {scanProgress.detail?.sources?.per_source_counts && Object.keys(scanProgress.detail.sources.per_source_counts).length > 0 && (
+                  <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                    {Object.entries(scanProgress.detail.sources.per_source_counts).map(([src, n]) => (
+                      <span
+                        key={src}
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] ${
+                          n === 0
+                            ? 'bg-gray-100 text-gray-500'
+                            : 'bg-white/70 text-gray-700 border border-gray-200'
+                        }`}
+                        title={n === 0 ? `${src} returned no candidates this scan` : undefined}
+                      >
+                        {src} <span className={`font-mono font-semibold ${n === 0 ? 'text-gray-400' : 'text-brand'}`}>{n}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Show details toggle — the heavy stuff is hidden by
+                    default to keep the dialog compact. Expanding reveals
+                    filtered names, the enriched list, batch errors. */}
+                {scanProgress.detail && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setProgressDetailOpen(o => !o)}
+                      className="flex items-center gap-1 text-[10px] text-brand hover:underline pt-0.5"
+                    >
+                      {progressDetailOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRightIcon className="h-3 w-3" />}
+                      {progressDetailOpen ? 'Hide details' : 'Show details'}
+                    </button>
+
+                    {progressDetailOpen && (
+                      <div className="space-y-2 pt-1 border-t border-brand/20">
+                        {/* Filtered out — what got dropped pre-Stage-2 and why */}
+                        {scanProgress.detail.filtered && (
+                          <div>
+                            <div className="text-[10px] font-semibold text-gray-700 mb-0.5">Filtered out</div>
+                            <div className="text-[10px] text-gray-600 flex items-center gap-3 flex-wrap">
+                              {scanProgress.detail.filtered.recent_skipped != null && (
+                                <span>Recently scanned: <span className="font-semibold">{scanProgress.detail.filtered.recent_skipped}</span></span>
+                              )}
+                              {scanProgress.detail.filtered.crm_skipped_total != null && (
+                                <span>Active CRM: <span className="font-semibold">{scanProgress.detail.filtered.crm_skipped_total}</span></span>
+                              )}
+                              {scanProgress.detail.filtered.crm_filtered_names && scanProgress.detail.filtered.crm_filtered_names.items.length > 0 && (
+                                <span>Dropped this scan: <span className="font-semibold">{scanProgress.detail.filtered.crm_filtered_names.items.length + (scanProgress.detail.filtered.crm_filtered_names.truncated || 0)}</span></span>
+                              )}
+                            </div>
+                            {scanProgress.detail.filtered.crm_filtered_names && scanProgress.detail.filtered.crm_filtered_names.items.length > 0 && (
+                              <div className="mt-1 text-[10px] text-gray-500 italic">
+                                {scanProgress.detail.filtered.crm_filtered_names.items.join(', ')}
+                                {scanProgress.detail.filtered.crm_filtered_names.truncated > 0 && ` +${scanProgress.detail.filtered.crm_filtered_names.truncated} more`}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Enriched list — rolling, oldest first since that's
+                            the order Claude returned them. Tier-coloured chip
+                            per row + score + POC count. */}
+                        {scanProgress.detail.enriched && scanProgress.detail.enriched.length > 0 && (
+                          <div>
+                            <div className="text-[10px] font-semibold text-gray-700 mb-0.5">Enriched ({scanProgress.detail.enriched.length})</div>
+                            <div className="space-y-0.5 max-h-40 overflow-y-auto">
+                              {scanProgress.detail.enriched.slice().reverse().map((e, idx) => (
+                                <div key={`${e.name}-${idx}`} className="flex items-center justify-between gap-2 py-0.5">
+                                  <div className="flex items-center gap-1.5 min-w-0">
+                                    <span className="text-[10px] text-gray-800 truncate">{e.name}</span>
+                                    {e.tier && (
+                                      <span
+                                        className={`text-[9px] px-1 rounded font-semibold whitespace-nowrap ${
+                                          e.tier === 'REACH_OUT_NOW' ? 'bg-emerald-100 text-emerald-700' :
+                                          e.tier === 'PRE_TOKEN_PRIORITY' ? 'bg-blue-100 text-blue-700' :
+                                          e.tier === 'RESEARCH' ? 'bg-amber-100 text-amber-700' :
+                                          e.tier === 'WATCH' ? 'bg-purple-100 text-purple-700' :
+                                          e.tier === 'NURTURE' ? 'bg-gray-100 text-gray-600' :
+                                          e.tier === 'SKIP' ? 'bg-red-50 text-red-500' :
+                                          'bg-gray-100 text-gray-500'
+                                        }`}
+                                      >
+                                        {e.tier.replace(/_/g, ' ')}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-[10px] text-gray-500 shrink-0">
+                                    {e.score != null && <span className="tabular-nums">{e.score}</span>}
+                                    {e.poc_count > 0 && <span>{e.poc_count} POC</span>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tier breakdown — appears at writing-stage when
+                            tier_breakdown is populated. Compact summary. */}
+                        {scanProgress.detail.tier_breakdown && Object.keys(scanProgress.detail.tier_breakdown).length > 0 && (
+                          <div>
+                            <div className="text-[10px] font-semibold text-gray-700 mb-0.5">By tier</div>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {Object.entries(scanProgress.detail.tier_breakdown).map(([tier, n]) => (
+                                <span key={tier} className="text-[10px] text-gray-600">
+                                  {tier.replace(/_/g, ' ')} <span className="font-semibold text-gray-800">{n}</span>
+                                </span>
+                              )).reduce((acc: any[], el, i) => i === 0 ? [el] : [...acc, <span key={`sep-${i}`} className="text-gray-300">·</span>, el], [])}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Source errors / batch errors — only visible if
+                            something went wrong. Helps explain "why DropsTab
+                            returned 0" without diving into agent_runs SQL. */}
+                        {((scanProgress.detail.sources?.errors?.length ?? 0) > 0 ||
+                          (scanProgress.detail.batch_errors?.length ?? 0) > 0) && (
+                          <div>
+                            <div className="text-[10px] font-semibold text-red-700 mb-0.5">Errors</div>
+                            <ul className="text-[10px] text-red-600 space-y-0.5">
+                              {scanProgress.detail.sources?.errors?.map((e, i) => (
+                                <li key={`s-${i}`} className="truncate" title={e}>· {e}</li>
+                              ))}
+                              {scanProgress.detail.batch_errors?.map((e, i) => (
+                                <li key={`b-${i}`} className="truncate" title={e}>· {e}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -2532,10 +2738,10 @@ export default function DiscoveryPanel() {
               const pocIndex = Math.min(rowDeepDive.xPocCount, Math.floor(rowDeepDive.elapsedSec / 110) + 1);
               const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
               return (
-                <div className="rounded-lg border border-[#3e8692]/40 bg-[#e8f4f5] p-3 text-xs space-y-2">
+                <div className="rounded-lg border border-brand/40 bg-brand-light p-3 text-xs space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <Loader2 className="h-3.5 w-3.5 text-[#3e8692] animate-spin shrink-0" />
+                      <Loader2 className="h-3.5 w-3.5 text-brand animate-spin shrink-0" />
                       <span className="font-semibold text-gray-800">
                         {rowDeepDive.xPocCount > 1
                           ? `Reading X timeline ${pocIndex} of ${rowDeepDive.xPocCount}…`
@@ -2640,7 +2846,7 @@ export default function DiscoveryPanel() {
       </Dialog>
 
       {/* Telegram DM draft dialog — styled consistently with the other
-          discovery dialogs (brand teal accent, same Label / auth-input,
+          discovery dialogs (brand teal accent, same Label / focus-brand,
           canonical Cancel/primary button pair). */}
       <Dialog
         open={dmDialog.open}
@@ -2692,7 +2898,7 @@ export default function DiscoveryPanel() {
                     onClick={() => regenerateDmDraft(v)}
                     className={`text-left rounded-lg border p-2.5 transition-colors ${
                       dmDialog.variant === v
-                        ? 'border-[#3e8692] bg-[#e8f4f5] ring-1 ring-[#3e8692]'
+                        ? 'border-brand bg-brand-light ring-1 ring-brand'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
@@ -2708,7 +2914,7 @@ export default function DiscoveryPanel() {
               <Label htmlFor="dm-text" className="mb-1.5 block">Message</Label>
               <textarea
                 id="dm-text"
-                className="auth-input w-full font-sans text-sm leading-relaxed p-3 resize-y min-h-[240px]"
+                className="focus-brand w-full font-sans text-sm leading-relaxed p-3 resize-y min-h-[240px]"
                 value={dmDialog.text}
                 onChange={e => setDmDialog(prev => ({ ...prev, text: e.target.value, copiedAt: null }))}
                 spellCheck

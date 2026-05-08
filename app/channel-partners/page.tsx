@@ -232,7 +232,7 @@ export default function PartnersPage() {
           <div className="flex items-center space-x-4">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input placeholder="Search partners by name, email, or website..." className="pl-10 auth-input" disabled />
+              <Input placeholder="Search partners by name, email, or website..." className="pl-10 focus-brand" disabled />
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -272,7 +272,7 @@ export default function PartnersPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input 
               placeholder="Search partners by name, email, or website..." 
-              className="pl-10 auth-input" 
+              className="pl-10 focus-brand" 
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)} 
             />
@@ -404,7 +404,7 @@ export default function PartnersPage() {
                     value={newPartner.name} 
                     onChange={(e) => setNewPartner({ ...newPartner, name: e.target.value })} 
                     placeholder="Enter partner name" 
-                    className="auth-input" 
+                    className="focus-brand" 
                     required 
                   />
                 </div>
@@ -416,7 +416,7 @@ export default function PartnersPage() {
                     value={newPartner.email} 
                     onChange={(e) => setNewPartner({ ...newPartner, email: e.target.value })} 
                     placeholder="Enter email address" 
-                    className="auth-input" 
+                    className="focus-brand" 
                   />
                 </div>
                 <div className="grid gap-2">
@@ -427,7 +427,7 @@ export default function PartnersPage() {
                     value={newPartner.website} 
                     onChange={(e) => setNewPartner({ ...newPartner, website: e.target.value })} 
                     placeholder="Enter website URL (e.g., https://example.com)" 
-                    className="auth-input" 
+                    className="focus-brand" 
                   />
                 </div>
                 <div className="grid gap-2">
@@ -437,7 +437,7 @@ export default function PartnersPage() {
                     value={newPartner.description} 
                     onChange={(e) => setNewPartner({ ...newPartner, description: e.target.value })} 
                     placeholder="Enter partner description" 
-                    className="auth-input" 
+                    className="focus-brand" 
                     rows={3}
                   />
                 </div>
@@ -447,7 +447,7 @@ export default function PartnersPage() {
                     value={newPartner.is_active ? 'active' : 'inactive'} 
                     onValueChange={(value) => setNewPartner({ ...newPartner, is_active: value === 'active' })}
                   >
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

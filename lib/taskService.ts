@@ -533,6 +533,39 @@ export class TaskService {
   }
 
   /**
+   * Bulk-fetch checklist progress for many tasks at once. Returns a map
+   * of task_id → { done, total }. Tasks with no checklist items are
+   * absent from the map (not present with zeros) — render call sites
+   * can short-circuit on `if (counts[taskId])`.
+   *
+   * Used by the tasks page to render a clickable checklist badge on
+   * each row (added 2026-05-07 — checklists were previously invisible
+   * outside the task detail modal).
+   */
+  static async getChecklistCounts(taskIds: string[]): Promise<Record<string, { done: number; total: number }>> {
+    if (taskIds.length === 0) return {};
+    try {
+      const { data, error } = await supabase
+        .from('task_checklist_items')
+        .select('task_id, is_done')
+        .in('task_id', taskIds);
+
+      if (error) throw error;
+
+      const counts: Record<string, { done: number; total: number }> = {};
+      for (const row of (data || []) as Array<{ task_id: string; is_done: boolean | null }>) {
+        if (!counts[row.task_id]) counts[row.task_id] = { done: 0, total: 0 };
+        counts[row.task_id].total++;
+        if (row.is_done) counts[row.task_id].done++;
+      }
+      return counts;
+    } catch (error) {
+      console.error('Error fetching checklist counts:', error);
+      return {};
+    }
+  }
+
+  /**
    * Add a comment to a task. Updates latest_comment on the task for backward compat.
    */
   static async addComment(

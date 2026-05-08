@@ -575,7 +575,7 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3e8692] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand mx-auto mb-4"></div>
           <p className="text-gray-600">Loading list...</p>
         </div>
       </div>
@@ -658,7 +658,7 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                   setEmailError('');
                 }}
                 placeholder="Enter your email"
-                className="auth-input"
+                className="focus-brand"
                 required
               />
               {emailError && (
@@ -825,7 +825,7 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                               href={kol.link}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-sm text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:ring-offset-1 rounded px-1 py-0.5 transition-all duration-200 whitespace-nowrap"
+                              className="text-sm text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-1 rounded px-1 py-0.5 transition-all duration-200 whitespace-nowrap"
                               onClick={() => {
                                 // Fire-and-forget click event tracking. Don't
                                 // await — the link should open immediately.

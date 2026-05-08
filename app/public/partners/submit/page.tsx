@@ -161,7 +161,7 @@ export default function PartnerSubmitPage() {
                 value={formData.name}
                 onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 disabled={isSubmitting}
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -173,7 +173,7 @@ export default function PartnerSubmitPage() {
                 value={formData.affiliation}
                 onChange={e => setFormData(prev => ({ ...prev, affiliation: e.target.value }))}
                 disabled={isSubmitting}
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
 
@@ -184,7 +184,7 @@ export default function PartnerSubmitPage() {
                 onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
                 disabled={isSubmitting}
               >
-                <SelectTrigger className="auth-input">
+                <SelectTrigger className="focus-brand">
                   <SelectValue placeholder="Select category..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -202,7 +202,7 @@ export default function PartnerSubmitPage() {
                 onValueChange={(value) => setFormData(prev => ({ ...prev, commission_model: value }))}
                 disabled={isSubmitting}
               >
-                <SelectTrigger className="auth-input">
+                <SelectTrigger className="focus-brand">
                   <SelectValue placeholder="Select commission model..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -225,7 +225,7 @@ export default function PartnerSubmitPage() {
                     value={formData.poc_name}
                     onChange={e => setFormData(prev => ({ ...prev, poc_name: e.target.value }))}
                     disabled={isSubmitting}
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
 
@@ -238,7 +238,7 @@ export default function PartnerSubmitPage() {
                     value={formData.poc_email}
                     onChange={e => setFormData(prev => ({ ...prev, poc_email: e.target.value }))}
                     disabled={isSubmitting}
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
 
@@ -250,7 +250,7 @@ export default function PartnerSubmitPage() {
                     value={formData.poc_telegram}
                     onChange={e => setFormData(prev => ({ ...prev, poc_telegram: e.target.value }))}
                     disabled={isSubmitting}
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
               </div>
@@ -264,7 +264,7 @@ export default function PartnerSubmitPage() {
                 value={formData.terms_of_interest}
                 onChange={e => setFormData(prev => ({ ...prev, terms_of_interest: e.target.value }))}
                 disabled={isSubmitting}
-                className="auth-input"
+                className="focus-brand"
                 rows={3}
               />
             </div>
@@ -277,7 +277,7 @@ export default function PartnerSubmitPage() {
                 value={formData.notes}
                 onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                 disabled={isSubmitting}
-                className="auth-input"
+                className="focus-brand"
                 rows={2}
               />
             </div>

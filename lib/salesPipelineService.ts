@@ -183,10 +183,16 @@ export interface SalesPipelineOpportunity extends CRMOpportunity {
   last_signal_at: string | null;
 }
 
+export type ActivityDirection = 'outbound' | 'inbound';
+
 export interface CRMActivity {
   id: string;
   opportunity_id: string;
   type: ActivityType;
+  /** Outbound = sent by the team. Inbound = reply received from prospect.
+   *  Only meaningful for type='message' in practice — bumps/notes/etc.
+   *  default to outbound. Added 2026-05-05 (migration 044). */
+  direction: ActivityDirection;
   title: string;
   description: string | null;
   outcome: string | null;
@@ -223,6 +229,10 @@ export interface CreateActivityData {
   opportunity_id: string;
   type: ActivityType;
   title: string;
+  /** Defaults to 'outbound' if omitted. Set to 'inbound' when logging
+   *  a reply received from the prospect. Drives last_team_message_at vs
+   *  last_reply_at auto-stamping in createActivity. */
+  direction?: ActivityDirection;
   description?: string;
   outcome?: string;
   next_step?: string;
@@ -462,16 +472,24 @@ export class SalesPipelineService {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    // Cast: database.types.ts predates migration 044's `direction` column.
+    // Runtime guarantee — the migration backfilled all rows to 'outbound'
+    // and the createActivity write path always sets it.
+    return (data || []) as unknown as CRMActivity[];
   }
 
   static async createActivity(activityData: CreateActivityData): Promise<CRMActivity> {
     const { data: { user } } = await supabase.auth.getUser();
 
+    // Default direction = outbound. Only matters for type='message' in
+    // practice but we set it for all rows so the column never has nulls.
+    const direction: ActivityDirection = activityData.direction ?? 'outbound';
+
     const { data, error } = await supabase
       .from('crm_activities')
       .insert([{
         ...activityData,
+        direction,
         owner_id: user?.id || null,
       }])
       .select()
@@ -479,10 +497,98 @@ export class SalesPipelineService {
 
     if (error) throw error;
 
+    // ── Auto-stamp opportunity milestone timestamps ────────────────────
+    // These columns existed but were never populated, which is why the
+    // /crm/sales-pipeline Weekly Activity widget couldn't show real
+    // Outreach / Reply / Proposal counts. Now every createActivity call
+    // updates the relevant milestone, so the funnel stays current
+    // without anyone needing to remember to set timestamps manually.
+    //
+    // Mapping (added 2026-05-05 with migration 044):
+    //   - outbound message OR bump  → last_team_message_at = now()
+    //   - inbound  message          → last_reply_at        = now()
+    //   - proposal                  → proposal_sent_at     = now()
+    //                                 (only if currently null — first proposal)
+    //   - call                      → discovery_call_at    = now()
+    //                                 (only if currently null — first call)
+    //   - meeting                   → no auto-stamp (meeting type covers
+    //                                 both "booked" and "happened" cases;
+    //                                 the funnel splits them by next_step_date)
+    //   - note                      → no auto-stamp
+    //
+    // We do these as best-effort updates: a failure here doesn't roll
+    // back the activity insert. The activity row IS the source of truth;
+    // milestone columns are denormalized convenience for fast funnel queries.
+    const now = new Date().toISOString();
+    const milestoneUpdate: Record<string, string> = {};
+    let conditionalCols: string[] = [];
+
+    if (activityData.type === 'message') {
+      if (direction === 'outbound') {
+        milestoneUpdate.last_team_message_at = now;
+        // bump_number / last_bump_date are tracked separately by the
+        // bump flow — outbound messages don't touch them.
+      } else {
+        milestoneUpdate.last_reply_at = now;
+        // Replies also count as "contact" — refresh last_contacted_at
+        // so stale-deal detection treats this as recent activity.
+        milestoneUpdate.last_contacted_at = now;
+      }
+    } else if (activityData.type === 'bump') {
+      // Bumps are always outbound; treat as a team message touch.
+      milestoneUpdate.last_team_message_at = now;
+    } else if (activityData.type === 'proposal') {
+      // First-proposal-wins: only stamp if not already set so we capture
+      // when the proposal originally went out, not the most recent edit.
+      conditionalCols.push('proposal_sent_at');
+    } else if (activityData.type === 'call') {
+      // First-call-wins, same reasoning as proposal.
+      conditionalCols.push('discovery_call_at');
+    }
+
+    if (Object.keys(milestoneUpdate).length > 0) {
+      try {
+        await (supabase as any)
+          .from('crm_opportunities')
+          .update(milestoneUpdate)
+          .eq('id', activityData.opportunity_id);
+      } catch (err) {
+        // Don't break the activity insert path — log and move on.
+        console.error('[createActivity] milestone update failed:', err);
+      }
+    }
+
+    // Conditional updates (only set if currently null) need a prior fetch
+    // since Supabase JS client doesn't expose `WHERE col IS NULL` on
+    // .update(). Cheap — single round-trip for the columns we care about.
+    if (conditionalCols.length > 0) {
+      try {
+        const { data: existing } = await (supabase as any)
+          .from('crm_opportunities')
+          .select(conditionalCols.join(','))
+          .eq('id', activityData.opportunity_id)
+          .single();
+        const patch: Record<string, string> = {};
+        for (const col of conditionalCols) {
+          if (existing && existing[col] == null) patch[col] = now;
+        }
+        if (Object.keys(patch).length > 0) {
+          await (supabase as any)
+            .from('crm_opportunities')
+            .update(patch)
+            .eq('id', activityData.opportunity_id);
+        }
+      } catch (err) {
+        console.error('[createActivity] conditional milestone update failed:', err);
+      }
+    }
+
     // Recalculate temperature score (new activity affects engagement)
     await this.recalcTemperature(activityData.opportunity_id);
 
-    return data;
+    // Cast: same reason as getActivities — db types don't yet include the
+    // direction column added by migration 044.
+    return data as unknown as CRMActivity;
   }
 
   // ----------------------------------------

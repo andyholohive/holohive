@@ -14,6 +14,8 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Calendar, Video, MoreHorizontal, XCircle, Copy, ExternalLink, List, CalendarDays, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import { BookingService, Booking } from '@/lib/bookingService';
 import { useToast } from '@/hooks/use-toast';
@@ -123,8 +125,14 @@ export default function MeetingsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-72" />
+        {/* Header — real title/subtitle render immediately. */}
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Calendar className="h-6 w-6 text-brand" />
+            Meetings
+          </h2>
+          <p className="text-gray-600 mt-1">View and manage your booked meetings.</p>
+        </div>
         <div className="flex gap-2">
           <Skeleton className="h-9 w-28" />
           <Skeleton className="h-9 w-28" />
@@ -139,31 +147,35 @@ export default function MeetingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Calendar className="h-6 w-6 text-[#3e8692]" />
+        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <Calendar className="h-6 w-6 text-brand" />
           Meetings
-        </h1>
-        <p className="text-gray-500 mt-1">View and manage your booked meetings.</p>
+        </h2>
+        <p className="text-gray-600 mt-1">View and manage your booked meetings.</p>
       </div>
 
-      {/* Tab Filters + View Toggle */}
+      {/* Tab Filters + View Toggle. Tabs use the shadcn <Tabs> component
+          for consistency with /intelligence and /crm/sales-pipeline (was
+          a row of <Button>s before 2026-05-06). Active state colored via
+          the data-[state=active] convention used by every other Tabs site
+          in the app. */}
       <div className="flex items-center justify-between">
-        <div className="flex gap-2">
-          {tabs.map((tab) => (
-            <Button
-              key={tab.key}
-              variant={activeTab === tab.key ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setActiveTab(tab.key)}
-              style={activeTab === tab.key ? { backgroundColor: '#3e8692', color: 'white' } : {}}
-            >
-              {tab.label}
-              <Badge variant="secondary" className="ml-2 text-xs">
-                {tab.count}
-              </Badge>
-            </Button>
-          ))}
-        </div>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabFilter)}>
+          <TabsList>
+            {tabs.map((tab) => (
+              <TabsTrigger
+                key={tab.key}
+                value={tab.key}
+                className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm"
+              >
+                {tab.label}
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {tab.count}
+                </Badge>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
         <div className="flex gap-1 border rounded-md p-0.5">
           <Button
             variant={viewMode === 'table' ? 'default' : 'ghost'}
@@ -209,12 +221,18 @@ export default function MeetingsPage() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12 text-gray-400">
-                      {activeTab === 'upcoming'
-                        ? 'No upcoming meetings.'
-                        : activeTab === 'past'
-                        ? 'No past meetings.'
-                        : 'No cancelled meetings.'}
+                    {/* colSpan must match the 9 column headers above so the
+                        empty state spans the full width of the table. */}
+                    <TableCell colSpan={9} className="p-0">
+                      <EmptyState
+                        icon={Calendar}
+                        title={
+                          activeTab === 'upcoming' ? 'No upcoming meetings.'
+                          : activeTab === 'past'   ? 'No past meetings.'
+                          : 'No cancelled meetings.'
+                        }
+                        className="py-12"
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -337,12 +355,12 @@ export default function MeetingsPage() {
                     className={`
                       relative min-h-[80px] p-1.5 text-left bg-white hover:bg-gray-50 transition-colors
                       ${!isCurrentMonth ? 'text-gray-300' : 'text-gray-700'}
-                      ${isToday ? 'bg-[#3e8692]/5 ring-1 ring-inset ring-[#3e8692]/30' : ''}
+                      ${isToday ? 'bg-brand/5 ring-1 ring-inset ring-brand/30' : ''}
                     `}
                   >
                     <span className={`
                       text-xs font-medium inline-flex items-center justify-center w-5 h-5 rounded-full
-                      ${isToday ? 'bg-[#3e8692] text-white' : ''}
+                      ${isToday ? 'bg-brand text-white' : ''}
                     `}>
                       {format(day, 'd')}
                     </span>

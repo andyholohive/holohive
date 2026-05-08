@@ -116,13 +116,13 @@ export default function ChangelogModal() {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <div className="flex items-center gap-2 mb-1">
-            <Sparkles className="h-5 w-5 text-[#3e8692]" />
+            <Sparkles className="h-5 w-5 text-brand" />
             <DialogTitle className="text-xl">What's New</DialogTitle>
           </div>
           <div className="flex items-center gap-2">
             <Badge
               variant="secondary"
-              className="bg-[#3e8692]/10 text-[#3e8692] hover:bg-[#3e8692]/20"
+              className="bg-brand/10 text-brand hover:bg-brand/20"
             >
               v{currentChangelog.version}
             </Badge>

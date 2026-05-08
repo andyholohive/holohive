@@ -16,6 +16,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2, ChevronDown, Star, Copy, ExternalLink, Eye, LayoutGrid, ChevronLeft, ChevronRight, Shield } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import ListAccessDialog from '@/components/lists/ListAccessDialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/lib/supabase';
@@ -199,10 +200,13 @@ export default function ListsPage() {
   const [accessDialogListId, setAccessDialogListId] = useState<string | null>(null);
   const [isAccessDialogOpen, setIsAccessDialogOpen] = useState(false);
   const [emailViewsList, setEmailViewsList] = useState<ListItem | null>(null);
+  // viewed_at is `string | null` in the DB but practically always set
+  // (the row only exists after a view event). Mark nullable so the
+  // setter below doesn't need a cast; consumers should null-guard.
   const [emailViews, setEmailViews] = useState<Array<{
     id: string;
     email: string;
-    viewed_at: string;
+    viewed_at: string | null;
     user_agent: string | null;
   }>>([]);
   const [loadingEmailViews, setLoadingEmailViews] = useState(false);
@@ -438,7 +442,8 @@ export default function ListsPage() {
         })
       );
 
-      setLists(listsWithKOLs);
+      // Cast: DB nullable fields vs interface (see archive/page.tsx note).
+      setLists(listsWithKOLs as ListItem[]);
     } catch (err) {
       setError('Failed to load lists');
       console.error('Error fetching lists:', err);
@@ -1035,37 +1040,9 @@ export default function ListsPage() {
     });
   };
 
-  const ListCardSkeleton = () => (
-    <Card className="transition-shadow h-full flex flex-col">
-      <CardHeader className="pb-4">
-        <div className="mb-3">
-          <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
-            <div className="flex items-center">
-              <Skeleton className="h-8 w-8 rounded-lg mr-2" />
-              <Skeleton className="h-5 w-40" />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Skeleton className="h-6 w-16 rounded-full" />
-            <Skeleton className="h-6 w-20 rounded-full" />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <div className="flex items-center text-sm text-gray-600">
-            <Skeleton className="h-4 w-4 mr-2" />
-            <Skeleton className="h-4 w-36" />
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-4 border-t border-gray-100 flex flex-col flex-1">
-        <div className="flex gap-2 mt-auto">
-          <Skeleton className="h-8 w-full rounded" />
-          <Skeleton className="h-8 w-full rounded" />
-        </div>
-        <Skeleton className="h-8 w-full rounded mt-2" />
-      </CardContent>
-    </Card>
-  );
+  // ListCardSkeleton extracted to module scope below the page component
+  // (audit 2026-05-06): was defined inline here, re-allocated every
+  // render. Pure JSX with no closure deps so a clean extract.
 
   if (loading) {
     return (
@@ -1090,7 +1067,7 @@ export default function ListsPage() {
           <div className="flex items-center space-x-4">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input placeholder="Search lists by name, notes, or KOLs..." className="pl-10 auth-input" disabled />
+              <Input placeholder="Search lists by name, notes, or KOLs..." className="pl-10 focus-brand" disabled />
             </div>
           </div>
           <div className="flex items-center justify-between">
@@ -1180,7 +1157,7 @@ export default function ListsPage() {
                         value={newList.name}
                         onChange={(e) => setNewList({ ...newList, name: e.target.value })}
                         placeholder="Enter list name"
-                        className="auth-input"
+                        className="focus-brand"
                         required
                       />
                     </div>
@@ -1191,7 +1168,7 @@ export default function ListsPage() {
                         value={newList.notes}
                         onChange={(e) => setNewList({ ...newList, notes: e.target.value })}
                         placeholder="Enter notes about this list..."
-                        className="auth-input min-h-[100px]"
+                        className="focus-brand min-h-[100px]"
                       />
                     </div>
 
@@ -1206,7 +1183,7 @@ export default function ListsPage() {
                           value={emailInput}
                           onChange={(e) => setEmailInput(e.target.value)}
                           placeholder="Enter email addresses (comma or newline separated)&#10;e.g. email1@example.com, email2@example.com&#10;or one per line"
-                          className="auth-input min-h-[80px]"
+                          className="focus-brand min-h-[80px]"
                           rows={3}
                         />
                         <Button
@@ -1264,7 +1241,7 @@ export default function ListsPage() {
                       <div className="mb-3">
                         <Input
                           placeholder="Search KOLs by name, region, or platform..."
-                          className="auth-input"
+                          className="focus-brand"
                           value={kolSearchTerm}
                           onChange={e => setKolSearchTerm(e.target.value)}
                         />
@@ -1324,7 +1301,7 @@ export default function ListsPage() {
                                             placeholder="Value"
                                             value={followersValue}
                                             onChange={(e) => setFollowersValue(e.target.value)}
-                                            className="h-8 text-xs auth-input"
+                                            className="h-8 text-xs focus-brand"
                                           />
                                         </div>
                                         {(followersOperator || followersValue) && (
@@ -1344,7 +1321,7 @@ export default function ListsPage() {
                                     </PopoverContent>
                                   </Popover>
                                   {(followersOperator && followersValue) && (
-                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       1
                                     </span>
                                   )}
@@ -1381,7 +1358,7 @@ export default function ListsPage() {
                                             placeholder="Value"
                                             value={ratingValue}
                                             onChange={(e) => setRatingValue(e.target.value)}
-                                            className="h-8 text-xs auth-input"
+                                            className="h-8 text-xs focus-brand"
                                           />
                                         </div>
                                         {(ratingOperator || ratingValue) && (
@@ -1401,7 +1378,7 @@ export default function ListsPage() {
                                     </PopoverContent>
                                   </Popover>
                                   {(ratingOperator && ratingValue) && (
-                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       1
                                     </span>
                                   )}
@@ -1451,7 +1428,7 @@ export default function ListsPage() {
                                     </PopoverContent>
                                   </Popover>
                                   {regionFilter.length > 0 && (
-                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       {regionFilter.length}
                                     </span>
                                   )}
@@ -1500,7 +1477,7 @@ export default function ListsPage() {
                                     </PopoverContent>
                                   </Popover>
                                   {platformFilter.length > 0 && (
-                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       {platformFilter.length}
                                     </span>
                                   )}
@@ -1547,7 +1524,7 @@ export default function ListsPage() {
                                     </PopoverContent>
                                   </Popover>
                                   {creatorTypeFilter.length > 0 && (
-                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       {creatorTypeFilter.length}
                                     </span>
                                   )}
@@ -1591,7 +1568,7 @@ export default function ListsPage() {
                                           href={kol.link} 
                                           target="_blank" 
                                           rel="noopener noreferrer"
-                                              className="text-sm text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:ring-offset-1 rounded px-1 py-0.5 transition-all duration-200"
+                                              className="text-sm text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-1 rounded px-1 py-0.5 transition-all duration-200"
                                         >
                                           View Profile
                                         </a>
@@ -1844,7 +1821,7 @@ export default function ListsPage() {
                                     href={kol.link} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
-                                    className="text-sm text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:ring-offset-1 rounded px-1 py-0.5 transition-all duration-200"
+                                    className="text-sm text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-1 rounded px-1 py-0.5 transition-all duration-200"
                                   >
                                     View Profile
                                   </a>
@@ -1985,7 +1962,7 @@ export default function ListsPage() {
                     id="share-link"
                     value={`${window.location.origin}/public/lists/${sharingList?.slug || sharingList?.id}`}
                     readOnly
-                    className="flex-1 auth-input"
+                    className="flex-1 focus-brand"
                   />
                   <Button
                     variant="outline"
@@ -2048,7 +2025,7 @@ export default function ListsPage() {
             <div className="py-4">
               {loadingEmailViews ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#3e8692]"></div>
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand"></div>
                 </div>
               ) : emailViews.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
@@ -2109,7 +2086,7 @@ export default function ListsPage() {
                     value={combinedListName}
                     onChange={(e) => setCombinedListName(e.target.value)}
                     placeholder="Enter name for combined list"
-                    className="auth-input"
+                    className="focus-brand"
                     required
                   />
                 </div>
@@ -2159,7 +2136,7 @@ export default function ListsPage() {
                           <div
                             key={list.id}
                             className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                              isSelected ? 'border-[#3e8692] bg-[#3e8692]/5' : 'border-gray-200 hover:border-gray-300'
+                              isSelected ? 'border-brand bg-brand/5' : 'border-gray-200 hover:border-gray-300'
                             }`}
                             onClick={toggleSelection}
                           >
@@ -2239,7 +2216,7 @@ export default function ListsPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search lists by name, notes, or KOLs..."
-              className="pl-10 auth-input"
+              className="pl-10 focus-brand"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -2286,15 +2263,15 @@ export default function ListsPage() {
           </div>
         </div>
         {filteredLists.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-gray-600">
-              {searchTerm || statusFilter !== 'all'
-                ? 'No lists found matching your criteria.'
-                : 'No lists found.'}
-            </p>
+          <EmptyState
+            icon={List}
+            title={searchTerm || statusFilter !== 'all'
+              ? 'No lists match your criteria.'
+              : 'No lists yet.'}
+          >
             {!searchTerm && statusFilter === 'all' && (
               <Button
-                className="mt-4 hover:opacity-90"
+                className="hover:opacity-90"
                 style={{ backgroundColor: '#3e8692', color: 'white' }}
                 onClick={() => { setIsEditMode(false); setIsNewListOpen(true); }}
               >
@@ -2302,7 +2279,7 @@ export default function ListsPage() {
                 Add Your First List
               </Button>
             )}
-          </div>
+          </EmptyState>
         ) : viewMode === 'card' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {paginatedLists.map((list) => (
@@ -2539,5 +2516,43 @@ export default function ListsPage() {
         )}
       </div>
     </ProtectedRoute>
+  );
+}
+
+// Module-scope skeleton — see comment in main component for context.
+// Pure JSX with no props/closure; one stable function reference for the
+// whole app lifetime so React's reconciler treats every instance as the
+// same component type (no remount on parent re-render).
+function ListCardSkeleton() {
+  return (
+    <Card className="transition-shadow h-full flex flex-col">
+      <CardHeader className="pb-4">
+        <div className="mb-3">
+          <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
+            <div className="flex items-center">
+              <Skeleton className="h-8 w-8 rounded-lg mr-2" />
+              <Skeleton className="h-5 w-40" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-6 w-16 rounded-full" />
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center text-sm text-gray-600">
+            <Skeleton className="h-4 w-4 mr-2" />
+            <Skeleton className="h-4 w-36" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-4 border-t border-gray-100 flex flex-col flex-1">
+        <div className="flex gap-2 mt-auto">
+          <Skeleton className="h-8 w-full rounded" />
+          <Skeleton className="h-8 w-full rounded" />
+        </div>
+        <Skeleton className="h-8 w-full rounded mt-2" />
+      </CardContent>
+    </Card>
   );
 } 

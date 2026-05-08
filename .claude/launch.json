@@ -4,8 +4,9 @@
     {
       "name": "next-dev",
       "runtimeExecutable": "/bin/zsh",
-      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npm run dev"],
-      "port": 3000
+      "runtimeArgs": ["-c", "export PATH=/usr/local/bin:$PATH && npm run dev -- --port $PORT"],
+      "port": 3000,
+      "autoPort": true
     }
   ]
 }

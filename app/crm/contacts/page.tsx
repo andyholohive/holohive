@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { KpiCard } from '@/components/ui/kpi-card';
 import {
   CRMService,
   CRMContact,
@@ -334,11 +335,11 @@ export default function ContactsPage() {
   if (loading) {
     return (
       <div className="flex flex-col gap-6">
-        {/* Header skeleton */}
+        {/* Header — real title/subtitle render immediately. */}
         <div className="flex items-center justify-between">
           <div>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-4 w-56" />
+            <h2 className="text-2xl font-bold text-gray-900">Contacts</h2>
+            <p className="text-gray-600">Manage your contact directory</p>
           </div>
           <div className="flex items-center gap-4">
             <Skeleton className="h-10 w-64" />
@@ -384,7 +385,7 @@ export default function ContactsPage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search contacts..."
-              className="pl-10 w-64 auth-input"
+              className="pl-10 w-64 focus-brand"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -405,60 +406,36 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards — flat KpiCard baseline (was gradient cards before
+          2026-05-06; replaced for visual consistency with /analytics and
+          /crm/network). Brand teal on Total Contacts (the operationally-
+          interesting metric); other tones differentiate the linked/
+          unlinked/category split. */}
       <div className="grid grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-100">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-600">Total Contacts</p>
-                <p className="text-2xl font-bold text-gray-900">{contacts.length}</p>
-              </div>
-              <div className="p-2.5 bg-blue-100 rounded-lg">
-                <UserPlus className="h-5 w-5 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-green-50 to-white border-green-100">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600">Linked</p>
-                <p className="text-2xl font-bold text-gray-900">{linkedContacts}</p>
-              </div>
-              <div className="p-2.5 bg-green-100 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-amber-50 to-white border-amber-100">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-amber-600">Unlinked</p>
-                <p className="text-2xl font-bold text-gray-900">{unlinkedContacts}</p>
-              </div>
-              <div className="p-2.5 bg-amber-100 rounded-lg">
-                <Users className="h-5 w-5 text-amber-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-purple-50 to-white border-purple-100">
-          <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-600">Categories</p>
-                <p className="text-2xl font-bold text-gray-900">{categories.length}</p>
-              </div>
-              <div className="p-2.5 bg-purple-100 rounded-lg">
-                <Building2 className="h-5 w-5 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <KpiCard
+          icon={UserPlus}
+          label="Total Contacts"
+          value={contacts.length}
+          accent="brand"
+        />
+        <KpiCard
+          icon={TrendingUp}
+          label="Linked"
+          value={linkedContacts}
+          accent="emerald"
+        />
+        <KpiCard
+          icon={Users}
+          label="Unlinked"
+          value={unlinkedContacts}
+          accent="amber"
+        />
+        <KpiCard
+          icon={Building2}
+          label="Categories"
+          value={categories.length}
+          accent="purple"
+        />
       </div>
 
       {/* Filters, Sort, and View Toggle */}
@@ -469,7 +446,7 @@ export default function ContactsPage() {
             <span className="text-sm text-gray-600">Filters:</span>
           </div>
           <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="w-40 h-9 text-sm auth-input">
+            <SelectTrigger className="w-40 h-9 text-sm focus-brand">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
@@ -480,7 +457,7 @@ export default function ContactsPage() {
             </SelectContent>
           </Select>
           <Select value={filterLinked} onValueChange={setFilterLinked}>
-            <SelectTrigger className="w-36 h-9 text-sm auth-input">
+            <SelectTrigger className="w-36 h-9 text-sm focus-brand">
               <SelectValue placeholder="Link status" />
             </SelectTrigger>
             <SelectContent>
@@ -495,7 +472,7 @@ export default function ContactsPage() {
             <span className="text-sm text-gray-600">Sort:</span>
           </div>
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-40 h-9 text-sm auth-input">
+            <SelectTrigger className="w-40 h-9 text-sm focus-brand">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
@@ -825,7 +802,7 @@ export default function ContactsPage() {
                   value={contactForm.name}
                   onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
                   placeholder="Contact name"
-                  className="auth-input"
+                  className="focus-brand"
                   required
                 />
               </div>
@@ -838,7 +815,7 @@ export default function ContactsPage() {
                     value={contactForm.email || ''}
                     onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
                     placeholder="Email address"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
                 <div className="grid gap-2">
@@ -848,7 +825,7 @@ export default function ContactsPage() {
                     value={contactForm.role || ''}
                     onChange={(e) => setContactForm({ ...contactForm, role: e.target.value })}
                     placeholder="Job title/role"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
               </div>
@@ -860,7 +837,7 @@ export default function ContactsPage() {
                     value={contactForm.telegram_id || ''}
                     onChange={(e) => setContactForm({ ...contactForm, telegram_id: e.target.value })}
                     placeholder="@username"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
                 <div className="grid gap-2">
@@ -870,7 +847,7 @@ export default function ContactsPage() {
                     value={contactForm.x_id || ''}
                     onChange={(e) => setContactForm({ ...contactForm, x_id: e.target.value })}
                     placeholder="@handle"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
               </div>
@@ -882,7 +859,7 @@ export default function ContactsPage() {
                       variant="outline"
                       role="combobox"
                       aria-expanded={categoryPopoverOpen}
-                      className="w-full justify-between auth-input font-normal"
+                      className="w-full justify-between focus-brand font-normal"
                     >
                       {contactForm.category || <span className="text-gray-400">Select or enter category...</span>}
                     </Button>
@@ -936,7 +913,7 @@ export default function ContactsPage() {
                   value={contactForm.notes || ''}
                   onChange={(e) => setContactForm({ ...contactForm, notes: e.target.value })}
                   placeholder="Additional notes..."
-                  className="auth-input"
+                  className="focus-brand"
                   rows={3}
                 />
               </div>
@@ -996,7 +973,7 @@ export default function ContactsPage() {
                               }
                             }}
                           >
-                            <SelectTrigger className="auth-input">
+                            <SelectTrigger className="focus-brand">
                               <SelectValue placeholder="Select affiliate..." />
                             </SelectTrigger>
                             <SelectContent>
@@ -1027,7 +1004,7 @@ export default function ContactsPage() {
                         </div>
                         {linkToPartner && (
                           <Select value={selectedPartnerId} onValueChange={setSelectedPartnerId}>
-                            <SelectTrigger className="auth-input">
+                            <SelectTrigger className="focus-brand">
                               <SelectValue placeholder="Select partner..." />
                             </SelectTrigger>
                             <SelectContent>

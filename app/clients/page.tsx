@@ -362,15 +362,48 @@ export default function ClientsPage() {
     try {
       setLoading(true);
       setError(null);
+
+      // Step 1 — must complete first because every parallel query
+      // below either uses the client list or builds a per-client map
+      // keyed by client_id (we don't NEED clientIds upfront for the
+      // raw selects, but campaigns is filtered by client_id and the
+      // status-map seed loop requires the fetched client objects).
       const fetchedClients = await ClientService.getClientsForUser(
         userProfile.role as 'admin' | 'member' | 'client',
         user.id
       );
-
       setClients(fetchedClients);
-      // Fetch campaigns for all clients and compute status breakdown
       const clientIds = fetchedClients.map(c => c.id);
-      const allCampaigns: any[] = await CampaignService.getCampaignsByClientIds(clientIds);
+
+      // Step 2 — fan out everything else in parallel. Was 10 sequential
+      // round-trips (~5-8s on slow connections); now one round-trip
+      // window. Promise.all rejects if any fails — wrap in try so a
+      // single 4xx from a stale row doesn't blank the whole page.
+      const [
+        allCampaigns,
+        allOpportunities,
+        notesRes,
+        ctxRes,
+        decRes,
+        weekRes,
+        actionRes,
+        milestoneRes,
+        templateRes,
+        mindshareRes,
+      ] = await Promise.all([
+        CampaignService.getCampaignsByClientIds(clientIds) as Promise<any[]>,
+        CRMService.getAllOpportunities(),
+        supabase.from('client_meeting_notes').select('*').order('meeting_date', { ascending: false }),
+        supabase.from('client_context').select('*'),
+        supabase.from('client_decision_log').select('*').order('decision_date', { ascending: false }),
+        supabase.from('client_weekly_updates').select('*').order('week_of', { ascending: false }),
+        supabase.from('client_action_items').select('*').order('display_order', { ascending: true }),
+        supabase.from('client_milestones').select('*').order('display_order', { ascending: true }),
+        supabase.from('milestone_templates').select('*').order('is_default', { ascending: false }).order('name'),
+        supabase.from('client_mindshare_config').select('client_id, is_enabled'),
+      ]);
+
+      // Build the campaigns-by-status map per client
       const statusMap: Record<string, Record<CampaignStatus, number>> = {};
       for (const client of fetchedClients) {
         statusMap[client.id] = { Planning: 0, Active: 0, Paused: 0, Completed: 0 };
@@ -387,81 +420,68 @@ export default function ClientsPage() {
         }))
       );
 
-      // Fetch linked accounts (opportunities with client_id)
-      const allOpportunities = await CRMService.getAllOpportunities();
+      // Linked accounts (opportunities with client_id)
       const accountsMap: Record<string, CRMOpportunity[]> = {};
       for (const opp of allOpportunities) {
         if (opp.client_id) {
-          if (!accountsMap[opp.client_id]) {
-            accountsMap[opp.client_id] = [];
-          }
+          if (!accountsMap[opp.client_id]) accountsMap[opp.client_id] = [];
           accountsMap[opp.client_id].push(opp);
         }
       }
       setLinkedAccounts(accountsMap);
 
-      // Fetch meeting notes
-      const { data: notesData } = await supabase
-        .from('client_meeting_notes')
-        .select('*')
-        .order('meeting_date', { ascending: false });
+      // Meeting notes
       const notesMap: Record<string, MeetingNote[]> = {};
-      for (const note of (notesData || [])) {
+      for (const note of (notesRes.data || [])) {
         if (!notesMap[note.client_id]) notesMap[note.client_id] = [];
         notesMap[note.client_id].push(note);
       }
       setClientMeetingNotes(notesMap);
 
-      // Fetch client contexts
-      const { data: ctxData } = await supabase.from('client_context').select('*');
+      // Client contexts
       const ctxMap: Record<string, ClientContext> = {};
-      for (const ctx of (ctxData || [])) ctxMap[ctx.client_id] = ctx;
+      for (const ctx of (ctxRes.data || [])) ctxMap[ctx.client_id] = ctx;
       setClientContexts(ctxMap);
 
-      // Fetch decision logs
-      const { data: decData } = await supabase.from('client_decision_log').select('*').order('decision_date', { ascending: false });
+      // Decision logs
       const decMap: Record<string, DecisionLogEntry[]> = {};
-      for (const d of (decData || [])) {
+      for (const d of (decRes.data || [])) {
         if (!decMap[d.client_id]) decMap[d.client_id] = [];
         decMap[d.client_id].push(d);
       }
       setClientDecisionLogs(decMap);
 
-      // Fetch weekly updates
-      const { data: weekData } = await supabase.from('client_weekly_updates').select('*').order('week_of', { ascending: false });
+      // Weekly updates
       const weekMap: Record<string, WeeklyUpdate[]> = {};
-      for (const w of (weekData || [])) {
+      for (const w of (weekRes.data || [])) {
         if (!weekMap[w.client_id]) weekMap[w.client_id] = [];
         weekMap[w.client_id].push(w);
       }
       setClientWeeklyUpdates(weekMap);
 
-      // Fetch action items
-      const { data: actionData } = await supabase.from('client_action_items').select('*').order('display_order', { ascending: true });
+      // Action items
       const actionMap: Record<string, ActionItem[]> = {};
-      for (const item of (actionData || [])) {
+      for (const item of (actionRes.data || [])) {
         if (!actionMap[item.client_id]) actionMap[item.client_id] = [];
         actionMap[item.client_id].push(item as ActionItem);
       }
       setClientActionItems(actionMap);
 
-      // Fetch milestones
-      const { data: milestoneData } = await supabase.from('client_milestones').select('*').order('display_order', { ascending: true });
+      // Milestones
       const msMap: Record<string, Milestone[]> = {};
-      for (const ms of (milestoneData || [])) {
+      for (const ms of (milestoneRes.data || [])) {
         if (!msMap[ms.client_id]) msMap[ms.client_id] = [];
         msMap[ms.client_id].push(ms as Milestone);
       }
       setClientMilestones(msMap);
 
-      // Fetch milestone templates
-      const { data: templateData } = await supabase.from('milestone_templates').select('*').order('is_default', { ascending: false }).order('name');
-      setMilestoneTemplates(templateData || []);
+      // Milestone templates
+      // Cast: see other setMilestoneTemplates site for context.
+      setMilestoneTemplates((templateRes.data || []) as Array<{ id: string; name: string; description: string | null; milestones: any[]; is_default: boolean }>);
 
-      // Fetch mindshare configs
-      const { data: mindshareData } = await supabase.from('client_mindshare_config').select('client_id, is_enabled');
+      // Mindshare configs
       const msEnabled: Record<string, boolean> = {};
-      for (const mc of (mindshareData || [])) {
+      for (const mc of (mindshareRes.data || [])) {
         msEnabled[mc.client_id] = mc.is_enabled;
       }
       setClientMindshareEnabled(msEnabled);
@@ -653,7 +673,9 @@ export default function ClientsPage() {
     });
     if (!error) {
       const { data } = await supabase.from('milestone_templates').select('*').order('is_default', { ascending: false }).order('name');
-      setMilestoneTemplates(data || []);
+      // Cast: DB nullable fields vs the inline interface narrowing
+      // is_default to boolean. See archive/page.tsx for long-term fix.
+      setMilestoneTemplates((data || []) as Array<{ id: string; name: string; description: string | null; milestones: any[]; is_default: boolean }>);
     }
     return !error;
   };
@@ -1563,7 +1585,7 @@ export default function ClientsPage() {
           <div className="flex items-center space-x-4">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input placeholder="Search clients by name, email, or location..." className="pl-10 auth-input" disabled />
+              <Input placeholder="Search clients by name, email, or location..." className="pl-10 focus-brand" disabled />
             </div>
           </div>
           {/* Status Tabs Skeleton */}
@@ -1641,7 +1663,7 @@ export default function ClientsPage() {
                     {/* Step Indicator */}
                     <div className="flex items-center justify-center mb-4 gap-2">
                       {startClientSections.map((label, idx) => (
-                        <div key={label} className={`px-3 py-1 rounded-full text-xs font-medium ${idx === startClientStep ? 'bg-[#3e8692] text-white' : 'bg-gray-200 text-gray-600'}`}>{label}</div>
+                        <div key={label} className={`px-3 py-1 rounded-full text-xs font-medium ${idx === startClientStep ? 'bg-brand text-white' : 'bg-gray-200 text-gray-600'}`}>{label}</div>
                       ))}
                     </div>
                     {/* Section rendering */}
@@ -1658,7 +1680,7 @@ export default function ClientsPage() {
                               value={startClientForm.companyName}
                               onChange={(e) => setStartClientForm({ ...startClientForm, companyName: e.target.value })}
                               placeholder="Enter company name"
-                              className="auth-input"
+                              className="focus-brand"
                               disabled={startClientForm.isRenewingClient}
                             />
                           </div>
@@ -1697,7 +1719,7 @@ export default function ClientsPage() {
                                   });
                                 }
                               }}>
-                                <SelectTrigger className="auth-input">
+                                <SelectTrigger className="focus-brand">
                                   <SelectValue placeholder="Select existing client" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -1720,7 +1742,7 @@ export default function ClientsPage() {
                               value={startClientForm.email}
                               onChange={(e) => setStartClientForm({ ...startClientForm, email: e.target.value })}
                               placeholder="Enter email address"
-                              className="auth-input"
+                              className="focus-brand"
                               disabled={startClientForm.isRenewingClient}
                             />
                             {/* Email format error message */}
@@ -1735,7 +1757,7 @@ export default function ClientsPage() {
                               value={startClientForm.location}
                               onChange={(e) => setStartClientForm({ ...startClientForm, location: e.target.value })}
                               placeholder="Enter location"
-                              className="auth-input"
+                              className="focus-brand"
                               disabled={startClientForm.isRenewingClient}
                             />
                           </div>
@@ -1744,7 +1766,7 @@ export default function ClientsPage() {
                               Source {!startClientForm.isRenewingClient && <span className="text-red-500">*</span>}
                             </Label>
                             <Select value={startClientForm.source} onValueChange={(value) => setStartClientForm({ ...startClientForm, source: value })} disabled={startClientForm.isRenewingClient}>
-                              <SelectTrigger className="auth-input" disabled={startClientForm.isRenewingClient}>
+                              <SelectTrigger className="focus-brand" disabled={startClientForm.isRenewingClient}>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -1783,7 +1805,7 @@ export default function ClientsPage() {
                                 <PopoverTrigger asChild>
                                   <Button
                                     variant="outline"
-                                    className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                                    className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                                     style={{
                                       borderColor: '#e5e7eb',
                                       backgroundColor: 'white',
@@ -1827,7 +1849,7 @@ export default function ClientsPage() {
                               value={startClientForm.campaignName}
                               onChange={(e) => setStartClientForm({ ...startClientForm, campaignName: e.target.value })}
                               placeholder="Enter campaign name"
-                              className="auth-input"
+                              className="focus-brand"
                             />
                           </div>
                           <div className="grid gap-2">
@@ -1835,7 +1857,7 @@ export default function ClientsPage() {
                               Campaign Manager <span className="text-red-500">*</span>
                             </Label>
                             <Select value={startClientForm.campaignManager} onValueChange={(value) => setStartClientForm({ ...startClientForm, campaignManager: value })}>
-                              <SelectTrigger className="auth-input">
+                              <SelectTrigger className="focus-brand">
                                 <SelectValue placeholder="Select campaign manager" />
                               </SelectTrigger>
                               <SelectContent>
@@ -1856,7 +1878,7 @@ export default function ClientsPage() {
                                 <PopoverTrigger asChild>
                                   <Button
                                     variant="outline"
-                                    className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                                    className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                                     style={{
                                       borderColor: '#e5e7eb',
                                       backgroundColor: 'white',
@@ -1889,7 +1911,7 @@ export default function ClientsPage() {
                                 <PopoverTrigger asChild>
                                   <Button
                                     variant="outline"
-                                    className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                                    className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                                     style={{
                                       borderColor: '#e5e7eb',
                                       backgroundColor: 'white',
@@ -1930,7 +1952,7 @@ export default function ClientsPage() {
                                 clientChoosingKols: value === 'global'
                               });
                             }}>
-                              <SelectTrigger className="auth-input">
+                              <SelectTrigger className="focus-brand">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -1970,7 +1992,7 @@ export default function ClientsPage() {
                                 <PopoverTrigger asChild>
                                   <Button
                                     variant="outline"
-                                    className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                                    className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                                     style={{
                                       borderColor: '#e5e7eb',
                                       backgroundColor: 'white',
@@ -2015,7 +2037,7 @@ export default function ClientsPage() {
                                 });
                               }}
                               placeholder="Enter total budget"
-                              className="auth-input"
+                              className="focus-brand"
                             />
                           </div>
                          {/* Campaign Budget Allocation Section */}
@@ -2040,7 +2062,7 @@ export default function ClientsPage() {
                                        setStartClientForm({ ...startClientForm, budgetAllocations: newAllocs });
                                      }}
                                    >
-                                     <SelectTrigger className="w-32 auth-input">
+                                     <SelectTrigger className="w-32 focus-brand">
                                        <SelectValue placeholder="Select region" />
                                      </SelectTrigger>
                                      <SelectContent>
@@ -2055,7 +2077,7 @@ export default function ClientsPage() {
                                        type="text"
                                        inputMode="numeric"
                                        pattern="[0-9,]*"
-                                       className="auth-input pl-6 w-full"
+                                       className="focus-brand pl-6 w-full"
                                        placeholder="Amount"
                                        value={formattedAmount}
                                        onChange={e => {
@@ -2267,7 +2289,7 @@ export default function ClientsPage() {
                     <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
                       <div className="grid gap-2">
                         <Label htmlFor="name">Company Name</Label>
-                        <Input id="name" value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} placeholder="Enter company name" className="auth-input" required />
+                        <Input id="name" value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} placeholder="Enter company name" className="focus-brand" required />
                       </div>
                       <div className="grid gap-2">
                         <Label>Company Logo</Label>
@@ -2313,16 +2335,16 @@ export default function ClientsPage() {
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} placeholder="Enter email address" className="auth-input" required />
+                        <Input id="email" type="email" value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} placeholder="Enter email address" className="focus-brand" required />
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="location">Location</Label>
-                        <Input id="location" value={newClient.location} onChange={(e) => setNewClient({ ...newClient, location: e.target.value })} placeholder="Enter location (optional)" className="auth-input" />
+                        <Input id="location" value={newClient.location} onChange={(e) => setNewClient({ ...newClient, location: e.target.value })} placeholder="Enter location (optional)" className="focus-brand" />
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="source">Source</Label>
                         <Select value={newClient.source} onValueChange={(value) => setNewClient({ ...newClient, source: value })}>
-                          <SelectTrigger className="auth-input">
+                          <SelectTrigger className="focus-brand">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -2336,7 +2358,7 @@ export default function ClientsPage() {
                       <div className="grid gap-2">
                         <Label htmlFor="client-status">Status</Label>
                         <Select value={newClient.is_active ? 'active' : 'inactive'} onValueChange={(value) => setNewClient({ ...newClient, is_active: value === 'active' })}>
-                          <SelectTrigger className="auth-input">
+                          <SelectTrigger className="focus-brand">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -2362,7 +2384,7 @@ export default function ClientsPage() {
                               value={newClient.whitelist_partner_id || ""} 
                               onValueChange={(value) => setNewClient({ ...newClient, whitelist_partner_id: value || null })}
                             >
-                              <SelectTrigger className="auth-input">
+                              <SelectTrigger className="focus-brand">
                                 <SelectValue placeholder="Select partner" />
                               </SelectTrigger>
                               <SelectContent>
@@ -2384,7 +2406,7 @@ export default function ClientsPage() {
                             value={domainInput}
                             onChange={(e) => setDomainInput(e.target.value)}
                             placeholder={"Enter domains (comma or newline separated)\ne.g. partner.com, agency.com"}
-                            className="auth-input min-h-[60px] flex-1"
+                            className="focus-brand min-h-[60px] flex-1"
                           />
                         </div>
                         <Button
@@ -2451,7 +2473,7 @@ export default function ClientsPage() {
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input placeholder="Search clients by name, email, or location..." className="pl-10 auth-input" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <Input placeholder="Search clients by name, email, or location..." className="pl-10 focus-brand" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
         </div>
         {/* Status Tabs */}
@@ -2466,10 +2488,10 @@ export default function ClientsPage() {
             </TabsTrigger>
             <TabsTrigger
               value="active"
-              className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm px-4 py-2"
+              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm px-4 py-2"
             >
               Active
-              <span className="ml-2 text-xs bg-[#e8f4f5] text-[#3e8692] px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.active}</span>
+              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.active}</span>
             </TabsTrigger>
             <TabsTrigger
               value="inactive"
@@ -2636,10 +2658,10 @@ export default function ClientsPage() {
                         {/* Context */}
                         <button
                           onClick={() => openContextModal(client)}
-                          className="flex flex-col items-center gap-1.5 p-2.5 rounded-lg border border-gray-200 hover:border-[#3e8692] hover:bg-[#e8f4f5]/30 transition-colors group relative"
+                          className="flex flex-col items-center gap-1.5 p-2.5 rounded-lg border border-gray-200 hover:border-brand hover:bg-brand-light/30 transition-colors group relative"
                         >
-                          <Briefcase className="h-4 w-4 text-gray-400 group-hover:text-[#3e8692]" />
-                          <span className="text-[11px] font-medium text-gray-600 group-hover:text-[#3e8692]">Context</span>
+                          <Briefcase className="h-4 w-4 text-gray-400 group-hover:text-brand" />
+                          <span className="text-[11px] font-medium text-gray-600 group-hover:text-brand">Context</span>
                           {clientContexts[client.id] ? (
                             <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-green-500" title="Set up" />
                           ) : (
@@ -2649,12 +2671,12 @@ export default function ClientsPage() {
                         {/* Weekly Update */}
                         <button
                           onClick={() => { if (clientWeeklyUpdates[client.id]?.length) { openWeeklyModal(client); } else { openWeeklyModal(client); openWeeklyForm(); } }}
-                          className="flex flex-col items-center gap-1.5 p-2.5 rounded-lg border border-gray-200 hover:border-[#3e8692] hover:bg-[#e8f4f5]/30 transition-colors group relative"
+                          className="flex flex-col items-center gap-1.5 p-2.5 rounded-lg border border-gray-200 hover:border-brand hover:bg-brand-light/30 transition-colors group relative"
                         >
-                          <Activity className="h-4 w-4 text-gray-400 group-hover:text-[#3e8692]" />
-                          <span className="text-[11px] font-medium text-gray-600 group-hover:text-[#3e8692]">Updates</span>
+                          <Activity className="h-4 w-4 text-gray-400 group-hover:text-brand" />
+                          <span className="text-[11px] font-medium text-gray-600 group-hover:text-brand">Updates</span>
                           {(clientWeeklyUpdates[client.id]?.length || 0) > 0 ? (
-                            <span className="absolute top-1.5 right-1.5 bg-[#3e8692] text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center">{clientWeeklyUpdates[client.id].length}</span>
+                            <span className="absolute top-1.5 right-1.5 bg-brand text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center">{clientWeeklyUpdates[client.id].length}</span>
                           ) : (
                             <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-gray-300" />
                           )}
@@ -2662,12 +2684,12 @@ export default function ClientsPage() {
                         {/* Meeting Notes */}
                         <button
                           onClick={() => { setMeetingNotesModalClient(client); setMeetingNotesTab('notes'); if (!(clientMeetingNotes[client.id]?.length)) openNoteForm(); }}
-                          className="flex flex-col items-center gap-1.5 p-2.5 rounded-lg border border-gray-200 hover:border-[#3e8692] hover:bg-[#e8f4f5]/30 transition-colors group relative"
+                          className="flex flex-col items-center gap-1.5 p-2.5 rounded-lg border border-gray-200 hover:border-brand hover:bg-brand-light/30 transition-colors group relative"
                         >
-                          <StickyNote className="h-4 w-4 text-gray-400 group-hover:text-[#3e8692]" />
-                          <span className="text-[11px] font-medium text-gray-600 group-hover:text-[#3e8692]">Notes</span>
+                          <StickyNote className="h-4 w-4 text-gray-400 group-hover:text-brand" />
+                          <span className="text-[11px] font-medium text-gray-600 group-hover:text-brand">Notes</span>
                           {(clientMeetingNotes[client.id]?.length || 0) > 0 ? (
-                            <span className="absolute top-1.5 right-1.5 bg-[#3e8692] text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center">{clientMeetingNotes[client.id].length}</span>
+                            <span className="absolute top-1.5 right-1.5 bg-brand text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center">{clientMeetingNotes[client.id].length}</span>
                           ) : (
                             <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-gray-300" />
                           )}
@@ -2720,7 +2742,7 @@ export default function ClientsPage() {
                   <Input
                     value={`${typeof window !== 'undefined' ? window.location.origin : ''}/public/portal/${clientToShare?.slug || clientToShare?.id}`}
                     readOnly
-                    className="flex-1 auth-input"
+                    className="flex-1 focus-brand"
                   />
                   <Button variant="outline" className="h-10" onClick={copyPortalLink}>
                     <Copy className="h-4 w-4" />
@@ -2740,7 +2762,7 @@ export default function ClientsPage() {
                   <Input
                     value={getFormUrl(ONBOARDING_FORM_SLUG)}
                     readOnly
-                    className="flex-1 auth-input"
+                    className="flex-1 focus-brand"
                   />
                   <Button variant="outline" className="h-10" onClick={() => copyFormLink(ONBOARDING_FORM_SLUG, 'Onboarding form')}>
                     <Copy className="h-4 w-4" />
@@ -2765,7 +2787,7 @@ export default function ClientsPage() {
                       </Button>
                     </div>
                     <div className="flex gap-2">
-                      <Input value={getFormUrl(formSlugOrId)} readOnly className="flex-1 auth-input" />
+                      <Input value={getFormUrl(formSlugOrId)} readOnly className="flex-1 focus-brand" />
                       <Button variant="outline" className="h-10" onClick={() => copyFormLink(formSlugOrId, form.name)}>
                         <Copy className="h-4 w-4" />
                       </Button>
@@ -2786,7 +2808,7 @@ export default function ClientsPage() {
                   <div className="space-y-2">
                     <Label>Add Form</Label>
                     <Select onValueChange={v => { setShareExtraForms(prev => [...prev, v]); setShareAddFormOpen(false); }}>
-                      <SelectTrigger className="auth-input">
+                      <SelectTrigger className="focus-brand">
                         <SelectValue placeholder="Select a form..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -2832,7 +2854,7 @@ export default function ClientsPage() {
                       <Label>Date <span className="text-red-500">*</span></Label>
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" className="auth-input justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: decisionForm.decision_date ? '#111827' : '#9ca3af' }}>
+                          <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: decisionForm.decision_date ? '#111827' : '#9ca3af' }}>
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {decisionForm.decision_date ? decisionForm.decision_date.toLocaleDateString() : 'Select date'}
                           </Button>
@@ -2844,7 +2866,7 @@ export default function ClientsPage() {
                     </div>
                     <div className="grid gap-2">
                       <Label>Decision Summary <span className="text-red-500">*</span></Label>
-                      <Input value={decisionForm.summary} onChange={(e) => setDecisionForm({ ...decisionForm, summary: e.target.value })} placeholder="1-2 line decision summary" className="auth-input" />
+                      <Input value={decisionForm.summary} onChange={(e) => setDecisionForm({ ...decisionForm, summary: e.target.value })} placeholder="1-2 line decision summary" className="focus-brand" />
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleDecisionSubmit} disabled={!decisionForm.summary.trim() || !decisionForm.decision_date}>
@@ -2935,13 +2957,13 @@ export default function ClientsPage() {
                   </div>
                   <div className="grid gap-2">
                     <Label>Title <span className="text-red-500">*</span></Label>
-                    <Input value={meetingNoteForm.title} onChange={(e) => setMeetingNoteForm({ ...meetingNoteForm, title: e.target.value })} placeholder="Meeting title" className="auth-input" />
+                    <Input value={meetingNoteForm.title} onChange={(e) => setMeetingNoteForm({ ...meetingNoteForm, title: e.target.value })} placeholder="Meeting title" className="focus-brand" />
                   </div>
                   <div className="grid gap-2">
                     <Label>Meeting Date <span className="text-red-500">*</span></Label>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className="auth-input justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: meetingNoteForm.meeting_date ? '#111827' : '#9ca3af' }}>
+                        <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: meetingNoteForm.meeting_date ? '#111827' : '#9ca3af' }}>
                           <CalendarIcon className="mr-2 h-4 w-4" />
                           {meetingNoteForm.meeting_date ? meetingNoteForm.meeting_date.toLocaleDateString() : 'Select date'}
                         </Button>
@@ -2953,7 +2975,7 @@ export default function ClientsPage() {
                   </div>
                   <div className="grid gap-2">
                     <Label>Attendees</Label>
-                    <Input value={meetingNoteForm.attendees} onChange={(e) => setMeetingNoteForm({ ...meetingNoteForm, attendees: e.target.value })} placeholder="e.g. John, Sarah, Mike" className="auth-input" />
+                    <Input value={meetingNoteForm.attendees} onChange={(e) => setMeetingNoteForm({ ...meetingNoteForm, attendees: e.target.value })} placeholder="e.g. John, Sarah, Mike" className="focus-brand" />
                   </div>
                   <div className="grid gap-2">
                     <Label>Content</Label>
@@ -3077,7 +3099,7 @@ export default function ClientsPage() {
                   <div className="grid gap-2">
                     <Label>Engagement Type</Label>
                     <Select value={contextForm.engagement_type} onValueChange={(v) => setContextForm({ ...contextForm, engagement_type: v })}>
-                      <SelectTrigger className="auth-input"><SelectValue placeholder="Select type" /></SelectTrigger>
+                      <SelectTrigger className="focus-brand"><SelectValue placeholder="Select type" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="KOL">KOL</SelectItem>
                         <SelectItem value="GTM">GTM</SelectItem>
@@ -3089,7 +3111,7 @@ export default function ClientsPage() {
                   <div className="grid gap-2">
                     <Label>Onboarding Phase</Label>
                     <Select value={contextForm.onboarding_phase} onValueChange={(v) => setContextForm({ ...contextForm, onboarding_phase: v === 'auto' ? '' : v })}>
-                      <SelectTrigger className="auth-input"><SelectValue placeholder="Auto (default)" /></SelectTrigger>
+                      <SelectTrigger className="focus-brand"><SelectValue placeholder="Auto (default)" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="auto">Auto (default)</SelectItem>
                         <SelectItem value="kickoff">Kickoff</SelectItem>
@@ -3102,20 +3124,20 @@ export default function ClientsPage() {
                     <div className="flex items-center justify-between">
                       <Label>Scope</Label>
                       {contextModalClient && getLinkedCRMAccount(contextModalClient.id) && (
-                        <span className="text-xs text-[#3e8692] font-medium">From Pipeline</span>
+                        <span className="text-xs text-brand font-medium">From Pipeline</span>
                       )}
                     </div>
                     {contextModalClient && getLinkedCRMAccount(contextModalClient.id) ? (
                       <div className="flex h-auto min-h-[80px] w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">{contextForm.scope || '—'}</div>
                     ) : (
-                      <Textarea value={contextForm.scope} onChange={(e) => setContextForm({ ...contextForm, scope: e.target.value })} placeholder="Project description, regions, etc." className="auth-input" rows={3} />
+                      <Textarea value={contextForm.scope} onChange={(e) => setContextForm({ ...contextForm, scope: e.target.value })} placeholder="Project description, regions, etc." className="focus-brand" rows={3} />
                     )}
                   </div>
                   <div className="grid gap-2">
                     <div className="flex items-center justify-between">
                       <Label>Start Date</Label>
                       {contextModalClient && getLinkedCRMAccount(contextModalClient.id) && (
-                        <span className="text-xs text-[#3e8692] font-medium">From Pipeline</span>
+                        <span className="text-xs text-brand font-medium">From Pipeline</span>
                       )}
                     </div>
                     {contextModalClient && getLinkedCRMAccount(contextModalClient.id) ? (
@@ -3126,7 +3148,7 @@ export default function ClientsPage() {
                     ) : (
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" className="auth-input justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: contextForm.start_date ? '#111827' : '#9ca3af' }}>
+                          <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: contextForm.start_date ? '#111827' : '#9ca3af' }}>
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {contextForm.start_date ? contextForm.start_date.toLocaleDateString() : 'Select start date'}
                           </Button>
@@ -3139,30 +3161,30 @@ export default function ClientsPage() {
                   </div>
                   <div className="grid gap-2">
                     <Label>Milestones</Label>
-                    <Textarea value={contextForm.milestones} onChange={(e) => setContextForm({ ...contextForm, milestones: e.target.value })} placeholder="Expected milestones..." className="auth-input" rows={3} />
+                    <Textarea value={contextForm.milestones} onChange={(e) => setContextForm({ ...contextForm, milestones: e.target.value })} placeholder="Expected milestones..." className="focus-brand" rows={3} />
                   </div>
                   <div className="grid gap-2">
                     <Label>Client Contacts</Label>
-                    <Input value={contextForm.client_contacts} onChange={(e) => setContextForm({ ...contextForm, client_contacts: e.target.value })} placeholder="Primary contacts on client side" className="auth-input" />
+                    <Input value={contextForm.client_contacts} onChange={(e) => setContextForm({ ...contextForm, client_contacts: e.target.value })} placeholder="Primary contacts on client side" className="focus-brand" />
                   </div>
                   <div className="grid gap-2">
                     <Label>Holo Hive Contacts</Label>
-                    <Input value={contextForm.holohive_contacts} onChange={(e) => setContextForm({ ...contextForm, holohive_contacts: e.target.value })} placeholder="Primary contacts on Holo Hive side" className="auth-input" />
+                    <Input value={contextForm.holohive_contacts} onChange={(e) => setContextForm({ ...contextForm, holohive_contacts: e.target.value })} placeholder="Primary contacts on Holo Hive side" className="focus-brand" />
                   </div>
                   <div className="border-t pt-4 mt-2">
                     <p className="text-sm font-semibold text-gray-700 mb-3">Resource Links (shown in client portal)</p>
                     <div className="grid gap-3">
                       <div className="grid gap-1">
                         <Label className="text-xs">Telegram Group URL</Label>
-                        <Input value={contextForm.telegram_url} onChange={(e) => setContextForm({ ...contextForm, telegram_url: e.target.value })} placeholder="https://t.me/..." className="auth-input" />
+                        <Input value={contextForm.telegram_url} onChange={(e) => setContextForm({ ...contextForm, telegram_url: e.target.value })} placeholder="https://t.me/..." className="focus-brand" />
                       </div>
                       <div className="grid gap-1">
                         <Label className="text-xs">Shared Drive URL</Label>
-                        <Input value={contextForm.shared_drive_url} onChange={(e) => setContextForm({ ...contextForm, shared_drive_url: e.target.value })} placeholder="https://drive.google.com/..." className="auth-input" />
+                        <Input value={contextForm.shared_drive_url} onChange={(e) => setContextForm({ ...contextForm, shared_drive_url: e.target.value })} placeholder="https://drive.google.com/..." className="focus-brand" />
                       </div>
                       <div className="grid gap-1">
                         <Label className="text-xs">GTM Sync / Tracker URL</Label>
-                        <Input value={contextForm.gtm_sync_url} onChange={(e) => setContextForm({ ...contextForm, gtm_sync_url: e.target.value })} placeholder="https://..." className="auth-input" />
+                        <Input value={contextForm.gtm_sync_url} onChange={(e) => setContextForm({ ...contextForm, gtm_sync_url: e.target.value })} placeholder="https://..." className="focus-brand" />
                       </div>
                     </div>
                   </div>
@@ -3189,7 +3211,7 @@ export default function ClientsPage() {
                             }
                           }}
                           placeholder="e.g. company.com"
-                          className="auth-input flex-1"
+                          className="focus-brand flex-1"
                         />
                         <Button size="sm" variant="outline" className="text-xs" onClick={() => {
                           const domain = contextDomainInput.replace(/^@/, '').trim().toLowerCase();
@@ -3265,7 +3287,7 @@ export default function ClientsPage() {
                           </div>
                           {item.attachment_url && (
                             <div className="ml-8 mt-1">
-                              <a href={item.attachment_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-[#3e8692] hover:underline">
+                              <a href={item.attachment_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-brand hover:underline">
                                 <LinkIcon className="h-3 w-3" />
                                 {item.attachment_label || 'View attachment'}
                               </a>
@@ -3316,7 +3338,7 @@ export default function ClientsPage() {
                       {saveTemplateOpen && (
                         <div className="border rounded-lg p-3 space-y-2 bg-blue-50">
                           <p className="text-xs font-medium text-gray-700">Save current milestones as a reusable template</p>
-                          <Input value={saveTemplateName} onChange={(e) => setSaveTemplateName(e.target.value)} placeholder="Template name..." className="auth-input" autoFocus />
+                          <Input value={saveTemplateName} onChange={(e) => setSaveTemplateName(e.target.value)} placeholder="Template name..." className="focus-brand" autoFocus />
                           <div className="flex items-center gap-2">
                             <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} disabled={!saveTemplateName.trim()} onClick={async () => {
                               if (contextModalClient) {
@@ -3342,9 +3364,9 @@ export default function ClientsPage() {
                       {/* Milestone form */}
                       {isMilestoneFormOpen && (
                         <div className="border rounded-lg p-3 space-y-2 bg-gray-50">
-                          <Input value={milestoneForm.name} onChange={(e) => setMilestoneForm({ ...milestoneForm, name: e.target.value })} placeholder="Milestone name" className="auth-input" autoFocus />
-                          <Input value={milestoneForm.subtitle} onChange={(e) => setMilestoneForm({ ...milestoneForm, subtitle: e.target.value })} placeholder="Subtitle (optional)" className="auth-input" />
-                          <Input value={milestoneForm.status_message} onChange={(e) => setMilestoneForm({ ...milestoneForm, status_message: e.target.value })} placeholder="Status message for client (optional)" className="auth-input" />
+                          <Input value={milestoneForm.name} onChange={(e) => setMilestoneForm({ ...milestoneForm, name: e.target.value })} placeholder="Milestone name" className="focus-brand" autoFocus />
+                          <Input value={milestoneForm.subtitle} onChange={(e) => setMilestoneForm({ ...milestoneForm, subtitle: e.target.value })} placeholder="Subtitle (optional)" className="focus-brand" />
+                          <Input value={milestoneForm.status_message} onChange={(e) => setMilestoneForm({ ...milestoneForm, status_message: e.target.value })} placeholder="Status message for client (optional)" className="focus-brand" />
                           <div className="flex items-center gap-2">
                             <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleMilestoneSubmit} disabled={!milestoneForm.name.trim()}>
                               {editingMilestoneId ? 'Save' : 'Add'}
@@ -3360,10 +3382,10 @@ export default function ClientsPage() {
                         const yoursItems = msItems.filter(i => i.court === 'yours').sort((a, b) => a.display_order - b.display_order);
                         const oursItems = msItems.filter(i => i.court === 'ours').sort((a, b) => a.display_order - b.display_order);
                         const isExpanded = activeMilestoneId === ms.id;
-                        const statusColor = ms.status === 'complete' ? 'border-green-200 bg-green-50/30' : ms.status === 'active' ? 'border-[#3e8692] bg-[#3e8692]/5' : 'border-gray-200 bg-gray-50/50';
+                        const statusColor = ms.status === 'complete' ? 'border-green-200 bg-green-50/30' : ms.status === 'active' ? 'border-brand bg-brand/5' : 'border-gray-200 bg-gray-50/50';
                         const StatusIcon = ms.status === 'complete' ? CheckCircle : ms.status === 'active' ? Circle : Lock;
-                        const statusIconColor = ms.status === 'complete' ? 'text-green-500' : ms.status === 'active' ? 'text-[#3e8692]' : 'text-gray-300';
-                        const statusBadge = ms.status === 'complete' ? { label: 'Complete', bg: 'bg-green-100 text-green-700' } : ms.status === 'active' ? { label: 'Active', bg: 'bg-[#e8f4f5] text-[#3e8692]' } : { label: 'Upcoming', bg: 'bg-gray-100 text-gray-500' };
+                        const statusIconColor = ms.status === 'complete' ? 'text-green-500' : ms.status === 'active' ? 'text-brand' : 'text-gray-300';
+                        const statusBadge = ms.status === 'complete' ? { label: 'Complete', bg: 'bg-green-100 text-green-700' } : ms.status === 'active' ? { label: 'Active', bg: 'bg-brand-light text-brand' } : { label: 'Upcoming', bg: 'bg-gray-100 text-gray-500' };
 
                         return (
                           <div key={ms.id} className={`border rounded-lg overflow-hidden ${statusColor} ${!ms.is_visible ? 'opacity-50' : ''}`}>
@@ -3425,7 +3447,7 @@ export default function ClientsPage() {
                                 {/* Action items by court */}
                                 <div className="grid grid-cols-2 gap-3">
                                   <div>
-                                    <p className="text-[10px] font-semibold text-[#3e8692] uppercase tracking-wider mb-1.5">Holo Hive</p>
+                                    <p className="text-[10px] font-semibold text-brand uppercase tracking-wider mb-1.5">Holo Hive</p>
                                     <div className="space-y-1">{oursItems.map(renderActionItem)}</div>
                                     {oursItems.length === 0 && <p className="text-xs text-gray-400 py-1">No items</p>}
                                   </div>
@@ -3439,14 +3461,14 @@ export default function ClientsPage() {
                                 {/* Add Item */}
                                 {isActionItemFormOpen && activeMilestoneId === ms.id ? (
                                   <div className="border rounded-lg p-3 space-y-2 bg-white">
-                                    <Input value={actionItemForm.text} onChange={(e) => setActionItemForm({ ...actionItemForm, text: e.target.value })} placeholder="Action item text" className="auth-input" autoFocus />
+                                    <Input value={actionItemForm.text} onChange={(e) => setActionItemForm({ ...actionItemForm, text: e.target.value })} placeholder="Action item text" className="focus-brand" autoFocus />
                                     <div className="grid grid-cols-2 gap-2">
-                                      <Input value={actionItemForm.attachment_url} onChange={(e) => setActionItemForm({ ...actionItemForm, attachment_url: e.target.value })} placeholder="Link URL (optional)" className="auth-input" />
-                                      <Input value={actionItemForm.attachment_label} onChange={(e) => setActionItemForm({ ...actionItemForm, attachment_label: e.target.value })} placeholder="Link label (optional)" className="auth-input" />
+                                      <Input value={actionItemForm.attachment_url} onChange={(e) => setActionItemForm({ ...actionItemForm, attachment_url: e.target.value })} placeholder="Link URL (optional)" className="focus-brand" />
+                                      <Input value={actionItemForm.attachment_label} onChange={(e) => setActionItemForm({ ...actionItemForm, attachment_label: e.target.value })} placeholder="Link label (optional)" className="focus-brand" />
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <Select value={actionItemForm.court} onValueChange={(v: 'yours' | 'ours') => setActionItemForm({ ...actionItemForm, court: v })}>
-                                        <SelectTrigger className="auth-input w-[160px]"><SelectValue /></SelectTrigger>
+                                        <SelectTrigger className="focus-brand w-[160px]"><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                           <SelectItem value="yours">Your Tasks</SelectItem>
                                           <SelectItem value="ours">Holo Hive</SelectItem>
@@ -3500,7 +3522,7 @@ export default function ClientsPage() {
                       <Label>Week Of <span className="text-red-500">*</span></Label>
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" className="auth-input justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: weeklyForm.week_of ? '#111827' : '#9ca3af' }}>
+                          <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: weeklyForm.week_of ? '#111827' : '#9ca3af' }}>
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {weeklyForm.week_of ? weeklyForm.week_of.toLocaleDateString() : 'Select week'}
                           </Button>
@@ -3514,7 +3536,7 @@ export default function ClientsPage() {
                       <Label>Next Check-in</Label>
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" className="auth-input justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: weeklyForm.next_checkin ? '#111827' : '#9ca3af' }}>
+                          <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: weeklyForm.next_checkin ? '#111827' : '#9ca3af' }}>
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {weeklyForm.next_checkin ? weeklyForm.next_checkin.toLocaleDateString() : 'Select date'}
                           </Button>
@@ -3527,15 +3549,15 @@ export default function ClientsPage() {
                   </div>
                   <div className="grid gap-2">
                     <Label>Current Focus <span className="text-red-500">*</span></Label>
-                    <Input value={weeklyForm.current_focus} onChange={(e) => setWeeklyForm({ ...weeklyForm, current_focus: e.target.value })} placeholder="1 sentence current focus" className="auth-input" />
+                    <Input value={weeklyForm.current_focus} onChange={(e) => setWeeklyForm({ ...weeklyForm, current_focus: e.target.value })} placeholder="1 sentence current focus" className="focus-brand" />
                   </div>
                   <div className="grid gap-2">
                     <Label>Active Initiatives</Label>
-                    <Textarea value={weeklyForm.active_initiatives} onChange={(e) => setWeeklyForm({ ...weeklyForm, active_initiatives: e.target.value })} placeholder="Max ~3 items, one per line" className="auth-input" rows={3} />
+                    <Textarea value={weeklyForm.active_initiatives} onChange={(e) => setWeeklyForm({ ...weeklyForm, active_initiatives: e.target.value })} placeholder="Max ~3 items, one per line" className="focus-brand" rows={3} />
                   </div>
                   <div className="grid gap-2">
                     <Label>Open Questions / Blockers</Label>
-                    <Textarea value={weeklyForm.open_questions} onChange={(e) => setWeeklyForm({ ...weeklyForm, open_questions: e.target.value })} placeholder="Blockers or open items..." className="auth-input" rows={2} />
+                    <Textarea value={weeklyForm.open_questions} onChange={(e) => setWeeklyForm({ ...weeklyForm, open_questions: e.target.value })} placeholder="Blockers or open items..." className="focus-brand" rows={2} />
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleWeeklySubmit} disabled={!weeklyForm.current_focus.trim() || !weeklyForm.week_of}>

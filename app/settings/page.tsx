@@ -8,13 +8,14 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { User, Mail, AtSign, Camera, Loader2, Save, ArrowLeft, MessageSquare, CheckCircle, XCircle, RefreshCw, Calendar, Link2, Copy, ExternalLink } from 'lucide-react';
+import { User, Mail, AtSign, Camera, Loader2, Save, ArrowLeft, MessageSquare, CheckCircle, XCircle, RefreshCw, Calendar, Link2, Copy, ExternalLink, Video } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { BookingService, BookingPage, AvailableSlot } from '@/lib/bookingService';
+import { TimePicker } from '@/components/ui/time-picker';
 
 export default function SettingsPage() {
   return (
@@ -28,11 +29,23 @@ function SettingsContent() {
   const { user, userProfile, refreshUserProfile } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Google Calendar connection state. Status is fetched from /api/google/status
+  // on mount; the OAuth callback redirects here with ?google=connected|error
+  // which we surface via toast.
+  const [googleStatus, setGoogleStatus] = useState<{
+    connected: boolean;
+    email?: string;
+    connected_at?: string;
+  } | null>(null);
+  const [googleLoading, setGoogleLoading] = useState(true);
+  const [googleActionLoading, setGoogleActionLoading] = useState(false);
 
   // Telegram webhook state
   const [webhookStatus, setWebhookStatus] = useState<{
@@ -86,8 +99,69 @@ function SettingsContent() {
 
       // Fetch booking page
       fetchBookingPage();
+
+      // Fetch Google Calendar connection status
+      fetchGoogleStatus();
     }
   }, [userProfile]);
+
+  // Surface OAuth callback result. The /api/google/oauth/callback route
+  // redirects here with ?google=connected&detail=email or ?google=error&detail=...
+  // After showing the toast, strip the params so a refresh doesn't re-fire it.
+  useEffect(() => {
+    const status = searchParams.get('google');
+    if (!status) return;
+    const detail = searchParams.get('detail');
+    if (status === 'connected') {
+      toast({ title: 'Google Calendar connected', description: detail ? `Linked ${detail}` : undefined });
+      fetchGoogleStatus();
+    } else if (status === 'error') {
+      toast({ title: 'Google connection failed', description: detail || 'Unknown error', variant: 'destructive' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    router.replace('/settings');
+  }, [searchParams]);
+
+  const fetchGoogleStatus = async () => {
+    setGoogleLoading(true);
+    try {
+      const res = await fetch('/api/google/status');
+      const data = await res.json();
+      if (data.connected) {
+        setGoogleStatus({ connected: true, email: data.email, connected_at: data.connected_at });
+      } else {
+        setGoogleStatus({ connected: false });
+      }
+    } catch (err) {
+      console.error('Error fetching Google status:', err);
+      setGoogleStatus({ connected: false });
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleConnectGoogle = () => {
+    // Hard navigate to /api/google/oauth/start — that route sets the
+    // CSRF cookie + redirects to Google's consent screen. After consent
+    // Google sends the user back to /api/google/oauth/callback which
+    // redirects here with ?google=connected.
+    window.location.href = '/api/google/oauth/start';
+  };
+
+  const handleDisconnectGoogle = async () => {
+    setGoogleActionLoading(true);
+    try {
+      const res = await fetch('/api/google/disconnect', { method: 'POST' });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast({ title: 'Google Calendar disconnected' });
+      setGoogleStatus({ connected: false });
+    } catch (err: any) {
+      toast({ title: 'Disconnect failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setGoogleActionLoading(false);
+    }
+  };
 
   const fetchBookingPage = async () => {
     setBookingLoading(true);
@@ -485,14 +559,14 @@ function SettingsContent() {
                           target.nextElementSibling?.classList.remove('hidden');
                         }}
                       />
-                      <div className="w-24 h-24 bg-gradient-to-br from-[#3e8692] to-[#2d6470] rounded-full flex items-center justify-center absolute top-0 left-0 hidden">
+                      <div className="w-24 h-24 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center absolute top-0 left-0 hidden">
                         <span className="text-white font-bold text-2xl">
                           {getUserInitials(formData.name || formData.email)}
                         </span>
                       </div>
                     </div>
                   ) : (
-                    <div className="w-24 h-24 bg-gradient-to-br from-[#3e8692] to-[#2d6470] rounded-full flex items-center justify-center">
+                    <div className="w-24 h-24 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center">
                       <span className="text-white font-bold text-2xl">
                         {getUserInitials(formData.name || formData.email)}
                       </span>
@@ -537,7 +611,7 @@ function SettingsContent() {
                       value={formData.name}
                       onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="Enter your name"
-                      className="pl-10 auth-input"
+                      className="pl-10 focus-brand"
                     />
                   </div>
                 </div>
@@ -551,7 +625,7 @@ function SettingsContent() {
                       id="email"
                       value={formData.email}
                       disabled
-                      className="pl-10 auth-input bg-gray-50 text-gray-500"
+                      className="pl-10 focus-brand bg-gray-50 text-gray-500"
                     />
                   </div>
                   <p className="text-sm text-gray-500">Email cannot be changed</p>
@@ -567,7 +641,7 @@ function SettingsContent() {
                       value={formData.telegram_id}
                       onChange={(e) => setFormData(prev => ({ ...prev, telegram_id: e.target.value }))}
                       placeholder="Enter your Telegram username"
-                      className="pl-10 auth-input"
+                      className="pl-10 focus-brand"
                     />
                   </div>
                 </div>
@@ -582,7 +656,7 @@ function SettingsContent() {
                       value={formData.x_id}
                       onChange={(e) => setFormData(prev => ({ ...prev, x_id: e.target.value }))}
                       placeholder="Enter your X username"
-                      className="pl-10 auth-input"
+                      className="pl-10 focus-brand"
                     />
                   </div>
                 </div>
@@ -684,7 +758,7 @@ function SettingsContent() {
                     <button
                       onClick={() => setBookingForm(prev => ({ ...prev, is_active: !prev.is_active }))}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        bookingForm.is_active ? 'bg-[#3e8692]' : 'bg-gray-300'
+                        bookingForm.is_active ? 'bg-brand' : 'bg-gray-300'
                       }`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -783,18 +857,22 @@ function SettingsContent() {
                             </div>
                             {isEnabled && (
                               <div className="flex items-center gap-2 text-sm">
-                                <Input
-                                  type="time"
+                                <TimePicker
                                   value={slot!.start}
-                                  onChange={e => updateSlotTime(dayIndex, 'start', e.target.value)}
-                                  className="w-28 h-8 text-sm"
+                                  onChange={(v) => updateSlotTime(dayIndex, 'start', v)}
+                                  className="w-28"
+                                  // End time can't be before start, so cap it
+                                  // by passing maxTime — but here we're setting
+                                  // the START so no upper bound is needed.
+                                  maxTime={slot!.end}
                                 />
                                 <span className="text-gray-400">to</span>
-                                <Input
-                                  type="time"
+                                <TimePicker
                                   value={slot!.end}
-                                  onChange={e => updateSlotTime(dayIndex, 'end', e.target.value)}
-                                  className="w-28 h-8 text-sm"
+                                  onChange={(v) => updateSlotTime(dayIndex, 'end', v)}
+                                  className="w-28"
+                                  // The end picker is constrained to be >= start.
+                                  minTime={slot!.start}
                                 />
                               </div>
                             )}
@@ -828,6 +906,112 @@ function SettingsContent() {
                 </>
               ) : (
                 <p className="text-sm text-gray-500">No booking page found for your account.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Google Calendar Integration Card — every user can self-connect */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Video className="h-5 w-5" />
+                Google Calendar
+              </CardTitle>
+              <CardDescription>
+                Connect your Google account to receive Telegram DMs 10 minutes before and at the start of your Google Meet calls.
+                Reminder timing is managed centrally on the <a href="/reminders" className="text-brand underline hover:opacity-80">Reminders page</a>.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {googleLoading ? (
+                <div className="flex items-center gap-2 text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Checking Google connection...</span>
+                </div>
+              ) : googleStatus?.connected ? (
+                <>
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-sm text-gray-600">Status</span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <CheckCircle className="h-3 w-3" />
+                      Connected
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-t">
+                    <span className="text-sm text-gray-600">Connected as</span>
+                    <span className="text-sm font-medium text-gray-900">{googleStatus.email}</span>
+                  </div>
+                  {googleStatus.connected_at && (
+                    <div className="flex items-center justify-between py-2 border-t">
+                      <span className="text-sm text-gray-600">Linked on</span>
+                      <span className="text-sm text-gray-900">
+                        {new Date(googleStatus.connected_at).toLocaleDateString('en-US', {
+                          year: 'numeric', month: 'long', day: 'numeric',
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  {!userProfile?.telegram_id && (
+                    <div className="border-t pt-3">
+                      <p className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-md">
+                        You haven&apos;t linked a Telegram account. Reminders need a Telegram chat to land in — set your <span className="font-medium">Telegram Username</span> above and have a super_admin link your DM on the Team page.
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={fetchGoogleStatus}
+                      disabled={googleActionLoading}
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-2 ${googleLoading ? 'animate-spin' : ''}`} />
+                      Refresh Status
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleDisconnectGoogle}
+                      disabled={googleActionLoading}
+                    >
+                      {googleActionLoading ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Disconnect
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-sm text-gray-600">Status</span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                      <XCircle className="h-3 w-3" />
+                      Not Connected
+                    </span>
+                  </div>
+                  <div className="pt-4 border-t">
+                    <Button
+                      onClick={handleConnectGoogle}
+                      disabled={googleActionLoading}
+                      className="hover:opacity-90"
+                      style={{ backgroundColor: '#3e8692', color: 'white' }}
+                    >
+                      <Video className="h-4 w-4 mr-2" />
+                      Connect Google Calendar
+                    </Button>
+                  </div>
+                  <div className="pt-4 border-t">
+                    <p className="text-xs text-gray-500">
+                      <strong>What we access:</strong> Read-only access to upcoming Calendar events on your primary calendar. We only act on events with a Google Meet link.
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      <strong>What we send:</strong> A Telegram DM 10 minutes before each Meet, and another at meeting start. You can disable the whole feature on the Reminders page.
+                    </p>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

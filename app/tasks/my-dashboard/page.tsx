@@ -128,12 +128,12 @@ export default function MyDashboardPage() {
             <div className="px-0">
               <Tabs value={clientFilter} onValueChange={setClientFilter}>
                 <TabsList className="bg-gray-100 p-1 h-auto flex-wrap">
-                  <TabsTrigger value="all" className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-xs px-3 py-1.5">
+                  <TabsTrigger value="all" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-xs px-3 py-1.5">
                     All
                     <span className="ml-1.5 text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{tasks.filter(t => t.status !== 'complete').length}</span>
                   </TabsTrigger>
                   {taskClients.map(c => (
-                    <TabsTrigger key={c.id} value={c.id} className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-xs px-3 py-1.5">
+                    <TabsTrigger key={c.id} value={c.id} className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-xs px-3 py-1.5">
                       <Building2 className="h-3 w-3 mr-1" />
                       {c.name}
                       <span className="ml-1.5 text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
@@ -141,7 +141,7 @@ export default function MyDashboardPage() {
                       </span>
                     </TabsTrigger>
                   ))}
-                  <TabsTrigger value="_internal" className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-xs px-3 py-1.5">
+                  <TabsTrigger value="_internal" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-xs px-3 py-1.5">
                     Internal
                     <span className="ml-1.5 text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
                       {tasks.filter(t => !t.client_id && t.status !== 'complete').length}
@@ -236,7 +236,7 @@ function TaskSection({ title, icon: Icon, color, tasks, getDueDateColor, clientM
                 {task.task_name}
               </span>
               {clientMap && task.client_id && clientMap[task.client_id] && (
-                <span className="text-[10px] bg-[#3e8692]/10 text-[#3e8692] px-1.5 py-0.5 rounded font-medium">{clientMap[task.client_id]}</span>
+                <span className="text-[10px] bg-brand/10 text-brand px-1.5 py-0.5 rounded font-medium">{clientMap[task.client_id]}</span>
               )}
               {task.due_date && (
                 <span className={`text-xs ${getDueDateColor(task.due_date)}`}>

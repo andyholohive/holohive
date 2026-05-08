@@ -151,8 +151,8 @@ export function FileUploadComponent({ campaignId, onUploadSuccess }: FileUploadC
         onClick={() => fileInputRef.current?.click()}
         className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
           isDragActive
-            ? 'border-[#3e8692] bg-[#3e8692]/5'
-            : 'border-gray-300 hover:border-[#3e8692] hover:bg-gray-50'
+            ? 'border-brand bg-brand/5'
+            : 'border-gray-300 hover:border-brand hover:bg-gray-50'
         }`}
       >
         <input
@@ -164,7 +164,7 @@ export function FileUploadComponent({ campaignId, onUploadSuccess }: FileUploadC
         />
         <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
         {isDragActive ? (
-          <p className="text-lg font-medium text-[#3e8692]">Drop files here...</p>
+          <p className="text-lg font-medium text-brand">Drop files here...</p>
         ) : (
           <>
             <p className="text-lg font-medium text-gray-700 mb-2">

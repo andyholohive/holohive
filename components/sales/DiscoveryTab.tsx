@@ -232,11 +232,11 @@ export default function DiscoveryTab({ onPromoted }: Props) {
             placeholder="Search prospects..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-9 h-9 text-sm auth-input"
+            className="pl-9 h-9 text-sm focus-brand"
           />
         </div>
         <Select value={statusFilter} onValueChange={v => setStatusFilter(v as StatusFilter)}>
-          <SelectTrigger className="h-9 w-auto text-sm auth-input">
+          <SelectTrigger className="h-9 w-auto text-sm focus-brand">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -246,7 +246,7 @@ export default function DiscoveryTab({ onPromoted }: Props) {
           </SelectContent>
         </Select>
         <Select value={tierFilter} onValueChange={v => setTierFilter(v as TierFilter)}>
-          <SelectTrigger className="h-9 w-auto text-sm auth-input">
+          <SelectTrigger className="h-9 w-auto text-sm focus-brand">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -330,7 +330,7 @@ export default function DiscoveryTab({ onPromoted }: Props) {
                               href={p.website_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-[11px] text-gray-400 hover:text-[#3e8692] inline-flex items-center gap-0.5 truncate"
+                              className="text-[11px] text-gray-400 hover:text-brand inline-flex items-center gap-0.5 truncate"
                               onClick={e => e.stopPropagation()}
                             >
                               {p.website_url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
@@ -389,7 +389,7 @@ export default function DiscoveryTab({ onPromoted }: Props) {
                           <DropdownMenuTrigger asChild>
                             <Button
                               size="sm"
-                              className="h-7 text-xs bg-[#3e8692] hover:bg-[#357884] text-white"
+                              className="h-7 text-xs bg-brand hover:bg-[#357884] text-white"
                               disabled={isBusy}
                             >
                               {isBusy ? (

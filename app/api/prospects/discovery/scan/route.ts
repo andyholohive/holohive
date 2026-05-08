@@ -1395,6 +1395,42 @@ export async function POST(request: Request) {
       batches.push(stage1.candidates.slice(i, i + BATCH_SIZE));
     }
 
+    // Detail block published into output_summary so the UI can show
+    // "what's actually happening" rather than just a percent. Three
+    // sub-blocks:
+    //
+    //   - sources:   per-source candidate counts + per-source errors
+    //   - filtered:  what got dropped pre-Stage-2 and why
+    //   - enriched:  rolling list of completed projects (added per-batch)
+    //
+    // We carry this object across updateProgress calls so each write
+    // includes the full latest snapshot. Names are truncated to keep
+    // the JSONB row small (UI only shows top 20 anyway).
+    const TRUNCATE = 20;
+    const truncate = <T,>(arr: T[], n = TRUNCATE) =>
+      arr.length > n ? { items: arr.slice(0, n), truncated: arr.length - n } : { items: arr, truncated: 0 };
+    const detail: Record<string, any> = {
+      sources: {
+        per_source_counts: stage1.perSourceCounts,
+        errors: stage1.sourceErrors,
+        list: sources,
+      },
+      filtered: {
+        recent_skipped: recentSkipCount,
+        crm_skipped_total: crmSkipCount,
+        crm_filtered_names: truncate(crmFilteredOut),
+        candidate_names: truncate(stage1.candidates.map(c => c.name).filter(Boolean) as string[]),
+      },
+      // Filled in as batches complete. Each entry: {name, tier, score, poc_count, icp_verdict}
+      enriched: [] as Array<{
+        name: string;
+        tier: string | null;
+        score: number | null;
+        poc_count: number;
+        icp_verdict: string | null;
+      }>,
+    };
+
     await updateProgress({
       stage: 'enriching',
       message: `Enriching ${stage1.candidates.length} candidates in ${batches.length} parallel batches...`,
@@ -1402,6 +1438,7 @@ export async function POST(request: Request) {
       batches_total: batches.length,
       batches_complete: 0,
       percent: 25,
+      detail,
     });
 
     // Wrap each batch to write progress as it finishes. Promise.allSettled
@@ -1413,6 +1450,20 @@ export async function POST(request: Request) {
         try {
           const result = await enrichBatch(anthropic, model, batch);
           batchesCompleted++;
+          // Append this batch's enriched projects to the rolling list so
+          // the UI can show "Pharos · REACH_OUT_NOW · 87 · 3 POCs" in
+          // real time as enrichment finishes, instead of waiting for the
+          // whole scan to complete.
+          for (const p of result.projects) {
+            if (!p.name) continue;
+            detail.enriched.push({
+              name: p.name,
+              tier: p.action_tier ?? null,
+              score: p.prospect_score?.total ?? null,
+              poc_count: Array.isArray(p.outreach_contacts) ? p.outreach_contacts.length : 0,
+              icp_verdict: p.icp_verdict ?? null,
+            });
+          }
           await updateProgress({
             stage: 'enriching',
             message: `Enriched batch ${batchesCompleted} of ${batches.length}...`,
@@ -1421,6 +1472,7 @@ export async function POST(request: Request) {
             batches_complete: batchesCompleted,
             // Scale 25% (start of stage 2) to 90% (end of stage 2)
             percent: Math.round(25 + (65 * batchesCompleted) / batches.length),
+            detail,
           });
           return result;
         } catch (err) {
@@ -1432,6 +1484,7 @@ export async function POST(request: Request) {
             batches_total: batches.length,
             batches_complete: batchesCompleted,
             percent: Math.round(25 + (65 * batchesCompleted) / batches.length),
+            detail,
           });
           throw err;
         }
@@ -1465,10 +1518,21 @@ export async function POST(request: Request) {
     const projectsToWrite = allProjects.filter(p => !skipSet.has((p.name || '').toLowerCase()));
     const skippedDupes = allProjects.length - projectsToWrite.length;
 
+    // Tier breakdown for the summary card. Built from the rolling
+    // enriched list so it's available even before the writes start.
+    const tierBreakdown: Record<string, number> = {};
+    for (const e of detail.enriched) {
+      const t = e.tier || 'UNKNOWN';
+      tierBreakdown[t] = (tierBreakdown[t] || 0) + 1;
+    }
+    detail.tier_breakdown = tierBreakdown;
+    detail.batch_errors = batchErrors.length > 0 ? batchErrors : undefined;
+
     await updateProgress({
       stage: 'writing',
       message: `Saving ${projectsToWrite.length} enriched prospects${skippedDupes > 0 ? ` (${skippedDupes} dupes filtered)` : ''}...`,
       percent: 92,
+      detail,
     });
 
     let inserted = 0;
@@ -1535,6 +1599,11 @@ export async function POST(request: Request) {
       total_input_tokens: totalInputTokens,
       total_output_tokens: totalOutputTokens,
       cost_usd: Number(costUsd.toFixed(4)),
+      // Detail block (sources / filtered / enriched / tier_breakdown)
+      // gets persisted on the final row so the progress endpoint can
+      // serve it for the most-recent-scan summary even after the dialog
+      // re-opens hours later.
+      detail,
     });
 
     return NextResponse.json({

@@ -238,7 +238,7 @@ export function CustomColorPicker({
                   handleHexInputChange('#' + value);
                 }}
                 placeholder="000000"
-                className="auth-input pl-7 font-mono text-sm uppercase"
+                className="focus-brand pl-7 font-mono text-sm uppercase"
                 maxLength={6}
               />
             </div>

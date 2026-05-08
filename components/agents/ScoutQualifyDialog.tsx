@@ -111,7 +111,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   disabled={loading}
-                  className="auth-input"
+                  className="focus-brand"
                 />
               </div>
               <div className="grid gap-2">
@@ -121,7 +121,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   disabled={loading}
-                  className="auth-input"
+                  className="focus-brand"
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -129,7 +129,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                   id="autoCreate"
                   checked={autoCreate}
                   onCheckedChange={(v) => setAutoCreate(v === true)}
-                  className="data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]"
+                  className="data-[state=checked]:bg-brand data-[state=checked]:border-brand"
                 />
                 <Label htmlFor="autoCreate" className="text-sm text-gray-600 cursor-pointer font-normal">
                   Auto-create opportunity if qualified

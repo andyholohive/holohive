@@ -402,6 +402,24 @@ async function newCrmNoGc(
   return { items, isEmpty: items.length === 0 };
 }
 
+// ─── 11. Google Meeting Reminder ─────────────────────────────────────
+// Event-driven: the dedicated /api/cron/google-meeting-reminders cron
+// fires every 5 minutes and handles the actual fan-out to per-user DMs
+// (since this rule sends to each connected user's Telegram, not to a
+// single configured chat_id like the other rules).
+//
+// The evaluator returns empty so the standard daily reminderService
+// loop skips it the same way it skips form_submission. The rule still
+// exists in reminder_rules so it shows up in /reminders for config —
+// params.advance_minutes, params.send_at_start, params.lookahead_minutes
+// are all read by the dedicated cron.
+async function googleMeetingReminder(
+  _supabase: SupabaseClient<Database>,
+  _params: Record<string, any>
+): Promise<ReminderResult> {
+  return { items: [], isEmpty: true };
+}
+
 // ─── Evaluator Registry ──────────────────────────────────────────────
 export const evaluators: Record<string, EvaluatorFn> = {
   kol_stats_stale: kolStatsStale,
@@ -414,6 +432,7 @@ export const evaluators: Record<string, EvaluatorFn> = {
   payment_reminder: paymentReminder,
   new_kol_no_gc: newKolNoGc,
   new_crm_no_gc: newCrmNoGc,
+  google_meeting_reminder: googleMeetingReminder,
 };
 
 // Emoji per rule type for message formatting
@@ -428,4 +447,5 @@ export const RULE_EMOJI: Record<string, string> = {
   payment_reminder: '\u{1F4B0}',      // 💰
   new_kol_no_gc: '\u{1F517}',        // 🔗
   new_crm_no_gc: '\u{1F517}',        // 🔗
+  google_meeting_reminder: '\u{1F4F9}', // 📹
 };

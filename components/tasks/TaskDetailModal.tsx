@@ -332,7 +332,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
             value={form.task_name}
             onChange={(e) => setForm({ ...form, task_name: e.target.value })}
             placeholder="Enter task name"
-            className="auth-input"
+            className="focus-brand"
           />
         </div>
 
@@ -389,7 +389,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
           <div className="grid gap-2">
             <Label>Assigned To</Label>
             <Select value={form.assigned_to} onValueChange={(v) => setForm({ ...form, assigned_to: v })}>
-              <SelectTrigger className="auth-input"><SelectValue placeholder="Select team member" /></SelectTrigger>
+              <SelectTrigger className="focus-brand"><SelectValue placeholder="Select team member" /></SelectTrigger>
               <SelectContent>
                 {teamMembers.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
               </SelectContent>
@@ -403,7 +403,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="auth-input justify-start text-left font-normal"
+                  className="focus-brand justify-start text-left font-normal"
                   style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.due_date ? '#111827' : '#9ca3af' }}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -429,7 +429,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
           <div className="grid gap-2">
             <Label>Frequency <span className="text-red-500">*</span></Label>
             <Select value={form.frequency} onValueChange={(v) => setForm({ ...form, frequency: v })}>
-              <SelectTrigger className="auth-input"><SelectValue placeholder="Select frequency" /></SelectTrigger>
+              <SelectTrigger className="focus-brand"><SelectValue placeholder="Select frequency" /></SelectTrigger>
               <SelectContent>
                 {FREQUENCIES.map((f) => <SelectItem key={f} value={f}>{FREQUENCY_LABELS[f]}</SelectItem>)}
               </SelectContent>
@@ -440,7 +440,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
           <div className="grid gap-2">
             <Label>Task Type <span className="text-red-500">*</span></Label>
             <Select value={form.task_type} onValueChange={(v) => setForm({ ...form, task_type: v })}>
-              <SelectTrigger className="auth-input"><SelectValue placeholder="Select type" /></SelectTrigger>
+              <SelectTrigger className="focus-brand"><SelectValue placeholder="Select type" /></SelectTrigger>
               <SelectContent>
                 {TASK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
               </SelectContent>
@@ -453,7 +453,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
           <div className="grid gap-2">
             <Label>Status</Label>
             <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-              <SelectTrigger className="auth-input"><SelectValue placeholder="Select status" /></SelectTrigger>
+              <SelectTrigger className="focus-brand"><SelectValue placeholder="Select status" /></SelectTrigger>
               <SelectContent>
                 {STATUSES.map((s) => {
                   const cfg = STATUS_CONFIG[s];
@@ -495,14 +495,14 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
             <Label>Client</Label>
             {userProfile?.role === 'admin' || userProfile?.role === 'super_admin' ? (
               <Select value={form.client_id} onValueChange={(v) => setForm({ ...form, client_id: v === '_none' ? '' : v })}>
-                <SelectTrigger className="auth-input"><SelectValue placeholder="Select client" /></SelectTrigger>
+                <SelectTrigger className="focus-brand"><SelectValue placeholder="Select client" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_none">No client</SelectItem>
                   {clients.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             ) : (
-              <div className="auth-input flex items-center text-sm text-gray-700 bg-gray-50 cursor-not-allowed">
+              <div className="focus-brand flex items-center text-sm text-gray-700 bg-gray-50 cursor-not-allowed">
                 {form.client_id && clients.find(c => c.id === form.client_id)?.name || 'No client'}
               </div>
             )}
@@ -515,7 +515,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
               value={form.link}
               onChange={(e) => setForm({ ...form, link: e.target.value })}
               placeholder="https://..."
-              className="auth-input"
+              className="focus-brand"
             />
           </div>
         </div>
@@ -534,7 +534,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
               value={form.latest_comment}
               onChange={(e) => setForm({ ...form, latest_comment: e.target.value })}
               placeholder="Add an initial comment..."
-              className="auth-input"
+              className="focus-brand"
               rows={2}
             />
           </div>

@@ -11,44 +11,52 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, RotateCcw, Trash2, Building2, Mail, MapPin, Calendar, List, Megaphone, ClipboardList, Users, AlertTriangle, Crown, Globe } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 
+// Local row types. Field nullability mirrors the Supabase schema
+// (database.types.ts) — `archived_at`, `created_at`, `is_active`, etc.
+// are `| null` in the DB even though our `.not('archived_at', 'is', null)`
+// filter guarantees archived_at is non-null at runtime. Keeping them
+// nullable in the type matches the source-of-truth Supabase types and
+// satisfies the type-checker without per-call-site casts. Consumers
+// (ArchivedItemCard) already null-guard archivedAt.
 interface ArchivedClient {
   id: string;
   name: string;
   email: string;
   location: string | null;
-  is_active: boolean;
-  archived_at: string;
-  created_at: string;
+  is_active: boolean | null;
+  archived_at: string | null;
+  created_at: string | null;
 }
 
 interface ArchivedList {
   id: string;
   name: string;
   status: string | null;
-  archived_at: string;
-  created_at: string;
+  archived_at: string | null;
+  created_at: string | null;
   kol_count?: number;
 }
 
 interface ArchivedCampaign {
   id: string;
   name: string;
-  status: string;
-  total_budget: number;
-  client_id: string;
+  status: string | null;
+  total_budget: number | null;
+  client_id: string | null;
   client_name?: string;
-  archived_at: string;
-  created_at: string;
+  archived_at: string | null;
+  created_at: string | null;
 }
 
 interface ArchivedForm {
   id: string;
   name: string;
   description: string | null;
-  status: string;
-  archived_at: string;
-  created_at: string;
+  status: string | null;
+  archived_at: string | null;
+  created_at: string | null;
   response_count?: number;
 }
 
@@ -60,8 +68,8 @@ interface ArchivedKOL {
   followers: number | null;
   region: string | null;
   tier: string | null;
-  archived_at: string;
-  created_at: string;
+  archived_at: string | null;
+  created_at: string | null;
 }
 
 export default function ArchivePage() {
@@ -95,74 +103,59 @@ export default function ArchivePage() {
     setError(null);
 
     try {
-      // Fetch archived clients
-      const { data: clients, error: clientsError } = await supabase
-        .from('clients')
-        .select('*')
-        .not('archived_at', 'is', null)
-        .order('archived_at', { ascending: false });
+      // Fan out all 5 archive queries in parallel — they're entirely
+      // independent (different tables) so this is one round-trip
+      // instead of five sequential awaits. Promise.all rejects on the
+      // first failure; the catch block below treats any single failure
+      // as a full-page failure (matches prior behavior).
+      const [clientsRes, listsRes, campaignsRes, formsRes, kolsRes] = await Promise.all([
+        supabase
+          .from('clients')
+          .select('*')
+          .not('archived_at', 'is', null)
+          .order('archived_at', { ascending: false }),
+        supabase
+          .from('lists')
+          .select('*, list_kols(count)')
+          .not('archived_at', 'is', null)
+          .order('archived_at', { ascending: false }),
+        supabase
+          .from('campaigns')
+          .select('*, clients(name)')
+          .not('archived_at', 'is', null)
+          .order('archived_at', { ascending: false }),
+        supabase
+          .from('forms')
+          .select('*, form_responses(count)')
+          .not('archived_at', 'is', null)
+          .order('archived_at', { ascending: false }),
+        supabase
+          .from('master_kols')
+          .select('*')
+          .not('archived_at', 'is', null)
+          .order('archived_at', { ascending: false }),
+      ]);
 
-      if (clientsError) throw clientsError;
-      setArchivedClients(clients || []);
+      // Throw the first error encountered so the catch block fires
+      // with a meaningful message instead of silently rendering empty
+      // state for one tab.
+      const firstError = clientsRes.error || listsRes.error || campaignsRes.error || formsRes.error || kolsRes.error;
+      if (firstError) throw firstError;
 
-      // Fetch archived lists with KOL count
-      const { data: lists, error: listsError } = await supabase
-        .from('lists')
-        .select(`
-          *,
-          list_kols(count)
-        `)
-        .not('archived_at', 'is', null)
-        .order('archived_at', { ascending: false });
-
-      if (listsError) throw listsError;
-      setArchivedLists((lists || []).map(list => ({
+      setArchivedClients(clientsRes.data || []);
+      setArchivedLists((listsRes.data || []).map(list => ({
         ...list,
-        kol_count: list.list_kols?.[0]?.count || 0
+        kol_count: list.list_kols?.[0]?.count || 0,
       })));
-
-      // Fetch archived campaigns with client name
-      const { data: campaigns, error: campaignsError } = await supabase
-        .from('campaigns')
-        .select(`
-          *,
-          clients(name)
-        `)
-        .not('archived_at', 'is', null)
-        .order('archived_at', { ascending: false });
-
-      if (campaignsError) throw campaignsError;
-      setArchivedCampaigns((campaigns || []).map(campaign => ({
+      setArchivedCampaigns((campaignsRes.data || []).map(campaign => ({
         ...campaign,
-        client_name: campaign.clients?.name
+        client_name: campaign.clients?.name,
       })));
-
-      // Fetch archived forms with response count
-      const { data: forms, error: formsError } = await supabase
-        .from('forms')
-        .select(`
-          *,
-          form_responses(count)
-        `)
-        .not('archived_at', 'is', null)
-        .order('archived_at', { ascending: false });
-
-      if (formsError) throw formsError;
-      setArchivedForms((forms || []).map(form => ({
+      setArchivedForms((formsRes.data || []).map(form => ({
         ...form,
-        response_count: form.form_responses?.[0]?.count || 0
+        response_count: form.form_responses?.[0]?.count || 0,
       })));
-
-      // Fetch archived KOLs
-      const { data: kols, error: kolsError } = await supabase
-        .from('master_kols')
-        .select('*')
-        .not('archived_at', 'is', null)
-        .order('archived_at', { ascending: false });
-
-      if (kolsError) throw kolsError;
-      setArchivedKOLs(kols || []);
-
+      setArchivedKOLs(kolsRes.data || []);
     } catch (err) {
       console.error('Error fetching archived items:', err);
       setError('Failed to load archived items');
@@ -344,7 +337,7 @@ export default function ArchivePage() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search archived items..."
-              className="pl-10 auth-input"
+              className="pl-10 focus-brand"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -394,64 +387,26 @@ export default function ArchivePage() {
           <TabsContent value="clients">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredClients.length === 0 ? (
-                <div className="col-span-full text-center py-8">
-                  <p className="text-gray-600">No archived clients found.</p>
+                <div className="col-span-full">
+                  <EmptyState icon={Building2} title="No archived clients found." />
                 </div>
               ) : (
                 filteredClients.map((client) => (
-                  <Card key={client.id} className="transition-shadow">
-                    <CardHeader className="pb-4">
-                      <div className="mb-3">
-                        <div className="flex items-center text-lg font-semibold text-gray-600 mb-2">
-                          <div className="bg-gray-100 p-1.5 rounded-lg mr-2">
-                            <Building2 className="h-5 w-5 text-gray-600" />
-                          </div>
-                          {client.name}
-                        </div>
-                        <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
-                          Archived
-                        </Badge>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Mail className="h-4 w-4 mr-2 text-gray-400" />
-                          <span>{client.email}</span>
-                        </div>
-                        {client.location && (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <MapPin className="h-4 w-4 mr-2 text-gray-400" />
-                            <span>{client.location}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                          <span>Archived: {formatDate(client.archived_at)}</span>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-4 border-t border-gray-100">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => handleRestore('client', client.id, client.name)}
-                        >
-                          <RotateCcw className="h-4 w-4 mr-2" />
-                          Restore
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handlePermanentDelete('client', client.id, client.name)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <ArchivedItemCard
+                    key={client.id}
+                    icon={Building2}
+                    name={client.name}
+                    archivedAt={client.archived_at}
+                    formatDate={formatDate}
+                    onRestore={() => handleRestore('client', client.id, client.name)}
+                    onDelete={() => handlePermanentDelete('client', client.id, client.name)}
+                    meta={
+                      <>
+                        <ArchivedMetaRow icon={Mail}>{client.email}</ArchivedMetaRow>
+                        {client.location && <ArchivedMetaRow icon={MapPin}>{client.location}</ArchivedMetaRow>}
+                      </>
+                    }
+                  />
                 ))
               )}
             </div>
@@ -461,65 +416,26 @@ export default function ArchivePage() {
           <TabsContent value="lists">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredLists.length === 0 ? (
-                <div className="col-span-full text-center py-8">
-                  <p className="text-gray-600">No archived lists found.</p>
+                <div className="col-span-full">
+                  <EmptyState icon={List} title="No archived lists found." />
                 </div>
               ) : (
                 filteredLists.map((list) => (
-                  <Card key={list.id} className="transition-shadow">
-                    <CardHeader className="pb-4">
-                      <div className="mb-3">
-                        <div className="flex items-center text-lg font-semibold text-gray-600 mb-2">
-                          <div className="bg-gray-100 p-1.5 rounded-lg mr-2">
-                            <List className="h-5 w-5 text-gray-600" />
-                          </div>
-                          {list.name}
-                        </div>
-                        <div className="flex gap-2">
-                          <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
-                            Archived
-                          </Badge>
-                          {list.status && (
-                            <Badge variant="outline" className="text-xs capitalize">
-                              {list.status}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Users className="h-4 w-4 mr-2 text-gray-400" />
-                          <span>{list.kol_count} KOLs</span>
-                        </div>
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                          <span>Archived: {formatDate(list.archived_at)}</span>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-4 border-t border-gray-100">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => handleRestore('list', list.id, list.name)}
-                        >
-                          <RotateCcw className="h-4 w-4 mr-2" />
-                          Restore
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handlePermanentDelete('list', list.id, list.name)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <ArchivedItemCard
+                    key={list.id}
+                    icon={List}
+                    name={list.name}
+                    archivedAt={list.archived_at}
+                    formatDate={formatDate}
+                    onRestore={() => handleRestore('list', list.id, list.name)}
+                    onDelete={() => handlePermanentDelete('list', list.id, list.name)}
+                    extraBadges={list.status && (
+                      <Badge variant="outline" className="text-xs capitalize">{list.status}</Badge>
+                    )}
+                    meta={
+                      <ArchivedMetaRow icon={Users}>{list.kol_count} KOLs</ArchivedMetaRow>
+                    }
+                  />
                 ))
               )}
             </div>
@@ -529,69 +445,37 @@ export default function ArchivePage() {
           <TabsContent value="campaigns">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredCampaigns.length === 0 ? (
-                <div className="col-span-full text-center py-8">
-                  <p className="text-gray-600">No archived campaigns found.</p>
+                <div className="col-span-full">
+                  <EmptyState icon={Megaphone} title="No archived campaigns found." />
                 </div>
               ) : (
                 filteredCampaigns.map((campaign) => (
-                  <Card key={campaign.id} className="transition-shadow">
-                    <CardHeader className="pb-4">
-                      <div className="mb-3">
-                        <div className="flex items-center text-lg font-semibold text-gray-600 mb-2">
-                          <div className="bg-gray-100 p-1.5 rounded-lg mr-2">
-                            <Megaphone className="h-5 w-5 text-gray-600" />
-                          </div>
-                          {campaign.name}
-                        </div>
-                        <div className="flex gap-2">
-                          <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
-                            Archived
-                          </Badge>
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {campaign.status}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
+                  <ArchivedItemCard
+                    key={campaign.id}
+                    icon={Megaphone}
+                    name={campaign.name}
+                    archivedAt={campaign.archived_at}
+                    formatDate={formatDate}
+                    onRestore={() => handleRestore('campaign', campaign.id, campaign.name)}
+                    onDelete={() => handlePermanentDelete('campaign', campaign.id, campaign.name)}
+                    extraBadges={
+                      <Badge variant="outline" className="text-xs capitalize">{campaign.status}</Badge>
+                    }
+                    meta={
+                      <>
                         {campaign.client_name && (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Building2 className="h-4 w-4 mr-2 text-gray-400" />
-                            <span>{campaign.client_name}</span>
-                          </div>
+                          <ArchivedMetaRow icon={Building2}>{campaign.client_name}</ArchivedMetaRow>
                         )}
+                        {/* Budget row uses $ prefix instead of an icon — render
+                            inline rather than via ArchivedMetaRow so the layout
+                            matches the other money-style rows in the app. */}
                         <div className="flex items-center text-sm text-gray-600">
                           <span className="text-gray-400 mr-2">$</span>
                           <span>{campaign.total_budget?.toLocaleString()}</span>
                         </div>
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                          <span>Archived: {formatDate(campaign.archived_at)}</span>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-4 border-t border-gray-100">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => handleRestore('campaign', campaign.id, campaign.name)}
-                        >
-                          <RotateCcw className="h-4 w-4 mr-2" />
-                          Restore
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handlePermanentDelete('campaign', campaign.id, campaign.name)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </>
+                    }
+                  />
                 ))
               )}
             </div>
@@ -601,66 +485,27 @@ export default function ArchivePage() {
           <TabsContent value="forms">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredForms.length === 0 ? (
-                <div className="col-span-full text-center py-8">
-                  <p className="text-gray-600">No archived forms found.</p>
+                <div className="col-span-full">
+                  <EmptyState icon={ClipboardList} title="No archived forms found." />
                 </div>
               ) : (
                 filteredForms.map((form) => (
-                  <Card key={form.id} className="transition-shadow">
-                    <CardHeader className="pb-4">
-                      <div className="mb-3">
-                        <div className="flex items-center text-lg font-semibold text-gray-600 mb-2">
-                          <div className="bg-gray-100 p-1.5 rounded-lg mr-2">
-                            <ClipboardList className="h-5 w-5 text-gray-600" />
-                          </div>
-                          {form.name}
-                        </div>
-                        <div className="flex gap-2">
-                          <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
-                            Archived
-                          </Badge>
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {form.status}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        {form.description && (
-                          <p className="text-sm text-gray-600 line-clamp-2">{form.description}</p>
-                        )}
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Users className="h-4 w-4 mr-2 text-gray-400" />
-                          <span>{form.response_count} responses</span>
-                        </div>
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                          <span>Archived: {formatDate(form.archived_at)}</span>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-4 border-t border-gray-100">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => handleRestore('form', form.id, form.name)}
-                        >
-                          <RotateCcw className="h-4 w-4 mr-2" />
-                          Restore
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handlePermanentDelete('form', form.id, form.name)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <ArchivedItemCard
+                    key={form.id}
+                    icon={ClipboardList}
+                    name={form.name}
+                    archivedAt={form.archived_at}
+                    formatDate={formatDate}
+                    onRestore={() => handleRestore('form', form.id, form.name)}
+                    onDelete={() => handlePermanentDelete('form', form.id, form.name)}
+                    extraBadges={
+                      <Badge variant="outline" className="text-xs capitalize">{form.status}</Badge>
+                    }
+                    description={form.description}
+                    meta={
+                      <ArchivedMetaRow icon={Users}>{form.response_count} responses</ArchivedMetaRow>
+                    }
+                  />
                 ))
               )}
             </div>
@@ -670,78 +515,36 @@ export default function ArchivePage() {
           <TabsContent value="kols">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredKOLs.length === 0 ? (
-                <div className="col-span-full text-center py-8">
-                  <p className="text-gray-600">No archived KOLs found.</p>
+                <div className="col-span-full">
+                  <EmptyState icon={Crown} title="No archived KOLs found." />
                 </div>
               ) : (
                 filteredKOLs.map((kol) => (
-                  <Card key={kol.id} className="transition-shadow">
-                    <CardHeader className="pb-4">
-                      <div className="mb-3">
-                        <div className="flex items-center text-lg font-semibold text-gray-600 mb-2">
-                          <div className="bg-gray-100 p-1.5 rounded-lg mr-2">
-                            <Crown className="h-5 w-5 text-gray-600" />
-                          </div>
-                          {kol.name}
-                        </div>
-                        <div className="flex gap-2 flex-wrap">
-                          <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
-                            Archived
-                          </Badge>
-                          {kol.tier && (
-                            <Badge variant="outline" className="text-xs">
-                              {kol.tier}
-                            </Badge>
-                          )}
-                          {kol.region && (
-                            <Badge variant="outline" className="text-xs">
-                              {kol.region}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
+                  <ArchivedItemCard
+                    key={kol.id}
+                    icon={Crown}
+                    name={kol.name}
+                    archivedAt={kol.archived_at}
+                    formatDate={formatDate}
+                    onRestore={() => handleRestore('kol', kol.id, kol.name)}
+                    onDelete={() => handlePermanentDelete('kol', kol.id, kol.name)}
+                    extraBadges={
+                      <>
+                        {kol.tier && <Badge variant="outline" className="text-xs">{kol.tier}</Badge>}
+                        {kol.region && <Badge variant="outline" className="text-xs">{kol.region}</Badge>}
+                      </>
+                    }
+                    meta={
+                      <>
                         {kol.platform && kol.platform.length > 0 && (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Globe className="h-4 w-4 mr-2 text-gray-400" />
-                            <span>{kol.platform.join(', ')}</span>
-                          </div>
+                          <ArchivedMetaRow icon={Globe}>{kol.platform.join(', ')}</ArchivedMetaRow>
                         )}
                         {kol.followers && (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Users className="h-4 w-4 mr-2 text-gray-400" />
-                            <span>{kol.followers.toLocaleString()} followers</span>
-                          </div>
+                          <ArchivedMetaRow icon={Users}>{kol.followers.toLocaleString()} followers</ArchivedMetaRow>
                         )}
-                        <div className="flex items-center text-sm text-gray-500">
-                          <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                          <span>Archived: {formatDate(kol.archived_at)}</span>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-4 border-t border-gray-100">
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => handleRestore('kol', kol.id, kol.name)}
-                        >
-                          <RotateCcw className="h-4 w-4 mr-2" />
-                          Restore
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => handlePermanentDelete('kol', kol.id, kol.name)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </>
+                    }
+                  />
                 ))
               )}
             </div>
@@ -801,6 +604,119 @@ export default function ArchivePage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────
+// ArchivedItemCard — shared structural shell for the 5 archive tabs.
+//
+// Extracted 2026-05-06 (audit): the 5 tabs (clients/lists/campaigns/
+// forms/kols) each had near-identical 50-line Card render blocks.
+// Variation between them is small and well-bounded:
+//   - icon + name (always)
+//   - "Archived" badge (always) + 0+ extra category badges
+//   - vertical info rows (passed as `meta` slot — different fields per type)
+//   - optional description (forms only)
+//   - Restore + Delete buttons (always, same shape)
+//
+// `meta` accepts ReactNode so callers can pass any combination of
+// `<ArchivedMetaRow>` instances. Keeps each tab's call site readable
+// while collapsing ~250 lines of duplicated chrome.
+// ────────────────────────────────────────────────────────────────────
+
+type ArchivedItemCardProps = {
+  icon: React.ComponentType<{ className?: string }>;
+  name: string;
+  archivedAt: string | null;
+  formatDate: (dateString: string) => string;
+  /** Optional non-"Archived" badges shown to the right of it. */
+  extraBadges?: React.ReactNode;
+  /** Optional one-line description (line-clamped) — used by Forms. */
+  description?: string | null;
+  /** Vertical info rows under the badges. Pass `<ArchivedMetaRow>`s. */
+  meta?: React.ReactNode;
+  onRestore: () => void;
+  onDelete: () => void;
+};
+
+function ArchivedItemCard({
+  icon: Icon,
+  name,
+  archivedAt,
+  formatDate,
+  extraBadges,
+  description,
+  meta,
+  onRestore,
+  onDelete,
+}: ArchivedItemCardProps) {
+  return (
+    <Card className="transition-shadow">
+      <CardHeader className="pb-4">
+        <div className="mb-3">
+          <div className="flex items-center text-lg font-semibold text-gray-600 mb-2">
+            <div className="bg-gray-100 p-1.5 rounded-lg mr-2">
+              <Icon className="h-5 w-5 text-gray-600" />
+            </div>
+            {name}
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
+              Archived
+            </Badge>
+            {extraBadges}
+          </div>
+        </div>
+        <div className="space-y-2">
+          {description && (
+            <p className="text-sm text-gray-600 line-clamp-2">{description}</p>
+          )}
+          {meta}
+          {archivedAt && (
+            <div className="flex items-center text-sm text-gray-500">
+              <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+              <span>Archived: {formatDate(archivedAt)}</span>
+            </div>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="pt-4 border-t border-gray-100">
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="w-full" onClick={onRestore}>
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Restore
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+            onClick={onDelete}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Single info row inside an ArchivedItemCard. Icon + label/value. */
+function ArchivedMetaRow({
+  icon: Icon,
+  children,
+  /** Use 'value' when the row is a metric/value line; 'meta' for soft labels. */
+  variant = 'value',
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+  variant?: 'value' | 'meta';
+}) {
+  return (
+    <div className={`flex items-center text-sm ${variant === 'value' ? 'text-gray-600' : 'text-gray-500'}`}>
+      <Icon className="h-4 w-4 mr-2 text-gray-400" />
+      <span>{children}</span>
     </div>
   );
 }

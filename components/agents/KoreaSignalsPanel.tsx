@@ -805,7 +805,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
             {/* Manual signal entry */}
             <button
               onClick={() => setManualSignalOpen(true)}
-              className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-1 focus:ring-[#3e8692]"
+              className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-1 focus:ring-brand"
             >
               <Plus className="w-3 h-3 text-gray-400" />
               Signal
@@ -815,7 +815,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
               <DropdownMenuTrigger asChild>
                 <button
                   disabled={autoScanLoading}
-                  className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-1 focus:ring-[#3e8692]"
+                  className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-1 focus:ring-brand"
                 >
                   <CalendarClock className="w-3 h-3 text-gray-400" />
                   {AUTO_SCAN_OPTIONS.find(o => o.value === autoScanFrequency)?.label || 'Off'}
@@ -839,7 +839,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
             {/* Recency filter dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-1 focus:ring-[#3e8692]">
+                <button className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-700 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-1 focus:ring-brand">
                   <Clock className="w-3 h-3 text-gray-400" />
                   {recencyMonths === 1 ? '1 mo' : `${recencyMonths} mo`}
                   <ChevronDown className="w-3 h-3 text-gray-400" />
@@ -903,7 +903,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                           onClick={() => setScanCadence(opt.value as any)}
                           className={`flex-1 text-center px-2 py-1.5 rounded-md text-xs border transition-colors ${
                             scanCadence === opt.value
-                              ? 'border-[#3e8692] bg-[#3e8692]/10 text-[#3e8692] font-medium'
+                              ? 'border-brand bg-brand/10 text-brand font-medium'
                               : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                           }`}
                         >
@@ -922,19 +922,19 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                     <div className="mt-1.5 space-y-1">
                       <label className="flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 cursor-pointer">
                         <Checkbox checked={modeApi} onCheckedChange={(v) => setModeApi(v === true)}
-                          className="data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
+                          className="data-[state=checked]:bg-brand data-[state=checked]:border-brand" />
                         <Building2 className="w-3 h-3 text-gray-400" />
                         <span className="text-xs text-gray-700">API (exchanges + RSS)</span>
                       </label>
                       <label className="flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 cursor-pointer">
                         <Checkbox checked={modeWeb} onCheckedChange={(v) => setModeWeb(v === true)}
-                          className="data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
+                          className="data-[state=checked]:bg-brand data-[state=checked]:border-brand" />
                         <Search className="w-3 h-3 text-gray-400" />
                         <span className="text-xs text-gray-700">Web Scraping</span>
                       </label>
                       <label className="flex items-center gap-2 p-1.5 rounded hover:bg-gray-50 cursor-pointer">
                         <Checkbox checked={modeClaude} onCheckedChange={(v) => setModeClaude(v === true)}
-                          className="data-[state=checked]:bg-[#3e8692] data-[state=checked]:border-[#3e8692]" />
+                          className="data-[state=checked]:bg-brand data-[state=checked]:border-brand" />
                         <Bot className="w-3 h-3 text-gray-400" />
                         <span className="text-xs text-gray-700">Claude AI (~$0.02/scan)</span>
                       </label>
@@ -973,19 +973,19 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                   <button
                     onClick={() => setProspectFilter('all')}
                     className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
-                      prospectFilter === 'all' ? 'bg-[#3e8692]/10 text-[#3e8692]' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                      prospectFilter === 'all' ? 'bg-brand/10 text-brand' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
                     }`}
                   >All</button>
                   <button
                     onClick={() => setProspectFilter('discovered')}
                     className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
-                      prospectFilter === 'discovered' ? 'bg-[#3e8692]/10 text-[#3e8692]' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                      prospectFilter === 'discovered' ? 'bg-brand/10 text-brand' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
                     }`}
                   >Discovered <span className="ml-0.5 text-[10px] opacity-70">{discoveredCount}</span></button>
                   <button
                     onClick={() => setProspectFilter('promoted')}
                     className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
-                      prospectFilter === 'promoted' ? 'bg-[#3e8692]/10 text-[#3e8692]' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                      prospectFilter === 'promoted' ? 'bg-brand/10 text-brand' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
                     }`}
                   >In Pipeline <span className="ml-0.5 text-[10px] opacity-70">{promotedCount}</span></button>
                   <button
@@ -1010,7 +1010,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
                       {prospectFilter !== 'all'
-                        ? <button onClick={() => setProspectFilter('all')} className="text-[#3e8692] hover:underline">Show all prospects</button>
+                        ? <button onClick={() => setProspectFilter('all')} className="text-brand hover:underline">Show all prospects</button>
                         : 'Click "Scan Now" to check Korean exchanges and news'}
                     </p>
                   </div>
@@ -1069,7 +1069,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                               >
                                 {promoting === p.id
                                   ? <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
-                                  : <Plus className="w-3.5 h-3.5 text-gray-400 hover:text-[#3e8692]" />}
+                                  : <Plus className="w-3.5 h-3.5 text-gray-400 hover:text-brand" />}
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent side="left">
@@ -1096,7 +1096,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                 {/* ─── Improvement #2: Signal Type Filter ─── */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-600 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-1 focus:ring-[#3e8692]">
+                    <button className="inline-flex items-center gap-1 text-xs border border-gray-200 rounded-md px-2 py-1 bg-white text-gray-600 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-1 focus:ring-brand">
                       <Filter className="w-3 h-3 text-gray-400" />
                       {signalTypeFilter === 'all'
                         ? 'All types'
@@ -1147,7 +1147,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
                       {signalTypeFilter !== 'all'
-                        ? <button onClick={() => setSignalTypeFilter('all')} className="text-[#3e8692] hover:underline">Show all signal types</button>
+                        ? <button onClick={() => setSignalTypeFilter('all')} className="text-brand hover:underline">Show all signal types</button>
                         : 'Run a scan to detect Korean market signals'}
                     </p>
                   </div>
@@ -1178,7 +1178,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                                 href={signal.source_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[10px] mt-1 text-[#3e8692] hover:underline"
+                                className="inline-flex items-center gap-1 text-[10px] mt-1 text-brand hover:underline"
                                 onClick={e => e.stopPropagation()}
                               >
                                 View source <ExternalLink className="w-2.5 h-2.5" />
@@ -1291,7 +1291,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                                 href={signal.source_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[10px] font-medium text-[#3e8692] hover:underline"
+                                className="inline-flex items-center gap-1 text-[10px] font-medium text-brand hover:underline"
                               >
                                 View source <ExternalLink className="w-2.5 h-2.5" />
                               </a>
@@ -1367,7 +1367,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                 onChange={e => setManualSignalData(d => ({ ...d, prospect_name: e.target.value }))}
                 placeholder="Enter exact prospect name..."
                 list="prospect-names-list"
-                className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#3e8692]"
+                className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand"
               />
               <datalist id="prospect-names-list">
                 {topProspects.map(p => <option key={p.id} value={p.name} />)}
@@ -1378,7 +1378,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
               <select
                 value={manualSignalData.signal_type}
                 onChange={e => setManualSignalData(d => ({ ...d, signal_type: e.target.value }))}
-                className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#3e8692]"
+                className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand"
               >
                 <optgroup label="Tier 1 — Act Immediately">
                   <option value="tge_within_60d">TGE / Token Launch (+25)</option>
@@ -1414,7 +1414,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                 value={manualSignalData.headline}
                 onChange={e => setManualSignalData(d => ({ ...d, headline: e.target.value }))}
                 placeholder="Brief description of the signal..."
-                className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#3e8692]"
+                className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand"
               />
             </div>
             <div>
@@ -1424,7 +1424,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                 value={manualSignalData.source_url}
                 onChange={e => setManualSignalData(d => ({ ...d, source_url: e.target.value }))}
                 placeholder="https://..."
-                className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#3e8692]"
+                className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand"
               />
             </div>
             <div>
@@ -1436,7 +1436,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                     onClick={() => setManualSignalData(d => ({ ...d, confidence: level }))}
                     className={`flex-1 text-xs py-1.5 rounded-md border transition-colors ${
                       manualSignalData.confidence === level
-                        ? 'border-[#3e8692] bg-[#3e8692]/10 text-[#3e8692] font-medium'
+                        ? 'border-brand bg-brand/10 text-brand font-medium'
                         : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                     }`}
                   >

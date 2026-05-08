@@ -200,10 +200,12 @@ const CampaignDetailsPage = () => {
 
   // Email views state
   const [isEmailViewsDialogOpen, setIsEmailViewsDialogOpen] = useState(false);
+  // viewed_at is nullable in the DB; mark it here so the setter below
+  // doesn't need a cast. See lists/page.tsx for the parallel pattern.
   const [emailViews, setEmailViews] = useState<Array<{
     id: string;
     email: string;
-    viewed_at: string;
+    viewed_at: string | null;
     user_agent: string | null;
   }>>([]);
   const [loadingEmailViews, setLoadingEmailViews] = useState(false);
@@ -2352,7 +2354,7 @@ const CampaignDetailsPage = () => {
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] w-full"
+              className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand w-full"
               style={{ borderColor: "#e5e7eb", backgroundColor: "white", color: value ? "#111827" : "#9ca3af" }}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
@@ -2999,7 +3001,7 @@ const CampaignDetailsPage = () => {
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] w-full"
+              className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand w-full"
               style={{ borderColor: "#e5e7eb", backgroundColor: "white", color: value ? "#111827" : "#9ca3af" }}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
@@ -3432,7 +3434,7 @@ const CampaignDetailsPage = () => {
           <div className="flex items-center justify-between relative">
             <Button
               variant="ghost"
-              className="py-2 px-3 rounded-md text-gray-600 hover:text-[#3e8692] transition-colors mb-1 text-sm"
+              className="py-2 px-3 rounded-md text-gray-600 hover:text-brand transition-colors mb-1 text-sm"
               onClick={() => router.back()}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />Back to Campaigns
@@ -3492,7 +3494,7 @@ const CampaignDetailsPage = () => {
                   )}
                   {editMode ? (
                       <Input
-                        className="text-2xl font-bold text-gray-900 auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                        className="text-2xl font-bold text-gray-900 focus-brand focus:ring-2 focus:ring-brand focus:border-brand"
                         style={{ borderColor: '#e5e7eb' }}
                         value={form?.name || ""}
                         onChange={e => handleChange("name", e.target.value)}
@@ -3516,7 +3518,7 @@ const CampaignDetailsPage = () => {
                         handleChange("status", value);
                       }}
                     >
-                      <SelectTrigger className="w-40 focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
+                      <SelectTrigger className="w-40 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -3549,7 +3551,7 @@ const CampaignDetailsPage = () => {
                       {loadingUpdates ? (
                         <div className="flex items-center gap-2">
                           {/* Left Arrow Skeleton */}
-                          <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse"></div>
+                          <Skeleton className="h-8 w-8 rounded-full" />
                           
                           {/* Update Card Skeleton */}
                           <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg p-3 min-h-[80px]">
@@ -3561,7 +3563,7 @@ const CampaignDetailsPage = () => {
                           </div>
                           
                           {/* Right Arrow Skeleton */}
-                          <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse"></div>
+                          <Skeleton className="h-8 w-8 rounded-full" />
                         </div>
                       ) : campaignUpdates.length === 0 ? (
                         <div className="text-sm text-gray-500 italic">No updates yet</div>
@@ -3673,7 +3675,7 @@ const CampaignDetailsPage = () => {
                                   key={index}
                                   className={`w-2 h-2 rounded-full transition-colors ${
                                     index === currentUpdateIndex 
-                                      ? 'bg-[#3e8692]' 
+                                      ? 'bg-brand' 
                                       : 'bg-gray-300 hover:bg-gray-400'
                                   }`}
                                   onClick={() => setCurrentUpdateIndex(index)}
@@ -3712,7 +3714,7 @@ const CampaignDetailsPage = () => {
                                 placeholder="Enter the latest update for this campaign..."
                                 value={updateText}
                                 onChange={(e) => setUpdateText(e.target.value)}
-                                className="auth-input min-h-[120px]"
+                                className="focus-brand min-h-[120px]"
                                 rows={4}
                               />
                             </div>
@@ -3789,7 +3791,7 @@ const CampaignDetailsPage = () => {
                   {/* Campaign Overview Section */}
                   <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                      <div className="bg-brand p-2.5 rounded-lg">
                         <FileText className="h-5 w-5 text-white" />
                       </div>
                       <h3 className="text-lg font-semibold text-gray-900">Campaign Overview</h3>
@@ -3806,7 +3808,7 @@ const CampaignDetailsPage = () => {
                           <Textarea
                             value={form?.outline || ""}
                             onChange={e => handleChange("outline", e.target.value)}
-                            className="auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                            className="focus-brand focus:ring-2 focus:ring-brand focus:border-brand"
                             style={{ borderColor: '#e5e7eb' }}
                             placeholder="Enter campaign outline..."
                             rows={3}
@@ -3820,13 +3822,13 @@ const CampaignDetailsPage = () => {
                           <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
                             Description
                           </div>
-                          <Badge variant="outline" className="text-[10px] text-[#3e8692] border-[#3e8692]">Client-Facing</Badge>
+                          <Badge variant="outline" className="text-[10px] text-brand border-brand">Client-Facing</Badge>
                         </div>
                         {editMode ? (
                           <Textarea
                             value={form?.description || ""}
                             onChange={e => handleChange("description", e.target.value)}
-                            className="auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                            className="focus-brand focus:ring-2 focus:ring-brand focus:border-brand"
                             style={{ borderColor: '#e5e7eb' }}
                             rows={3}
                           />
@@ -3840,7 +3842,7 @@ const CampaignDetailsPage = () => {
                   {/* Timeline Section */}
                   <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                      <div className="bg-brand p-2.5 rounded-lg">
                         <CalendarIcon className="h-5 w-5 text-white" />
                       </div>
                       <h3 className="text-lg font-semibold text-gray-900">Timeline</h3>
@@ -3853,7 +3855,7 @@ const CampaignDetailsPage = () => {
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                            className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                             style={{ borderColor: "#e5e7eb", backgroundColor: "white", color: form?.start_date ? "#111827" : "#9ca3af" }}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -3882,7 +3884,7 @@ const CampaignDetailsPage = () => {
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                            className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                             style={{ borderColor: "#e5e7eb", backgroundColor: "white", color: form?.end_date ? "#111827" : "#9ca3af" }}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
@@ -3907,12 +3909,12 @@ const CampaignDetailsPage = () => {
                   </div>
                   <div className="col-span-2 bg-white p-4 rounded-lg border border-gray-200">
                     <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
-                      <MapPin className="h-3.5 w-3.5 text-[#3e8692]" />
+                      <MapPin className="h-3.5 w-3.5 text-brand" />
                       Region
                     </div>
                     {editMode ? (
                       <Select value={form?.region || ""} onValueChange={value => handleChange("region", value)}>
-                        <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
+                        <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -3930,7 +3932,7 @@ const CampaignDetailsPage = () => {
                   {/* Client Information Section */}
                   <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                      <div className="bg-brand p-2.5 rounded-lg">
                         <Building2 className="h-5 w-5 text-white" />
                       </div>
                       <h3 className="text-lg font-semibold text-gray-900">Client Information</h3>
@@ -3940,7 +3942,7 @@ const CampaignDetailsPage = () => {
                         <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Client</div>
                         {editMode ? (
                           <Select value={form?.client_id || ""} onValueChange={value => handleChange("client_id", value)}>
-                            <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
+                            <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand">
                               <SelectValue placeholder="Select client" />
                             </SelectTrigger>
                             <SelectContent>
@@ -3959,7 +3961,7 @@ const CampaignDetailsPage = () => {
                               <div className="flex items-center gap-3">
                                 <Avatar className="h-10 w-10">
                                   {clientLogoUrl && <AvatarImage src={clientLogoUrl} alt={clientName} className="object-cover" />}
-                                  <AvatarFallback className="bg-[#3e8692] text-white font-semibold">
+                                  <AvatarFallback className="bg-brand text-white font-semibold">
                                     {initials}
                                   </AvatarFallback>
                                 </Avatar>
@@ -3978,7 +3980,7 @@ const CampaignDetailsPage = () => {
                   {/* Client Communication Section - Hidden */}
                   {false && <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                      <div className="bg-brand p-2.5 rounded-lg">
                         <Phone className="h-5 w-5 text-white" />
                       </div>
                       <h3 className="text-lg font-semibold text-gray-900">Client Communication</h3>
@@ -4019,7 +4021,7 @@ const CampaignDetailsPage = () => {
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
-                              className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                              className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                               style={{ borderColor: "#e5e7eb", backgroundColor: "white", color: form?.intro_call_date ? "#111827" : "#9ca3af" }}
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
@@ -4088,7 +4090,7 @@ const CampaignDetailsPage = () => {
                   {/* Team & Management Section */}
                   <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                      <div className="bg-brand p-2.5 rounded-lg">
                         <Users className="h-5 w-5 text-white" />
                       </div>
                       <h3 className="text-lg font-semibold text-gray-900">Team & Management</h3>
@@ -4098,7 +4100,7 @@ const CampaignDetailsPage = () => {
                         <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Manager</div>
                         {editMode ? (
                           <Select value={form?.manager || ""} onValueChange={value => handleChange("manager", value)}>
-                            <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
+                            <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand">
                               <SelectValue placeholder="Select manager" />
                             </SelectTrigger>
                             <SelectContent>
@@ -4117,7 +4119,7 @@ const CampaignDetailsPage = () => {
                               <div className="flex items-center gap-3">
                                 <Avatar className="h-10 w-10">
                                   {managerPhotoUrl && <AvatarImage src={managerPhotoUrl} alt={managerName} className="object-cover" />}
-                                  <AvatarFallback className="bg-[#3e8692] text-white font-semibold">
+                                  <AvatarFallback className="bg-brand text-white font-semibold">
                                     {initials}
                                   </AvatarFallback>
                                 </Avatar>
@@ -4156,7 +4158,7 @@ const CampaignDetailsPage = () => {
                   {/* Campaign Settings Section */}
                   <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                      <div className="bg-brand p-2.5 rounded-lg">
                         <BadgeCheck className="h-5 w-5 text-white" />
                       </div>
                       <h3 className="text-lg font-semibold text-gray-900">Campaign Settings</h3>
@@ -4208,7 +4210,7 @@ const CampaignDetailsPage = () => {
                   {/* Approved Access Section */}
                   <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                      <div className="bg-brand p-2.5 rounded-lg">
                         <Users className="h-5 w-5 text-white" />
                       </div>
                       <h3 className="text-lg font-semibold text-gray-900">Approved Access</h3>
@@ -4225,7 +4227,7 @@ const CampaignDetailsPage = () => {
                             value={emailInput}
                             onChange={(e) => setEmailInput(e.target.value)}
                             placeholder={"Enter emails or domains (comma or newline separated)\ne.g. user@example.com, partner.com"}
-                            className="auth-input min-h-[80px]"
+                            className="focus-brand min-h-[80px]"
                           />
                           <Button
                             type="button"
@@ -4288,7 +4290,7 @@ const CampaignDetailsPage = () => {
                   {/* Budget Section */}
                   <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-[#3e8692] p-2.5 rounded-lg">
+                      <div className="bg-brand p-2.5 rounded-lg">
                         <DollarSign className="h-5 w-5 text-white" />
                       </div>
                       <h3 className="text-lg font-semibold text-gray-900">Budget</h3>
@@ -4304,7 +4306,7 @@ const CampaignDetailsPage = () => {
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
                                 <Input
                                   type="text"
-                                  className="pl-6 w-full auth-input focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                                  className="pl-6 w-full focus-brand focus:ring-2 focus:ring-brand focus:border-brand"
                                   style={{ borderColor: '#e5e7eb' }}
                                   value={form?.total_budget ? Number(form.total_budget).toLocaleString() : ""}
                                   onChange={e => {
@@ -4321,7 +4323,7 @@ const CampaignDetailsPage = () => {
                           </div>
                           <div>
                             <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Allocated</div>
-                            <div className="text-2xl font-bold text-[#3e8692]">{CampaignService.formatCurrency(campaign.total_allocated || 0)}</div>
+                            <div className="text-2xl font-bold text-brand">{CampaignService.formatCurrency(campaign.total_allocated || 0)}</div>
                           </div>
                         </div>
                         {/* Progress Bar */}
@@ -4332,7 +4334,7 @@ const CampaignDetailsPage = () => {
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                             <div
-                              className="h-full bg-gradient-to-r from-[#3e8692] to-[#2d6470] transition-all duration-300 rounded-full"
+                              className="h-full bg-gradient-to-r from-brand to-[#2d6470] transition-all duration-300 rounded-full"
                               style={{ width: `${Math.min(CampaignService.calculateBudgetUtilization(campaign.total_budget, campaign.total_allocated || 0), 100)}%` }}
                             ></div>
                           </div>
@@ -4366,7 +4368,7 @@ const CampaignDetailsPage = () => {
                           <div className="flex flex-wrap gap-2">
                             {(campaign?.budget_type || []).length > 0 ? (
                               (campaign?.budget_type || []).map((type: string) => (
-                                <Badge key={type} variant="outline" className="capitalize text-[#3e8692] border-[#3e8692]">{type}</Badge>
+                                <Badge key={type} variant="outline" className="capitalize text-brand border-brand">{type}</Badge>
                               ))
                             ) : (
                               <span className="text-gray-400 italic">No budget types specified</span>
@@ -4386,7 +4388,7 @@ const CampaignDetailsPage = () => {
                             updated[idx].region = value;
                             setAllocations(updated);
                           }}>
-                            <SelectTrigger className="w-32 focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input">
+                            <SelectTrigger className="w-32 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand">
                               <SelectValue placeholder="Select region" />
                             </SelectTrigger>
                             <SelectContent>
@@ -4401,7 +4403,7 @@ const CampaignDetailsPage = () => {
                               type="text"
                               inputMode="numeric"
                               pattern="[0-9,]*"
-                              className="auth-input pl-6 w-full"
+                              className="focus-brand pl-6 w-full"
                               placeholder="Amount"
                               value={alloc.allocated_budget ? Number(String(alloc.allocated_budget).replace(/,/g, '')).toLocaleString('en-US') : ''}
                               onChange={e => {
@@ -4493,7 +4495,7 @@ const CampaignDetailsPage = () => {
                          <div className="flex items-center max-w-sm w-full mb-2">
                            <Input
                              placeholder="Search KOLs by name, region, or platform..."
-                             className="auth-input"
+                             className="focus-brand"
                              value={kolSearchTerm}
                              onChange={e => setKolSearchTerm(e.target.value)}
                            />
@@ -4656,7 +4658,7 @@ const CampaignDetailsPage = () => {
                            value={newKOLData.hh_status}
                            onValueChange={(value) => setNewKOLData(prev => ({ ...prev, hh_status: value as any }))}
                          >
-                           <SelectTrigger className="auth-input">
+                           <SelectTrigger className="focus-brand">
                              <SelectValue />
                            </SelectTrigger>
                            <SelectContent>
@@ -4673,7 +4675,7 @@ const CampaignDetailsPage = () => {
                            placeholder="Add notes for selected KOLs..."
                            value={newKOLData.notes}
                            onChange={(e) => setNewKOLData(prev => ({ ...prev, notes: e.target.value }))}
-                           className="auth-input"
+                           className="focus-brand"
                          />
                        </div>
 
@@ -4699,7 +4701,7 @@ const CampaignDetailsPage = () => {
                                    id="payment-amount"
                                    type="number"
                                    min={0}
-                                   className="auth-input pl-6 w-full"
+                                   className="focus-brand pl-6 w-full"
                                    value={newKOLData.payment_amount || ''}
                                    onChange={(e) => setNewKOLData(prev => ({ ...prev, payment_amount: Number(e.target.value) || 0 }))}
                                    placeholder="0.00"
@@ -4712,7 +4714,7 @@ const CampaignDetailsPage = () => {
                                  <PopoverTrigger asChild>
                                    <Button
                                      variant="outline"
-                                     className="auth-input justify-start text-left font-normal"
+                                     className="focus-brand justify-start text-left font-normal"
                                      style={{ borderColor: "#e5e7eb", backgroundColor: "white" }}
                                    >
                                      <CalendarIcon className="mr-2 h-4 w-4" />
@@ -4744,7 +4746,7 @@ const CampaignDetailsPage = () => {
                                  value={newKOLData.payment_method}
                                  onValueChange={(value) => setNewKOLData(prev => ({ ...prev, payment_method: value }))}
                                >
-                                 <SelectTrigger className="auth-input">
+                                 <SelectTrigger className="focus-brand">
                                    <SelectValue />
                                  </SelectTrigger>
                                  <SelectContent>
@@ -4814,7 +4816,7 @@ const CampaignDetailsPage = () => {
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <Users className="h-6 w-6 text-white" />
                             </div>
                             <p className="text-sm text-gray-600">Total KOLs in Campaign</p>
@@ -4831,7 +4833,7 @@ const CampaignDetailsPage = () => {
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
                             <p className="text-sm text-gray-600">Average Followers per KOL</p>
@@ -4865,7 +4867,7 @@ const CampaignDetailsPage = () => {
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <Globe className="h-6 w-6 text-white" />
                             </div>
                             <p className="text-sm text-gray-600">
@@ -4900,7 +4902,7 @@ const CampaignDetailsPage = () => {
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <Flag className="h-6 w-6 text-white" />
                             </div>
                             <p className="text-sm text-gray-600">
@@ -5151,7 +5153,7 @@ const CampaignDetailsPage = () => {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
                       placeholder="Search KOLs by name, region, or status..."
-                      className="pl-10 auth-input"
+                      className="pl-10 focus-brand"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -5210,7 +5212,7 @@ const CampaignDetailsPage = () => {
                         <div className="h-5"></div>
                         <Button
                           size="sm"
-                          className="bg-[#3e8692] hover:bg-[#2d6b75] text-white border-0 shadow-sm whitespace-nowrap"
+                          className="bg-brand hover:bg-[#2d6b75] text-white border-0 shadow-sm whitespace-nowrap"
                           disabled={selectedKOLs.length === 0 || !bulkStatus}
                           onClick={async () => {
                             if (!bulkStatus || selectedKOLs.length === 0) return;
@@ -5411,7 +5413,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {kolFilters.platform.length > 0 && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   {kolFilters.platform.length}
                                 </span>
                               )}
@@ -5448,7 +5450,7 @@ const CampaignDetailsPage = () => {
                                         placeholder="Value"
                                         value={kolFilters.followers_value}
                                         onChange={(e) => setKolFilters(prev => ({ ...prev, followers_value: e.target.value }))}
-                                        className="h-8 text-xs auth-input"
+                                        className="h-8 text-xs focus-brand"
                                       />
                                     </div>
                                     {(kolFilters.followers_operator || kolFilters.followers_value) && (
@@ -5465,7 +5467,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {(kolFilters.followers_operator && kolFilters.followers_value) && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   1
                                 </span>
                               )}
@@ -5515,7 +5517,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {kolFilters.region.length > 0 && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   {kolFilters.region.length}
                                 </span>
                               )}
@@ -5562,7 +5564,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {kolFilters.creator_type.length > 0 && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   {kolFilters.creator_type.length}
                                 </span>
                               )}
@@ -5611,7 +5613,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {kolFilters.hh_status.length > 0 && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   {kolFilters.hh_status.length}
                                 </span>
                               )}
@@ -5649,7 +5651,7 @@ const CampaignDetailsPage = () => {
                                         placeholder="Value"
                                         value={kolFilters.paid_value}
                                         onChange={(e) => setKolFilters(prev => ({ ...prev, paid_value: e.target.value }))}
-                                        className="h-8 text-xs auth-input"
+                                        className="h-8 text-xs focus-brand"
                                       />
                                     </div>
                                     {(kolFilters.paid_operator || kolFilters.paid_value) && (
@@ -5666,7 +5668,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {(kolFilters.paid_operator && kolFilters.paid_value) && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   1
                                 </span>
                               )}
@@ -6059,7 +6061,7 @@ const CampaignDetailsPage = () => {
                                             max={20}
                                             value={quickAddContentCount}
                                             onChange={(e) => setQuickAddContentCount(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
-                                            className="w-16 h-8 text-center auth-input"
+                                            className="w-16 h-8 text-center focus-brand"
                                           />
                                         </div>
                                         <div className="text-xs font-semibold text-gray-600">Select Type</div>
@@ -6444,7 +6446,7 @@ const CampaignDetailsPage = () => {
                                 type="number"
                                 value={kolFilters.followers_value}
                                 onChange={(e) => setKolFilters(prev => ({ ...prev, followers_value: e.target.value }))}
-                                className="auth-input h-7 text-xs w-16"
+                                className="focus-brand h-7 text-xs w-16"
                               />
                             </div>
                           </div>
@@ -6469,7 +6471,7 @@ const CampaignDetailsPage = () => {
                                 type="number"
                                 value={kolFilters.budget_value}
                                 onChange={(e) => setKolFilters(prev => ({ ...prev, budget_value: e.target.value }))}
-                                className="auth-input h-7 text-xs w-16"
+                                className="focus-brand h-7 text-xs w-16"
                               />
                             </div>
                           </div>
@@ -6494,7 +6496,7 @@ const CampaignDetailsPage = () => {
                                 type="number"
                                 value={kolFilters.paid_value}
                                 onChange={(e) => setKolFilters(prev => ({ ...prev, paid_value: e.target.value }))}
-                                className="auth-input h-7 text-xs w-16"
+                                className="focus-brand h-7 text-xs w-16"
                               />
                             </div>
                           </div>
@@ -6536,7 +6538,7 @@ const CampaignDetailsPage = () => {
                       <Card key={campaignKOL.id} className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-4">
                           <div className="flex flex-col items-center text-center">
-                            <div className="w-16 h-16 bg-gradient-to-br from-[#3e8692] to-[#2d6470] rounded-full flex items-center justify-center mb-3">
+                            <div className="w-16 h-16 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center mb-3">
                               <span className="text-white font-bold text-xl">
                                 {campaignKOL.master_kol.name.charAt(0).toUpperCase()}
                               </span>
@@ -6688,7 +6690,7 @@ const CampaignDetailsPage = () => {
                               setAddContentData(d => ({ ...d, campaign_kols_id: v, platform: autoplatform }));
                             }}
                           >
-                            <SelectTrigger className="auth-input">
+                            <SelectTrigger className="focus-brand">
                               <SelectValue placeholder="Select KOL" />
                             </SelectTrigger>
                             <SelectContent>
@@ -6704,7 +6706,7 @@ const CampaignDetailsPage = () => {
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
-                                className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                                className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                                 style={{
                                   borderColor: "#e5e7eb",
                                   backgroundColor: "white",
@@ -6741,7 +6743,7 @@ const CampaignDetailsPage = () => {
                             placeholder="https://..."
                             value={addContentData.content_link}
                             onChange={e => setAddContentData(d => ({ ...d, content_link: e.target.value }))}
-                            className="auth-input"
+                            className="focus-brand"
                           />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
@@ -6751,7 +6753,7 @@ const CampaignDetailsPage = () => {
                               value={addContentData.platform}
                               onValueChange={v => setAddContentData(d => ({ ...d, platform: v }))}
                             >
-                              <SelectTrigger className="auth-input">
+                              <SelectTrigger className="focus-brand">
                                 <SelectValue placeholder="Select Platform" />
                               </SelectTrigger>
                               <SelectContent>
@@ -6767,7 +6769,7 @@ const CampaignDetailsPage = () => {
                               value={addContentData.type}
                               onValueChange={v => setAddContentData(d => ({ ...d, type: v }))}
                             >
-                              <SelectTrigger className="auth-input">
+                              <SelectTrigger className="focus-brand">
                                 <SelectValue placeholder="Select Type" />
                               </SelectTrigger>
                               <SelectContent>
@@ -6785,7 +6787,7 @@ const CampaignDetailsPage = () => {
                               value={addContentData.status}
                               onValueChange={v => setAddContentData(d => ({ ...d, status: v }))}
                             >
-                              <SelectTrigger className="auth-input">
+                              <SelectTrigger className="focus-brand">
                                 <SelectValue placeholder="Select Status" />
                               </SelectTrigger>
                               <SelectContent>
@@ -6802,7 +6804,7 @@ const CampaignDetailsPage = () => {
                               min={0}
                               value={addContentData.impressions}
                               onChange={e => setAddContentData(d => ({ ...d, impressions: e.target.value }))}
-                              className="auth-input"
+                              className="focus-brand"
                             />
                           </div>
                         </div>
@@ -6814,7 +6816,7 @@ const CampaignDetailsPage = () => {
                               min={0}
                               value={addContentData.likes}
                               onChange={e => setAddContentData(d => ({ ...d, likes: e.target.value }))}
-                              className="auth-input"
+                              className="focus-brand"
                             />
                           </div>
                           <div className="grid gap-2">
@@ -6824,7 +6826,7 @@ const CampaignDetailsPage = () => {
                               min={0}
                               value={addContentData.retweets}
                               onChange={e => setAddContentData(d => ({ ...d, retweets: e.target.value }))}
-                              className="auth-input"
+                              className="focus-brand"
                             />
                           </div>
                         </div>
@@ -6836,7 +6838,7 @@ const CampaignDetailsPage = () => {
                             min={0}
                             value={addContentData.comments}
                             onChange={e => setAddContentData(d => ({ ...d, comments: e.target.value }))}
-                            className="auth-input"
+                            className="focus-brand"
                           />
                           </div>
                           <div className="grid gap-2">
@@ -6846,7 +6848,7 @@ const CampaignDetailsPage = () => {
                               min={0}
                               value={addContentData.bookmarks}
                               onChange={e => setAddContentData(d => ({ ...d, bookmarks: e.target.value }))}
-                              className="auth-input"
+                              className="focus-brand"
                             />
                           </div>
                         </div>
@@ -7062,7 +7064,7 @@ const CampaignDetailsPage = () => {
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
                             <p className="text-sm text-gray-600">
@@ -7087,7 +7089,7 @@ const CampaignDetailsPage = () => {
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
                             <p className="text-sm text-gray-600">
@@ -7112,7 +7114,7 @@ const CampaignDetailsPage = () => {
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
                             <p className="text-sm text-gray-600">
@@ -7137,7 +7139,7 @@ const CampaignDetailsPage = () => {
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
                             <p className="text-sm text-gray-600">
@@ -7162,7 +7164,7 @@ const CampaignDetailsPage = () => {
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
                             <p className="text-sm text-gray-600">
@@ -7189,7 +7191,7 @@ const CampaignDetailsPage = () => {
                       <Card className="hover:shadow-lg transition-shadow duration-200">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-[#3e8692] to-[#2d6470] p-3 rounded-lg">
+                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
                             <p className="text-sm text-gray-600">
@@ -7412,7 +7414,7 @@ const CampaignDetailsPage = () => {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
                       placeholder="Search Contents by KOL, platform, or status..."
-                      className="pl-10 auth-input"
+                      className="pl-10 focus-brand"
                       value={contentsSearchTerm}
                       onChange={e => setContentsSearchTerm(e.target.value)}
                     />
@@ -7564,7 +7566,7 @@ const CampaignDetailsPage = () => {
                           <div className="h-5"></div>
                           <Button
                             size="sm"
-                            className="bg-[#3e8692] hover:bg-[#2d6b75] text-white border-0 shadow-sm whitespace-nowrap"
+                            className="bg-brand hover:bg-[#2d6b75] text-white border-0 shadow-sm whitespace-nowrap"
                             disabled={selectedContents.length === 0 || (!bulkContentStatus && !bulkContentPlatform && !bulkContentType && !bulkContentActivationDate)}
                             onClick={handleBulkStatusChange}
                           >
@@ -7633,7 +7635,7 @@ const CampaignDetailsPage = () => {
                                         placeholder="Value"
                                         value={contentFilters.impressions_value}
                                         onChange={(e) => setContentFilters(prev => ({ ...prev, impressions_value: e.target.value }))}
-                                        className="h-8 text-xs auth-input"
+                                        className="h-8 text-xs focus-brand"
                                       />
                                     </div>
                                     {(contentFilters.impressions_operator || contentFilters.impressions_value) && (
@@ -7650,7 +7652,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {(contentFilters.impressions_operator && contentFilters.impressions_value) && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   1
                                 </span>
                               )}
@@ -7687,7 +7689,7 @@ const CampaignDetailsPage = () => {
                                         placeholder="Value"
                                         value={contentFilters.likes_value}
                                         onChange={(e) => setContentFilters(prev => ({ ...prev, likes_value: e.target.value }))}
-                                        className="h-8 text-xs auth-input"
+                                        className="h-8 text-xs focus-brand"
                                       />
                                     </div>
                                     {(contentFilters.likes_operator || contentFilters.likes_value) && (
@@ -7704,7 +7706,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {(contentFilters.likes_operator && contentFilters.likes_value) && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   1
                                 </span>
                               )}
@@ -7741,7 +7743,7 @@ const CampaignDetailsPage = () => {
                                         placeholder="Value"
                                         value={contentFilters.retweets_value}
                                         onChange={(e) => setContentFilters(prev => ({ ...prev, retweets_value: e.target.value }))}
-                                        className="h-8 text-xs auth-input"
+                                        className="h-8 text-xs focus-brand"
                                       />
                                     </div>
                                     {(contentFilters.retweets_operator || contentFilters.retweets_value) && (
@@ -7758,7 +7760,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {(contentFilters.retweets_operator && contentFilters.retweets_value) && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   1
                                 </span>
                               )}
@@ -7795,7 +7797,7 @@ const CampaignDetailsPage = () => {
                                         placeholder="Value"
                                         value={contentFilters.comments_value}
                                         onChange={(e) => setContentFilters(prev => ({ ...prev, comments_value: e.target.value }))}
-                                        className="h-8 text-xs auth-input"
+                                        className="h-8 text-xs focus-brand"
                                       />
                                     </div>
                                     {(contentFilters.comments_operator || contentFilters.comments_value) && (
@@ -7812,7 +7814,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {(contentFilters.comments_operator && contentFilters.comments_value) && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   1
                                 </span>
                               )}
@@ -7849,7 +7851,7 @@ const CampaignDetailsPage = () => {
                                         placeholder="Value"
                                         value={contentFilters.bookmarks_value}
                                         onChange={(e) => setContentFilters(prev => ({ ...prev, bookmarks_value: e.target.value }))}
-                                        className="h-8 text-xs auth-input"
+                                        className="h-8 text-xs focus-brand"
                                       />
                                     </div>
                                     {(contentFilters.bookmarks_operator || contentFilters.bookmarks_value) && (
@@ -7866,7 +7868,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {(contentFilters.bookmarks_operator && contentFilters.bookmarks_value) && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   1
                                 </span>
                               )}
@@ -7949,7 +7951,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {contentFilters.platform.length > 0 && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   {contentFilters.platform.length}
                                 </span>
                               )}
@@ -7996,7 +7998,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {contentFilters.type.length > 0 && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   {contentFilters.type.length}
                                 </span>
                               )}
@@ -8043,7 +8045,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {contentFilters.status.length > 0 && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   {contentFilters.status.length}
                                 </span>
                               )}
@@ -8082,7 +8084,7 @@ const CampaignDetailsPage = () => {
                                         placeholder="Value"
                                         value={contentFilters.impressions_value}
                                         onChange={(e) => setContentFilters(prev => ({ ...prev, impressions_value: e.target.value }))}
-                                        className="h-8 text-xs auth-input"
+                                        className="h-8 text-xs focus-brand"
                                       />
                                     </div>
                                     {(contentFilters.impressions_operator || contentFilters.impressions_value) && (
@@ -8099,7 +8101,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {(contentFilters.impressions_operator && contentFilters.impressions_value) && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   1
                                 </span>
                               )}
@@ -8136,7 +8138,7 @@ const CampaignDetailsPage = () => {
                                         placeholder="Value"
                                         value={contentFilters.likes_value}
                                         onChange={(e) => setContentFilters(prev => ({ ...prev, likes_value: e.target.value }))}
-                                        className="h-8 text-xs auth-input"
+                                        className="h-8 text-xs focus-brand"
                                       />
                                     </div>
                                     {(contentFilters.likes_operator || contentFilters.likes_value) && (
@@ -8153,7 +8155,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {(contentFilters.likes_operator && contentFilters.likes_value) && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   1
                                 </span>
                               )}
@@ -8190,7 +8192,7 @@ const CampaignDetailsPage = () => {
                                         placeholder="Value"
                                         value={contentFilters.retweets_value}
                                         onChange={(e) => setContentFilters(prev => ({ ...prev, retweets_value: e.target.value }))}
-                                        className="h-8 text-xs auth-input"
+                                        className="h-8 text-xs focus-brand"
                                       />
                                     </div>
                                     {(contentFilters.retweets_operator || contentFilters.retweets_value) && (
@@ -8207,7 +8209,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {(contentFilters.retweets_operator && contentFilters.retweets_value) && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   1
                                 </span>
                               )}
@@ -8244,7 +8246,7 @@ const CampaignDetailsPage = () => {
                                         placeholder="Value"
                                         value={contentFilters.comments_value}
                                         onChange={(e) => setContentFilters(prev => ({ ...prev, comments_value: e.target.value }))}
-                                        className="h-8 text-xs auth-input"
+                                        className="h-8 text-xs focus-brand"
                                       />
                                     </div>
                                     {(contentFilters.comments_operator || contentFilters.comments_value) && (
@@ -8261,7 +8263,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {(contentFilters.comments_operator && contentFilters.comments_value) && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   1
                                 </span>
                               )}
@@ -8298,7 +8300,7 @@ const CampaignDetailsPage = () => {
                                         placeholder="Value"
                                         value={contentFilters.bookmarks_value}
                                         onChange={(e) => setContentFilters(prev => ({ ...prev, bookmarks_value: e.target.value }))}
-                                        className="h-8 text-xs auth-input"
+                                        className="h-8 text-xs focus-brand"
                                       />
                                     </div>
                                     {(contentFilters.bookmarks_operator || contentFilters.bookmarks_value) && (
@@ -8315,7 +8317,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverContent>
                               </Popover>
                               {(contentFilters.bookmarks_operator && contentFilters.bookmarks_value) && (
-                                <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                   1
                                 </span>
                               )}
@@ -8674,7 +8676,7 @@ const CampaignDetailsPage = () => {
                               return (
                                 <div key={kolId} className="space-y-4">
                                   <div className="flex items-center gap-2 pb-2 border-b">
-                                    <h4 className="font-semibold text-md text-[#3e8692]">{kol.master_kol.name}</h4>
+                                    <h4 className="font-semibold text-md text-brand">{kol.master_kol.name}</h4>
                                     <span className="text-sm text-gray-500">({numberOfPayments} payment{numberOfPayments > 1 ? 's' : ''})</span>
                                   </div>
 
@@ -8695,7 +8697,7 @@ const CampaignDetailsPage = () => {
                                           type="text"
                                           inputMode="numeric"
                                           pattern="[0-9,]*"
-                                          className="auth-input pl-6 w-full"
+                                          className="focus-brand pl-6 w-full"
                                           value={payment.amount ? Number(payment.amount).toLocaleString('en-US') : ''}
                                           onChange={(e) => {
                                             const raw = e.target.value.replace(/[^0-9]/g, '');
@@ -8719,7 +8721,7 @@ const CampaignDetailsPage = () => {
                                         <PopoverTrigger asChild>
                                           <Button
                                             variant="outline"
-                                            className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                                            className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                                             style={{
                                               borderColor: "#e5e7eb",
                                               backgroundColor: "white",
@@ -8762,7 +8764,7 @@ const CampaignDetailsPage = () => {
                                           });
                                         }}
                                       >
-                                        <SelectTrigger className="auth-input">
+                                        <SelectTrigger className="focus-brand">
                                           <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -8790,7 +8792,7 @@ const CampaignDetailsPage = () => {
                                             };
                                           });
                                         }}
-                                        className="auth-input"
+                                        className="focus-brand"
                                         triggerContent={
                                           <div>
                                             {(() => {
@@ -8831,7 +8833,7 @@ const CampaignDetailsPage = () => {
                                         });
                                       }}
                                       placeholder="Enter transaction ID"
-                                      className="auth-input"
+                                      className="focus-brand"
                                     />
                                   </div>
 
@@ -8851,7 +8853,7 @@ const CampaignDetailsPage = () => {
                                       }}
                                       placeholder="Add any notes about this payment"
                                       rows={2}
-                                      className="auth-input"
+                                      className="focus-brand"
                                     />
                                   </div>
                                     </div>
@@ -8871,7 +8873,7 @@ const CampaignDetailsPage = () => {
                               placeholder="e.g., Venue Rental, Equipment, Agency Fee"
                               value={nonKOLPayment.recipient_name}
                               onChange={(e) => setNonKOLPayment(prev => ({ ...prev, recipient_name: e.target.value }))}
-                              className="auth-input"
+                              className="focus-brand"
                             />
                           </div>
 
@@ -8884,7 +8886,7 @@ const CampaignDetailsPage = () => {
                                   type="text"
                                   inputMode="numeric"
                                   pattern="[0-9,]*"
-                                  className="auth-input pl-6 w-full"
+                                  className="focus-brand pl-6 w-full"
                                   value={nonKOLPayment.amount ? Number(nonKOLPayment.amount).toLocaleString('en-US') : ''}
                                   onChange={(e) => {
                                     const raw = e.target.value.replace(/[^0-9]/g, '');
@@ -8901,7 +8903,7 @@ const CampaignDetailsPage = () => {
                                 <PopoverTrigger asChild>
                                   <Button
                                     variant="outline"
-                                    className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                                    className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                                     style={{
                                       borderColor: "#e5e7eb",
                                       backgroundColor: "white",
@@ -8939,7 +8941,7 @@ const CampaignDetailsPage = () => {
                                 value={nonKOLPayment.payment_method}
                                 onValueChange={(value) => setNonKOLPayment(prev => ({ ...prev, payment_method: value }))}
                               >
-                                <SelectTrigger className="auth-input">
+                                <SelectTrigger className="focus-brand">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -8956,7 +8958,7 @@ const CampaignDetailsPage = () => {
                                 placeholder="Optional"
                                 value={nonKOLPayment.transaction_id}
                                 onChange={(e) => setNonKOLPayment(prev => ({ ...prev, transaction_id: e.target.value }))}
-                                className="auth-input"
+                                className="focus-brand"
                               />
                             </div>
                           </div>
@@ -8967,7 +8969,7 @@ const CampaignDetailsPage = () => {
                               placeholder="Optional wallet address"
                               value={nonKOLPayment.wallet}
                               onChange={(e) => setNonKOLPayment(prev => ({ ...prev, wallet: e.target.value }))}
-                              className="auth-input"
+                              className="focus-brand"
                             />
                           </div>
 
@@ -8978,7 +8980,7 @@ const CampaignDetailsPage = () => {
                               value={nonKOLPayment.notes}
                               onChange={(e) => setNonKOLPayment(prev => ({ ...prev, notes: e.target.value }))}
                               rows={2}
-                              className="auth-input"
+                              className="focus-brand"
                             />
                           </div>
                         </div>
@@ -9048,7 +9050,7 @@ const CampaignDetailsPage = () => {
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <Input
                           placeholder="Search Payments by KOL, method, or notes..."
-                          className="pl-10 auth-input"
+                          className="pl-10 focus-brand"
                           value={paymentsSearchTerm}
                           onChange={e => setPaymentsSearchTerm(e.target.value)}
                         />
@@ -9127,7 +9129,7 @@ const CampaignDetailsPage = () => {
                         <div className="h-5"></div>
                         <Button
                           size="sm"
-                          className="bg-[#3e8692] hover:bg-[#2d6b75] text-white border-0 shadow-sm whitespace-nowrap"
+                          className="bg-brand hover:bg-[#2d6b75] text-white border-0 shadow-sm whitespace-nowrap"
                           disabled={selectedPayments.length === 0 || !bulkPaymentMethod}
                           onClick={handleBulkPaymentMethodChange}
                         >
@@ -9245,7 +9247,7 @@ const CampaignDetailsPage = () => {
                                     </PopoverContent>
                                   </Popover>
                                   {paymentFilters.kol_ids.length > 0 && (
-                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       {paymentFilters.kol_ids.length}
                                     </span>
                                   )}
@@ -9299,7 +9301,7 @@ const CampaignDetailsPage = () => {
                                             placeholder="Value"
                                             value={paymentFilters.amount_value}
                                             onChange={(e) => setPaymentFilters(prev => ({ ...prev, amount_value: e.target.value }))}
-                                            className="h-8 text-xs auth-input"
+                                            className="h-8 text-xs focus-brand"
                                           />
                                         </div>
                                         {(paymentFilters.amount_operator || paymentFilters.amount_value) && (
@@ -9316,7 +9318,7 @@ const CampaignDetailsPage = () => {
                                     </PopoverContent>
                                   </Popover>
                                   {(paymentFilters.amount_operator && paymentFilters.amount_value) && (
-                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       1
                                     </span>
                                   )}
@@ -9380,7 +9382,7 @@ const CampaignDetailsPage = () => {
                                     </PopoverContent>
                                   </Popover>
                                   {paymentFilters.payment_methods.length > 0 && (
-                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       {paymentFilters.payment_methods.length}
                                     </span>
                                   )}
@@ -9436,7 +9438,7 @@ const CampaignDetailsPage = () => {
                                     </PopoverContent>
                                   </Popover>
                                   {paymentFilters.has_content && (
-                                    <span className="ml-1 bg-[#3e8692] text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       1
                                     </span>
                                   )}
@@ -9830,7 +9832,7 @@ const CampaignDetailsPage = () => {
                                 <div className="mt-3">
                                   <div className="w-full bg-gray-200 rounded-full h-2">
                                     <div 
-                                      className="bg-[#3e8692] h-2 rounded-full transition-all duration-300" 
+                                      className="bg-brand h-2 rounded-full transition-all duration-300" 
                                       style={{ width: `${Math.min(utilization, 100)}%` }}
                                     ></div>
                                   </div>
@@ -9855,7 +9857,7 @@ const CampaignDetailsPage = () => {
                             <span className="text-gray-600 font-medium">Total</span>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <div className="w-3 h-3 rounded bg-[#3e8692]"></div>
+                            <div className="w-3 h-3 rounded bg-brand"></div>
                             <span className="text-gray-600 font-medium">Payments</span>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -9927,7 +9929,7 @@ const CampaignDetailsPage = () => {
                               <span className="text-gray-600 font-medium">Regional Budget</span>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 rounded bg-[#3e8692]"></div>
+                              <div className="w-3 h-3 rounded bg-brand"></div>
                               <span className="text-gray-600 font-medium">Payments Made</span>
                             </div>
                             <div className="flex items-center space-x-2">
@@ -10558,7 +10560,7 @@ const CampaignDetailsPage = () => {
                 value={newPaymentData.campaign_kol_id}
                 onValueChange={(value) => setNewPaymentData(prev => ({ ...prev, campaign_kol_id: value }))}
               >
-                <SelectTrigger className="auth-input">
+                <SelectTrigger className="focus-brand">
                   <SelectValue placeholder="Select KOL" />
                 </SelectTrigger>
                 <SelectContent>
@@ -10579,7 +10581,7 @@ const CampaignDetailsPage = () => {
                   type="text"
                   inputMode="numeric"
                   pattern="[0-9,]*"
-                  className="auth-input pl-6 w-full"
+                  className="focus-brand pl-6 w-full"
                   value={newPaymentData.amount ? Number(newPaymentData.amount).toLocaleString('en-US') : ''}
                   onChange={(e) => {
                     const raw = e.target.value.replace(/[^0-9]/g, '');
@@ -10595,7 +10597,7 @@ const CampaignDetailsPage = () => {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="auth-input justify-start text-left font-normal focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692]"
+                    className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
                     style={{
                       borderColor: "#e5e7eb",
                       backgroundColor: "white",
@@ -10631,7 +10633,7 @@ const CampaignDetailsPage = () => {
                 value={newPaymentData.payment_method}
                 onValueChange={(value) => setNewPaymentData(prev => ({ ...prev, payment_method: value }))}
               >
-                <SelectTrigger className="auth-input">
+                <SelectTrigger className="focus-brand">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -10648,8 +10650,8 @@ const CampaignDetailsPage = () => {
                   .filter(content => content.campaign_kols_id === newPaymentData.campaign_kol_id)
                   .map(content => content.id)}
                 selected={Array.isArray(newPaymentData.content_id) ? newPaymentData.content_id : (newPaymentData.content_id && newPaymentData.content_id !== 'none' ? [newPaymentData.content_id] : [])}
-                onSelectedChange={(selectedIds) => setNewPaymentData(prev => ({ ...prev, content_id: selectedIds }))}
-                className="auth-input"
+                onSelectedChange={(selectedIds) => setNewPaymentData(prev => ({ ...prev, content_id: selectedIds as unknown as string }))}
+                className="focus-brand"
                 triggerContent={
                   <div>
                     {(() => {
@@ -10680,7 +10682,7 @@ const CampaignDetailsPage = () => {
                 value={newPaymentData.transaction_id}
                 onChange={(e) => setNewPaymentData(prev => ({ ...prev, transaction_id: e.target.value }))}
                 placeholder="Enter transaction ID"
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
             <div className="grid gap-2">
@@ -10691,7 +10693,7 @@ const CampaignDetailsPage = () => {
                 onChange={(e) => setNewPaymentData(prev => ({ ...prev, notes: e.target.value }))}
                 placeholder="Add any notes about this payment"
                 rows={3}
-                className="auth-input"
+                className="focus-brand"
               />
             </div>
           </div>
@@ -10803,7 +10805,7 @@ const CampaignDetailsPage = () => {
                   id="share-campaign-link"
                   value={`${typeof window !== 'undefined' ? window.location.origin : ''}/public/campaigns/${campaign?.id}`}
                   readOnly
-                  className="flex-1 auth-input"
+                  className="flex-1 focus-brand"
                 />
                 <Button
                   variant="outline"
@@ -10896,7 +10898,7 @@ const CampaignDetailsPage = () => {
           <div className="py-4">
             {loadingEmailViews ? (
               <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#3e8692]"></div>
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand"></div>
               </div>
             ) : emailViews.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
@@ -10956,7 +10958,7 @@ const CampaignDetailsPage = () => {
                   <button
                     type="button"
                     onClick={() => setIsEditingPaymentMessage(true)}
-                    className="text-sm text-[#3e8692] hover:underline flex items-center gap-1"
+                    className="text-sm text-brand hover:underline flex items-center gap-1"
                   >
                     <Edit className="h-3.5 w-3.5" />
                     Edit
@@ -10967,7 +10969,7 @@ const CampaignDetailsPage = () => {
                 <Textarea
                   value={paymentNotificationMessage}
                   onChange={(e) => setPaymentNotificationMessage(e.target.value)}
-                  className="auth-input min-h-[100px] text-sm"
+                  className="focus-brand min-h-[100px] text-sm"
                   autoFocus
                 />
               ) : (

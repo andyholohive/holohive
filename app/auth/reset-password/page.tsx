@@ -304,7 +304,7 @@ export default function ResetPasswordPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input"
+                  className="focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand"
                 />
               </div>
               
@@ -317,7 +317,7 @@ export default function ResetPasswordPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  className="focus:outline-none focus:ring-2 focus:ring-[#3e8692] focus:border-[#3e8692] auth-input"
+                  className="focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand"
                 />
               </div>
               

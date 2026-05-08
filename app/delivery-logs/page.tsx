@@ -14,6 +14,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { UserService } from '@/lib/userService';
+import { toneClassName, type BadgeTone } from '@/components/ui/status-badge';
 import {
   Plus,
   Trash2,
@@ -57,21 +58,20 @@ type Client = {
 const WORK_TYPES = ['Client-Facing', 'Internal'] as const;
 const TRIGGERS = ['Client Request', 'Follow-Up Needed', 'SOP', 'Extra'] as const;
 
-const workTypeBadge = (type: string) => {
-  return type === 'Client-Facing'
-    ? 'bg-blue-100 text-blue-800'
-    : 'bg-gray-100 text-gray-700';
+// Tone maps migrated to centralized palette 2026-05-06. 'yellow' and
+// 'orange' aren't in the shared palette; mapped to warning (amber).
+const TRIGGER_TONES: Record<string, BadgeTone> = {
+  'Client Request':    'purple',
+  'Follow-Up Needed':  'warning', // amber, was yellow
+  'SOP':               'success', // emerald, was green
+  'Extra':             'warning', // amber, was orange — same family
 };
 
-const triggerBadge = (trigger: string) => {
-  switch (trigger) {
-    case 'Client Request': return 'bg-purple-100 text-purple-800';
-    case 'Follow-Up Needed': return 'bg-yellow-100 text-yellow-800';
-    case 'SOP': return 'bg-green-100 text-green-800';
-    case 'Extra': return 'bg-orange-100 text-orange-800';
-    default: return 'bg-gray-100 text-gray-700';
-  }
-};
+const workTypeBadge = (type: string) =>
+  toneClassName(type === 'Client-Facing' ? 'info' : 'neutral');
+
+const triggerBadge = (trigger: string) =>
+  toneClassName(TRIGGER_TONES[trigger] ?? 'neutral');
 
 type EditingCell = { entryId: string; field: string } | null;
 
@@ -90,6 +90,11 @@ export default function DeliveryLogsPage() {
   const [entries, setEntries] = useState<DeliveryLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [clientsLoading, setClientsLoading] = useState(true);
+  // Active vs Archived view. "Active" matches the original behavior
+  // (is_active=true + archived_at IS NULL). "Archived" surfaces clients
+  // we've offboarded — useful for back-filling delivery logs after a
+  // contract ends or pulling history during a renewal pitch.
+  const [viewMode, setViewMode] = useState<'active' | 'archived'>('active');
   const [teamMembers, setTeamMembers] = useState<{ id: string; name: string }[]>([]);
   const [whoMode, setWhoMode] = useState<'team' | 'custom'>('team');
   const [searchTerm, setSearchTerm] = useState('');
@@ -144,16 +149,25 @@ export default function DeliveryLogsPage() {
     return Math.round((d - dayZeroDate) / (1000 * 60 * 60 * 24));
   };
 
-  // Fetch clients on mount
+  // Fetch clients on mount AND whenever viewMode changes. The Active
+  // tab keeps the historical filter (is_active=true, not archived). The
+  // Archived tab includes anything that's been deactivated OR has an
+  // archived_at timestamp — both are signals the relationship has
+  // wound down, and we want either to show up.
   useEffect(() => {
     const fetchClients = async () => {
       setClientsLoading(true);
+      const baseQuery = supabase
+        .from('clients')
+        .select('id, name, logo_url, is_active');
+      const clientsQuery = viewMode === 'active'
+        ? baseQuery.eq('is_active', true).is('archived_at', null)
+        // Archived = is_active=false OR archived_at is set. Postgrest's
+        // .or() takes a comma-joined filter string.
+        : baseQuery.or('is_active.eq.false,archived_at.not.is.null');
+
       const [{ data: clientData }, { data: logData }] = await Promise.all([
-        supabase
-          .from('clients')
-          .select('id, name, logo_url, is_active')
-          .eq('is_active', true)
-          .is('archived_at', null),
+        clientsQuery,
         supabase
           .from('client_delivery_log')
           .select('client_id, updated_at')
@@ -179,12 +193,21 @@ export default function DeliveryLogsPage() {
       });
 
       setClients(sorted);
-      if (sorted.length > 0 && !selectedClientId) {
-        setSelectedClientId(sorted[0].id);
+      // If the currently-selected client isn't in the new list (we
+      // switched view modes), fall back to the first one. Otherwise
+      // keep the existing selection so toggling back-and-forth doesn't
+      // lose the user's place.
+      const stillVisible = sorted.some(c => c.id === selectedClientId);
+      if (!stillVisible) {
+        setSelectedClientId(sorted.length > 0 ? sorted[0].id : '');
       }
       setClientsLoading(false);
     };
     fetchClients();
+  }, [viewMode]);
+
+  // Team members only need to load once — they don't depend on viewMode
+  useEffect(() => {
     UserService.getAllUsers().then((users) => {
       setTeamMembers(users.filter(u => u.role !== 'client').map(u => ({ id: u.id, name: u.name || u.email })));
     });
@@ -212,7 +235,8 @@ export default function DeliveryLogsPage() {
       .eq('client_id', selectedClientId)
       .order('logged_at', { ascending: false })
       .order('sort_order', { ascending: true });
-    setEntries(data || []);
+    // Cast: DB nullable fields vs interface (see archive/page.tsx note).
+    setEntries((data || []) as DeliveryLogEntry[]);
     setLoading(false);
   };
 
@@ -502,7 +526,7 @@ export default function DeliveryLogsPage() {
               {inlineWhoMode === 'team' && (
                 <button type="button" className="text-[10px] text-green-600 hover:underline" onClick={saveInlineEdit}>Save</button>
               )}
-              <button type="button" className="text-[10px] text-[#3e8692] hover:underline" onClick={() => { setInlineWhoMode(inlineWhoMode === 'team' ? 'custom' : 'team'); setEditingValue(''); }}>
+              <button type="button" className="text-[10px] text-brand hover:underline" onClick={() => { setInlineWhoMode(inlineWhoMode === 'team' ? 'custom' : 'team'); setEditingValue(''); }}>
                 {inlineWhoMode === 'team' ? 'Manual' : 'Team'}
               </button>
               <button type="button" className="text-[10px] text-gray-400 hover:underline" onClick={cancelEditing}>Cancel</button>
@@ -603,14 +627,37 @@ export default function DeliveryLogsPage() {
               )}
             </div>
 
-            {/* Client Tabs */}
+            {/* Active / Archived view toggle. Sits above the per-client
+                tabs so the client list reloads when you switch. */}
             <div className="pt-4">
+              <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'active' | 'archived')}>
+                <TabsList className="bg-gray-100 p-1 h-auto">
+                  <TabsTrigger
+                    value="active"
+                    className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
+                  >
+                    Active Clients
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="archived"
+                    className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
+                  >
+                    Archived
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            {/* Client Tabs */}
+            <div className="pt-3">
               {clientsLoading ? (
                 <div className="flex gap-2">
                   {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-24 rounded" />)}
                 </div>
               ) : clients.length === 0 ? (
-                <p className="text-sm text-gray-500">No active clients found.</p>
+                <p className="text-sm text-gray-500">
+                  {viewMode === 'active' ? 'No active clients found.' : 'No archived clients found.'}
+                </p>
               ) : (
                 <Tabs value={selectedClientId} onValueChange={setSelectedClientId}>
                   <TabsList className="bg-gray-100 p-1 h-auto flex-wrap">
@@ -618,7 +665,7 @@ export default function DeliveryLogsPage() {
                       <TabsTrigger
                         key={client.id}
                         value={client.id}
-                        className="data-[state=active]:bg-white data-[state=active]:text-[#3e8692] data-[state=active]:shadow-sm text-sm px-4 py-2"
+                        className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-2"
                       >
                         {client.logo_url ? (
                           <img src={client.logo_url} alt="" className="h-4 w-4 object-contain rounded mr-2 inline-block" />
@@ -640,13 +687,13 @@ export default function DeliveryLogsPage() {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     placeholder="Search actions, who, notes..."
-                    className="pl-10 auth-input"
+                    className="pl-10 focus-brand"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
                 <Select value={filterWorkType} onValueChange={setFilterWorkType}>
-                  <SelectTrigger className="w-[160px] auth-input">
+                  <SelectTrigger className="w-[160px] focus-brand">
                     <Filter className="h-3.5 w-3.5 mr-2 text-gray-400" />
                     <SelectValue placeholder="Work Type" />
                   </SelectTrigger>
@@ -656,7 +703,7 @@ export default function DeliveryLogsPage() {
                   </SelectContent>
                 </Select>
                 <Select value={filterTrigger} onValueChange={setFilterTrigger}>
-                  <SelectTrigger className="w-[180px] auth-input">
+                  <SelectTrigger className="w-[180px] focus-brand">
                     <Filter className="h-3.5 w-3.5 mr-2 text-gray-400" />
                     <SelectValue placeholder="Trigger" />
                   </SelectTrigger>
@@ -726,7 +773,7 @@ export default function DeliveryLogsPage() {
                     <tbody>
                       {/* Inline add row */}
                       {isAddingInline && (
-                        <tr className="border-b border-[#3e8692]/20 bg-[#e8f4f5]/20">
+                        <tr className="border-b border-brand/20 bg-brand-light/20">
                           <td className="py-3 px-4 text-gray-400 text-xs">—</td>
                           <td className="py-3 px-4 whitespace-nowrap">
                             <Popover>
@@ -783,7 +830,7 @@ export default function DeliveryLogsPage() {
                                     {teamMembers.map((m) => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
-                                <button type="button" className="text-[10px] text-[#3e8692] hover:underline mt-0.5 block" onClick={() => { setInlineNewWhoMode('custom'); setInlineNew({ ...inlineNew, who: '' }); }}>Manual</button>
+                                <button type="button" className="text-[10px] text-brand hover:underline mt-0.5 block" onClick={() => { setInlineNewWhoMode('custom'); setInlineNew({ ...inlineNew, who: '' }); }}>Manual</button>
                               </div>
                             ) : (
                               <div>
@@ -794,7 +841,7 @@ export default function DeliveryLogsPage() {
                                   className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-gray-600"
                                   style={{ outline: 'none', boxShadow: 'none' }}
                                 />
-                                <button type="button" className="text-[10px] text-[#3e8692] hover:underline mt-0.5 block" onClick={() => { setInlineNewWhoMode('team'); setInlineNew({ ...inlineNew, who: '' }); }}>Team</button>
+                                <button type="button" className="text-[10px] text-brand hover:underline mt-0.5 block" onClick={() => { setInlineNewWhoMode('team'); setInlineNew({ ...inlineNew, who: '' }); }}>Team</button>
                               </div>
                             )}
                           </td>
@@ -944,7 +991,7 @@ export default function DeliveryLogsPage() {
               <div className="grid gap-2">
                 <Label>Work Type <span className="text-red-500">*</span></Label>
                 <Select value={form.work_type} onValueChange={(v) => setForm({ ...form, work_type: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue placeholder="Select type" /></SelectTrigger>
                   <SelectContent>
                     {WORK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
@@ -954,7 +1001,7 @@ export default function DeliveryLogsPage() {
                 <Label>Date <span className="text-red-500">*</span></Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="auth-input justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.logged_at ? '#111827' : '#9ca3af' }}>
+                    <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.logged_at ? '#111827' : '#9ca3af' }}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {form.logged_at ? form.logged_at.toLocaleDateString() : 'Select date'}
                     </Button>
@@ -967,14 +1014,14 @@ export default function DeliveryLogsPage() {
             </div>
             <div className="grid gap-2">
               <Label>Action <span className="text-red-500">*</span></Label>
-              <Input value={form.action} onChange={(e) => setForm({ ...form, action: e.target.value })} placeholder="What was done?" className="auth-input" />
+              <Input value={form.action} onChange={(e) => setForm({ ...form, action: e.target.value })} placeholder="What was done?" className="focus-brand" />
             </div>
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
                 <Label>Who</Label>
                 <button
                   type="button"
-                  className="text-xs text-[#3e8692] hover:underline"
+                  className="text-xs text-brand hover:underline"
                   onClick={() => { setWhoMode(whoMode === 'team' ? 'custom' : 'team'); setForm({ ...form, who: '' }); }}
                 >
                   {whoMode === 'team' ? 'Enter manually instead' : 'Pick from team'}
@@ -982,28 +1029,28 @@ export default function DeliveryLogsPage() {
               </div>
               {whoMode === 'team' ? (
                 <Select value={form.who} onValueChange={(v) => setForm({ ...form, who: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select team member" /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue placeholder="Select team member" /></SelectTrigger>
                   <SelectContent>
                     {teamMembers.map((m) => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               ) : (
-                <Input value={form.who} onChange={(e) => setForm({ ...form, who: e.target.value })} placeholder="Enter name manually" className="auth-input" />
+                <Input value={form.who} onChange={(e) => setForm({ ...form, who: e.target.value })} placeholder="Enter name manually" className="focus-brand" />
               )}
             </div>
             <div className="grid gap-2">
               <Label>How (Method)</Label>
-              <Textarea value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })} placeholder="Method, script, tool, process used..." className="auth-input" rows={3} />
+              <Textarea value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })} placeholder="Method, script, tool, process used..." className="focus-brand" rows={3} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Where</Label>
-                <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Location or platform" className="auth-input" />
+                <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Location or platform" className="focus-brand" />
               </div>
               <div className="grid gap-2">
                 <Label>Trigger</Label>
                 <Select value={form.trigger} onValueChange={(v) => setForm({ ...form, trigger: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select trigger" /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue placeholder="Select trigger" /></SelectTrigger>
                   <SelectContent>
                     {TRIGGERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
@@ -1012,7 +1059,7 @@ export default function DeliveryLogsPage() {
             </div>
             <div className="grid gap-2">
               <Label>Notes</Label>
-              <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Additional notes..." className="auth-input" rows={3} />
+              <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Additional notes..." className="focus-brand" rows={3} />
             </div>
           </div>
           <DialogFooter>

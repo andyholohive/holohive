@@ -379,21 +379,21 @@ export default function DeliverableTemplatesPage() {
           <div className="space-y-3">
             <div className="space-y-1">
               <Label className="text-xs">Name</Label>
-              <Input className="auth-input" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+              <Input className="focus-brand" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Slug</Label>
-              <Input className="auth-input" value={editForm.slug} onChange={e => setEditForm(f => ({ ...f, slug: e.target.value }))} placeholder="unique-slug" />
+              <Input className="focus-brand" value={editForm.slug} onChange={e => setEditForm(f => ({ ...f, slug: e.target.value }))} placeholder="unique-slug" />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Description</Label>
-              <Input className="auth-input" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
+              <Input className="focus-brand" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Category</Label>
                 <Select value={editForm.category} onValueChange={v => setEditForm(f => ({ ...f, category: v }))}>
-                  <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {CATEGORY_OPTIONS.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                   </SelectContent>
@@ -402,7 +402,7 @@ export default function DeliverableTemplatesPage() {
               <div className="space-y-1">
                 <Label className="text-xs">Icon</Label>
                 <Select value={editForm.icon} onValueChange={v => setEditForm(f => ({ ...f, icon: v }))}>
-                  <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {ICON_OPTIONS.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}
                   </SelectContent>
@@ -432,30 +432,30 @@ export default function DeliverableTemplatesPage() {
           <div className="space-y-3">
             <div className="space-y-1">
               <Label className="text-xs">Step Name</Label>
-              <Input className="auth-input" value={stepForm.step_name} onChange={e => setStepForm(f => ({ ...f, step_name: e.target.value }))} />
+              <Input className="focus-brand" value={stepForm.step_name} onChange={e => setStepForm(f => ({ ...f, step_name: e.target.value }))} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Description</Label>
-              <Input className="auth-input" value={stepForm.description} onChange={e => setStepForm(f => ({ ...f, description: e.target.value }))} />
+              <Input className="focus-brand" value={stepForm.description} onChange={e => setStepForm(f => ({ ...f, description: e.target.value }))} />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Role Key</Label>
-                <Input className="auth-input" value={stepForm.default_role} onChange={e => setStepForm(f => ({ ...f, default_role: e.target.value }))} placeholder="e.g. translator" />
+                <Input className="focus-brand" value={stepForm.default_role} onChange={e => setStepForm(f => ({ ...f, default_role: e.target.value }))} placeholder="e.g. translator" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Role Label</Label>
-                <Input className="auth-input" value={stepForm.role_label} onChange={e => setStepForm(f => ({ ...f, role_label: e.target.value }))} placeholder="e.g. Translator" />
+                <Input className="focus-brand" value={stepForm.role_label} onChange={e => setStepForm(f => ({ ...f, role_label: e.target.value }))} placeholder="e.g. Translator" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Duration (days)</Label>
-                <Input type="number" min={1} className="auth-input" value={stepForm.estimated_duration_days} onChange={e => setStepForm(f => ({ ...f, estimated_duration_days: parseInt(e.target.value) || 1 }))} />
+                <Input type="number" min={1} className="focus-brand" value={stepForm.estimated_duration_days} onChange={e => setStepForm(f => ({ ...f, estimated_duration_days: parseInt(e.target.value) || 1 }))} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Task Type</Label>
-                <Input className="auth-input" value={stepForm.task_type} onChange={e => setStepForm(f => ({ ...f, task_type: e.target.value }))} />
+                <Input className="focus-brand" value={stepForm.task_type} onChange={e => setStepForm(f => ({ ...f, task_type: e.target.value }))} />
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -465,7 +465,7 @@ export default function DeliverableTemplatesPage() {
             <div className="space-y-1">
               <Label className="text-xs">Checklist Items (one per line)</Label>
               <textarea
-                className="auth-input w-full border rounded-md p-2 text-sm min-h-[80px]"
+                className="focus-brand w-full border rounded-md p-2 text-sm min-h-[80px]"
                 value={stepForm.checklist_items}
                 onChange={e => setStepForm(f => ({ ...f, checklist_items: e.target.value }))}
                 placeholder="Check item 1&#10;Check item 2"

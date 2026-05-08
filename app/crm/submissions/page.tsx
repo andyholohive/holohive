@@ -10,10 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import {
   Search, Inbox, Clock, DollarSign, User, Mail, MessageSquare,
-  Target, Calendar, ChevronDown, ChevronUp, ExternalLink
+  Target, Calendar, ChevronDown, ChevronUp, ExternalLink, RefreshCw, Loader2,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { EmptyState } from '@/components/ui/empty-state';
+import { KpiCard } from '@/components/ui/kpi-card';
 
 interface ContactSubmission {
   id: number;
@@ -36,13 +38,17 @@ export default function SubmissionsPage() {
   const [selectedSubmission, setSelectedSubmission] = useState<ContactSubmission | null>(null);
   const [sortField, setSortField] = useState<'created_at' | 'name' | 'project_name'>('created_at');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  // Separate refreshing state so the manual refresh button can show a
+  // spinner without blanking the table (vs. setLoading(true) which would).
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchSubmissions();
   }, []);
 
-  const fetchSubmissions = async () => {
-    setLoading(true);
+  const fetchSubmissions = async (silent = false) => {
+    if (silent) setRefreshing(true);
+    else setLoading(true);
     try {
       const { data, error } = await supabase
         .from('contact_submissions')
@@ -50,7 +56,10 @@ export default function SubmissionsPage() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setSubmissions(data || []);
+      // Cast: DB row has nullable fields the local interface narrows. See
+      // notes in archive/page.tsx for the long-term fix (align interfaces
+      // with database.types.ts). Safe at runtime — extra fields ignored.
+      setSubmissions((data || []) as ContactSubmission[]);
     } catch (error) {
       console.error('Error fetching submissions:', error);
       toast({
@@ -60,6 +69,7 @@ export default function SubmissionsPage() {
       });
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -134,10 +144,11 @@ export default function SubmissionsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
+        {/* Header — real title/subtitle render immediately. */}
         <div className="flex items-center justify-between">
           <div>
-            <Skeleton className="h-8 w-64 mb-2" />
-            <Skeleton className="h-4 w-48" />
+            <h2 className="text-2xl font-bold text-gray-900">Contact Submissions</h2>
+            <p className="text-gray-600">Inbound inquiries from the contact form</p>
           </div>
         </div>
         <div className="grid grid-cols-3 gap-4">
@@ -153,60 +164,70 @@ export default function SubmissionsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header — title left, search + refresh on the right.
+          Standardized 2026-05-06: previously there were no actions in
+          the header and the search lived in its own row below the stat
+          cards. Now matches /network and /crm/contacts which keep
+          search inline with the page title. */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Contact Submissions</h2>
           <p className="text-gray-600">Inbound inquiries from the contact form</p>
         </div>
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search by name, project, email..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="pl-10 w-64"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchSubmissions(true)}
+            disabled={refreshing}
+            title="Refresh submissions"
+          >
+            {refreshing
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <RefreshCw className="h-4 w-4" />}
+          </Button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats — flat KpiCard baseline (was 3 ad-hoc Cards before
+          2026-05-06). Total uses brand teal as the primary metric;
+          This Week uses sky for "fresh / recent" semantics; Latest is
+          gray since it's a date, not a count. */}
       <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="pt-4 pb-4 px-5">
-            <div className="flex items-center gap-2 mb-1">
-              <Inbox className="h-4 w-4 text-gray-400" />
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Total</p>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-            <p className="text-xs text-gray-400 mt-1">All submissions</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4 px-5">
-            <div className="flex items-center gap-2 mb-1">
-              <Clock className="h-4 w-4 text-blue-400" />
-              <p className="text-xs font-semibold uppercase tracking-wider text-blue-400">This Week</p>
-            </div>
-            <p className="text-2xl font-bold text-blue-700">{stats.thisWeek}</p>
-            <p className="text-xs text-gray-400 mt-1">Last 7 days</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4 px-5">
-            <div className="flex items-center gap-2 mb-1">
-              <Calendar className="h-4 w-4 text-gray-400" />
-              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Latest</p>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">
-              {submissions.length > 0 ? formatDate(submissions[0].created_at) : '—'}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">Most recent submission</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input
-          placeholder="Search by name, project, email..."
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          className="pl-10 w-64 auth-input"
+        <KpiCard
+          icon={Inbox}
+          label="Total"
+          value={stats.total}
+          sub="All submissions"
+          accent="brand"
+        />
+        <KpiCard
+          icon={Clock}
+          label="This Week"
+          value={stats.thisWeek}
+          sub="Last 7 days"
+          accent="sky"
+        />
+        <KpiCard
+          icon={Calendar}
+          label="Latest"
+          value={submissions.length > 0 ? formatDate(submissions[0].created_at) : '—'}
+          sub="Most recent submission"
+          accent="gray"
         />
       </div>
+
+      {/* Search bar moved into the header above on 2026-05-06 (was a
+          standalone row below the stats). */}
 
       {/* Table */}
       <Card>
@@ -241,8 +262,15 @@ export default function SubmissionsPage() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-12 text-gray-400">
-                  {searchTerm ? 'No submissions match your search' : 'No submissions yet'}
+                {/* colSpan must match the column count above (8) so the
+                    empty cell spans the whole table — narrowing this
+                    would push the icon to the leftmost column only. */}
+                <TableCell colSpan={8} className="p-0">
+                  <EmptyState
+                    icon={Inbox}
+                    title={searchTerm ? 'No submissions match your search.' : 'No submissions yet.'}
+                    className="py-12"
+                  />
                 </TableCell>
               </TableRow>
             ) : (

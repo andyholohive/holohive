@@ -20,13 +20,13 @@ export default function AISuggestionCard({ type, suggestion, onApply, onDismiss 
   const listSuggestion = suggestion as ListSuggestion;
 
   return (
-    <Card className="border-2 border-[#3e8692] bg-gradient-to-br from-blue-50 to-teal-50">
+    <Card className="border-2 border-brand bg-gradient-to-br from-blue-50 to-teal-50">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-semibold text-[#3e8692]">
+          <CardTitle className="text-lg font-semibold text-brand">
             {isCampaign ? '🎯 Campaign Suggestion' : '📋 KOL List Suggestion'}
           </CardTitle>
-          <Badge variant="outline" className="border-[#3e8692] text-[#3e8692]">
+          <Badge variant="outline" className="border-brand text-brand">
             AI Generated
           </Badge>
         </div>

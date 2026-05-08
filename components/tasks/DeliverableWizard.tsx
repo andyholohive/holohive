@@ -65,6 +65,13 @@ interface DeliverableWizardProps {
   teamMembers: TeamMember[];
   clients: ClientOption[];
   onCreated: () => void;
+  /** Pre-select a template when the wizard opens. Used by the "Run this
+   *  SOP" button on /sops to skip step 0 and land directly on Configure.
+   *  Added 2026-05-07 (migration 048 / SOP-task linking). */
+  preselectedTemplateId?: string;
+  /** Optional starting title — pre-fills the title field if provided.
+   *  The "Run this SOP" flow uses this to seed with the SOP name. */
+  initialTitle?: string;
 }
 
 const toLocalDateString = (date: Date) => {
@@ -76,7 +83,7 @@ const toLocalDateString = (date: Date) => {
 
 const STEPS = ['Select Type', 'Configure', 'Assign Roles', 'Review & Create'] as const;
 
-export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, onCreated }: DeliverableWizardProps) {
+export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, onCreated, preselectedTemplateId, initialTitle }: DeliverableWizardProps) {
   const { user, userProfile } = useAuth();
   const { toast } = useToast();
 
@@ -95,24 +102,37 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
   const [startDate, setStartDate] = useState<Date>(new Date());
   const [priority, setPriority] = useState('medium');
 
-  // Step 3: role assignments + due date overrides
-  const [roleAssignments, setRoleAssignments] = useState<Record<string, { userId: string; userName: string }>>({});
+  // Step 3: per-step assignments + due date overrides.
+  //
+  // Was previously keyed by `default_role` which meant "all steps with
+  // the same role got the same assignee." Templates like "Client
+  // Onboarding - Internal Setup" have 8 steps sharing one role —
+  // picking any assignee dumped all 8 onto one person. Now we key by
+  // step.id so each row in the wizard table is independently assigned.
+  // Picking a person in one row no longer overwrites peers (2026-05-07).
+  const [stepAssignments, setStepAssignments] = useState<Record<string, { userId: string; userName: string }>>({});
   const [dueDateOverrides, setDueDateOverrides] = useState<Record<number, string>>({});
 
   useEffect(() => {
     if (open) {
-      setStep(0);
-      setSelectedTemplateId(null);
+      // When a template is pre-selected (the "Run this SOP" path),
+      // skip step 0 and seed the template + start at Configure.
+      // loadTemplateSteps fires from a separate effect when
+      // selectedTemplateId changes — same hook that runs after the
+      // user clicks a template tile in step 0.
+      const startStep = preselectedTemplateId ? 1 : 0;
+      setStep(startStep);
+      setSelectedTemplateId(preselectedTemplateId ?? null);
       setTemplateSteps([]);
-      setTitle('');
+      setTitle(initialTitle ?? '');
       setClientId('');
       setStartDate(new Date());
       setPriority('medium');
-      setRoleAssignments({});
+      setStepAssignments({});
       setDueDateOverrides({});
       loadTemplates();
     }
-  }, [open]);
+  }, [open, preselectedTemplateId, initialTitle]);
 
   // Auto-compute priority from start date
   useEffect(() => {
@@ -140,6 +160,25 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
   };
 
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId) || null;
+
+  // Load template steps whenever selectedTemplateId changes — covers
+  // both the manual-click path (handleSelectTemplate) AND the pre-select
+  // path used by "Run this SOP". Without this effect, opening with a
+  // pre-selected template would land on Configure with empty steps.
+  useEffect(() => {
+    if (!selectedTemplateId) return;
+    if (templateSteps.length > 0 && templateSteps[0].template_id === selectedTemplateId) return;
+    let cancelled = false;
+    (async () => {
+      const data = await DeliverableService.getTemplateWithSteps(selectedTemplateId);
+      if (cancelled || !data) return;
+      setTemplateSteps(data.steps);
+      // Auto-fill title only if it's empty (the "Run this SOP" caller
+      // can pass initialTitle to seed it with the SOP name).
+      setTitle(prev => prev || data.template?.name || '');
+    })();
+    return () => { cancelled = true; };
+  }, [selectedTemplateId]);
 
   const handleSelectTemplate = async (id: string) => {
     setSelectedTemplateId(id);
@@ -201,7 +240,11 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
         clientId: clientId || null,
         startDate: toLocalDateString(startDate),
         priority,
-        roleAssignments,
+        // Pass an empty roleAssignments — stepAssignments is the source
+        // of truth post-2026-05-07. The service still accepts both for
+        // back-compat but we only populate the per-step map.
+        roleAssignments: {},
+        stepAssignments,
         dueDateOverrides,
         createdBy: user.id,
         createdByName: userProfile.name || userProfile.email || '',
@@ -232,8 +275,8 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
         </DialogHeader>
 
         {/* Info banner */}
-        <div className="bg-[#3e8692]/5 border border-[#3e8692]/20 rounded-lg px-4 py-3 text-xs text-gray-600 leading-relaxed">
-          <span className="font-medium text-[#3e8692]">How it works:</span> Pick a workflow template, configure details, and assign team members to each step. This will create a <span className="font-medium">parent task</span> with individual <span className="font-medium">subtasks</span> for each step — complete with due dates and checklists. Track progress in the Workflow tab.
+        <div className="bg-brand/5 border border-brand/20 rounded-lg px-4 py-3 text-xs text-gray-600 leading-relaxed">
+          <span className="font-medium text-brand">How it works:</span> Pick a workflow template, configure details, and assign team members to each step. This will create a <span className="font-medium">parent task</span> with individual <span className="font-medium">subtasks</span> for each step — complete with due dates and checklists. Track progress in the Workflow tab.
         </div>
 
         {/* Step indicator */}
@@ -244,9 +287,9 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                 onClick={() => i < step && setStep(i)}
                 className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full transition-colors ${
                   i === step
-                    ? 'bg-[#3e8692] text-white'
+                    ? 'bg-brand text-white'
                     : i < step
-                    ? 'bg-[#3e8692]/10 text-[#3e8692] cursor-pointer hover:bg-[#3e8692]/20'
+                    ? 'bg-brand/10 text-brand cursor-pointer hover:bg-brand/20'
                     : 'bg-gray-100 text-gray-400'
                 }`}
                 disabled={i > step}
@@ -277,7 +320,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                         onClick={() => handleSelectTemplate(t.id)}
                         className={`text-left p-4 rounded-lg border-2 transition-all ${
                           isSelected
-                            ? 'border-[#3e8692] bg-[#3e8692]/5'
+                            ? 'border-brand bg-brand/5'
                             : 'border-gray-200 hover:border-gray-300 bg-white'
                         }`}
                       >
@@ -298,7 +341,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                             </div>
                           </div>
                           {isSelected && (
-                            <Check className="h-5 w-5 text-[#3e8692] flex-shrink-0" />
+                            <Check className="h-5 w-5 text-brand flex-shrink-0" />
                           )}
                         </div>
                       </button>
@@ -315,7 +358,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
               <div className="space-y-2">
                 <Label>Title</Label>
                 <Input
-                  className="auth-input"
+                  className="focus-brand"
                   value={title}
                   onChange={e => setTitle(e.target.value)}
                   placeholder="Deliverable title"
@@ -325,7 +368,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
               <div className="space-y-2">
                 <Label>Client</Label>
                 <Select value={clientId} onValueChange={setClientId}>
-                  <SelectTrigger className="auth-input">
+                  <SelectTrigger className="focus-brand">
                     <SelectValue placeholder="Select client (optional)" />
                   </SelectTrigger>
                   <SelectContent>
@@ -343,7 +386,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      className="auth-input w-full justify-start text-left font-normal"
+                      className="focus-brand w-full justify-start text-left font-normal"
                       style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: '#111827' }}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
@@ -398,11 +441,14 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                     size="sm"
                     className="text-xs h-7"
                     onClick={() => {
-                      const allRoles: Record<string, { userId: string; userName: string }> = {};
+                      // Assign every step (by step.id, not by role) to the
+                      // current user. Updated post-2026-05-07 to match the
+                      // per-step keying used by the Select inputs below.
+                      const all: Record<string, { userId: string; userName: string }> = {};
                       templateSteps.forEach(s => {
-                        allRoles[s.default_role] = { userId: user.id, userName: userProfile.name || userProfile.email || '' };
+                        all[s.id] = { userId: user.id, userName: userProfile.name || userProfile.email || '' };
                       });
-                      setRoleAssignments(allRoles);
+                      setStepAssignments(all);
                     }}
                   >
                     Assign all to me
@@ -431,19 +477,34 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                         </td>
                         <td className="p-2">
                           <Select
-                            value={roleAssignments[s.default_role]?.userId || 'unassigned'}
+                            value={stepAssignments[s.id]?.userId || 'unassigned'}
                             onValueChange={val => {
                               const member = teamMembers.find(m => m.id === val);
-                              setRoleAssignments(prev => {
+                              setStepAssignments(prev => {
                                 if (val === 'unassigned') {
                                   const next = { ...prev };
-                                  delete next[s.default_role];
+                                  delete next[s.id];
                                   return next;
                                 }
-                                return {
-                                  ...prev,
-                                  [s.default_role]: { userId: val, userName: member?.name || '' },
-                                };
+                                // Convenience: when picking an assignee for
+                                // the FIRST step of a given role, auto-fill
+                                // peers that share the same role and are
+                                // still unassigned. Subsequent picks for
+                                // OTHER steps don't propagate — preserves
+                                // independent per-step control.
+                                const next: typeof prev = { ...prev, [s.id]: { userId: val, userName: member?.name || '' } };
+                                const sameRolePeers = templateSteps.filter(
+                                  p => p.id !== s.id && p.default_role === s.default_role && !prev[p.id]
+                                );
+                                const isFirstPickForRole = !templateSteps.some(
+                                  p => p.id !== s.id && p.default_role === s.default_role && prev[p.id]
+                                );
+                                if (isFirstPickForRole) {
+                                  for (const peer of sameRolePeers) {
+                                    next[peer.id] = { userId: val, userName: member?.name || '' };
+                                  }
+                                }
+                                return next;
                               });
                             }}
                           >
@@ -463,7 +524,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
-                                className="auth-input h-8 text-xs w-full justify-start text-left font-normal"
+                                className="focus-brand h-8 text-xs w-full justify-start text-left font-normal"
                                 style={{
                                   borderColor: '#e5e7eb',
                                   backgroundColor: 'white',
@@ -547,7 +608,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                   </thead>
                   <tbody>
                     {templateSteps.map(s => {
-                      const assignee = roleAssignments[s.default_role];
+                      const assignee = stepAssignments[s.id];
                       const checklistCount = Array.isArray(s.checklist_items) ? s.checklist_items.length : 0;
                       return (
                         <tr key={s.id} className="border-b last:border-0">

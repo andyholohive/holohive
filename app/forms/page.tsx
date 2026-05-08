@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Search, Edit, Trash2, Share2, FileText, Copy, CheckCircle2, ExternalLink, Globe, Eye, Download, Upload, Users, Handshake, Link2 } from 'lucide-react';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
@@ -150,7 +151,8 @@ export default function FormsPage() {
         .limit(100);
 
       if (error) throw error;
-      setLeads(data || []);
+      // Cast: DB nullable fields vs interface (see archive/page.tsx note).
+      setLeads((data || []) as LeadSubmission[]);
     } catch (error) {
       console.error('Error fetching leads:', error);
       toast({
@@ -173,7 +175,8 @@ export default function FormsPage() {
         .limit(100);
 
       if (error) throw error;
-      setPartners(data || []);
+      // Cast: DB nullable fields vs interface (see archive/page.tsx note).
+      setPartners((data || []) as PartnerSubmission[]);
     } catch (error) {
       console.error('Error fetching partners:', error);
       toast({
@@ -196,7 +199,8 @@ export default function FormsPage() {
         .limit(100);
 
       if (error) throw error;
-      setLinks(data || []);
+      // Cast: DB nullable fields vs interface (see archive/page.tsx note).
+      setLinks((data || []) as LinkSubmission[]);
     } catch (error) {
       console.error('Error fetching links:', error);
       toast({
@@ -585,7 +589,7 @@ export default function FormsPage() {
                     placeholder="e.g., KOL Application Form"
                     value={newFormName}
                     onChange={(e) => setNewFormName(e.target.value)}
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
                 <div>
@@ -596,13 +600,13 @@ export default function FormsPage() {
                     value={newFormDescription}
                     onChange={(e) => setNewFormDescription(e.target.value)}
                     rows={3}
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
                 <div>
                   <Label htmlFor="form-status">Status</Label>
                   <Select value={newFormStatus} onValueChange={(value) => setNewFormStatus(value as FormStatus)}>
-                    <SelectTrigger className="auth-input">
+                    <SelectTrigger className="focus-brand">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -662,11 +666,11 @@ export default function FormsPage() {
               placeholder="Search forms..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 auth-input"
+              className="pl-10 focus-brand"
             />
           </div>
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
-            <SelectTrigger className="w-[150px] auth-input">
+            <SelectTrigger className="w-[150px] focus-brand">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
@@ -748,7 +752,7 @@ export default function FormsPage() {
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <button
                         onClick={() => handleViewResponses(form)}
-                        className="flex items-center gap-1 hover:text-[#3e8692] transition-colors"
+                        className="flex items-center gap-1 hover:text-brand transition-colors"
                         title="View responses"
                       >
                         <FileText className="h-4 w-4" />
@@ -823,11 +827,12 @@ export default function FormsPage() {
                 {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
               </div>
             ) : leads.length === 0 ? (
-              <div className="text-center py-12">
-                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No lead submissions</h3>
-                <p className="text-gray-600">Lead form submissions will appear here</p>
-              </div>
+              <EmptyState
+                icon={Users}
+                title="No lead submissions"
+                description="Lead form submissions will appear here."
+                className="py-12"
+              />
             ) : (
               <Card>
                 <Table>
@@ -880,11 +885,12 @@ export default function FormsPage() {
                 {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
               </div>
             ) : partners.length === 0 ? (
-              <div className="text-center py-12">
-                <Handshake className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No partner submissions</h3>
-                <p className="text-gray-600">Partner application submissions will appear here</p>
-              </div>
+              <EmptyState
+                icon={Handshake}
+                title="No partner submissions"
+                description="Partner application submissions will appear here."
+                className="py-12"
+              />
             ) : (
               <Card>
                 <Table>
@@ -940,11 +946,12 @@ export default function FormsPage() {
                 {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
               </div>
             ) : links.length === 0 ? (
-              <div className="text-center py-12">
-                <Link2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No link submissions</h3>
-                <p className="text-gray-600">Link form submissions will appear here</p>
-              </div>
+              <EmptyState
+                icon={Link2}
+                title="No link submissions"
+                description="Link form submissions will appear here."
+                className="py-12"
+              />
             ) : (
               <Card>
                 <Table>
@@ -1015,7 +1022,7 @@ export default function FormsPage() {
             {sharingForm && (
               <div className="space-y-4">
                 {/* Form Details */}
-                <div className="border-l-4 border-[#3e8692] bg-gray-50 p-4 rounded">
+                <div className="border-l-4 border-brand bg-gray-50 p-4 rounded">
                   <h4 className="font-semibold text-gray-900 mb-2">{sharingForm.name}</h4>
                   {sharingForm.description && (
                     <p className="text-sm text-gray-600 mb-3">{sharingForm.description}</p>
@@ -1040,7 +1047,7 @@ export default function FormsPage() {
                     <Input
                       value={`${window.location.origin}/public/forms/${sharingForm.slug || sharingForm.id}`}
                       readOnly
-                      className="auth-input flex-1"
+                      className="focus-brand flex-1"
                     />
                     <Button
                       variant="outline"
@@ -1089,7 +1096,7 @@ export default function FormsPage() {
             {duplicatingForm && (
               <div className="space-y-4">
                 {/* Original Form Info */}
-                <div className="border-l-4 border-[#3e8692] bg-gray-50 p-4 rounded">
+                <div className="border-l-4 border-brand bg-gray-50 p-4 rounded">
                   <p className="text-sm text-gray-600 mb-1">Duplicating from:</p>
                   <h4 className="font-semibold text-gray-900">{duplicatingForm.name}</h4>
                 </div>
@@ -1102,7 +1109,7 @@ export default function FormsPage() {
                     value={duplicateFormName}
                     onChange={(e) => setDuplicateFormName(e.target.value)}
                     placeholder="Enter name for duplicated form"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
               </div>

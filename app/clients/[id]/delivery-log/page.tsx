@@ -164,7 +164,8 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
       .eq('client_id', clientId)
       .order('logged_at', { ascending: false })
       .order('sort_order', { ascending: true });
-    setEntries(data || []);
+    // Cast: DB nullable fields vs interface (see archive/page.tsx note).
+    setEntries((data || []) as DeliveryLogEntry[]);
     setLoading(false);
   };
 
@@ -471,7 +472,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
               {inlineWhoMode === 'team' && (
                 <button type="button" className="text-[10px] text-green-600 hover:underline" onClick={saveInlineEdit}>Save</button>
               )}
-              <button type="button" className="text-[10px] text-[#3e8692] hover:underline" onClick={() => { setInlineWhoMode(inlineWhoMode === 'team' ? 'custom' : 'team'); setEditingValue(''); }}>
+              <button type="button" className="text-[10px] text-brand hover:underline" onClick={() => { setInlineWhoMode(inlineWhoMode === 'team' ? 'custom' : 'team'); setEditingValue(''); }}>
                 {inlineWhoMode === 'team' ? 'Manual' : 'Team'}
               </button>
               <button type="button" className="text-[10px] text-gray-400 hover:underline" onClick={cancelEditing}>Cancel</button>
@@ -560,7 +561,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
           <div className="flex items-center justify-between">
             <Button
               variant="ghost"
-              className="py-2 px-3 rounded-md text-gray-600 hover:text-[#3e8692] transition-colors mb-1 text-sm"
+              className="py-2 px-3 rounded-md text-gray-600 hover:text-brand transition-colors mb-1 text-sm"
               onClick={() => router.push('/clients')}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />Back to Clients
@@ -599,13 +600,13 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Search actions, who, notes..."
-                  className="pl-10 auth-input"
+                  className="pl-10 focus-brand"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               <Select value={filterWorkType} onValueChange={setFilterWorkType}>
-                <SelectTrigger className="w-[160px] auth-input">
+                <SelectTrigger className="w-[160px] focus-brand">
                   <Filter className="h-3.5 w-3.5 mr-2 text-gray-400" />
                   <SelectValue placeholder="Work Type" />
                 </SelectTrigger>
@@ -615,7 +616,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                 </SelectContent>
               </Select>
               <Select value={filterTrigger} onValueChange={setFilterTrigger}>
-                <SelectTrigger className="w-[180px] auth-input">
+                <SelectTrigger className="w-[180px] focus-brand">
                   <Filter className="h-3.5 w-3.5 mr-2 text-gray-400" />
                   <SelectValue placeholder="Trigger" />
                 </SelectTrigger>
@@ -679,7 +680,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                     <tbody>
                       {/* Inline add row */}
                       {isAddingInline && (
-                        <tr className="border-b border-[#3e8692]/20 bg-[#e8f4f5]/20">
+                        <tr className="border-b border-brand/20 bg-brand-light/20">
                           <td className="py-3 px-4 text-gray-400 text-xs">—</td>
                           <td className="py-3 px-4 whitespace-nowrap">
                             <Popover>
@@ -736,7 +737,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                                     {teamMembers.map((m) => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
                                   </SelectContent>
                                 </Select>
-                                <button type="button" className="text-[10px] text-[#3e8692] hover:underline mt-0.5 block" onClick={() => { setInlineNewWhoMode('custom'); setInlineNew({ ...inlineNew, who: '' }); }}>Manual</button>
+                                <button type="button" className="text-[10px] text-brand hover:underline mt-0.5 block" onClick={() => { setInlineNewWhoMode('custom'); setInlineNew({ ...inlineNew, who: '' }); }}>Manual</button>
                               </div>
                             ) : (
                               <div>
@@ -747,7 +748,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                                   className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs text-gray-600"
                                   style={{ outline: 'none', boxShadow: 'none' }}
                                 />
-                                <button type="button" className="text-[10px] text-[#3e8692] hover:underline mt-0.5 block" onClick={() => { setInlineNewWhoMode('team'); setInlineNew({ ...inlineNew, who: '' }); }}>Team</button>
+                                <button type="button" className="text-[10px] text-brand hover:underline mt-0.5 block" onClick={() => { setInlineNewWhoMode('team'); setInlineNew({ ...inlineNew, who: '' }); }}>Team</button>
                               </div>
                             )}
                           </td>
@@ -908,7 +909,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
               <div className="grid gap-2">
                 <Label>Work Type <span className="text-red-500">*</span></Label>
                 <Select value={form.work_type} onValueChange={(v) => setForm({ ...form, work_type: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select type" /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue placeholder="Select type" /></SelectTrigger>
                   <SelectContent>
                     {WORK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
@@ -918,7 +919,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                 <Label>Date <span className="text-red-500">*</span></Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="auth-input justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.logged_at ? '#111827' : '#9ca3af' }}>
+                    <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.logged_at ? '#111827' : '#9ca3af' }}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {form.logged_at ? form.logged_at.toLocaleDateString() : 'Select date'}
                     </Button>
@@ -931,14 +932,14 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
             </div>
             <div className="grid gap-2">
               <Label>Action <span className="text-red-500">*</span></Label>
-              <Input value={form.action} onChange={(e) => setForm({ ...form, action: e.target.value })} placeholder="What was done?" className="auth-input" />
+              <Input value={form.action} onChange={(e) => setForm({ ...form, action: e.target.value })} placeholder="What was done?" className="focus-brand" />
             </div>
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
                 <Label>Who</Label>
                 <button
                   type="button"
-                  className="text-xs text-[#3e8692] hover:underline"
+                  className="text-xs text-brand hover:underline"
                   onClick={() => { setWhoMode(whoMode === 'team' ? 'custom' : 'team'); setForm({ ...form, who: '' }); }}
                 >
                   {whoMode === 'team' ? 'Enter manually instead' : 'Pick from team'}
@@ -946,28 +947,28 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
               </div>
               {whoMode === 'team' ? (
                 <Select value={form.who} onValueChange={(v) => setForm({ ...form, who: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select team member" /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue placeholder="Select team member" /></SelectTrigger>
                   <SelectContent>
                     {teamMembers.map((m) => <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               ) : (
-                <Input value={form.who} onChange={(e) => setForm({ ...form, who: e.target.value })} placeholder="Enter name manually" className="auth-input" />
+                <Input value={form.who} onChange={(e) => setForm({ ...form, who: e.target.value })} placeholder="Enter name manually" className="focus-brand" />
               )}
             </div>
             <div className="grid gap-2">
               <Label>How (Method)</Label>
-              <Textarea value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })} placeholder="Method, script, tool, process used..." className="auth-input" rows={3} />
+              <Textarea value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })} placeholder="Method, script, tool, process used..." className="focus-brand" rows={3} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label>Where</Label>
-                <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Location or platform" className="auth-input" />
+                <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Location or platform" className="focus-brand" />
               </div>
               <div className="grid gap-2">
                 <Label>Trigger</Label>
                 <Select value={form.trigger} onValueChange={(v) => setForm({ ...form, trigger: v })}>
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select trigger" /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue placeholder="Select trigger" /></SelectTrigger>
                   <SelectContent>
                     {TRIGGERS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
@@ -976,7 +977,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
             </div>
             <div className="grid gap-2">
               <Label>Notes</Label>
-              <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Additional notes..." className="auth-input" rows={3} />
+              <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Additional notes..." className="focus-brand" rows={3} />
             </div>
           </div>
           <DialogFooter>

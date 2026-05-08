@@ -87,7 +87,22 @@
   }
 }
 
-/* Custom auth input focus styles */
+/* Brand-colored focus state for inputs (and Select/Popover triggers).
+ *
+ * Renamed from `.auth-input` on 2026-05-06: the original name suggested
+ * this was auth-page-only, but it's used on hundreds of inputs across
+ * the whole app. The class adds an INSET 1px brand-color border + glow
+ * on focus (visually different from shadcn Input's default external ring).
+ *
+ * Apply `focus-brand` to any input, Select trigger, or popover trigger
+ * that should adopt the branded focus look. Both the legacy `.auth-input`
+ * and the new `.focus-brand` selectors are listed below — the legacy
+ * selector stays in place until all 600+ usages are migrated, so removing
+ * it from JSX in batches is safe. */
+.focus-brand:focus,
+.focus-brand:focus-within,
+.focus-brand[data-state="open"],
+.focus-brand[data-state="focused"],
 .auth-input:focus,
 .auth-input:focus-within,
 .auth-input[data-state="open"],
@@ -97,6 +112,7 @@
   box-shadow: inset 0 0 0 1px #3e8692 !important;
 }
 
+.focus-brand:focus-visible,
 .auth-input:focus-visible {
   outline: none !important;
   border-color: #3e8692 !important;

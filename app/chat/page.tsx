@@ -637,7 +637,7 @@ export default function ChatPage() {
                 onClick={() => switchSession(session.id)}
                 className={`p-3 rounded-lg cursor-pointer transition-colors group ${
                   currentSession?.id === session.id
-                    ? 'bg-[#3e8692]/10 border border-[#3e8692]/30'
+                    ? 'bg-brand/10 border border-brand/30'
                     : 'hover:bg-gray-50 border border-transparent'
                 }`}
               >
@@ -738,7 +738,7 @@ export default function ChatPage() {
                       await createNewSession();
                     }
                   }}
-                  className="flex-1 text-sm min-h-[48px] max-h-[200px] resize-none auth-input overflow-y-auto"
+                  className="flex-1 text-sm min-h-[48px] max-h-[200px] resize-none focus-brand overflow-y-auto"
                   rows={1}
                 />
                 <Button
@@ -764,7 +764,7 @@ export default function ChatPage() {
               <div className="max-w-3xl mx-auto space-y-4">
                 {loading && (
                   <div className="text-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#3e8692] mx-auto"></div>
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand mx-auto"></div>
                     <p className="text-xs text-gray-500 mt-2">Loading...</p>
                   </div>
                 )}
@@ -842,7 +842,7 @@ export default function ChatPage() {
                       <div
                         className={`${isGeneratedMessage ? 'w-full' : msg.role === 'user' ? 'max-w-[70%]' : 'max-w-[80%]'} px-4 py-3 rounded-2xl text-sm ${
                           msg.role === 'user'
-                            ? 'bg-gradient-to-r from-[#3e8692] to-[#2d5a63] text-white shadow-md'
+                            ? 'bg-gradient-to-r from-brand to-[#2d5a63] text-white shadow-md'
                             : 'bg-white text-gray-900 border border-gray-200 shadow-sm'
                         }`}
                       >
@@ -870,7 +870,7 @@ export default function ChatPage() {
                               return (
                                 <div className="mt-3 p-3 bg-gray-50 border border-gray-300 rounded-lg relative">
                                   <div className="flex items-center justify-between mb-2">
-                                    <span className="text-xs font-semibold text-[#3e8692]">Client Message (Telegram)</span>
+                                    <span className="text-xs font-semibold text-brand">Client Message (Telegram)</span>
                                     <button
                                       onClick={() => {
                                         navigator.clipboard.writeText(generatedMessageContent);
@@ -881,7 +881,7 @@ export default function ChatPage() {
                                           btn.innerText = originalText;
                                         }, 2000);
                                       }}
-                                      className="text-xs px-2 py-1 bg-[#3e8692] text-white rounded hover:bg-[#2d5a63] transition-colors flex items-center gap-1"
+                                      className="text-xs px-2 py-1 bg-brand text-white rounded hover:bg-[#2d5a63] transition-colors flex items-center gap-1"
                                     >
                                       Copy
                                     </button>
@@ -941,7 +941,7 @@ export default function ChatPage() {
                                     setPendingListKOLs(searchResultKOLIds);
                                     setCreateListDialogOpen(true);
                                   }}
-                                  className="text-xs px-3 py-2 bg-[#3e8692] text-white rounded-lg hover:bg-[#2d5a63] transition-colors flex items-center gap-2"
+                                  className="text-xs px-3 py-2 bg-brand text-white rounded-lg hover:bg-[#2d5a63] transition-colors flex items-center gap-2"
                                 >
                                   Create List from {searchResultKOLIds.length} KOLs
                                 </button>
@@ -1025,7 +1025,7 @@ export default function ChatPage() {
                   onChange={handleMessageChange}
                   onKeyDown={handleKeyPress}
                   disabled={sending}
-                  className="flex-1 text-sm min-h-[48px] max-h-[200px] resize-none auth-input overflow-y-auto"
+                  className="flex-1 text-sm min-h-[48px] max-h-[200px] resize-none focus-brand overflow-y-auto"
                   rows={1}
                 />
                 <Button
@@ -1093,7 +1093,7 @@ export default function ChatPage() {
                   handleCreateListFromKOLs();
                 }
               }}
-              className="auth-input"
+              className="focus-brand"
               autoFocus
             />
           </div>
