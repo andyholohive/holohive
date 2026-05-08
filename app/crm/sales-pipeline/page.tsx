@@ -24,7 +24,7 @@ import {
   Target, AlertTriangle, ArrowRight, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronUp,
   Phone, MessageSquare, Calendar, FileText, StickyNote, Zap, RotateCcw, Clock, Edit, Copy, Check, ChevronsUpDown,
   Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown, Paperclip, Eye, Image,
-  Sparkles,
+  Sparkles, Twitter,
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -87,8 +87,11 @@ import { formatDistanceToNow, format } from 'date-fns';
 
 function DroppableColumn({ id, children, className }: { id: string; children: React.ReactNode; className?: string }) {
   const { setNodeRef, isOver } = useDroppable({ id });
+  // Drop-target highlight: brand teal (was ring-blue-400 before
+  // 2026-05-06). Brand color is the right semantic here — drag-drop is
+  // an active app interaction, not a category indicator.
   return (
-    <div ref={setNodeRef} className={`${className} ${isOver ? 'ring-2 ring-blue-400 ring-offset-2' : ''}`}>
+    <div ref={setNodeRef} className={`${className} ${isOver ? 'ring-2 ring-brand ring-offset-2' : ''}`}>
       {children}
     </div>
   );
@@ -149,6 +152,27 @@ export default function SalesPipelinePage() {
   const [users, setUsers] = useState<{ id: string; name: string | null; email: string }[]>([]);
   const [metrics, setMetrics] = useState({ totalCount: 0, bucketA: 0, bucketB: 0, bucketC: 0, activeValue: 0, bamfamViolations: 0 });
 
+  // Weekly Activity Funnel (header) — canonical 5-stage outbound funnel.
+  // Backed by migration 044's `direction` column on crm_activities +
+  // auto-stamped milestones (proposal_sent_at, etc.) from createActivity.
+  // Counts distinct opportunities per stage — one prospect DM'd 5x = 1.
+  type SalesFunnelData = {
+    window_days: number;
+    outreach: number;
+    replies: number;
+    calls_booked: number;
+    calls_taken: number;
+    proposals_sent: number;
+  };
+  const [salesFunnel, setSalesFunnel] = useState<SalesFunnelData | null>(null);
+  const [salesFunnelWindow, setSalesFunnelWindow] = useState<7 | 14 | 30>(7);
+  useEffect(() => {
+    fetch(`/api/analytics/sales-funnel?days=${salesFunnelWindow}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && typeof d.outreach === 'number') setSalesFunnel(d); })
+      .catch(() => {});
+  }, [salesFunnelWindow]);
+
   // UI state
   const [searchTerm, setSearchTerm] = useState('');
   const [actionsSearch, setActionsSearch] = useState('');
@@ -157,6 +181,10 @@ export default function SalesPipelinePage() {
   const [activeTab, setActiveTab] = useState<'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery'>('actions');
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('table');
   const [pathFilter, setPathFilter] = useState<'all' | 'closer' | 'sdr'>('all');
+  // Overall-tab unified search — broadcasts into Outreach/Pipeline/Orbit
+  // filters when the user types here, so one query scopes the whole Overall
+  // view. Each tab's own search input still works independently.
+  const [overallSearch, setOverallSearch] = useState('');
 
   // DnD state
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -240,6 +268,9 @@ export default function SalesPipelinePage() {
   const [selectedOutreach, setSelectedOutreach] = useState<string[]>([]);
   const [isBulkBumping, setIsBulkBumping] = useState(false);
   const [isBulkMoving, setIsBulkMoving] = useState(false);
+  // Orbit-tab multi-select — mirrors selectedOutreach. Bulk handlers below.
+  const [selectedOrbit, setSelectedOrbit] = useState<string[]>([]);
+  const [isOrbitBulkMoving, setIsOrbitBulkMoving] = useState(false);
   const outreachSearchTimeout = useRef<NodeJS.Timeout | null>(null);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const OUTREACH_PAGE_SIZE = 50;
@@ -522,6 +553,64 @@ export default function SalesPipelinePage() {
   // Data Fetching
   // ============================================
 
+  // ─── Per-resource fetchers ────────────────────────────────────────
+  // Split out from a monolithic fetchData on 2026-05-06 (audit). Was:
+  // 24 mutation handlers each refetched all 6 resources (~1000+ opps,
+  // affiliates, users, metrics, outreach count, templates) after every
+  // single-cell edit / drag / bump. Now mutations refetch only what
+  // could have changed, and most use optimistic local updates. The
+  // non-opp resources (affiliates, users, templates) almost never
+  // change during a session — refetching them on every keystroke was
+  // pure waste.
+  //
+  // fetchData() is kept as the all-in-one for initial mount and when
+  // the operator explicitly wants a fresh slate.
+
+  const fetchOpportunities = useCallback(async () => {
+    try {
+      const opps = await SalesPipelineService.getAll();
+      setOpportunities(opps);
+    } catch (err) {
+      console.error('Error fetching opportunities:', err);
+    }
+  }, []);
+
+  const fetchMetrics = useCallback(async () => {
+    try {
+      const met = await SalesPipelineService.getMetrics();
+      setMetrics(met);
+    } catch (err) {
+      console.error('Error fetching metrics:', err);
+    }
+  }, []);
+
+  const fetchAffiliates = useCallback(async () => {
+    try {
+      const affs = await CRMService.getAllAffiliates();
+      setAffiliates(affs);
+    } catch (err) {
+      console.error('Error fetching affiliates:', err);
+    }
+  }, []);
+
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const tmpls = await SalesPipelineService.getTemplates();
+      setTemplates(tmpls);
+    } catch (err) {
+      console.error('Error fetching templates:', err);
+    }
+  }, []);
+
+  const fetchOutreachCount = useCallback(async () => {
+    try {
+      const outreachCount = await SalesPipelineService.getColdDmsPaginated(1, 1, {});
+      setOutreachAllTotal(outreachCount.count);
+    } catch (err) {
+      console.error('Error fetching outreach count:', err);
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
       const [opps, affs, usrs, met, outreachCount, tmpls] = await Promise.all([
@@ -545,6 +634,22 @@ export default function SalesPipelinePage() {
     }
   }, []);
 
+  // ─── Optimistic update helpers ────────────────────────────────────
+  // Local state mutations that the UI sees immediately, without
+  // waiting for a refetch. Pair each with a server mutation; if the
+  // server call fails, call fetchOpportunities() to revert. The point
+  // is to avoid the 1000-row refetch on the happy path.
+
+  const applyOppPatch = useCallback((oppId: string, patch: Partial<SalesPipelineOpportunity>) => {
+    setOpportunities(prev => prev.map(o =>
+      o.id === oppId ? { ...o, ...patch, updated_at: new Date().toISOString() } : o
+    ));
+  }, []);
+
+  const removeOpp = useCallback((oppId: string) => {
+    setOpportunities(prev => prev.filter(o => o.id !== oppId));
+  }, []);
+
   useEffect(() => { fetchData(); }, [fetchData]);
 
   // Persist action sort preference per user
@@ -564,6 +669,16 @@ export default function SalesPipelinePage() {
   };
 
   // Outreach data fetching
+  //
+  // Decoupled from the all-total count fetch on 2026-05-06 (audit #2):
+  // previously `fetchOutreach` ran TWO queries — the filtered/paginated
+  // result + an unfiltered count for the "X of Y" display. The unfiltered
+  // count was being refetched on every page change + every filter change
+  // even though it only changes when opps are created/deleted or moved
+  // in/out of cold_dm. That's roughly half the queries this function
+  // generates, all wasted on tab navigation. Now only the filtered query
+  // runs here; the all-total is refetched explicitly by mutation handlers
+  // via `fetchOutreachCount()`.
   const fetchOutreach = useCallback(async () => {
     setOutreachLoading(true);
     try {
@@ -571,13 +686,9 @@ export default function SalesPipelinePage() {
         ...outreachFilters,
         owner_id: outreachFilters.owner_id === 'mine' ? (user?.id || undefined) : outreachFilters.owner_id,
       };
-      const [result, allResult] = await Promise.all([
-        SalesPipelineService.getColdDmsPaginated(outreachPage, OUTREACH_PAGE_SIZE, resolvedFilters),
-        SalesPipelineService.getColdDmsPaginated(1, 1, {}),
-      ]);
+      const result = await SalesPipelineService.getColdDmsPaginated(outreachPage, OUTREACH_PAGE_SIZE, resolvedFilters);
       setOutreachOpps(result.data);
       setOutreachTotal(result.count);
-      setOutreachAllTotal(allResult.count);
     } catch (err) {
       console.error('Error fetching outreach:', err);
     } finally {
@@ -590,6 +701,22 @@ export default function SalesPipelinePage() {
       fetchOutreach();
     }
   }, [activeTab, fetchOutreach, overviewSections.outreach]);
+
+  // Broadcast Overall search → all three subsection filters. The Overall
+  // search input ONLY renders on the overview tab, so this effect only
+  // fires when the user is actively typing there — and importantly, it
+  // does NOT fire on tab switches (which would otherwise clobber per-tab
+  // searches with the empty initial value). User mental model: typing in
+  // Overall pushes that query down to each section; per-tab searches keep
+  // working independently when the user is on a specific tab.
+  useEffect(() => {
+    const term = overallSearch;
+    setPipelineSearch(term);
+    setOrbitSearch(term);
+    setOutreachFilters(prev => prev.searchTerm === term ? prev : { ...prev, searchTerm: term });
+    setOutreachPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overallSearch]);
 
   // ============================================
   // Filtered Opportunities
@@ -653,7 +780,10 @@ export default function SalesPipelinePage() {
       await SalesPipelineService.create({ ...form, stage: form.stage || ('cold_dm' as OpportunityStage), temperature_score: form.temperature_score ?? 50 });
       setIsCreateOpen(false);
       setForm({ name: '' });
-      await fetchData();
+      // Need server-generated id + computed fields, so refetch opps
+      // (not the rest of the resources). Metrics in parallel.
+      void fetchOpportunities();
+      void fetchMetrics();
     } catch (err: any) {
       alert(err.message || 'Error creating opportunity');
     } finally {
@@ -666,12 +796,16 @@ export default function SalesPipelinePage() {
     setIsSubmitting(true);
     try {
       await SalesPipelineService.update(editingOpp.id, form);
+      const oppId = editingOpp.id;
       setSlideOverMode('view');
       setEditingOpp(null);
       setForm({ name: '' });
-      await fetchData();
+      // Optimistic: form already represents desired state.
+      applyOppPatch(oppId, form as Partial<SalesPipelineOpportunity>);
+      void fetchMetrics();
     } catch (err: any) {
       alert(err.message || 'Error updating opportunity');
+      void fetchOpportunities(); // revert
     } finally {
       setIsSubmitting(false);
     }
@@ -697,10 +831,12 @@ export default function SalesPipelinePage() {
     try {
       await SalesPipelineService.delete(id);
       if (slideOverOpp?.id === id) setSlideOverOpp(null);
-      await fetchData();
-      if (activeTab === 'outreach') await fetchOutreach();
+      removeOpp(id);
+      void fetchMetrics();
+      if (activeTab === 'outreach') { void fetchOutreach(); void fetchOutreachCount(); }
     } catch (err) {
       console.error('Error deleting:', err);
+      void fetchOpportunities(); // revert
     }
   };
 
@@ -752,10 +888,12 @@ export default function SalesPipelinePage() {
       updateData.last_contacted_at = new Date().toISOString();
       // Note: co-owners are now assigned in the activity log popup when booking a meeting
       await SalesPipelineService.update(oppId, updateData);
-      await fetchData();
-      if (activeTab === 'outreach') await fetchOutreach();
+      applyOppPatch(oppId, updateData);
+      void fetchMetrics();
+      if (activeTab === 'outreach') { void fetchOutreach(); void fetchOutreachCount(); }
     } catch (err) {
       console.error('Error changing stage:', err);
+      void fetchOpportunities(); // revert
     }
   };
 
@@ -763,74 +901,86 @@ export default function SalesPipelinePage() {
     if (!orbitPrompt) return;
     const { oppId, oppName } = orbitPrompt;
     const reasonLabel = ORBIT_REASONS.find(r => r.value === orbitReasonValue)?.label || orbitReasonValue;
+    const patch = {
+      stage: 'orbit' as OpportunityStage,
+      orbit_reason: orbitReasonValue,
+      orbit_followup_days: orbitFollowupDays,
+    };
     try {
-      await SalesPipelineService.update(oppId, {
-        stage: 'orbit' as OpportunityStage,
-        orbit_reason: orbitReasonValue,
-        orbit_followup_days: orbitFollowupDays,
-      });
+      await SalesPipelineService.update(oppId, patch);
       setOrbitPrompt(null);
       setOrbitReasonValue('no_response');
       setOrbitFollowupDays(90);
-      await fetchData();
+      applyOppPatch(oppId, patch as Partial<SalesPipelineOpportunity>);
+      void fetchMetrics();
       // Open activity log popup
       openActivityLogPrompt(oppId, oppName, 'note', `Moved to orbit — ${reasonLabel}`);
     } catch (err) {
       console.error('Error moving to orbit:', err);
+      void fetchOpportunities(); // revert
     }
   };
 
   const confirmTgHandle = async () => {
     if (!tgHandlePrompt || !tgHandleValue.trim()) return;
     const { oppId, oppName } = tgHandlePrompt;
+    const patch = {
+      stage: 'tg_intro' as OpportunityStage,
+      tg_handle: tgHandleValue.trim(),
+      last_contacted_at: new Date().toISOString(),
+    };
     try {
-      await SalesPipelineService.update(oppId, {
-        stage: 'tg_intro' as OpportunityStage,
-        tg_handle: tgHandleValue.trim(),
-        last_contacted_at: new Date().toISOString(),
-      } as any);
+      await SalesPipelineService.update(oppId, patch as any);
       setTgHandlePrompt(null);
       setTgHandleValue('');
-      await fetchData();
-      openActivityLogPrompt(oppId, oppName, 'message', `Got TG handle: ${tgHandleValue.trim()}`);
+      applyOppPatch(oppId, patch as Partial<SalesPipelineOpportunity>);
+      void fetchMetrics();
+      openActivityLogPrompt(oppId, oppName, 'message', `Got TG handle: ${patch.tg_handle}`);
     } catch (err) {
       console.error('Error saving TG handle:', err);
+      void fetchOpportunities();
     }
   };
 
   const confirmBucket = async () => {
     if (!bucketPrompt) return;
     const { oppId, oppName } = bucketPrompt;
+    const patch = {
+      stage: 'discovery_done' as OpportunityStage,
+      bucket: bucketValue,
+      last_contacted_at: new Date().toISOString(),
+    };
     try {
-      await SalesPipelineService.update(oppId, {
-        stage: 'discovery_done' as OpportunityStage,
-        bucket: bucketValue,
-        last_contacted_at: new Date().toISOString(),
-      } as any);
+      await SalesPipelineService.update(oppId, patch as any);
       setBucketPrompt(null);
-      await fetchData();
+      applyOppPatch(oppId, patch as Partial<SalesPipelineOpportunity>);
+      void fetchMetrics();
       openActivityLogPrompt(oppId, oppName, 'meeting', 'Discovery call completed');
     } catch (err) {
       console.error('Error assigning bucket:', err);
+      void fetchOpportunities();
     }
   };
 
   const confirmClosedLost = async () => {
     if (!closedLostPrompt) return;
     const { oppId, oppName } = closedLostPrompt;
+    const patch = {
+      stage: 'v2_closed_lost' as OpportunityStage,
+      closed_lost_reason: closedLostReasonValue || undefined,
+    };
     try {
-      await SalesPipelineService.update(oppId, {
-        stage: 'v2_closed_lost' as OpportunityStage,
-        closed_lost_reason: closedLostReasonValue || undefined,
-      });
+      await SalesPipelineService.update(oppId, patch);
       setClosedLostPrompt(null);
       setClosedLostReasonValue('');
-      await fetchData();
+      applyOppPatch(oppId, patch as Partial<SalesPipelineOpportunity>);
+      void fetchMetrics();
       // Open activity log popup
       const reason = closedLostReasonValue ? `Closed lost — ${closedLostReasonValue}` : 'Closed lost';
       openActivityLogPrompt(oppId, oppName, 'note', reason);
     } catch (err) {
       console.error('Error closing lost:', err);
+      void fetchOpportunities();
     }
   };
 
@@ -847,42 +997,49 @@ export default function SalesPipelinePage() {
         if (!closedWonClientId) return;
         clientId = closedWonClientId;
       }
-      await SalesPipelineService.update(oppId, {
+      const patch = {
         stage: 'v2_closed_won' as OpportunityStage,
         client_id: clientId,
-      });
+      };
+      await SalesPipelineService.update(oppId, patch);
       setClosedWonPrompt(null);
-      await fetchData();
+      applyOppPatch(oppId, patch as Partial<SalesPipelineOpportunity>);
+      void fetchMetrics();
       openActivityLogPrompt(oppId, oppName, 'note', 'Deal closed won');
     } catch (err) {
       console.error('Error closing won:', err);
+      void fetchOpportunities();
     }
   };
 
   const skipClosedWon = async () => {
     if (!closedWonPrompt) return;
     const { oppId, oppName } = closedWonPrompt;
+    const patch = { stage: 'v2_closed_won' as OpportunityStage };
     try {
-      await SalesPipelineService.update(oppId, {
-        stage: 'v2_closed_won' as OpportunityStage,
-      });
+      await SalesPipelineService.update(oppId, patch);
       setClosedWonPrompt(null);
-      await fetchData();
+      applyOppPatch(oppId, patch as Partial<SalesPipelineOpportunity>);
+      void fetchMetrics();
       openActivityLogPrompt(oppId, oppName, 'note', 'Deal closed won');
     } catch (err) {
       console.error('Error closing won:', err);
+      void fetchOpportunities();
     }
   };
 
   const handleResurrect = async (opp: SalesPipelineOpportunity) => {
+    const patch = {
+      stage: 'cold_dm' as OpportunityStage,
+      orbit_reason: null,
+    };
     try {
-      await SalesPipelineService.update(opp.id, {
-        stage: 'cold_dm' as OpportunityStage,
-        orbit_reason: null,
-      });
-      await fetchData();
+      await SalesPipelineService.update(opp.id, patch);
+      applyOppPatch(opp.id, patch as Partial<SalesPipelineOpportunity>);
+      void fetchMetrics();
     } catch (err) {
       console.error('Error resurrecting:', err);
+      void fetchOpportunities();
     }
   };
 
@@ -895,14 +1052,17 @@ export default function SalesPipelinePage() {
     ));
     try {
       await SalesPipelineService.recordBump(oppId);
-      await fetchData();
-      if (activeTab === 'outreach') await fetchOutreach();
+      // No fetchOpportunities — the optimistic patch above is the
+      // canonical state. recordBump triggers temperature recalc on the
+      // server, but the UI doesn't show temperature on the bump button
+      // so we don't need a fresh server read.
+      if (activeTab === 'outreach') { void fetchOutreach(); void fetchOutreachCount(); }
       if (slideOverOpp?.id === oppId) {
-        await fetchActivities(oppId);
+        void fetchActivities(oppId);
       }
     } catch (err) {
       console.error('Error recording bump:', err);
-      await fetchData(); // revert on error
+      void fetchOpportunities(); // revert on error
     } finally {
       setIsBumping(false);
     }
@@ -917,10 +1077,10 @@ export default function SalesPipelinePage() {
     ));
     try {
       await SalesPipelineService.reduceBump(oppId);
-      await fetchData();
+      // No refetch — same reasoning as handleRecordBump.
     } catch (err) {
       console.error('Error reducing bump:', err);
-      await fetchData(); // revert on error
+      void fetchOpportunities(); // revert on error
     } finally {
       setIsBumping(false);
     }
@@ -956,8 +1116,11 @@ export default function SalesPipelinePage() {
           const [h, m] = activityMeetingTime.split(':').map(Number);
           meetingDate.setHours(h, m, 0, 0);
         }
-        await SalesPipelineService.update(slideOverOpp.id, { next_meeting_at: meetingDate.toISOString() });
-        await fetchData();
+        const nextMeetingIso = meetingDate.toISOString();
+        await SalesPipelineService.update(slideOverOpp.id, { next_meeting_at: nextMeetingIso });
+        applyOppPatch(slideOverOpp.id, { next_meeting_at: nextMeetingIso } as Partial<SalesPipelineOpportunity>);
+        // Metrics include bamfamViolations which depends on next_meeting_at.
+        void fetchMetrics();
       }
       setActivityForm({ opportunity_id: '', type: 'note', title: '' });
       setActivityFile(null);
@@ -973,29 +1136,39 @@ export default function SalesPipelinePage() {
   };
 
   const handleInlineEdit = async (oppId: string, field: string, value: string) => {
+    const updates: any = {};
+    if (field === 'deal_value') {
+      updates.deal_value = value ? parseFloat(value) : null;
+    } else if (field === 'temperature_score') {
+      updates.temperature_score = parseInt(value) || 50;
+    } else {
+      updates[field] = value || null;
+    }
+    // Optimistic — type-cell edits are the most-frequent operation on
+    // this page; refetching all 1000 opps after each one was crippling
+    // perceived responsiveness. Patch local state, send the write,
+    // background-refresh metrics. If the write fails, revert.
+    applyOppPatch(oppId, updates);
+    setEditingCell(null);
     try {
-      const updates: any = {};
-      if (field === 'deal_value') {
-        updates.deal_value = value ? parseFloat(value) : null;
-      } else if (field === 'temperature_score') {
-        updates.temperature_score = parseInt(value) || 50;
-      } else {
-        updates[field] = value || null;
-      }
       await SalesPipelineService.update(oppId, updates);
-      await fetchData();
+      void fetchMetrics();
     } catch (err) {
       console.error('Error inline edit:', err);
+      void fetchOpportunities(); // revert
     }
-    setEditingCell(null);
   };
 
   const handleRecalculateAll = async () => {
     setIsRecalculating(true);
     try {
       await SalesPipelineService.recalcAllTemperatures();
-      await fetchData();
-      if (activeTab === 'outreach') await fetchOutreach();
+      // Mass mutation — every opp's temperature_score may have moved,
+      // so we DO need to refetch the full list. But not affiliates /
+      // users / templates.
+      await fetchOpportunities();
+      void fetchMetrics();
+      if (activeTab === 'outreach') { void fetchOutreach(); void fetchOutreachCount(); }
     } catch (err) {
       console.error('Error recalculating temperatures:', err);
     } finally {
@@ -1043,8 +1216,21 @@ export default function SalesPipelinePage() {
         if (oldIndex !== -1 && newIndex !== -1) {
           const reordered = arrayMove(stageOpps, oldIndex, newIndex);
           const positions = reordered.map((o, i) => ({ id: o.id, position: i }));
-          await SalesPipelineService.updatePositions(positions);
-          await fetchData();
+          // Optimistic position update — the kanban orders by position
+          // so this gives instant visual feedback. Send the write in
+          // the background; revert on failure.
+          const positionMap = new Map(positions.map(p => [p.id, p.position]));
+          setOpportunities(prev => prev.map(o =>
+            positionMap.has(o.id) ? { ...o, position: positionMap.get(o.id)! } : o,
+          ));
+          try {
+            await SalesPipelineService.updatePositions(positions);
+            // No metrics refetch — position changes don't affect any
+            // pipeline aggregate (count by stage, value, etc.).
+          } catch (err) {
+            console.error('Error updating positions:', err);
+            void fetchOpportunities(); // revert
+          }
         }
       } else if (targetOpp && targetOpp.stage !== opp.stage) {
         // Dropped on card in different stage
@@ -1580,9 +1766,11 @@ export default function SalesPipelinePage() {
           openActivityLogPrompt(oppId, opp.name, 'meeting', 'Meeting outcome', false);
         } else if (action.label === 'Send Proposal') {
           // Mark proposal as sent, then show activity log
-          await SalesPipelineService.update(oppId, { proposal_sent_at: new Date().toISOString() } as any);
+          const sentAt = new Date().toISOString();
+          await SalesPipelineService.update(oppId, { proposal_sent_at: sentAt } as any);
+          applyOppPatch(oppId, { proposal_sent_at: sentAt } as Partial<SalesPipelineOpportunity>);
           openActivityLogPrompt(oppId, opp.name, 'proposal', 'Proposal sent');
-          await fetchData();
+          void fetchMetrics();
         } else {
           const guidance = ACTION_GUIDANCE[action.label];
           openSlideOver(opp, guidance);
@@ -1622,13 +1810,16 @@ export default function SalesPipelinePage() {
       if (activityLogPrompt.showMeetingPicker && activityLogForm.co_owner_ids) {
         activityUpdate.co_owner_ids = activityLogForm.co_owner_ids;
       }
-      await SalesPipelineService.update(activityLogPrompt.oppId, activityUpdate);
+      const oppId = activityLogPrompt.oppId;
+      await SalesPipelineService.update(oppId, activityUpdate);
       setActivityLogPrompt(null);
       setActivityLogForm({ title: '', description: '', outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined, co_owner_ids: undefined });
-      await fetchData();
-      if (activeTab === 'outreach') await fetchOutreach();
+      applyOppPatch(oppId, activityUpdate);
+      void fetchMetrics();
+      if (activeTab === 'outreach') { void fetchOutreach(); void fetchOutreachCount(); }
     } catch (err) {
       console.error('Error logging activity:', err);
+      void fetchOpportunities();
     } finally {
       setIsActivityLogSubmitting(false);
     }
@@ -1673,13 +1864,90 @@ export default function SalesPipelinePage() {
       .replace(/\/+$/, '');
   };
 
+  /**
+   * Render a project name with an inline Twitter/X link icon when a
+   * twitter_handle is set. When missing, shows a "+" pill (visible on
+   * row hover) that opens the edit dialog so the user can fill it in.
+   *
+   * Used in every table renderer (Outreach, Pipeline, Orbit, Nurture)
+   * for visual consistency. The clickable area is just the icon — the
+   * project name itself keeps whatever click behavior the row defines
+   * (row-click for slide-over, name-click for inline edit, etc).
+   */
+  const renderProjectNameSuffix = (twitterHandle: string | null | undefined, onAddTwitter?: () => void) => {
+    if (twitterHandle) {
+      const handle = twitterHandle.replace(/^@/, '').replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//, '').replace(/\/$/, '');
+      return (
+        <a
+          href={`https://x.com/${handle}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className="flex-shrink-0 inline-flex items-center justify-center h-4 w-4 rounded text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+          title={`Open @${handle} on X`}
+        >
+          <Twitter className="h-3 w-3" />
+        </a>
+      );
+    }
+    if (onAddTwitter) {
+      return (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onAddTwitter(); }}
+          className="flex-shrink-0 opacity-0 group-hover:opacity-100 inline-flex items-center justify-center h-4 w-4 rounded text-gray-400 hover:text-brand hover:bg-brand-light transition-all"
+          title="Add Twitter/X handle"
+        >
+          <Plus className="h-3 w-3" />
+        </button>
+      );
+    }
+    return null;
+  };
+
+  /**
+   * Render the POC cell — platform badge + handle. When platform is
+   * 'twitter' the handle becomes a clickable link to x.com that opens
+   * in a new tab. For other platforms the handle stays as plain text
+   * (we don't have URL builders for IG/LinkedIn/Telegram handles).
+   */
+  const renderPocCell = (opp: SalesPipelineOpportunity, maxWidthClass = 'max-w-[120px]') => {
+    if (!opp.poc_handle) return <span className="text-gray-400 text-xs">—</span>;
+    const cleanHandle = cleanPocHandle(opp.poc_handle);
+    const isTwitter = opp.poc_platform === 'twitter';
+    const xHandle = cleanHandle.replace(/^@/, '');
+    return (
+      <div className="flex items-center gap-1.5 overflow-hidden">
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize shrink-0">
+          {opp.poc_platform || 'other'}
+        </Badge>
+        {isTwitter && xHandle ? (
+          <a
+            href={`https://x.com/${xHandle}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className={`text-xs text-blue-600 hover:underline truncate ${maxWidthClass}`}
+            title={cleanHandle}
+          >
+            {cleanHandle}
+          </a>
+        ) : (
+          <span className={`text-xs text-gray-600 truncate ${maxWidthClass}`}>
+            {cleanHandle}
+          </span>
+        )}
+      </div>
+    );
+  };
+
   const linkifyText = (text: string) => {
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = text.split(urlRegex);
     if (parts.length === 1) return text;
     return parts.map((part, i) =>
       urlRegex.test(part) ? (
-        <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-[#3e8692] hover:underline break-all" onClick={e => e.stopPropagation()}>{part}</a>
+        <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline break-all" onClick={e => e.stopPropagation()}>{part}</a>
       ) : part
     );
   };
@@ -1705,7 +1973,7 @@ export default function SalesPipelinePage() {
 
     return (
       <Card
-        className={`group hover:shadow-md transition-all duration-200 border-l-4 ${colors.border} ${isDragging ? 'shadow-lg ring-2 ring-blue-400 opacity-90' : ''} ${bamfam ? 'bg-red-50/30' : ''}`}
+        className={`group hover:shadow-md transition-all duration-200 border-l-4 ${colors.border} ${isDragging ? 'shadow-lg ring-2 ring-brand opacity-90' : ''} ${bamfam ? 'bg-red-50/30' : ''}`}
         onClick={() => openSlideOver(opp)}
       >
         <CardContent className="p-4">
@@ -1992,6 +2260,7 @@ export default function SalesPipelinePage() {
                       <TableRow className="bg-gray-50/50">
                         <TableHead className="w-10"></TableHead>
                         <TableHead>Name</TableHead>
+                        <TableHead className="w-[180px]">POC</TableHead>
                         <TableHead className="w-[70px]">Bucket</TableHead>
                         <TableHead className="w-[70px]">Path</TableHead>
                         <TableHead className="w-[90px]">Temp</TableHead>
@@ -2008,7 +2277,7 @@ export default function SalesPipelinePage() {
                       <SortableContext items={stageOpps.map(o => o.id)} strategy={verticalListSortingStrategy}>
                         {stageOpps.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={11} className="text-center text-sm text-gray-400 py-8">
+                            <TableCell colSpan={12} className="text-center text-sm text-gray-400 py-8">
                               No opportunities in this stage
                             </TableCell>
                           </TableRow>
@@ -2026,7 +2295,7 @@ export default function SalesPipelinePage() {
                                     onChange={e => setEditingValue(e.target.value)}
                                     onBlur={() => handleInlineEdit(opp.id, 'name', editingValue)}
                                     onKeyDown={e => { if (e.key === 'Enter') handleInlineEdit(opp.id, 'name', editingValue); if (e.key === 'Escape') setEditingCell(null); }}
-                                    className="h-8 text-sm font-medium auth-input"
+                                    className="h-8 text-sm font-medium focus-brand"
                                     autoFocus
                                     onClick={e => e.stopPropagation()}
                                   />
@@ -2037,8 +2306,12 @@ export default function SalesPipelinePage() {
                                   >
                                     <Building2 className="h-4 w-4 text-gray-400" />
                                     <span className="font-medium">{opp.name}</span>
+                                    {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
                                   </div>
                                 )}
+                              </TableCell>
+                              <TableCell className="whitespace-nowrap max-w-[180px] overflow-hidden">
+                                {renderPocCell(opp, 'max-w-[120px]')}
                               </TableCell>
                               <TableCell>
                                 {opp.bucket && (
@@ -2071,7 +2344,7 @@ export default function SalesPipelinePage() {
                                     onChange={e => setEditingValue(e.target.value)}
                                     onBlur={() => handleInlineEdit(opp.id, 'deal_value', editingValue)}
                                     onKeyDown={e => { if (e.key === 'Enter') handleInlineEdit(opp.id, 'deal_value', editingValue); if (e.key === 'Escape') setEditingCell(null); }}
-                                    className="h-8 text-sm text-right auth-input"
+                                    className="h-8 text-sm text-right focus-brand"
                                     autoFocus
                                     onClick={e => e.stopPropagation()}
                                   />
@@ -2196,9 +2469,16 @@ export default function SalesPipelinePage() {
     setIsBulkBumping(true);
     try {
       await SalesPipelineService.bulkRecordBump(selectedOutreach);
+      // Bulk operation — every selected opp's bump_number changed
+      // server-side. Cheaper to refetch the opps list once than to
+      // try and patch N rows individually + reconcile temperatures.
+      // Drop the affiliate/users/templates fetch though.
+      const selected = new Set(selectedOutreach);
       setSelectedOutreach([]);
-      await fetchOutreach();
-      await fetchData();
+      void fetchOutreach();
+      await fetchOpportunities();
+      void fetchMetrics();
+      void selected; // satisfy linter on unused
     } catch (err: any) {
       console.error('Error bulk bumping:', err);
       alert(err.message || 'Error bumping selected opportunities');
@@ -2213,13 +2493,21 @@ export default function SalesPipelinePage() {
     setIsBulkMoving(true);
     try {
       await SalesPipelineService.bulkUpdateStage(selectedOutreach, 'warm');
+      // Optimistic: patch all selected to warm; server is authoritative
+      // but the local state update is enough for the kanban to update.
+      const selected = new Set(selectedOutreach);
+      setOpportunities(prev => prev.map(o =>
+        selected.has(o.id) ? { ...o, stage: 'warm' as OpportunityStage, updated_at: new Date().toISOString() } : o,
+      ));
       setSelectedOutreach([]);
-      await fetchOutreach();
-      await fetchData();
+      void fetchOutreach();
+      void fetchOutreachCount();
+      void fetchMetrics();
     } catch (err: any) {
       console.error('Error bulk moving to warm:', err);
       alert(err.message || 'Error moving selected opportunities to warm');
       setSelectedOutreach([]);
+      void fetchOpportunities(); // revert
     } finally {
       setIsBulkMoving(false);
     }
@@ -2230,13 +2518,18 @@ export default function SalesPipelinePage() {
     if (!confirm(`Delete ${selectedOutreach.length} selected opportunities? This cannot be undone.`)) return;
     try {
       await SalesPipelineService.bulkDelete(selectedOutreach);
+      // Optimistic remove — drop all selected from local state.
+      const selected = new Set(selectedOutreach);
+      setOpportunities(prev => prev.filter(o => !selected.has(o.id)));
       setSelectedOutreach([]);
-      await fetchOutreach();
-      await fetchData();
+      void fetchOutreach();
+      void fetchOutreachCount();
+      void fetchMetrics();
     } catch (err: any) {
       console.error('Error bulk deleting:', err);
       alert(err.message || 'Error deleting selected opportunities');
       setSelectedOutreach([]);
+      void fetchOpportunities(); // revert
     }
   };
 
@@ -2248,6 +2541,64 @@ export default function SalesPipelinePage() {
 
   const selectAllOnPage = () => {
     setSelectedOutreach(outreachOpps.map(o => o.id));
+  };
+
+  // ─── Orbit multi-select handlers ────────────────────────────────────
+  // Mirror the Outreach pattern: toggle/select-all + bulk actions for
+  // Move-to-Cold-DM (resurrect), Move-to-Pipeline (warm), and Delete.
+
+  const toggleOrbitSelect = (id: string) => {
+    setSelectedOrbit(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllOrbitVisible = () => {
+    setSelectedOrbit(orbitOpps.map(o => o.id));
+  };
+
+  const handleOrbitBulkMove = async (targetStage: 'cold_dm' | 'warm') => {
+    if (selectedOrbit.length === 0 || isOrbitBulkMoving) return;
+    setIsOrbitBulkMoving(true);
+    const ids = selectedOrbit;
+    try {
+      // Move stage. For cold_dm we also need to clear orbit_reason —
+      // bulkUpdateStage doesn't touch other columns, so do this in two
+      // passes: bulk stage update + per-id orbit_reason clear.
+      await SalesPipelineService.bulkUpdateStage(ids, targetStage);
+      if (targetStage === 'cold_dm') {
+        await Promise.all(ids.map(id =>
+          SalesPipelineService.update(id, { orbit_reason: null })
+        ));
+      }
+      setOpportunities(prev => prev.map(o =>
+        ids.includes(o.id)
+          ? { ...o, stage: targetStage, orbit_reason: targetStage === 'cold_dm' ? null : o.orbit_reason }
+          : o
+      ));
+      setSelectedOrbit([]);
+      void fetchMetrics();
+    } catch (err) {
+      console.error('Error in orbit bulk move:', err);
+      void fetchOpportunities();
+    } finally {
+      setIsOrbitBulkMoving(false);
+    }
+  };
+
+  const handleOrbitBulkDelete = async () => {
+    if (selectedOrbit.length === 0) return;
+    if (!confirm(`Delete ${selectedOrbit.length} selected opportunities? This cannot be undone.`)) return;
+    const ids = selectedOrbit;
+    try {
+      await SalesPipelineService.bulkDelete(ids);
+      setOpportunities(prev => prev.filter(o => !ids.includes(o.id)));
+      setSelectedOrbit([]);
+      void fetchMetrics();
+    } catch (err) {
+      console.error('Error in orbit bulk delete:', err);
+      void fetchOpportunities();
+    }
   };
 
   const renderOutreachTab = () => (
@@ -2298,14 +2649,14 @@ export default function SalesPipelinePage() {
             placeholder="Search cold DMs..."
             defaultValue={outreachFilters.searchTerm}
             onChange={e => handleOutreachSearch(e.target.value)}
-            className="pl-9 h-9 text-sm auth-input"
+            className="pl-9 h-9 text-sm focus-brand"
           />
         </div>
         <Select
           value={outreachFilters.dm_account || 'all'}
           onValueChange={v => { setOutreachFilters(prev => ({ ...prev, dm_account: v === 'all' ? undefined : v as DmAccount })); setOutreachPage(1); setSelectedOutreach([]); }}
         >
-          <SelectTrigger className="h-9 w-auto text-sm auth-input [&>span]:truncate-none [&>span]:line-clamp-none">
+          <SelectTrigger className="h-9 w-auto text-sm focus-brand [&>span]:truncate-none [&>span]:line-clamp-none">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -2318,7 +2669,7 @@ export default function SalesPipelinePage() {
           value={outreachFilters.bucket || 'all'}
           onValueChange={v => { setOutreachFilters(prev => ({ ...prev, bucket: v === 'all' ? undefined : v as Bucket })); setOutreachPage(1); setSelectedOutreach([]); }}
         >
-          <SelectTrigger className="h-9 w-auto text-sm auth-input [&>span]:truncate-none [&>span]:line-clamp-none">
+          <SelectTrigger className="h-9 w-auto text-sm focus-brand [&>span]:truncate-none [&>span]:line-clamp-none">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -2332,7 +2683,7 @@ export default function SalesPipelinePage() {
           value={outreachFilters.bumpRange || 'all'}
           onValueChange={v => { setOutreachFilters(prev => ({ ...prev, bumpRange: v === 'all' ? undefined : v as 'none' | '1-2' | '3+' })); setOutreachPage(1); setSelectedOutreach([]); }}
         >
-          <SelectTrigger className="h-9 w-auto text-sm auth-input [&>span]:truncate-none [&>span]:line-clamp-none">
+          <SelectTrigger className="h-9 w-auto text-sm focus-brand [&>span]:truncate-none [&>span]:line-clamp-none">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -2344,9 +2695,11 @@ export default function SalesPipelinePage() {
         </Select>
       </div>
 
-      {/* Bulk action toolbar */}
+      {/* Bulk action toolbar — sticky so it stays visible while scrolling.
+          `top-0` pins it to the viewport (or the nearest scrolling ancestor);
+          z-30 keeps it above the table header but below dialogs/dropdowns. */}
       {selectedOutreach.length > 0 && (
-        <div className="flex items-center gap-3 mb-3 px-4 py-2.5 bg-sky-50 border border-sky-200 rounded-lg">
+        <div className="sticky top-0 z-30 flex items-center gap-3 mb-3 px-4 py-2.5 bg-sky-50 border border-sky-200 rounded-lg shadow-sm">
           <span className="text-sm font-medium text-sky-800">{selectedOutreach.length} selected</span>
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={selectAllOnPage}>
             Select All on Page
@@ -2468,11 +2821,12 @@ export default function SalesPipelinePage() {
                         <div className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-100 rounded px-2 py-1 -mx-2 -my-1 whitespace-nowrap overflow-hidden">
                           <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
                           <span className="font-medium truncate">{opp.name}</span>
+                          {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
                           {groupCount > 1 && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium shrink-0 whitespace-nowrap">{groupCount} POCs</span>
                           )}
                           <button
-                            className="shrink-0 ml-auto opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400 hover:text-[#3e8692]"
+                            className="shrink-0 ml-auto opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400 hover:text-brand"
                             title="Add another POC for this project"
                             onClick={e => {
                               e.stopPropagation();
@@ -2498,14 +2852,7 @@ export default function SalesPipelinePage() {
                       )}
                     </TableCell>
                     <TableCell className="whitespace-nowrap max-w-[200px] overflow-hidden">
-                      {opp.poc_handle ? (
-                        <div className="flex items-center gap-1.5 overflow-hidden">
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize shrink-0">{opp.poc_platform || 'other'}</Badge>
-                          <span className="text-xs text-gray-600 truncate">{cleanPocHandle(opp.poc_handle)}</span>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
+                      {renderPocCell(opp, 'max-w-[150px]')}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
@@ -2789,7 +3136,7 @@ export default function SalesPipelinePage() {
               if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
               searchDebounceRef.current = setTimeout(() => setActionsSearch(v), 300);
             }}
-            className="pl-9 h-9 text-sm auth-input max-w-xs"
+            className="pl-9 h-9 text-sm focus-brand max-w-xs"
           />
         </div>
 
@@ -3092,6 +3439,47 @@ export default function SalesPipelinePage() {
 
   const renderOrbitTab = () => (
     <div className="pb-8">
+      {/* Sticky bulk action toolbar — mirrors the Outreach toolbar so users
+          have the same multi-select UX in Orbit. Only renders when at least
+          one row is selected. */}
+      {selectedOrbit.length > 0 && (
+        <div className="sticky top-0 z-30 flex items-center gap-3 mb-3 px-4 py-2.5 bg-orange-50 border border-orange-200 rounded-lg shadow-sm">
+          <span className="text-sm font-medium text-orange-800">{selectedOrbit.length} selected</span>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={selectAllOrbitVisible}>
+            Select All Visible
+          </Button>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setSelectedOrbit([])}>
+            Deselect All
+          </Button>
+          <div className="flex-1" />
+          <Button
+            size="sm"
+            className="h-7 text-xs bg-sky-600 hover:bg-sky-700 text-white"
+            onClick={() => handleOrbitBulkMove('cold_dm')}
+            disabled={isOrbitBulkMoving}
+          >
+            {isOrbitBulkMoving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RotateCcw className="h-3 w-3 mr-1" />}
+            Move to Cold DM
+          </Button>
+          <Button
+            size="sm"
+            className="h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white"
+            onClick={() => handleOrbitBulkMove('warm')}
+            disabled={isOrbitBulkMoving}
+          >
+            {isOrbitBulkMoving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ArrowRight className="h-3 w-3 mr-1" />}
+            Move to Pipeline (Warm)
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
+            onClick={handleOrbitBulkDelete}
+          >
+            <Trash2 className="h-3 w-3 mr-1" /> Delete
+          </Button>
+        </div>
+      )}
       {orbitByReason.map(group => {
         const isCollapsed = collapsedStages.has(`orbit_${group.value}`);
         const groupValue = group.opps.reduce((s, o) => s + (o.deal_value || 0), 0);
@@ -3125,7 +3513,9 @@ export default function SalesPipelinePage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-gray-50/50">
+                      <TableHead className="w-10"></TableHead>
                       <TableHead>Name</TableHead>
+                      <TableHead className="w-[180px]">POC</TableHead>
                       <TableHead className="w-[70px]">Bucket</TableHead>
                       <TableHead className="w-[70px]">DM</TableHead>
                       <TableHead className="w-[90px]">Temp</TableHead>
@@ -3139,17 +3529,31 @@ export default function SalesPipelinePage() {
                   <TableBody>
                     {group.opps.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center text-sm text-gray-400 py-8">
+                        <TableCell colSpan={11} className="text-center text-sm text-gray-400 py-8">
                           No opportunities
                         </TableCell>
                       </TableRow>
-                    ) : group.opps.map(opp => (
+                    ) : group.opps.map(opp => {
+                      const isChecked = selectedOrbit.includes(opp.id);
+                      return (
                       <TableRow key={opp.id} className="group hover:bg-gray-50 cursor-pointer" onClick={() => openSlideOver(opp)}>
+                        <TableCell className="w-10" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center justify-center">
+                            <Checkbox
+                              checked={isChecked}
+                              onCheckedChange={() => toggleOrbitSelect(opp.id)}
+                            />
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Building2 className="h-4 w-4 text-gray-400" />
                             <span className="font-medium">{opp.name}</span>
+                            {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
                           </div>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap max-w-[180px] overflow-hidden">
+                          {renderPocCell(opp, 'max-w-[120px]')}
                         </TableCell>
                         <TableCell>
                           {opp.bucket && (
@@ -3206,7 +3610,8 @@ export default function SalesPipelinePage() {
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -3300,13 +3705,13 @@ export default function SalesPipelinePage() {
               <div className="grid gap-4">
                 <div className="grid gap-2">
                   <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Name *</Label>
-                  <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Company or contact name" className="auth-input" />
+                  <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Company or contact name" className="focus-brand" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Path</Label>
                     <Select value={form.dm_account || 'sdr'} onValueChange={v => setForm(f => ({ ...f, dm_account: v as DmAccount }))}>
-                      <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="closer">Closer (Path A)</SelectItem>
                         <SelectItem value="sdr">SDR (Path B)</SelectItem>
@@ -3317,7 +3722,7 @@ export default function SalesPipelinePage() {
                   <div className="grid gap-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Bucket</Label>
                     <Select value={form.bucket || ''} onValueChange={v => setForm(f => ({ ...f, bucket: v as Bucket }))}>
-                      <SelectTrigger className="auth-input"><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="A">A - High Priority</SelectItem>
                         <SelectItem value="B">B - Medium</SelectItem>
@@ -3328,13 +3733,13 @@ export default function SalesPipelinePage() {
                 </div>
                 <div className="grid gap-2">
                   <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Temperature: {form.temperature_score || 50}</Label>
-                  <input type="range" min="0" max="100" value={form.temperature_score || 50} onChange={e => setForm(f => ({ ...f, temperature_score: parseInt(e.target.value) }))} className="w-full accent-[#3e8692]" />
+                  <input type="range" min="0" max="100" value={form.temperature_score || 50} onChange={e => setForm(f => ({ ...f, temperature_score: parseInt(e.target.value) }))} className="w-full accent-brand" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">POC Platform</Label>
                     <Select value={form.poc_platform || ''} onValueChange={v => setForm(f => ({ ...f, poc_platform: v as PocPlatform }))}>
-                      <SelectTrigger className="auth-input"><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
                       <SelectContent>
                         {POC_PLATFORMS.map(p => (
                           <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
@@ -3344,14 +3749,14 @@ export default function SalesPipelinePage() {
                   </div>
                   <div className="grid gap-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">POC Handle / ID</Label>
-                    <Input value={form.poc_handle || ''} onChange={e => setForm(f => ({ ...f, poc_handle: e.target.value }))} placeholder="@handle or ID" className="auth-input" />
+                    <Input value={form.poc_handle || ''} onChange={e => setForm(f => ({ ...f, poc_handle: e.target.value }))} placeholder="@handle or ID" className="focus-brand" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Source</Label>
                     <Select value={form.source || ''} onValueChange={v => setForm(f => ({ ...f, source: v }))}>
-                      <SelectTrigger className="auth-input"><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="referral">Referral</SelectItem>
                         <SelectItem value="inbound">Inbound</SelectItem>
@@ -3362,14 +3767,14 @@ export default function SalesPipelinePage() {
                   </div>
                   <div className="grid gap-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">TG Handle</Label>
-                    <Input value={form.tg_handle || ''} onChange={e => setForm(f => ({ ...f, tg_handle: e.target.value }))} placeholder="@handle" className="auth-input" />
+                    <Input value={form.tg_handle || ''} onChange={e => setForm(f => ({ ...f, tg_handle: e.target.value }))} placeholder="@handle" className="focus-brand" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Owner</Label>
                     <Select value={form.owner_id || ''} onValueChange={v => setForm(f => ({ ...f, owner_id: v }))}>
-                      <SelectTrigger className="auth-input"><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
                       <SelectContent>
                         {users.map(u => (
                           <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
@@ -3379,7 +3784,7 @@ export default function SalesPipelinePage() {
                   </div>
                   <div className="grid gap-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Referrer</Label>
-                    <Input value={form.referrer || ''} onChange={e => setForm(f => ({ ...f, referrer: e.target.value }))} placeholder="Who referred?" className="auth-input" />
+                    <Input value={form.referrer || ''} onChange={e => setForm(f => ({ ...f, referrer: e.target.value }))} placeholder="Who referred?" className="focus-brand" />
                   </div>
                 </div>
                 <div className="grid gap-2">
@@ -3388,7 +3793,7 @@ export default function SalesPipelinePage() {
                     {(form.co_owner_ids || []).map(id => {
                       const u = users.find(u => u.id === id);
                       return (
-                        <span key={id} className="inline-flex items-center gap-1 bg-[#3e8692]/10 text-[#3e8692] text-xs px-2 py-0.5 rounded-full">
+                        <span key={id} className="inline-flex items-center gap-1 bg-brand/10 text-brand text-xs px-2 py-0.5 rounded-full">
                           {u?.name || u?.email || id}
                           <button type="button" onClick={() => setForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-red-500 ml-0.5">&times;</button>
                         </span>
@@ -3407,7 +3812,7 @@ export default function SalesPipelinePage() {
                 <div className="grid gap-2">
                   <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Affiliate</Label>
                   <Select value={form.affiliate_id || ''} onValueChange={v => setForm(f => ({ ...f, affiliate_id: v }))}>
-                    <SelectTrigger className="auth-input"><SelectValue placeholder="Select affiliate..." /></SelectTrigger>
+                    <SelectTrigger className="focus-brand"><SelectValue placeholder="Select affiliate..." /></SelectTrigger>
                     <SelectContent>
                       {affiliates.map(a => (
                         <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
@@ -3418,12 +3823,12 @@ export default function SalesPipelinePage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Deal Value</Label>
-                    <Input type="number" value={form.deal_value || ''} onChange={e => setForm(f => ({ ...f, deal_value: e.target.value ? parseFloat(e.target.value) : undefined }))} placeholder="0" className="auth-input" />
+                    <Input type="number" value={form.deal_value || ''} onChange={e => setForm(f => ({ ...f, deal_value: e.target.value ? parseFloat(e.target.value) : undefined }))} placeholder="0" className="focus-brand" />
                   </div>
                   <div className="grid gap-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Currency</Label>
                     <Select value={form.currency || 'USD'} onValueChange={v => setForm(f => ({ ...f, currency: v }))}>
-                      <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="USD">USD</SelectItem>
                         <SelectItem value="USDT">USDT</SelectItem>
@@ -3441,7 +3846,7 @@ export default function SalesPipelinePage() {
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
-                          className="auth-input justify-start text-left font-normal w-full"
+                          className="focus-brand justify-start text-left font-normal w-full"
                           style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.next_meeting_at ? '#111827' : '#9ca3af' }}
                         >
                           <Calendar className="mr-2 h-4 w-4" />
@@ -3474,7 +3879,7 @@ export default function SalesPipelinePage() {
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
-                          className="auth-input justify-start text-left font-normal w-full"
+                          className="focus-brand justify-start text-left font-normal w-full"
                           style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.next_meeting_at ? '#111827' : '#9ca3af' }}
                         >
                           <Clock className="mr-2 h-4 w-4" />
@@ -3538,7 +3943,7 @@ export default function SalesPipelinePage() {
                 <div className="grid gap-2">
                   <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Meeting Type</Label>
                     <Select value={(form as any).next_meeting_type || ''} onValueChange={v => setForm(f => ({ ...f, next_meeting_type: v }))}>
-                      <SelectTrigger className="auth-input"><SelectValue placeholder="Select..." /></SelectTrigger>
+                      <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="discovery">Discovery Call</SelectItem>
                         <SelectItem value="proposal">Proposal Call</SelectItem>
@@ -3550,12 +3955,12 @@ export default function SalesPipelinePage() {
                 {editingOpp?.stage === 'orbit' && (
                   <div className="grid gap-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Orbit Follow-up Days</Label>
-                    <Input type="number" min={1} value={form.orbit_followup_days || 90} onChange={e => setForm(f => ({ ...f, orbit_followup_days: Math.max(1, parseInt(e.target.value) || 90) }))} className="auth-input" />
+                    <Input type="number" min={1} value={form.orbit_followup_days || 90} onChange={e => setForm(f => ({ ...f, orbit_followup_days: Math.max(1, parseInt(e.target.value) || 90) }))} className="focus-brand" />
                   </div>
                 )}
                 <div className="grid gap-2">
                   <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Notes</Label>
-                  <Textarea value={form.notes || ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Additional notes..." className="auth-input" rows={3} />
+                  <Textarea value={form.notes || ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Additional notes..." className="focus-brand" rows={3} />
                 </div>
               </div>
               <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
@@ -3733,7 +4138,7 @@ export default function SalesPipelinePage() {
                   value={bookingUserId[`slide-${opp.id}`] || opp.owner_id || ''}
                   onValueChange={v => setBookingUserId(prev => ({ ...prev, [`slide-${opp.id}`]: v }))}
                 >
-                  <SelectTrigger className="h-8 text-xs w-[120px] border-[#3e8692]/30">
+                  <SelectTrigger className="h-8 text-xs w-[120px] border-brand/30">
                     <SelectValue placeholder="Team member" />
                   </SelectTrigger>
                   <SelectContent>
@@ -3743,7 +4148,7 @@ export default function SalesPipelinePage() {
                   </SelectContent>
                 </Select>
                 <Button
-                  variant="outline" size="sm" className="text-xs text-[#3e8692] border-[#3e8692]/30 hover:bg-[#3e8692]/5"
+                  variant="outline" size="sm" className="text-xs text-brand border-brand/30 hover:bg-brand/5"
                   onClick={() => copyBookingLink(bookingUserId[`slide-${opp.id}`] || opp.owner_id || '', opp.id)}
                 >
                   <Calendar className="h-3.5 w-3.5 mr-1" /> Copy Booking Link
@@ -3770,7 +4175,7 @@ export default function SalesPipelinePage() {
                 value={opp.stage}
                 onValueChange={(v) => handleStageChange(opp.id, v as SalesPipelineStage, opp.stage)}
               >
-                <SelectTrigger className="auth-input">
+                <SelectTrigger className="focus-brand">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -3807,19 +4212,50 @@ export default function SalesPipelinePage() {
                     </button>
                   ))}
                 </div>
+
+                {/* Direction toggle — only meaningful for messages.
+                    Defaults to outbound. Setting to inbound stamps
+                    last_reply_at on the opportunity (so the funnel
+                    can count replies). Hidden for note/meeting/proposal
+                    since those are always team-side actions. */}
+                {activityForm.type === 'message' && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-gray-500">Direction:</span>
+                    {([
+                      { v: 'outbound' as const, label: 'Outbound (we sent)', cls: 'bg-sky-100 text-sky-700 border-sky-200' },
+                      { v: 'inbound' as const,  label: 'Inbound (reply)',    cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+                    ]).map(opt => {
+                      const current = activityForm.direction ?? 'outbound';
+                      const active = current === opt.v;
+                      return (
+                        <button
+                          key={opt.v}
+                          type="button"
+                          onClick={() => setActivityForm(f => ({ ...f, direction: opt.v }))}
+                          className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-medium transition-colors ${
+                            active ? opt.cls : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <Input
                     placeholder="Title..."
                     value={activityForm.title}
                     onChange={e => setActivityForm(f => ({ ...f, title: e.target.value }))}
-                    className="h-9 text-sm flex-1 auth-input"
+                    className="h-9 text-sm flex-1 focus-brand"
                   />
                 </div>
                 <Textarea
                   placeholder="Description (optional)"
                   value={activityForm.description || ''}
                   onChange={e => setActivityForm(f => ({ ...f, description: e.target.value }))}
-                  className="text-sm min-h-[60px] auth-input"
+                  className="text-sm min-h-[60px] focus-brand"
                   rows={2}
                 />
                 <div className="flex gap-2">
@@ -3827,13 +4263,13 @@ export default function SalesPipelinePage() {
                     placeholder="Outcome"
                     value={activityForm.outcome || ''}
                     onChange={e => setActivityForm(f => ({ ...f, outcome: e.target.value }))}
-                    className="h-9 text-sm flex-1 auth-input"
+                    className="h-9 text-sm flex-1 focus-brand"
                   />
                   <Input
                     placeholder="Next step"
                     value={activityForm.next_step || ''}
                     onChange={e => setActivityForm(f => ({ ...f, next_step: e.target.value }))}
-                    className="h-9 text-sm flex-1 auth-input"
+                    className="h-9 text-sm flex-1 focus-brand"
                   />
                 </div>
                 {/* Meeting Date/Time (only for meeting type) */}
@@ -3843,7 +4279,7 @@ export default function SalesPipelinePage() {
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
-                          className="h-9 text-sm flex-1 auth-input justify-start font-normal"
+                          className="h-9 text-sm flex-1 focus-brand justify-start font-normal"
                           style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: activityMeetingDate ? '#111827' : '#9ca3af' }}
                         >
                           <Calendar className="mr-2 h-4 w-4" />
@@ -3865,7 +4301,7 @@ export default function SalesPipelinePage() {
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
-                          className="h-9 text-sm flex-1 auth-input justify-start font-normal"
+                          className="h-9 text-sm flex-1 focus-brand justify-start font-normal"
                           style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: activityMeetingTime ? '#111827' : '#9ca3af' }}
                         >
                           <Clock className="mr-2 h-4 w-4" />
@@ -3929,7 +4365,7 @@ export default function SalesPipelinePage() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="h-9 text-sm flex-1 auth-input justify-start font-normal"
+                        className="h-9 text-sm flex-1 focus-brand justify-start font-normal"
                         style={{
                           borderColor: '#e5e7eb',
                           backgroundColor: 'white',
@@ -4035,7 +4471,7 @@ export default function SalesPipelinePage() {
                           href={act.attachment_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 mt-1.5 text-xs text-[#3e8692] hover:underline"
+                          className="inline-flex items-center gap-1 mt-1.5 text-xs text-brand hover:underline"
                           onClick={e => e.stopPropagation()}
                         >
                           <Paperclip className="h-3 w-3" />
@@ -4088,7 +4524,7 @@ export default function SalesPipelinePage() {
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   placeholder="Company or contact name"
-                  className="auth-input"
+                  className="focus-brand"
                 />
               </div>
 
@@ -4096,7 +4532,7 @@ export default function SalesPipelinePage() {
                 <div className="grid gap-2">
                   <Label>Stage</Label>
                   <Select value={form.stage || 'cold_dm'} onValueChange={v => setForm(f => ({ ...f, stage: v as SalesPipelineStage }))}>
-                    <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {ALL_V2_STAGES.filter(s => s !== 'proposal_sent').map(s => (
                         <SelectItem key={s} value={s}>{STAGE_LABELS[s]}</SelectItem>
@@ -4110,7 +4546,7 @@ export default function SalesPipelinePage() {
                 <div className="grid gap-2">
                   <Label>POC Platform</Label>
                   <Select value={form.poc_platform || ''} onValueChange={v => setForm(f => ({ ...f, poc_platform: v as PocPlatform }))}>
-                    <SelectTrigger className="auth-input"><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
                     <SelectContent>
                       {POC_PLATFORMS.map(p => (
                         <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
@@ -4124,7 +4560,7 @@ export default function SalesPipelinePage() {
                     value={form.poc_handle || ''}
                     onChange={e => setForm(f => ({ ...f, poc_handle: e.target.value }))}
                     placeholder="@handle or ID"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
               </div>
@@ -4134,7 +4570,7 @@ export default function SalesPipelinePage() {
                   value={form.owner_id || ''}
                   onValueChange={v => setForm(f => ({ ...f, owner_id: v }))}
                 >
-                  <SelectTrigger className="auth-input"><SelectValue placeholder="Select..." /></SelectTrigger>
+                  <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
                   <SelectContent>
                     {users.map(u => (
                       <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
@@ -4149,7 +4585,7 @@ export default function SalesPipelinePage() {
                   {(form.co_owner_ids || []).map(id => {
                     const u = users.find(u => u.id === id);
                     return (
-                      <span key={id} className="inline-flex items-center gap-1 bg-[#3e8692]/10 text-[#3e8692] text-xs px-2 py-0.5 rounded-full">
+                      <span key={id} className="inline-flex items-center gap-1 bg-brand/10 text-brand text-xs px-2 py-0.5 rounded-full">
                         {u?.name || u?.email || id}
                         <button type="button" onClick={() => setForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-red-500 ml-0.5">&times;</button>
                       </span>
@@ -4203,7 +4639,7 @@ export default function SalesPipelinePage() {
                     value={form.referrer || ''}
                     onChange={e => setForm(f => ({ ...f, referrer: e.target.value }))}
                     placeholder="Who referred?"
-                    className="auth-input"
+                    className="focus-brand"
                   />
                 </div>
               )}
@@ -4217,7 +4653,7 @@ export default function SalesPipelinePage() {
                         type="button"
                         variant="outline"
                         role="combobox"
-                        className="w-full justify-between font-normal auth-input"
+                        className="w-full justify-between font-normal focus-brand"
                       >
                         {form.affiliate_id
                           ? affiliates.find(a => a.id === form.affiliate_id)?.name || 'Select affiliate...'
@@ -4253,7 +4689,7 @@ export default function SalesPipelinePage() {
                                 }
                               }}
                             >
-                              <Plus className="h-4 w-4 text-[#3e8692]" />
+                              <Plus className="h-4 w-4 text-brand" />
                               <span>Add "<strong>{affiliateSearch}</strong>" as new affiliate</span>
                             </button>
                           </CommandEmpty>
@@ -4286,7 +4722,7 @@ export default function SalesPipelinePage() {
                   value={form.notes || ''}
                   onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                   placeholder="Additional notes..."
-                  className="auth-input"
+                  className="focus-brand"
                   rows={3}
                 />
               </div>
@@ -4305,7 +4741,7 @@ export default function SalesPipelinePage() {
                         value={form.dm_account || 'sdr'}
                         onValueChange={v => setForm(f => ({ ...f, dm_account: v as DmAccount }))}
                       >
-                        <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="closer">Closer (Path A)</SelectItem>
                           <SelectItem value="sdr">SDR (Path B)</SelectItem>
@@ -4319,7 +4755,7 @@ export default function SalesPipelinePage() {
                         value={form.bucket || ''}
                         onValueChange={v => setForm(f => ({ ...f, bucket: v as Bucket }))}
                       >
-                        <SelectTrigger className="auth-input"><SelectValue placeholder="Select..." /></SelectTrigger>
+                        <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="A">A - High Priority</SelectItem>
                           <SelectItem value="B">B - Medium</SelectItem>
@@ -4335,7 +4771,7 @@ export default function SalesPipelinePage() {
                       value={form.tg_handle || ''}
                       onChange={e => setForm(f => ({ ...f, tg_handle: e.target.value }))}
                       placeholder="@handle"
-                      className="auth-input"
+                      className="focus-brand"
                     />
                   </div>
 
@@ -4347,7 +4783,7 @@ export default function SalesPipelinePage() {
                         value={form.deal_value || ''}
                         onChange={e => setForm(f => ({ ...f, deal_value: e.target.value ? parseFloat(e.target.value) : undefined }))}
                         placeholder="0"
-                        className="auth-input"
+                        className="focus-brand"
                       />
                     </div>
                     <div className="grid gap-2">
@@ -4356,7 +4792,7 @@ export default function SalesPipelinePage() {
                         value={form.currency || 'USD'}
                         onValueChange={v => setForm(f => ({ ...f, currency: v }))}
                       >
-                        <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="USD">USD</SelectItem>
                           <SelectItem value="USDT">USDT</SelectItem>
@@ -4377,7 +4813,7 @@ export default function SalesPipelinePage() {
                         max="100"
                         value={form.temperature_score || 50}
                         onChange={e => setForm(f => ({ ...f, temperature_score: parseInt(e.target.value) }))}
-                        className="w-full accent-[#3e8692]"
+                        className="w-full accent-brand"
                       />
                     </div>
                   )}
@@ -4505,7 +4941,7 @@ export default function SalesPipelinePage() {
                   <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">DM Template <span className="font-normal normal-case text-gray-400">(optional)</span></Label>
                   <Popover open={templatePopoverOpen} onOpenChange={setTemplatePopoverOpen}>
                     <PopoverTrigger asChild>
-                      <Button variant="outline" role="combobox" className="auth-input justify-between font-normal text-sm h-10">
+                      <Button variant="outline" role="combobox" className="focus-brand justify-between font-normal text-sm h-10">
                         Pick a template...
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -4563,21 +4999,21 @@ export default function SalesPipelinePage() {
               <Input
                 value={activityLogForm.title}
                 onChange={e => setActivityLogForm(f => ({ ...f, title: e.target.value }))}
-                className="auth-input"
+                className="focus-brand"
                 placeholder="Activity title..."
               />
             </div>
 
             {/* Copy Booking Link — send to prospect so they self-book */}
             {activityLogPrompt?.showMeetingPicker && (
-              <div className="p-3 bg-[#3e8692]/5 border border-[#3e8692]/20 rounded-lg">
+              <div className="p-3 bg-brand/5 border border-brand/20 rounded-lg">
                 <p className="text-xs text-gray-600 mb-2">Send a booking link so they can pick a time themselves:</p>
                 <div className="flex items-center gap-2">
                   <Select
                     value={bookingUserId[`activity-${activityLogPrompt.oppId}`] || activityLogPrompt.ownerId || ''}
                     onValueChange={v => setBookingUserId(prev => ({ ...prev, [`activity-${activityLogPrompt.oppId}`]: v }))}
                   >
-                    <SelectTrigger className="h-8 text-sm flex-1 border-[#3e8692]/30">
+                    <SelectTrigger className="h-8 text-sm flex-1 border-brand/30">
                       <SelectValue placeholder="Team member" />
                     </SelectTrigger>
                     <SelectContent>
@@ -4590,7 +5026,7 @@ export default function SalesPipelinePage() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="text-sm whitespace-nowrap border-[#3e8692]/30 text-[#3e8692] hover:bg-[#3e8692]/10"
+                    className="text-sm whitespace-nowrap border-brand/30 text-brand hover:bg-brand/10"
                     onClick={() => copyBookingLink(bookingUserId[`activity-${activityLogPrompt.oppId}`] || activityLogPrompt.ownerId || '', activityLogPrompt.oppId)}
                   >
                     <Copy className="h-4 w-4 mr-2" />
@@ -4609,7 +5045,7 @@ export default function SalesPipelinePage() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="auth-input justify-start text-left font-normal w-full"
+                        className="focus-brand justify-start text-left font-normal w-full"
                         style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: activityLogForm.meeting_date ? '#111827' : '#9ca3af' }}
                       >
                         <Calendar className="mr-2 h-4 w-4" />
@@ -4636,7 +5072,7 @@ export default function SalesPipelinePage() {
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="auth-input justify-start text-left font-normal w-full"
+                        className="focus-brand justify-start text-left font-normal w-full"
                         style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: activityLogForm.meeting_time ? '#111827' : '#9ca3af' }}
                       >
                         <Clock className="mr-2 h-4 w-4" />
@@ -4705,7 +5141,7 @@ export default function SalesPipelinePage() {
                   {(activityLogForm.co_owner_ids || []).map(id => {
                     const u = users.find(u => u.id === id);
                     return (
-                      <span key={id} className="inline-flex items-center gap-1 bg-[#3e8692]/10 text-[#3e8692] text-xs px-2 py-0.5 rounded-full">
+                      <span key={id} className="inline-flex items-center gap-1 bg-brand/10 text-brand text-xs px-2 py-0.5 rounded-full">
                         {u?.name || u?.email || id}
                         <button type="button" onClick={() => setActivityLogForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-red-500 ml-0.5">&times;</button>
                       </span>
@@ -4736,7 +5172,7 @@ export default function SalesPipelinePage() {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-xs text-gray-500 hover:text-[#3e8692]"
+                    className="h-6 px-2 text-xs text-gray-500 hover:text-brand"
                     onClick={() => {
                       navigator.clipboard.writeText(activityLogForm.description);
                       toast({ title: 'Copied to clipboard' });
@@ -4750,7 +5186,7 @@ export default function SalesPipelinePage() {
               <Textarea
                 value={activityLogForm.description}
                 onChange={e => setActivityLogForm(f => ({ ...f, description: e.target.value }))}
-                className="auth-input min-h-[60px]"
+                className="focus-brand min-h-[60px]"
                 placeholder={activityLogPrompt?.type === 'message' ? 'DM content...' : 'Add context...'}
                 rows={activityLogPrompt?.type === 'message' ? 4 : 2}
               />
@@ -4763,7 +5199,7 @@ export default function SalesPipelinePage() {
                 <Input
                   value={activityLogForm.outcome}
                   onChange={e => setActivityLogForm(f => ({ ...f, outcome: e.target.value }))}
-                  className="auth-input"
+                  className="focus-brand"
                   placeholder="Result..."
                 />
               </div>
@@ -4772,7 +5208,7 @@ export default function SalesPipelinePage() {
                 <Input
                   value={activityLogForm.next_step}
                   onChange={e => setActivityLogForm(f => ({ ...f, next_step: e.target.value }))}
-                  className="auth-input"
+                  className="focus-brand"
                   placeholder="What's next..."
                 />
               </div>
@@ -4785,7 +5221,7 @@ export default function SalesPipelinePage() {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="auth-input justify-start text-left font-normal w-full"
+                    className="focus-brand justify-start text-left font-normal w-full"
                     style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: activityLogForm.next_step_date ? '#111827' : '#9ca3af' }}
                   >
                     <Calendar className="mr-2 h-4 w-4" />
@@ -4896,7 +5332,7 @@ export default function SalesPipelinePage() {
             <DialogDescription>Link {closedWonPrompt?.oppName} to a client, or skip.</DialogDescription>
           </DialogHeader>
           <Select value={closedWonMode} onValueChange={v => setClosedWonMode(v as 'new' | 'existing')}>
-            <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="new">Create New Client</SelectItem>
               <SelectItem value="existing">Link Existing Client</SelectItem>
@@ -4911,7 +5347,7 @@ export default function SalesPipelinePage() {
                   onChange={e => setClosedWonName(e.target.value)}
                   placeholder="Company or contact name"
                   autoFocus
-                  className="auth-input"
+                  className="focus-brand"
                 />
               </div>
               <div>
@@ -4921,14 +5357,14 @@ export default function SalesPipelinePage() {
                   onChange={e => setClosedWonEmail(e.target.value)}
                   placeholder="client@example.com (optional)"
                   type="email"
-                  className="auth-input"
+                  className="focus-brand"
                 />
               </div>
             </div>
           ) : (
             <Popover open={closedWonClientPopoverOpen} onOpenChange={setClosedWonClientPopoverOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between auth-input">
+                <Button variant="outline" role="combobox" className="w-full justify-between focus-brand">
                   {selectedClient ? selectedClient.name : 'Select a client...'}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -4986,7 +5422,7 @@ export default function SalesPipelinePage() {
           onChange={e => setTgHandleValue(e.target.value)}
           placeholder="@handle"
           autoFocus
-          className="auth-input"
+          className="focus-brand"
         />
         <DialogFooter>
           <Button variant="outline" onClick={() => setTgHandlePrompt(null)}>Cancel</Button>
@@ -5038,11 +5474,12 @@ export default function SalesPipelinePage() {
   if (loading) {
     return (
       <div className="flex flex-col h-full gap-6">
-        {/* Header */}
+        {/* Header — real title/subtitle render immediately so the user
+            sees page context; only the data sections below skeleton. */}
         <div className="flex items-center justify-between">
           <div>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-4 w-48" />
+            <h2 className="text-2xl font-bold text-gray-900">Sales Pipeline</h2>
+            <p className="text-gray-600">Playbook-driven sales pipeline</p>
           </div>
           <div className="flex items-center gap-4">
             <Skeleton className="h-10 w-64 rounded-md" />
@@ -5106,6 +5543,98 @@ export default function SalesPipelinePage() {
             New Opportunity
           </Button>
         </div>
+      </div>
+
+      {/* Weekly Activity Funnel — canonical 5-stage outbound funnel.
+          Outreach → Replies → Calls Booked → Calls Taken → Proposals.
+          Counts DISTINCT opportunities per stage (one prospect DM'd 5x
+          = 1 outreach). Backed by:
+            - migration 044 (direction column on crm_activities)
+            - auto-stamped milestones (proposal_sent_at) from createActivity
+            - meeting next_step_date split for booked vs taken
+          Each step shows the conversion % vs Outreach so the funnel
+          shape is visually obvious. */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-brand" />
+            <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider">
+              Weekly Activity Funnel
+            </h3>
+            <Badge variant="secondary" className="text-[10px]">
+              last {salesFunnelWindow}d
+            </Badge>
+          </div>
+          <Select
+            value={String(salesFunnelWindow)}
+            onValueChange={(v) => setSalesFunnelWindow(Number(v) as 7 | 14 | 30)}
+          >
+            <SelectTrigger className="h-8 w-28 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="14">Last 14 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {!salesFunnel ? (
+          <div className="grid grid-cols-5 gap-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-20 rounded-lg" />
+            ))}
+          </div>
+        ) : (
+          (() => {
+            // Use Outreach as the funnel-top denominator. ÷0 guard via ||1.
+            const top = salesFunnel.outreach || 1;
+            type Step = {
+              label: string;
+              count: number;
+              colorClass: string;
+              hint: string;
+            };
+            const steps: Step[] = [
+              { label: 'Outreach',     count: salesFunnel.outreach,       colorClass: 'bg-sky-50 text-sky-700 border-sky-200',           hint: 'Distinct opps we sent an outbound message or bump to' },
+              { label: 'Replies',      count: salesFunnel.replies,        colorClass: 'bg-purple-50 text-purple-700 border-purple-200',  hint: 'Distinct opps that wrote back (inbound message)' },
+              { label: 'Calls Booked', count: salesFunnel.calls_booked,   colorClass: 'bg-amber-50 text-amber-700 border-amber-200',     hint: 'Meetings logged with a future date' },
+              { label: 'Calls Taken',  count: salesFunnel.calls_taken,    colorClass: 'bg-orange-50 text-orange-700 border-orange-200',  hint: 'Meetings logged without a future date (= happened)' },
+              { label: 'Proposals',    count: salesFunnel.proposals_sent, colorClass: 'bg-emerald-50 text-emerald-700 border-emerald-200', hint: 'Opportunities with proposal_sent_at in window' },
+            ];
+            return (
+              <div className="flex items-stretch gap-2">
+                {steps.map((step, i) => {
+                  const pct = i === 0 ? 100 : Math.round((step.count / top) * 100);
+                  return (
+                    <div key={step.label} className="flex items-center gap-2 flex-1 min-w-0">
+                      <div
+                        className={`flex-1 rounded-lg border px-3 py-2.5 text-center min-w-0 ${step.colorClass}`}
+                        title={step.hint}
+                      >
+                        <div className="text-[10px] uppercase tracking-wider opacity-80 truncate">
+                          {step.label}
+                        </div>
+                        <div className="text-2xl font-bold tabular-nums mt-0.5 leading-none">
+                          {step.count}
+                        </div>
+                        {i === 0 ? (
+                          <div className="text-[10px] opacity-70 mt-1">distinct opps</div>
+                        ) : salesFunnel.outreach > 0 ? (
+                          <div className="text-[10px] opacity-70 mt-1">{pct}% of outreach</div>
+                        ) : null}
+                      </div>
+                      {i < steps.length - 1 && (
+                        <ArrowRight className="h-4 w-4 text-gray-300 shrink-0" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()
+        )}
       </div>
 
       {/* Attention Cards — urgency items for managers (clickable, always unfiltered) */}
@@ -5215,7 +5744,7 @@ export default function SalesPipelinePage() {
           onClick={() => setShowDashboard(!showDashboard)}
         >
           <div className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-[#3e8692]" />
+            <BarChart3 className="h-4 w-4 text-brand" />
             <span className="text-sm font-semibold text-gray-900">Sales Dashboard</span>
             <TooltipProvider delayDuration={200}>
               <Tooltip>
@@ -5223,7 +5752,7 @@ export default function SalesPipelinePage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-[11px] text-gray-500 hover:text-[#3e8692] gap-1"
+                    className="h-6 px-2 text-[11px] text-gray-500 hover:text-brand gap-1"
                     disabled={isRecalculating}
                     onClick={(e) => { e.stopPropagation(); handleRecalculateAll(); }}
                   >
@@ -5264,7 +5793,7 @@ export default function SalesPipelinePage() {
               onClick={() => setDashboardPeriod(opt.key)}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                 dashboardPeriod === opt.key
-                  ? 'bg-[#3e8692] text-white'
+                  ? 'bg-brand text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
@@ -5589,7 +6118,7 @@ export default function SalesPipelinePage() {
             {/* Path filter */}
             {activeTab === 'pipeline' && (
               <Select value={pathFilter} onValueChange={v => setPathFilter(v as 'all' | 'closer' | 'sdr')}>
-                <SelectTrigger className="h-9 w-40 text-sm auth-input">
+                <SelectTrigger className="h-9 w-40 text-sm focus-brand">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -5641,7 +6170,7 @@ export default function SalesPipelinePage() {
                 if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
                 searchDebounceRef.current = setTimeout(() => setPipelineSearch(v), 300);
               }}
-              className="pl-9 h-9 text-sm auth-input max-w-xs"
+              className="pl-9 h-9 text-sm focus-brand max-w-xs"
             />
           </div>
           {viewMode === 'kanban' ? renderKanban() : renderTable()}
@@ -5658,7 +6187,7 @@ export default function SalesPipelinePage() {
                 if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
                 searchDebounceRef.current = setTimeout(() => setOrbitSearch(v), 300);
               }}
-              className="pl-9 h-9 text-sm auth-input max-w-xs"
+              className="pl-9 h-9 text-sm focus-brand max-w-xs"
             />
           </div>
           {renderOrbitTab()}
@@ -5666,6 +6195,35 @@ export default function SalesPipelinePage() {
 
         <TabsContent value="overview" className="mt-0">
           <div className="space-y-4 pb-8">
+            {/* Unified search — broadcasts into Outreach/Pipeline/Orbit so
+                one query scopes all three sections at once. Per-tab searches
+                still work independently when the user is on a specific tab. */}
+            <div className="flex items-center gap-2 sticky top-0 z-20 bg-white py-2 -mt-2 -mx-1 px-1">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                <Input
+                  value={overallSearch}
+                  onChange={(e) => setOverallSearch(e.target.value)}
+                  placeholder="Search across Outreach, Pipeline, and Orbit..."
+                  className="pl-9 focus-brand"
+                />
+                {overallSearch && (
+                  <button
+                    onClick={() => setOverallSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 inline-flex items-center justify-center rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                    title="Clear search"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {overallSearch && (
+                <span className="text-xs text-gray-500">
+                  Filtering all sections by &ldquo;{overallSearch}&rdquo;
+                </span>
+              )}
+            </div>
+
             {/* Outreach Section */}
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               <button
@@ -5782,21 +6340,11 @@ export default function SalesPipelinePage() {
                                 <div className="flex items-center gap-2">
                                   <Building2 className="h-4 w-4 text-gray-400" />
                                   <span className="font-medium">{opp.name}</span>
+                                  {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
                                 </div>
                               </TableCell>
                               <TableCell>
-                                {opp.poc_handle ? (
-                                  <div className="flex items-center gap-1.5">
-                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize flex-shrink-0">
-                                      {opp.poc_platform || 'other'}
-                                    </Badge>
-                                    <span className="text-xs text-gray-600 truncate max-w-[120px]">
-                                      {cleanPocHandle(opp.poc_handle)}
-                                    </span>
-                                  </div>
-                                ) : (
-                                  <span className="text-xs text-gray-300">—</span>
-                                )}
+                                {renderPocCell(opp, 'max-w-[120px]')}
                               </TableCell>
                               <TableCell>
                                 <span className="text-xs text-gray-600">
@@ -5829,7 +6377,11 @@ export default function SalesPipelinePage() {
         </TabsContent>
 
         <TabsContent value="discovery" className="mt-0">
-          <DiscoveryTab onPromoted={() => fetchData()} />
+          {/* onPromoted: a Discovery prospect was just turned into a CRM
+              opportunity server-side. We need fresh opps + metrics; the
+              other 4 resources (affiliates/users/templates/outreachCount)
+              don't change so we skip them. */}
+          <DiscoveryTab onPromoted={() => { void fetchOpportunities(); void fetchMetrics(); }} />
         </TabsContent>
 
         <TabsContent value="templates" className="mt-0">
@@ -5846,7 +6398,7 @@ export default function SalesPipelinePage() {
               { value: 'bump', label: 'Bumps' },
             ];
 
-            const allTags = [...new Set(templates.flatMap(t => t.tags || []))];
+            const allTags = Array.from(new Set(templates.flatMap(t => t.tags || [])));
 
             const filteredTemplates = templates.filter(t => {
               if (templateStageFilter !== 'all' && t.stage !== templateStageFilter) return false;
@@ -5948,7 +6500,7 @@ export default function SalesPipelinePage() {
                         onClick={() => setTemplateStageFilter(s.value)}
                         className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                           templateStageFilter === s.value
-                            ? 'bg-[#3e8692] text-white'
+                            ? 'bg-brand text-white'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
@@ -5970,7 +6522,7 @@ export default function SalesPipelinePage() {
                       onClick={() => setTemplateTagFilter('all')}
                       className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                         templateTagFilter === 'all'
-                          ? 'bg-[#3e8692] text-white'
+                          ? 'bg-brand text-white'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
@@ -5982,7 +6534,7 @@ export default function SalesPipelinePage() {
                         onClick={() => setTemplateTagFilter(tag)}
                         className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                           templateTagFilter === tag
-                            ? 'bg-[#3e8692] text-white'
+                            ? 'bg-brand text-white'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
@@ -6101,7 +6653,7 @@ export default function SalesPipelinePage() {
                           value={templateForm.name}
                           onChange={e => setTemplateForm(prev => ({ ...prev, name: e.target.value }))}
                           placeholder="e.g., Cold DM — Initial Outreach"
-                          className="auth-input"
+                          className="focus-brand"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
@@ -6115,7 +6667,7 @@ export default function SalesPipelinePage() {
                               sub_type: v === 'bump' ? 'bump_1' : 'general',
                             }))}
                           >
-                            <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="cold_dm">Cold DM</SelectItem>
                               <SelectItem value="warm">Warm</SelectItem>
@@ -6134,7 +6686,7 @@ export default function SalesPipelinePage() {
                             value={templateForm.sub_type || 'general'}
                             onValueChange={v => setTemplateForm(prev => ({ ...prev, sub_type: v }))}
                           >
-                            <SelectTrigger className="auth-input"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               {getSubTypeOptions(templateForm.stage).map(opt => (
                                 <SelectItem key={opt} value={opt}>{getSubTypeLabel(opt)}</SelectItem>
@@ -6164,7 +6716,7 @@ export default function SalesPipelinePage() {
                           )}
                           <Input
                             placeholder="Type a tag and press Enter (e.g., Token Launch, DeFi)"
-                            className="auth-input"
+                            className="focus-brand"
                             onKeyDown={e => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
@@ -6185,7 +6737,7 @@ export default function SalesPipelinePage() {
                           onChange={e => setTemplateForm(prev => ({ ...prev, content: e.target.value }))}
                           placeholder="Write your template here... Use [KOL_NAME], [PROJECT_NAME], etc. as placeholders."
                           rows={6}
-                          className="auth-input"
+                          className="focus-brand"
                         />
                       </div>
                       <div>
@@ -6211,7 +6763,7 @@ export default function SalesPipelinePage() {
                           <Input
                             type="file"
                             accept="image/*"
-                            className="auth-input"
+                            className="focus-brand"
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (!file) return;
