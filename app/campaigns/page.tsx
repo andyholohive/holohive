@@ -1018,23 +1018,35 @@ export default function CampaignsPage() {
                 clicking through. delayDuration kept short so it feels
                 responsive but doesn't fire on accidental fly-by hovers. */}
             <TooltipProvider delayDuration={250}>
+              {/* activeBgClass / activeTextClass / countActiveClass split:
+                  we can't use Tailwind's data-[state=active]:... selector
+                  here because <TooltipTrigger asChild> overwrites Radix
+                  Tabs' data-state attribute with Tooltip's own. Derive
+                  active styling from the controlled statusFilter state
+                  instead — simpler and bypasses the data-state collision
+                  entirely. */}
               {([
-                { value: 'all',       label: 'All',       activeTextClass: 'data-[state=active]:text-gray-900', countClass: 'bg-gray-200 data-[state=active]:bg-gray-100' },
-                { value: 'Planning',  label: 'Planning',  activeTextClass: 'data-[state=active]:text-blue-700', countClass: 'bg-blue-100 text-blue-700' },
-                { value: 'Active',    label: 'Active',    activeTextClass: 'data-[state=active]:text-brand',     countClass: 'bg-brand-light text-brand' },
-                { value: 'Paused',    label: 'Paused',    activeTextClass: 'data-[state=active]:text-yellow-700',countClass: 'bg-yellow-100 text-yellow-700' },
-                { value: 'Completed', label: 'Completed', activeTextClass: 'data-[state=active]:text-gray-700', countClass: 'bg-gray-200 text-gray-700' },
+                { value: 'all',       label: 'All',       activeText: 'text-gray-900',   inactiveText: 'text-gray-600',   countBg: 'bg-gray-200 text-gray-700' },
+                { value: 'Planning',  label: 'Planning',  activeText: 'text-blue-700',   inactiveText: 'text-gray-600',   countBg: 'bg-blue-100 text-blue-700' },
+                { value: 'Active',    label: 'Active',    activeText: 'text-brand',      inactiveText: 'text-gray-600',   countBg: 'bg-brand-light text-brand' },
+                { value: 'Paused',    label: 'Paused',    activeText: 'text-yellow-700', inactiveText: 'text-gray-600',   countBg: 'bg-yellow-100 text-yellow-700' },
+                { value: 'Completed', label: 'Completed', activeText: 'text-gray-700',   inactiveText: 'text-gray-600',   countBg: 'bg-gray-200 text-gray-700' },
               ] as const).map((t) => {
                 const names = campaignsByStatus[t.value as keyof typeof campaignsByStatus];
+                const isActive = statusFilter === t.value;
                 return (
                   <Tooltip key={t.value}>
                     <TooltipTrigger asChild>
                       <TabsTrigger
                         value={t.value}
-                        className={`data-[state=active]:bg-white data-[state=active]:shadow-sm px-4 py-2 ${t.activeTextClass}`}
+                        className={`px-4 py-2 transition-colors ${
+                          isActive
+                            ? `bg-white shadow-sm ${t.activeText}`
+                            : `${t.inactiveText} hover:bg-gray-50`
+                        }`}
                       >
                         {t.label}
-                        <span className={`ml-2 text-xs px-2 py-0.5 rounded-full pointer-events-none ${t.countClass}`}>{names.length}</span>
+                        <span className={`ml-2 text-xs px-2 py-0.5 rounded-full pointer-events-none ${t.countBg}`}>{names.length}</span>
                       </TabsTrigger>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" align="start" className="max-w-xs p-0">
