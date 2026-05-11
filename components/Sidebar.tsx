@@ -522,17 +522,24 @@ export default function Sidebar({ children }: SidebarProps) {
                 <CollapsibleSection id="workspace" icon={Briefcase}>
                   <NavItem href="/daily-standup" icon={CheckCircle} label="Daily Stand-Up" />
                   <NavItem href="/tasks" icon={ListTodo} label="HQ" />
-                  {/* Task sub-nav — visible only when expanded AND on a /tasks route */}
-                  {!isSidebarCollapsed && pathname.startsWith('/tasks') && (
+                  {/* HQ sub-nav — visible only when expanded AND on an HQ
+                      child route. Templates (msg) + SOPs were promoted in
+                      from the Documents section so all task-adjacent
+                      surfaces live under one parent. The visibility
+                      condition includes /templates + /sops so the sub-nav
+                      stays open while navigating between them. */}
+                  {!isSidebarCollapsed && (pathname.startsWith('/tasks') || pathname === '/templates' || pathname === '/sops') && (
                     <div className="pl-6 space-y-0.5">
                       <SubNavItem href="/tasks" icon={ListTodo} label="All Tasks" exact />
                       <SubNavItem href="/tasks/my-dashboard" icon={LayoutDashboard} label="My Dashboard" exact />
                       <SubNavItem href="/tasks/deliverables" icon={Target} label="Deliverables" />
+                      {!guestHideAlways && <SubNavItem href="/templates" icon={MessageSquare} label="Templates" exact />}
                       {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
                         <>
+                          <SubNavItem href="/sops" icon={BookOpen} label="SOPs" exact />
                           <SubNavItem href="/tasks/admin" icon={ShieldCheck} label="Admin Overview" exact />
                           <SubNavItem href="/tasks/automations" icon={Zap} label="Automations" exact />
-                          <SubNavItem href="/tasks/templates" icon={FileText} label="Templates" exact />
+                          <SubNavItem href="/tasks/templates" icon={FileText} label="Task Templates" exact />
                           <SubNavItem href="/tasks/deliverables/templates" icon={Sliders} label="Deliverable Templates" exact />
                         </>
                       )}
@@ -549,8 +556,10 @@ export default function Sidebar({ children }: SidebarProps) {
                   {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/mindshare" icon={TrendingUp} label="Mindshare" />}
                   {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/forms" icon={ClipboardList} label="Forms" />}
                   {!guestHide('/links') && <NavItem href="/links" icon={Link2} label="Links" />}
-                  {!guestHideAlways && <NavItem href="/templates" icon={MessageSquare} label="Templates" />}
-                  {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/sops" icon={BookOpen} label="SOPs" />}
+                  {/* Templates + SOPs moved to HQ sub-nav. Their old
+                      registry entries in SidebarCustomize stay in the
+                      Workspace section so bookmarks/customization picks
+                      them up under the right header. */}
                 </CollapsibleSection>
               )}
 

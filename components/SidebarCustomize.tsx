@@ -98,8 +98,11 @@ export const NAV_REGISTRY: NavItemDef[] = [
   { href: '/mindshare', label: 'Mindshare', icon: TrendingUp, section: 'Documents', requiredRole: 'admin' },
   { href: '/forms', label: 'Forms', icon: ClipboardList, section: 'Documents', requiredRole: 'admin' },
   { href: '/links', label: 'Links', icon: Link2, section: 'Documents', pageKey: '/links' },
-  { href: '/templates', label: 'Templates', icon: MessageSquare, section: 'Documents', notForGuest: true },
-  { href: '/sops', label: 'SOPs', icon: BookOpen, section: 'Documents', requiredRole: 'admin' },
+  // Templates + SOPs moved into the HQ sub-nav (under Workspace) so
+  // all task-adjacent surfaces sit under one parent. Customize/bookmark
+  // groups them under "Workspace" to match.
+  { href: '/templates', label: 'Templates', icon: MessageSquare, section: 'Workspace', notForGuest: true },
+  { href: '/sops', label: 'SOPs', icon: BookOpen, section: 'Workspace', requiredRole: 'admin' },
 
   // Admin Tools — combines Field Options + Claude MCP + Archive into one
   // tabbed page at /admin. Original routes (/admin/field-options, /mcp,
