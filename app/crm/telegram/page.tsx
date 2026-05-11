@@ -61,6 +61,9 @@ interface TelegramChat {
   message_count: number;
   opportunity_id: string | null;
   master_kol_id: string | null;
+  /** Long-running client chats — surfaced in the "Clients" tab.
+   *  ON DELETE SET NULL via migration 058. */
+  client_id: string | null;
   /** Marks the chat as an internal team/working chat. Surfaced under
    *  the new "Internal" tab. (migration 057) */
   is_internal: boolean;
@@ -80,6 +83,10 @@ interface TelegramChat {
     id: string;
     name: string;
     platform: string[] | null;
+  } | null;
+  client?: {
+    id: string;
+    name: string;
   } | null;
 }
 
@@ -125,6 +132,7 @@ const SAMPLE_CHATS: TelegramChat[] = [
     message_count: 156,
     opportunity_id: null,
     master_kol_id: null,
+    client_id: null,
     is_internal: false,
     is_hidden: false,
     created_at: new Date().toISOString(),
@@ -142,6 +150,7 @@ const SAMPLE_CHATS: TelegramChat[] = [
     message_count: 89,
     opportunity_id: null,
     master_kol_id: null,
+    client_id: null,
     is_internal: false,
     is_hidden: false,
     created_at: new Date().toISOString(),
@@ -159,6 +168,7 @@ const SAMPLE_CHATS: TelegramChat[] = [
     message_count: 23,
     opportunity_id: null,
     master_kol_id: null,
+    client_id: null,
     is_internal: false,
     is_hidden: false,
     created_at: new Date().toISOString(),
@@ -188,6 +198,9 @@ export default function TelegramChatsPage() {
   const [messages, setMessages] = useState<Record<string, TelegramMessage[]>>({});
   const [opportunities, setOpportunities] = useState<CRMOpportunity[]>([]);
   const [masterKOLs, setMasterKOLs] = useState<MasterKOL[]>([]);
+  // Active clients for the Link-to-Client picker. Excludes archived
+  // clients (matches the rest of the app's client dropdowns).
+  const [clientsList, setClientsList] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -204,6 +217,11 @@ export default function TelegramChatsPage() {
   const [kolLinkDialogOpen, setKolLinkDialogOpen] = useState(false);
   const [selectedKolId, setSelectedKolId] = useState<string>('');
   const [kolPopoverOpen, setKolPopoverOpen] = useState(false);
+
+  // Client Link dialog state — mirrors the opportunity / KOL pattern
+  const [clientLinkDialogOpen, setClientLinkDialogOpen] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
+  const [clientPopoverOpen, setClientPopoverOpen] = useState(false);
 
   // Send message dialog state
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
@@ -228,7 +246,7 @@ export default function TelegramChatsPage() {
   }, []);
 
   const fetchData = async () => {
-    await Promise.all([fetchChats(), fetchMessages(), fetchOpportunities(), fetchMasterKOLs()]);
+    await Promise.all([fetchChats(), fetchMessages(), fetchOpportunities(), fetchMasterKOLs(), fetchClients()]);
   };
 
   const fetchChats = async () => {
@@ -238,13 +256,16 @@ export default function TelegramChatsPage() {
         .select(`
           *,
           opportunity:crm_opportunities(id, name, stage),
-          master_kol:master_kols(id, name, platform)
+          master_kol:master_kols(id, name, platform),
+          client:clients(id, name)
         `)
         .order('last_message_at', { ascending: false, nullsFirst: false });
 
       if (error) throw error;
       // Cast: DB nullable fields vs interface (see archive/page.tsx note).
-      setChats((data || []) as TelegramChat[]);
+      // unknown cast needed because the new client:clients FK join (mig 058)
+      // isn't in the generated database.types.ts yet.
+      setChats((data || []) as unknown as TelegramChat[]);
     } catch (error) {
       console.error('Error fetching chats:', error);
       toast({
@@ -254,6 +275,20 @@ export default function TelegramChatsPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchClients = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id, name')
+        .is('archived_at', null)
+        .order('name');
+      if (error) throw error;
+      setClientsList((data || []) as { id: string; name: string }[]);
+    } catch (error) {
+      console.error('Error fetching clients for telegram link picker:', error);
     }
   };
 
@@ -737,6 +772,54 @@ export default function TelegramChatsPage() {
     }
   };
 
+  // ─── Client link handlers (mirrors opportunity / KOL pattern) ───────
+
+  const openClientLinkDialog = (chat: TelegramChat) => {
+    setSelectedChat(chat);
+    setSelectedClientId(chat.client_id || '__none__');
+    setClientLinkDialogOpen(true);
+  };
+
+  const handleUnlinkClient = async (chat: TelegramChat) => {
+    if (!chat.client_id) return;
+    try {
+      const { error } = await (supabase as any)
+        .from('telegram_chats')
+        .update({ client_id: null, updated_at: new Date().toISOString() })
+        .eq('id', chat.id);
+      if (error) throw error;
+      toast({ title: 'Chat unlinked', description: 'Chat has been unlinked from the client' });
+      fetchChats();
+    } catch (error: any) {
+      console.error('Error unlinking chat from client:', error);
+      toast({ title: 'Error', description: error?.message || 'Failed to unlink chat', variant: 'destructive' });
+    }
+  };
+
+  const handleLinkClient = async () => {
+    if (!selectedChat) return;
+    const clientId = selectedClientId === '__none__' ? null : selectedClientId;
+    setLinking(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('telegram_chats')
+        .update({ client_id: clientId, updated_at: new Date().toISOString() })
+        .eq('id', selectedChat.id);
+      if (error) throw error;
+      toast({
+        title: clientId ? 'Chat linked' : 'Chat unlinked',
+        description: clientId ? 'Chat has been linked to the client' : 'Chat has been unlinked from the client',
+      });
+      setClientLinkDialogOpen(false);
+      fetchChats();
+    } catch (error: any) {
+      console.error('Error linking chat to client:', error);
+      toast({ title: 'Error', description: error?.message || 'Failed to update chat link', variant: 'destructive' });
+    } finally {
+      setLinking(false);
+    }
+  };
+
   // Open message dialog
   const openMessageDialog = (chat: TelegramChat) => {
     setChatToMessage(chat);
@@ -996,8 +1079,11 @@ export default function TelegramChatsPage() {
   const groupChats = visibleChats.filter(chat => (chat.chat_type === 'group' || chat.chat_type === 'supergroup') && !chat.is_internal);
   const dmChats = visibleChats.filter(chat => chat.chat_type === 'private');
   const kolChats = visibleChats.filter(chat => chat.master_kol_id !== null);
+  const clientChats = visibleChats.filter(chat => chat.client_id !== null);
   const internalChats = visibleChats.filter(chat => chat.is_internal);
-  const unassignedChats = visibleChats.filter(chat => !chat.opportunity_id && !chat.master_kol_id && !chat.is_internal && chat.chat_type !== 'private');
+  // Unassigned now also excludes client-linked chats so a chat tied to
+  // a client doesn't keep nagging from the Unassigned tab.
+  const unassignedChats = visibleChats.filter(chat => !chat.opportunity_id && !chat.master_kol_id && !chat.client_id && !chat.is_internal && chat.chat_type !== 'private');
   const leadsChats = visibleChats.filter(chat => chat.opportunity_id !== null);
 
   const filteredGroupChats = groupChats.filter(chat => {
@@ -1045,6 +1131,16 @@ export default function TelegramChatsPage() {
       chat.title?.toLowerCase().includes(query) ||
       chat.chat_id.includes(query) ||
       chat.opportunity?.name?.toLowerCase().includes(query)
+    );
+  });
+
+  const filteredClientChats = clientChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query) ||
+      chat.client?.name?.toLowerCase().includes(query)
     );
   });
 
@@ -1120,6 +1216,13 @@ export default function TelegramChatsPage() {
             Internal
             {internalChats.length > 0 && (
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{internalChats.length}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="clients" className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4" />
+            Clients
+            {clientChats.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{clientChats.length}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="chats" className="flex items-center gap-2">
@@ -1302,6 +1405,14 @@ export default function TelegramChatsPage() {
                           >
                             <Megaphone className="h-4 w-4 mr-1.5" />
                             Link to KOL
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openClientLinkDialog(chat)}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1.5" />
+                            Link to Client
                           </Button>
                           {renderChatActions(chat)}
                         </div>
@@ -2269,6 +2380,120 @@ export default function TelegramChatsPage() {
           )}
         </TabsContent>
 
+        {/* Clients Tab — chats linked to clients (post-sale delivery
+            groups, retainer chats, etc). Same compact card pattern as
+            Internal. Dropdown menu still gives access to Change/Unlink
+            via the inline Edit/Unlink buttons. */}
+        <TabsContent value="clients" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-gray-600">
+              Chats linked to clients ({clientChats.length} total)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Input
+                  placeholder="Search clients..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="focus-brand pl-10 w-64"
+                />
+              </div>
+              <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {filteredClientChats.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <CheckCircle className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {clientChats.length === 0 ? 'No client chats yet' : 'No matching chats'}
+                </h3>
+                <p className="text-gray-500 max-w-md mx-auto">
+                  {clientChats.length === 0
+                    ? 'Link chats to clients from the Unassigned tab via "Link to Client".'
+                    : 'Try a different search term.'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredClientChats.map(chat => {
+                const activity = getActivityStatus(chat.last_message_at);
+                return (
+                  <Card key={chat.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                            <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                            <h3 className="font-semibold text-gray-900 truncate">
+                              {chat.title || 'Unnamed Chat'}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{chat.chat_id}</code>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => copyToClipboard(chat.chat_id)}>
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{formatTimeAgo(chat.last_message_at)}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>{chat.message_count} messages</span>
+                            </div>
+                          </div>
+                          {chat.client && (
+                            <div className="mt-3 flex items-center gap-2">
+                              <CheckCircle className="h-4 w-4 text-emerald-500" />
+                              <span className="text-sm text-gray-700">
+                                Linked to: <strong>{chat.client.name}</strong>
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleUnlinkClient(chat)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                          >
+                            <Unlink className="h-4 w-4 mr-1.5" />
+                            Unlink
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openClientLinkDialog(chat)}
+                          >
+                            <Edit className="h-4 w-4 mr-1.5" />
+                            Change Client
+                          </Button>
+                          {renderChatActions(chat)}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
         {/* Hidden Tab — soft-hidden chats. Only renders when at least
             one chat is hidden (the TabsTrigger is conditional on the
             same check). Same compact card pattern as Internal. */}
@@ -2531,6 +2756,100 @@ export default function TelegramChatsPage() {
               style={{ backgroundColor: '#3e8692', color: 'white' }}
             >
               {linking ? 'Saving...' : (selectedKolId && selectedKolId !== '__none__') ? 'Link Chat' : 'Unlink Chat'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Client Link Dialog — same shape as the opportunity / KOL link
+          dialogs. Popover + Command for searchable picker, "__none__"
+          sentinel = unlink. */}
+      <Dialog open={clientLinkDialogOpen} onOpenChange={setClientLinkDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link Chat to Client</DialogTitle>
+            <DialogDescription>
+              Connect this Telegram chat to a client (e.g. delivery group, retainer chat).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Chat</Label>
+              <div className="p-3 bg-gray-50 rounded-md">
+                <p className="font-medium">{selectedChat?.title || 'Unnamed Chat'}</p>
+                <code className="text-xs text-gray-500">{selectedChat?.chat_id}</code>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="client">Client</Label>
+              <Popover open={clientPopoverOpen} onOpenChange={setClientPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={clientPopoverOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {selectedClientId && selectedClientId !== '__none__'
+                      ? clientsList.find(c => c.id === selectedClientId)?.name
+                      : selectedClientId === '__none__'
+                        ? 'No link (unlink)'
+                        : 'Select a client...'}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search clients..." className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>No client found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="__none__"
+                          onSelect={() => {
+                            setSelectedClientId('__none__');
+                            setClientPopoverOpen(false);
+                          }}
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${selectedClientId === '__none__' ? 'opacity-100' : 'opacity-0'}`} />
+                          <span className="text-gray-500">No link (unlink)</span>
+                        </CommandItem>
+                        {clientsList.map(c => (
+                          <CommandItem
+                            key={c.id}
+                            value={c.name}
+                            onSelect={() => {
+                              setSelectedClientId(c.id);
+                              setClientPopoverOpen(false);
+                            }}
+                          >
+                            <Check className={`mr-2 h-4 w-4 ${selectedClientId === c.id ? 'opacity-100' : 'opacity-0'}`} />
+                            <span>{c.name}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-gray-500">
+                Pick the client this chat belongs to. Archived clients are excluded.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClientLinkDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleLinkClient}
+              disabled={linking}
+              style={{ backgroundColor: '#3e8692', color: 'white' }}
+            >
+              {linking ? 'Saving...' : (selectedClientId && selectedClientId !== '__none__') ? 'Link Chat' : 'Unlink Chat'}
             </Button>
           </DialogFooter>
         </DialogContent>
