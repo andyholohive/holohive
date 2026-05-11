@@ -31,6 +31,80 @@ import { supabase } from '@/lib/supabase';
 import { FileUploadComponent } from '@/components/campaign/FileUploadComponent';
 import { ReportTabContent } from '@/components/campaign/ReportTabContent';
 
+/**
+ * Compact multiselect for use inside Dialogs. Popover + Checkbox list,
+ * shows selected items as small badges on the trigger. Self-contained
+ * so it can ship alongside the master KOL edit dialog without pulling
+ * in the more complex portal-rendered MultiSelect from /kols.
+ */
+function DialogMultiSelect({
+  selected,
+  options,
+  onChange,
+  placeholder = 'Select...',
+}: {
+  selected: string[];
+  options: string[];
+  onChange: (next: string[]) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between font-normal h-auto min-h-9 py-1.5"
+        >
+          <div className="flex flex-wrap gap-1 items-center text-left flex-1 min-w-0">
+            {selected.length === 0 ? (
+              <span className="text-gray-400">{placeholder}</span>
+            ) : (
+              selected.map((s) => (
+                <span key={s} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">
+                  {s}
+                </span>
+              ))
+            )}
+          </div>
+          <ChevronDown className="h-4 w-4 shrink-0 opacity-50 ml-2" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <div className="max-h-64 overflow-auto py-1">
+          {options.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-gray-400">No options</div>
+          ) : (
+            options.map((opt) => {
+              const isSelected = selected.includes(opt);
+              return (
+                <label
+                  key={opt}
+                  className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-sm"
+                >
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={() => {
+                      onChange(
+                        isSelected
+                          ? selected.filter((s) => s !== opt)
+                          : [...selected, opt],
+                      );
+                    }}
+                  />
+                  <span>{opt}</span>
+                </label>
+              );
+            })
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 const CampaignDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -5813,15 +5887,16 @@ const CampaignDetailsPage = () => {
                                 style={{ left: '60px', verticalAlign: 'middle', fontWeight: 'bold', width: '20%', boxShadow: 'inset -1px 0 0 0 #d1d5db' }}
                                 onClick={() => handleCellSelect('kols', campaignKOL.id, 'name', campaignKOL.master_kol.name)}
                               >
-                                <div className="flex items-center w-full h-full group/kolname">
+                                <div className="flex items-center w-full h-full">
                                   <div className="truncate font-bold">{campaignKOL.master_kol.name}</div>
                                   {/* Edit pencil — opens the master KOL edit
-                                      dialog. Always-on for affordance, low-key
-                                      styling so it doesn't compete with the name. */}
+                                      dialog. Always visible for discoverability;
+                                      low-key gray → brand-on-hover styling so
+                                      it doesn't compete visually with the name. */}
                                   <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); openMasterKolEditDialog(campaignKOL.master_kol as unknown as MasterKOL); }}
-                                    className="ml-1.5 inline-flex items-center justify-center h-5 w-5 rounded text-gray-300 hover:text-brand hover:bg-brand-light/40 opacity-0 group-hover/kolname:opacity-100 transition-opacity"
+                                    className="ml-1.5 inline-flex items-center justify-center h-5 w-5 rounded text-gray-400 hover:text-brand hover:bg-brand-light/40 transition-colors"
                                     title="Edit KOL info"
                                   >
                                     <Edit className="h-3 w-3" />
@@ -11282,76 +11357,85 @@ const CampaignDetailsPage = () => {
 
               <div className="space-y-1.5">
                 <Label htmlFor="mk-pricing">Pricing</Label>
-                <Input
-                  id="mk-pricing"
+                <Select
                   value={masterKolForm.pricing || ''}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, pricing: e.target.value || null }))}
-                  className="focus-brand"
-                />
+                  onValueChange={(v) => setMasterKolForm(f => ({ ...f, pricing: v || null }))}
+                >
+                  <SelectTrigger id="mk-pricing" className="focus-brand">
+                    <SelectValue placeholder="Select pricing" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {((fieldOptions as any)?.pricingTiers || []).map((p: string) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1.5">
                 <Label htmlFor="mk-tier">Tier</Label>
-                <Input
-                  id="mk-tier"
+                <Select
                   value={masterKolForm.tier || ''}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, tier: e.target.value || null }))}
-                  className="focus-brand"
-                />
+                  onValueChange={(v) => setMasterKolForm(f => ({ ...f, tier: v || null }))}
+                >
+                  <SelectTrigger id="mk-tier" className="focus-brand">
+                    <SelectValue placeholder="Select tier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {((fieldOptions as any)?.tiers || []).map((t: string) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="mk-platform">Platforms</Label>
-                <Input
-                  id="mk-platform"
-                  value={(masterKolForm.platform || []).join(', ')}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, platform: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
-                  placeholder="comma-separated"
-                  className="focus-brand"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="mk-niche">Niches</Label>
-                <Input
-                  id="mk-niche"
-                  value={(masterKolForm.niche || []).join(', ')}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, niche: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
-                  placeholder="comma-separated"
-                  className="focus-brand"
+              <div className="space-y-1.5 col-span-2">
+                <Label>Platforms</Label>
+                <DialogMultiSelect
+                  selected={masterKolForm.platform || []}
+                  options={fieldOptions?.platforms || []}
+                  onChange={(next) => setMasterKolForm(f => ({ ...f, platform: next }))}
+                  placeholder="Select platforms..."
                 />
               </div>
 
               <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="mk-creator-type">Creator Type</Label>
-                <Input
-                  id="mk-creator-type"
-                  value={(masterKolForm.creator_type || []).join(', ')}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, creator_type: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
-                  placeholder="comma-separated"
-                  className="focus-brand"
+                <Label>Niches</Label>
+                <DialogMultiSelect
+                  selected={masterKolForm.niche || []}
+                  options={fieldOptions?.niches || []}
+                  onChange={(next) => setMasterKolForm(f => ({ ...f, niche: next }))}
+                  placeholder="Select niches..."
                 />
               </div>
 
               <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="mk-content-type">Content Type</Label>
-                <Input
-                  id="mk-content-type"
-                  value={(masterKolForm.content_type || []).join(', ')}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, content_type: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
-                  placeholder="comma-separated"
-                  className="focus-brand"
+                <Label>Creator Type</Label>
+                <DialogMultiSelect
+                  selected={masterKolForm.creator_type || []}
+                  options={fieldOptions?.creatorTypes || []}
+                  onChange={(next) => setMasterKolForm(f => ({ ...f, creator_type: next }))}
+                  placeholder="Select creator types..."
                 />
               </div>
 
               <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="mk-deliverables">Deliverables</Label>
-                <Input
-                  id="mk-deliverables"
-                  value={(masterKolForm.deliverables || []).join(', ')}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, deliverables: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
-                  placeholder="comma-separated"
-                  className="focus-brand"
+                <Label>Content Type</Label>
+                <DialogMultiSelect
+                  selected={masterKolForm.content_type || []}
+                  options={fieldOptions?.contentTypes || []}
+                  onChange={(next) => setMasterKolForm(f => ({ ...f, content_type: next }))}
+                  placeholder="Select content types..."
+                />
+              </div>
+
+              <div className="space-y-1.5 col-span-2">
+                <Label>Deliverables</Label>
+                <DialogMultiSelect
+                  selected={masterKolForm.deliverables || []}
+                  options={fieldOptions?.deliverables || []}
+                  onChange={(next) => setMasterKolForm(f => ({ ...f, deliverables: next }))}
+                  placeholder="Select deliverables..."
                 />
               </div>
 
