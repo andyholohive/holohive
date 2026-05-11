@@ -557,15 +557,13 @@ export default function Sidebar({ children }: SidebarProps) {
               {/* Admin Section — hidden for guests */}
               {!guestHideAlways && (
                 <CollapsibleSection id="admin" icon={Settings}>
-                  <NavItem href="/admin/field-options" icon={Sliders} label="Field Options" />
-                  {/* Claude MCP Cookbook — reference page for the AI
-                      connector (example prompts for every tool). Sits
-                      in the Admin section because it's a settings/help-
-                      style item, but visible to everyone since the
-                      connector itself is. */}
-                  <NavItem href="/mcp" icon={Bot} label="Claude MCP" />
+                  {/* Single "Admin Tools" entry — combines Field Options,
+                      Claude MCP, and Archive into a tabbed /admin page.
+                      Original routes (/admin/field-options, /mcp, /archive)
+                      still work for direct linking + bookmarks; this just
+                      collapses three sidebar entries into one. */}
+                  <NavItem href="/admin" icon={Sliders} label="Admin Tools" />
                   {userProfile?.role === 'super_admin' && <NavItem href="/admin/changelog" icon={Sparkles} label="Changelog" />}
-                  <NavItem href="/archive" icon={Archive} label="Archive" />
                 </CollapsibleSection>
               )}
 

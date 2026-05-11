@@ -101,10 +101,12 @@ export const NAV_REGISTRY: NavItemDef[] = [
   { href: '/templates', label: 'Templates', icon: MessageSquare, section: 'Documents', notForGuest: true },
   { href: '/sops', label: 'SOPs', icon: BookOpen, section: 'Documents', requiredRole: 'admin' },
 
-  { href: '/admin/field-options', label: 'Field Options', icon: Sliders, section: 'Admin', notForGuest: true },
-  { href: '/mcp', label: 'Claude MCP', icon: Bot, section: 'Admin', notForGuest: true },
+  // Admin Tools — combines Field Options + Claude MCP + Archive into one
+  // tabbed page at /admin. Original routes (/admin/field-options, /mcp,
+  // /archive) still work for direct links + bookmarks but are no longer
+  // surfaced separately in the sidebar.
+  { href: '/admin', label: 'Admin Tools', icon: Sliders, section: 'Admin', notForGuest: true },
   { href: '/admin/changelog', label: 'Changelog', icon: Sparkles, section: 'Admin', requiredRole: 'super_admin' },
-  { href: '/archive', label: 'Archive', icon: Archive, section: 'Admin', notForGuest: true },
 ];
 
 /** O(1) lookup by href, used when rendering the Bookmarks section. */
