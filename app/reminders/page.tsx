@@ -32,6 +32,7 @@ const RULE_TYPES: Record<string, { label: string; description: string }> = {
   new_crm_no_gc: { label: 'New CRM Opp - No GC', description: 'New CRM opps without group chat' },
   google_meeting_reminder: { label: 'Google Meeting Reminders', description: 'DM each connected user before their Google Meet calls' },
   stale_proposal: { label: 'Stale Proposal', description: 'Flag deals stuck in proposal_sent/proposal_call without recent activity' },
+  task_assigned: { label: 'Task Assignment', description: 'DM the assignee on Telegram whenever a task is assigned' },
 };
 
 const SCHEDULE_TYPES: Record<string, { label: string; description: string }> = {
@@ -56,6 +57,7 @@ const RULE_EMOJI: Record<string, string> = {
   new_crm_no_gc: '\u{1F517}',
   google_meeting_reminder: '\u{1F4F9}',
   stale_proposal: '\u{1F4DD}',
+  task_assigned: '\u{1F4CB}',
 };
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -381,6 +383,27 @@ export default function RemindersPage() {
       case 'form_submission':
         return (
           <p className="text-sm text-gray-500">This rule is event-driven. It routes form submission notifications to the configured chatroom.</p>
+        );
+      case 'task_assigned':
+        return (
+          <div className="space-y-2">
+            <p className="text-sm text-gray-500">
+              This rule is event-driven. It fires inline whenever a task is assigned (or reassigned),
+              DM&apos;ing the new assignee on their personal Telegram.
+            </p>
+            <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2">
+              <p className="text-xs text-amber-800">
+                <strong>How it works:</strong> when a user is set as the <code>assigned_to</code> on a task,
+                the server looks up their <code>users.telegram_id</code> and sends them a DM.
+                The <strong>Telegram Chat</strong> field below is unused — DMs go to each
+                assignee&apos;s own Telegram, not to a single group chat.
+              </p>
+              <p className="text-xs text-amber-800 mt-1">
+                Set the <strong>Active</strong> toggle off to disable assignment DMs without redeploying.
+                Server-side dedupe prevents re-DMs on minor task edits.
+              </p>
+            </div>
+          </div>
         );
       case 'stale_proposal':
         return (

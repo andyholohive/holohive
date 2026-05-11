@@ -521,7 +521,7 @@ export default function Sidebar({ children }: SidebarProps) {
               {!guestHideSection(['/daily-standup', '/tasks']) && (
                 <CollapsibleSection id="workspace" icon={Briefcase}>
                   <NavItem href="/daily-standup" icon={CheckCircle} label="Daily Stand-Up" />
-                  <NavItem href="/tasks" icon={ListTodo} label="Tasks" />
+                  <NavItem href="/tasks" icon={ListTodo} label="HQ" />
                   {/* Task sub-nav — visible only when expanded AND on a /tasks route */}
                   {!isSidebarCollapsed && pathname.startsWith('/tasks') && (
                     <div className="pl-6 space-y-0.5">

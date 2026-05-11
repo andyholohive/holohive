@@ -178,6 +178,21 @@ export class TaskService {
   /**
    * Create a new task
    */
+  /**
+   * Best-effort fire-and-forget Telegram notification for an assignment.
+   * Server-side dedupes via tasks.last_assignee_notified_to so calling
+   * this on every save is safe — it'll skip if the same person was
+   * already notified for the current assignment.
+   */
+  private static notifyAssignment(taskId: string): void {
+    if (typeof window === 'undefined') return; // server-side calls skip
+    fetch('/api/tasks/notify-assignment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_id: taskId }),
+    }).catch(err => console.warn('[tasks] notify-assignment failed:', err));
+  }
+
   static async createTask(task: Partial<TaskInsert>): Promise<Task> {
     try {
       const { data, error } = await supabase
@@ -187,7 +202,10 @@ export class TaskService {
         .single();
 
       if (error) throw error;
-      return data as Task;
+      const created = data as Task;
+      // Fire DM to assignee if one was set on creation
+      if (created.assigned_to) this.notifyAssignment(created.id);
+      return created;
     } catch (error) {
       console.error('Error creating task:', error);
       throw error;
@@ -230,6 +248,13 @@ export class TaskService {
       // Auto-complete parent deliverable if all subtasks are done
       if (updates.status === 'complete' && updatedTask.parent_task_id) {
         this.checkDeliverableAutoComplete(updatedTask.parent_task_id).catch(() => {});
+      }
+
+      // Fire DM if assignment was touched on this update. Server-side
+      // dedupes against last_assignee_notified_to so re-saves of the
+      // same assignment don't spam the assignee.
+      if ('assigned_to' in updates && updatedTask.assigned_to) {
+        this.notifyAssignment(updatedTask.id);
       }
 
       return updatedTask;
@@ -291,6 +316,13 @@ export class TaskService {
         if (task?.parent_task_id) {
           this.checkDeliverableAutoComplete(task.parent_task_id).catch(() => {});
         }
+      }
+
+      // Fire DM if the assignment field was just touched. Server-side
+      // dedupes via last_assignee_notified_to so re-saves of the same
+      // assignee don't spam them.
+      if (field === 'assigned_to' && value) {
+        this.notifyAssignment(id);
       }
     } catch (error) {
       console.error('Error updating task field:', error);

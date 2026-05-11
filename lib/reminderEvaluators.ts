@@ -402,6 +402,18 @@ async function newCrmNoGc(
   return { items, isEmpty: items.length === 0 };
 }
 
+// ─── 13. Task Assigned — event-driven, fires inline from
+// /api/tasks/notify-assignment. The evaluator returns empty so the
+// daily reminder cron skips it (same pattern as form_submission +
+// google_meeting_reminder). The rule's existence in /reminders gives
+// the user one place to see + toggle whether assignment DMs go out at all.
+async function taskAssigned(
+  _supabase: SupabaseClient<Database>,
+  _params: Record<string, any>
+): Promise<ReminderResult> {
+  return { items: [], isEmpty: true };
+}
+
 // ─── 12. Stale Proposal — flag deals that have been sitting in
 // proposal_sent / proposal_call too long without activity. Drives the
 // "deals going dark after the proposal" pain the manager flagged.
@@ -488,6 +500,7 @@ export const evaluators: Record<string, EvaluatorFn> = {
   new_crm_no_gc: newCrmNoGc,
   google_meeting_reminder: googleMeetingReminder,
   stale_proposal: staleProposal,
+  task_assigned: taskAssigned,
 };
 
 // Emoji per rule type for message formatting
@@ -504,4 +517,5 @@ export const RULE_EMOJI: Record<string, string> = {
   new_crm_no_gc: '\u{1F517}',        // 🔗
   google_meeting_reminder: '\u{1F4F9}', // 📹
   stale_proposal: '\u{1F4DD}',          // 📝
+  task_assigned: '\u{1F4CB}',           // 📋
 };
