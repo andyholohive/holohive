@@ -35,6 +35,14 @@ function SettingsContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // Local object-URL preview shown immediately when the user picks a file,
+  // so they get visual confirmation before the upload finishes. Swapped
+  // out for the real public URL on upload success. Stored separately
+  // from formData so it doesn't leak into the saved user record.
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  // Surfaces image load failures (CORS / 403 / etc.) so the user doesn't
+  // silently see initials and think the upload broke.
+  const [photoLoadFailed, setPhotoLoadFailed] = useState(false);
 
   // Google Calendar connection state. Status is fetched from /api/google/status
   // on mount; the OAuth callback redirects here with ?google=connected|error
@@ -348,7 +356,7 @@ function SettingsContent() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    // Allow-list to match the bucket's allowed_mime_types — Supabase
+    // Allow-list matches the bucket's allowed_mime_types — Supabase
     // rejects mismatches with a confusing "mime type not supported" error.
     const ALLOWED = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!ALLOWED.includes(file.type)) {
@@ -369,6 +377,13 @@ function SettingsContent() {
       return;
     }
 
+    // Show the picked file immediately as a local object-URL preview.
+    // Gives the user visual confirmation before the upload completes —
+    // and means they don't depend on the public URL loading correctly
+    // to know that "something happened" when they clicked Upload.
+    const previewUrl = URL.createObjectURL(file);
+    setPhotoPreviewUrl(previewUrl);
+    setPhotoLoadFailed(false);
     setUploadingPhoto(true);
 
     // File path = {user_id}/{timestamp}.{ext}. The {user_id} prefix
@@ -387,15 +402,15 @@ function SettingsContent() {
         });
 
       if (uploadError) {
-        // Surface the real reason instead of a generic "Upload failed".
-        // Common cases: Bucket not found / new row violates RLS / payload
-        // too large. Each tells the user (or you) exactly what to fix.
         console.error('[settings] profile-photos upload error:', uploadError);
         toast({
           title: 'Upload failed',
           description: uploadError.message || 'Storage rejected the upload.',
           variant: 'destructive',
         });
+        // Roll back the preview so user knows the upload didn't take
+        URL.revokeObjectURL(previewUrl);
+        setPhotoPreviewUrl(null);
         return;
       }
 
@@ -404,8 +419,8 @@ function SettingsContent() {
         .getPublicUrl(fileName);
 
       // Cache-buster — Supabase serves with a 1-hour cache header, so the
-      // <img> wouldn't refresh if you re-uploaded within an hour. Append a
-      // version query param so the URL is always unique per upload.
+      // <img> wouldn't refresh if you re-uploaded within an hour. Append
+      // a version query param so the URL is always unique per upload.
       const finalUrl = `${publicUrl}?v=${Date.now()}`;
 
       const { error: updateError } = await supabase
@@ -423,8 +438,16 @@ function SettingsContent() {
         return;
       }
 
+      // Update local form state with the real URL. Keep the preview
+      // visible for now — the JSX prefers preview over formData URL while
+      // uploading and falls back gracefully when the real URL loads.
       setFormData(prev => ({ ...prev, profile_photo_url: finalUrl }));
       await refreshUserProfile();
+
+      // Now safe to drop the preview — the real public URL is in state
+      // and AuthContext is in sync.
+      URL.revokeObjectURL(previewUrl);
+      setPhotoPreviewUrl(null);
 
       toast({
         title: 'Photo updated',
@@ -437,6 +460,8 @@ function SettingsContent() {
         description: error?.message || 'Unexpected error. Check the browser console.',
         variant: 'destructive',
       });
+      URL.revokeObjectURL(previewUrl);
+      setPhotoPreviewUrl(null);
     } finally {
       setUploadingPhoto(false);
       // Clear the input so the same file can be re-selected (browsers
@@ -546,31 +571,44 @@ function SettingsContent() {
               {/* Profile Photo */}
               <div className="flex items-center space-x-6">
                 <div className="relative">
-                  {formData.profile_photo_url ? (
-                    <div className="w-24 h-24 rounded-full overflow-hidden">
-                      <img
-                        src={formData.profile_photo_url}
-                        alt="Profile"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          target.nextElementSibling?.classList.remove('hidden');
-                        }}
-                      />
-                      <div className="w-24 h-24 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center absolute top-0 left-0 hidden">
+                  {(() => {
+                    // Display priority: in-flight preview > saved photo URL > initials.
+                    // Preview wins during upload so the user sees the picked file
+                    // immediately, even while the network round-trip completes.
+                    const displayUrl = photoPreviewUrl || formData.profile_photo_url;
+                    if (displayUrl && !photoLoadFailed) {
+                      return (
+                        <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100">
+                          <img
+                            // key forces React to remount the <img> when the
+                            // URL changes. Without this, browsers sometimes
+                            // hold the old image element and don't trigger a
+                            // fresh fetch even with a different src attribute.
+                            key={displayUrl}
+                            src={displayUrl}
+                            alt="Profile"
+                            className="w-full h-full object-cover"
+                            onLoad={() => setPhotoLoadFailed(false)}
+                            onError={() => {
+                              // Surface failures instead of silently swapping
+                              // to initials — that hid real bucket/RLS issues.
+                              console.error('[settings] image failed to load:', displayUrl);
+                              setPhotoLoadFailed(true);
+                            }}
+                          />
+                        </div>
+                      );
+                    }
+                    // No URL OR load failed → initials gradient. If the load
+                    // failed we also pulse the border to flag it.
+                    return (
+                      <div className={`w-24 h-24 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center ${photoLoadFailed ? 'ring-2 ring-rose-400 ring-offset-2' : ''}`}>
                         <span className="text-white font-bold text-2xl">
                           {getUserInitials(formData.name || formData.email)}
                         </span>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="w-24 h-24 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold text-2xl">
-                        {getUserInitials(formData.name || formData.email)}
-                      </span>
-                    </div>
-                  )}
+                    );
+                  })()}
                   {uploadingPhoto && (
                     <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
                       <Loader2 className="h-6 w-6 text-white animate-spin" />
@@ -594,7 +632,12 @@ function SettingsContent() {
                     <Camera className="h-4 w-4 mr-2" />
                     {uploadingPhoto ? 'Uploading...' : 'Change Photo'}
                   </Button>
-                  <p className="text-sm text-gray-500 mt-2">JPG, PNG or GIF. Max 5MB.</p>
+                  <p className="text-sm text-gray-500 mt-2">JPG, PNG, GIF, or WebP. Max 5MB.</p>
+                  {photoLoadFailed && !uploadingPhoto && (
+                    <p className="text-xs text-rose-600 mt-1">
+                      Saved photo failed to load. Try uploading again.
+                    </p>
+                  )}
                 </div>
               </div>
 
