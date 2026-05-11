@@ -141,7 +141,10 @@ export default function LinksPage() {
     try {
       const [{ data, error }, { data: clientData }] = await Promise.all([
         supabase.from('links').select('*').order('created_at', { ascending: false }),
-        supabase.from('clients').select('id, name').order('name'),
+        // Skip archived clients — they shouldn't appear as options when
+        // adding/editing links. Existing links pointing to archived
+        // clients still resolve their stored client_id via clientMap.
+        supabase.from('clients').select('id, name').is('archived_at', null).order('name'),
       ]);
       setClients(clientData || []);
 

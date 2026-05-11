@@ -63,7 +63,8 @@ export default function LinkSubmitPage() {
   useEffect(() => {
     const fetchClients = async () => {
       const [{ data: dbClients }, { data: linkData }] = await Promise.all([
-        supabase.from('clients').select('id, name').order('name'),
+        // Skip archived clients — they shouldn't show as picker options.
+        supabase.from('clients').select('id, name').is('archived_at', null).order('name'),
         supabase.from('links').select('client').not('client', 'is', null),
       ]);
 
