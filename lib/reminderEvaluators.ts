@@ -402,6 +402,60 @@ async function newCrmNoGc(
   return { items, isEmpty: items.length === 0 };
 }
 
+// ─── 12. Stale Proposal — flag deals that have been sitting in
+// proposal_sent / proposal_call too long without activity. Drives the
+// "deals going dark after the proposal" pain the manager flagged.
+async function staleProposal(
+  supabase: SupabaseClient<Database>,
+  params: Record<string, any>
+): Promise<ReminderResult> {
+  const proposalAgeDays: number = params.proposal_age_days ?? 14;
+  const inactivityDays: number = params.inactivity_days ?? 7;
+  const proposalCutoff = daysAgo(proposalAgeDays);
+  const inactivityCutoff = daysAgo(inactivityDays);
+
+  // Post-proposal stages worth nudging on. Excludes contract / closed
+  // states because those are either too late or already done.
+  const POST_PROPOSAL = ['proposal_sent', 'proposal_call'];
+
+  const { data: opps } = await (supabase as any)
+    .from('crm_opportunities')
+    .select('name, stage, proposal_sent_at, updated_at, owner_id, deal_value, decision_maker_name')
+    .in('stage', POST_PROPOSAL)
+    .lte('proposal_sent_at', proposalCutoff)
+    .lte('updated_at', inactivityCutoff)
+    .order('proposal_sent_at', { ascending: true })
+    .limit(30);
+
+  if (!opps || opps.length === 0) return { items: [], isEmpty: true };
+
+  // Look up owner names
+  const ownerIds = Array.from(new Set(opps.map((o: any) => o.owner_id).filter(Boolean))) as string[];
+  const ownerMap = new Map<string, string>();
+  if (ownerIds.length > 0) {
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name')
+      .in('id', ownerIds);
+    for (const u of users || []) ownerMap.set(u.id, u.name);
+  }
+
+  const items: ReminderItem[] = opps.map((o: any) => {
+    const ageDays = o.proposal_sent_at
+      ? Math.ceil((Date.now() - new Date(o.proposal_sent_at).getTime()) / 86_400_000)
+      : null;
+    const owner = o.owner_id ? ownerMap.get(o.owner_id) || '' : '';
+    const valueStr = o.deal_value ? `$${o.deal_value.toLocaleString()}` : '';
+    const dmStr = o.decision_maker_name ? ` · DM: ${o.decision_maker_name}` : '';
+    return {
+      label: o.name,
+      detail: `${ageDays}d since proposal${valueStr ? ` · ${valueStr}` : ''}${owner ? ` (${owner})` : ''}${dmStr}`,
+    };
+  });
+
+  return { items, isEmpty: items.length === 0 };
+}
+
 // ─── 11. Google Meeting Reminder ─────────────────────────────────────
 // Event-driven: the dedicated /api/cron/google-meeting-reminders cron
 // fires every 5 minutes and handles the actual fan-out to per-user DMs
@@ -433,6 +487,7 @@ export const evaluators: Record<string, EvaluatorFn> = {
   new_kol_no_gc: newKolNoGc,
   new_crm_no_gc: newCrmNoGc,
   google_meeting_reminder: googleMeetingReminder,
+  stale_proposal: staleProposal,
 };
 
 // Emoji per rule type for message formatting
@@ -448,4 +503,5 @@ export const RULE_EMOJI: Record<string, string> = {
   new_kol_no_gc: '\u{1F517}',        // 🔗
   new_crm_no_gc: '\u{1F517}',        // 🔗
   google_meeting_reminder: '\u{1F4F9}', // 📹
+  stale_proposal: '\u{1F4DD}',          // 📝
 };

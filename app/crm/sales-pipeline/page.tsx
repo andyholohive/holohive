@@ -76,10 +76,10 @@ import {
   CreateSalesDmTemplateData,
 } from '@/lib/salesPipelineService';
 import { UserService } from '@/lib/userService';
-import { BookingService } from '@/lib/bookingService';
+import { BookingService, Booking } from '@/lib/bookingService';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow, format, endOfWeek, endOfMonth, addDays, addMonths, differenceInDays } from 'date-fns';
 
 // ============================================
 // DnD Components
@@ -178,13 +178,21 @@ export default function SalesPipelinePage() {
   const [actionsSearch, setActionsSearch] = useState('');
   const [pipelineSearch, setPipelineSearch] = useState('');
   const [orbitSearch, setOrbitSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery'>('actions');
+  const [activeTab, setActiveTab] = useState<'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery' | 'forecast' | 'metrics'>('actions');
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('table');
   const [pathFilter, setPathFilter] = useState<'all' | 'closer' | 'sdr'>('all');
   // Overall-tab unified search — broadcasts into Outreach/Pipeline/Orbit
   // filters when the user types here, so one query scopes the whole Overall
   // view. Each tab's own search input still works independently.
   const [overallSearch, setOverallSearch] = useState('');
+
+  // Metrics tab state — bookings are lazy-loaded the first time the
+  // Metrics tab is opened (or the Outreach metrics strip mounts).
+  // Range is rolling-90-day default which covers most analyst windows.
+  const [metricsBookings, setMetricsBookings] = useState<Booking[]>([]);
+  const [metricsBookingsLoading, setMetricsBookingsLoading] = useState(false);
+  const [metricsRangeDays, setMetricsRangeDays] = useState<7 | 30 | 90>(30);
+  const [metricsUserId, setMetricsUserId] = useState<string>('');
 
   // DnD state
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -768,6 +776,177 @@ export default function SalesPipelinePage() {
     sorted.forEach(o => counts.set(o.name || '', (counts.get(o.name || '') || 0) + 1));
     return { sortedOutreach: sorted, outreachNameCounts: counts };
   }, [outreachOpps]);
+
+  // ─── Forecast tab data ──────────────────────────────────────────────
+  // Post-proposal stages we want visibility into. Excludes closed_won
+  // (no need to chase) and closed_lost (already gone). proposal_call
+  // and v2_contract belong here too — once a proposal is out, we want
+  // to see it through to close.
+  const POST_PROPOSAL_STAGES: SalesPipelineStage[] = useMemo(
+    () => ['proposal_sent', 'proposal_call', 'v2_contract'],
+    [],
+  );
+
+  // Stage win-probability heuristic for weighted forecast. Conservative
+  // numbers — easy to tune later if your team starts tracking actuals.
+  const STAGE_WIN_PROB: Record<string, number> = useMemo(() => ({
+    proposal_sent: 0.20,
+    proposal_call: 0.40,
+    v2_contract: 0.70,
+  }), []);
+
+  const forecastOpps = useMemo(
+    () => opportunities.filter(o => POST_PROPOSAL_STAGES.includes(o.stage as SalesPipelineStage)),
+    [opportunities, POST_PROPOSAL_STAGES],
+  );
+
+  // At-risk = proposal sent 14+ days ago AND no activity (updated_at)
+  // in the last 7 days. updated_at is a reasonable proxy for "last
+  // touched" without joining activities. Tune thresholds if needed.
+  const isOppAtRisk = (opp: SalesPipelineOpportunity): boolean => {
+    if (!opp.proposal_sent_at) return false;
+    const proposalAgeDays = differenceInDays(new Date(), new Date(opp.proposal_sent_at));
+    if (proposalAgeDays < 14) return false;
+    if (!opp.updated_at) return true;
+    const inactivityDays = differenceInDays(new Date(), new Date(opp.updated_at));
+    return inactivityDays > 7;
+  };
+
+  // Group by expected close period. Bucket boundaries match Calendly /
+  // Salesforce conventions. "No Date" sits last because that's the
+  // problematic bucket — deals nobody has dated yet.
+  const forecastByPeriod = useMemo(() => {
+    const today = new Date();
+    const thisSunday = endOfWeek(today, { weekStartsOn: 1 });
+    const nextSunday = addDays(thisSunday, 7);
+    const eom = endOfMonth(today);
+    const eom2 = endOfMonth(addMonths(today, 1));
+
+    const groups = {
+      thisWeek:  [] as SalesPipelineOpportunity[],
+      nextWeek:  [] as SalesPipelineOpportunity[],
+      thisMonth: [] as SalesPipelineOpportunity[],
+      nextMonth: [] as SalesPipelineOpportunity[],
+      later:     [] as SalesPipelineOpportunity[],
+      noDate:    [] as SalesPipelineOpportunity[],
+    };
+
+    for (const o of forecastOpps) {
+      if (!o.expected_close_date) { groups.noDate.push(o); continue; }
+      const d = new Date(o.expected_close_date + 'T00:00:00');
+      if      (d <= thisSunday) groups.thisWeek.push(o);
+      else if (d <= nextSunday) groups.nextWeek.push(o);
+      else if (d <= eom)        groups.thisMonth.push(o);
+      else if (d <= eom2)       groups.nextMonth.push(o);
+      else                      groups.later.push(o);
+    }
+
+    // Sort each bucket by oldest proposal first — those need attention sooner.
+    const sortByProposalAge = (a: SalesPipelineOpportunity, b: SalesPipelineOpportunity) => {
+      const aT = a.proposal_sent_at ? new Date(a.proposal_sent_at).getTime() : 0;
+      const bT = b.proposal_sent_at ? new Date(b.proposal_sent_at).getTime() : 0;
+      return aT - bT;
+    };
+    Object.values(groups).forEach(arr => arr.sort(sortByProposalAge));
+    return groups;
+  }, [forecastOpps]);
+
+  // ─── Outreach metrics computation ───────────────────────────────────
+  // Per-user metrics over a rolling window. Used by both the Outreach-tab
+  // metrics strip (current user, last 30d) and the Metrics tab (any user,
+  // any window, plus team-total comparison).
+
+  /**
+   * Compute metrics for a single user over a date range.
+   * Touch 1s   = cold_dm opps owned by user, bump_number ≥ 1, created in window.
+   * Replies   = opps owned by user that are in any stage past cold_dm
+   *             (proxy for "got a reply"), created in window.
+   * Qualified = opps owned by user with ≥3 of 5 qual_* checks, updated in window.
+   * Calls     = bookings owned by user (booking_page.user_id), confirmed,
+   *             meeting_date in window.
+   */
+  const computeOutreachMetrics = useCallback((userId: string, days: number) => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffMs = cutoff.getTime();
+
+    const userOpps = opportunities.filter(o => o.owner_id === userId);
+    const inWindow = (iso: string | null | undefined) =>
+      !!iso && new Date(iso).getTime() >= cutoffMs;
+
+    const touch1s = userOpps.filter(o =>
+      o.stage === 'cold_dm' && o.bump_number >= 1 && inWindow(o.created_at)
+    ).length;
+
+    // "Got a reply" proxy: opp moved past cold_dm and was either created
+    // in window (new fast-converters) or had its stage change in window
+    // (using updated_at as proxy for stage change).
+    const replies = userOpps.filter(o =>
+      o.stage !== 'cold_dm' && (inWindow(o.created_at) || inWindow(o.updated_at))
+    ).length;
+
+    const qualified = userOpps.filter(o => {
+      const checks = [o.qual_budget, o.qual_dm, o.qual_timeline, o.qual_scope, o.qual_fit].filter(Boolean).length;
+      return checks >= 3 && (inWindow(o.created_at) || inWindow(o.updated_at));
+    }).length;
+
+    const userBookings = metricsBookings.filter(b =>
+      b.booking_page?.user_id === userId &&
+      b.status === 'confirmed' &&
+      new Date(b.meeting_date).getTime() >= cutoffMs
+    );
+    const callsBooked = userBookings.length;
+    const callsHeld = userBookings.filter(b => b.attendance_status === 'held').length;
+    const noShows = userBookings.filter(b => b.attendance_status === 'no_show').length;
+    const callsPending = userBookings.filter(b =>
+      b.attendance_status === null && new Date(b.meeting_date) < new Date()
+    ).length;
+
+    const replyRate = touch1s > 0 ? replies / touch1s : 0;
+    const qualificationRate = replies > 0 ? qualified / replies : 0;
+    const showRate = callsBooked > 0 ? callsHeld / (callsBooked - callsPending || callsBooked) : 0;
+
+    return {
+      touch1s, replies, replyRate,
+      qualified, qualificationRate,
+      callsBooked, callsHeld, noShows, callsPending, showRate,
+    };
+  }, [opportunities, metricsBookings]);
+
+  // Load bookings the first time the user opens Metrics or the Outreach strip.
+  useEffect(() => {
+    if (activeTab !== 'metrics' && activeTab !== 'outreach') return;
+    if (metricsBookings.length > 0 || metricsBookingsLoading) return;
+    setMetricsBookingsLoading(true);
+    // Pull last 90 days — covers all three default range options without refetching.
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - 90);
+    BookingService.getBookingsForMetrics(from.toISOString(), to.toISOString())
+      .then(rows => setMetricsBookings(rows))
+      .catch(err => console.error('Error loading metrics bookings:', err))
+      .finally(() => setMetricsBookingsLoading(false));
+    // Default to current user when first opening Metrics.
+    if (!metricsUserId && user?.id) setMetricsUserId(user.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // KPI roll-up at top of Forecast tab.
+  const forecastKpis = useMemo(() => {
+    const totalValue = forecastOpps.reduce((s, o) => s + (o.deal_value || 0), 0);
+    const atRisk = forecastOpps.filter(isOppAtRisk);
+    const atRiskValue = atRisk.reduce((s, o) => s + (o.deal_value || 0), 0);
+    const thisMonthValue = [...forecastByPeriod.thisWeek, ...forecastByPeriod.nextWeek, ...forecastByPeriod.thisMonth]
+      .reduce((s, o) => s + (o.deal_value || 0), 0);
+    // Weighted forecast = sum(deal_value × win_probability) across all
+    // post-proposal opps. Quick gut check on how much of the pipeline
+    // is realistically going to close.
+    const weighted = forecastOpps.reduce(
+      (s, o) => s + (o.deal_value || 0) * (STAGE_WIN_PROB[o.stage] || 0.2),
+      0,
+    );
+    return { totalValue, atRiskCount: atRisk.length, atRiskValue, thisMonthValue, weighted };
+  }, [forecastOpps, forecastByPeriod, STAGE_WIN_PROB]);
 
   // ============================================
   // CRUD Handlers
@@ -2603,6 +2782,48 @@ export default function SalesPipelinePage() {
 
   const renderOutreachTab = () => (
     <div className="pb-8">
+      {/* Personal metrics strip — shows the current user's last-30-day
+          outreach scorecard above their work surface. Self-feedback loop
+          while they're actually working. Manager-style aggregate view
+          lives on the Metrics tab. */}
+      {user?.id && (() => {
+        const personal = computeOutreachMetrics(user.id, 30);
+        const items = [
+          { label: 'Touch 1s', value: personal.touch1s },
+          { label: 'Replies', value: personal.replies },
+          { label: 'Reply %', value: `${(personal.replyRate * 100).toFixed(0)}%`, tone: personal.replyRate >= 0.2 ? 'good' as const : 'neutral' as const },
+          { label: 'Qualified', value: personal.qualified },
+          { label: 'Booked', value: personal.callsBooked },
+          { label: 'Held', value: personal.callsHeld, tone: 'good' as const },
+          { label: 'No-show', value: personal.noShows, tone: personal.noShows > 0 ? 'bad' as const : 'neutral' as const },
+        ];
+        return (
+          <div className="mb-4 bg-gradient-to-r from-sky-50 to-white border border-sky-100 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-sky-700 uppercase tracking-wide">My outreach · last 30 days</span>
+              <button
+                onClick={() => setActiveTab('metrics')}
+                className="text-xs text-sky-700 hover:underline"
+              >
+                View team metrics →
+              </button>
+            </div>
+            <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+              {items.map(it => (
+                <div key={it.label} className="text-center">
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wider">{it.label}</div>
+                  <div className={`text-lg font-bold tabular-nums ${
+                    it.tone === 'good' ? 'text-emerald-700' :
+                    it.tone === 'bad' ? 'text-rose-600' :
+                    'text-gray-900'
+                  }`}>{it.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Owner sub-tabs */}
       <div className="flex items-center gap-1 mb-4">
         <button
@@ -3623,6 +3844,378 @@ export default function SalesPipelinePage() {
   );
 
   // ============================================
+  // RENDER: Forecast Tab
+  // ============================================
+  // Post-proposal visibility — every deal that's been proposed but not
+  // yet closed, grouped by expected close date with at-risk auto-flag.
+  // KPIs at the top give a quick "where's my pipeline at?" answer.
+
+  const renderForecastTab = () => {
+    const periods: Array<{ key: keyof typeof forecastByPeriod; label: string; tone: string; description: string }> = [
+      { key: 'thisWeek',  label: 'This Week',  tone: 'bg-emerald-50 border-emerald-200 text-emerald-700', description: 'Closing this week' },
+      { key: 'nextWeek',  label: 'Next Week',  tone: 'bg-emerald-50 border-emerald-200 text-emerald-700', description: 'Closing next week' },
+      { key: 'thisMonth', label: 'This Month', tone: 'bg-sky-50 border-sky-200 text-sky-700', description: 'Closing this month' },
+      { key: 'nextMonth', label: 'Next Month', tone: 'bg-sky-50 border-sky-200 text-sky-700', description: 'Closing next month' },
+      { key: 'later',     label: 'Later',      tone: 'bg-gray-50 border-gray-200 text-gray-700', description: '60+ days out' },
+      { key: 'noDate',    label: 'No Date Set', tone: 'bg-amber-50 border-amber-200 text-amber-700', description: 'Set an expected close date' },
+    ];
+
+    return (
+      <div className="pb-8 space-y-6">
+        {/* KPI strip — high-level pipeline health */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="text-xs text-gray-500 uppercase tracking-wide">Pipeline value</div>
+            <div className="text-2xl font-bold text-gray-900 mt-1">${forecastKpis.totalValue.toLocaleString()}</div>
+            <div className="text-xs text-gray-500 mt-1">{forecastOpps.length} active deal{forecastOpps.length === 1 ? '' : 's'}</div>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="text-xs text-gray-500 uppercase tracking-wide">Weighted forecast</div>
+            <div className="text-2xl font-bold text-emerald-700 mt-1">${Math.round(forecastKpis.weighted).toLocaleString()}</div>
+            <div className="text-xs text-gray-500 mt-1">Stage-weighted probability</div>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="text-xs text-gray-500 uppercase tracking-wide">This month</div>
+            <div className="text-2xl font-bold text-sky-700 mt-1">${forecastKpis.thisMonthValue.toLocaleString()}</div>
+            <div className="text-xs text-gray-500 mt-1">Expected to close</div>
+          </div>
+          <div className={`border rounded-lg p-4 ${forecastKpis.atRiskCount > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
+            <div className={`text-xs uppercase tracking-wide ${forecastKpis.atRiskCount > 0 ? 'text-red-700' : 'text-gray-500'}`}>At risk</div>
+            <div className={`text-2xl font-bold mt-1 ${forecastKpis.atRiskCount > 0 ? 'text-red-700' : 'text-gray-400'}`}>
+              {forecastKpis.atRiskCount}
+            </div>
+            <div className="text-xs text-gray-500 mt-1">${forecastKpis.atRiskValue.toLocaleString()} stalled</div>
+          </div>
+        </div>
+
+        {/* Empty state */}
+        {forecastOpps.length === 0 && (
+          <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
+            <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-gray-500">No proposals out yet. Move a deal to <span className="font-medium">Proposal Sent</span> to see it here.</p>
+          </div>
+        )}
+
+        {/* Period buckets */}
+        {periods.map(period => {
+          const opps = forecastByPeriod[period.key];
+          if (opps.length === 0) return null;
+          const periodValue = opps.reduce((s, o) => s + (o.deal_value || 0), 0);
+          const periodAtRisk = opps.filter(isOppAtRisk).length;
+
+          return (
+            <div key={period.key} className="space-y-2">
+              <div className={`flex items-center justify-between px-4 py-2.5 rounded-lg border ${period.tone}`}>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-semibold">{period.label}</h4>
+                  <span className="text-xs opacity-70">· {period.description}</span>
+                  <Badge variant="secondary" className="text-xs">{opps.length}</Badge>
+                  {periodAtRisk > 0 && (
+                    <Badge variant="secondary" className="text-xs bg-red-100 text-red-700 hover:bg-red-100">
+                      {periodAtRisk} at-risk
+                    </Badge>
+                  )}
+                </div>
+                {periodValue > 0 && (
+                  <span className="text-sm font-medium">${periodValue.toLocaleString()}</span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {opps.map(opp => {
+                  const atRisk = isOppAtRisk(opp);
+                  const proposalAge = opp.proposal_sent_at
+                    ? differenceInDays(new Date(), new Date(opp.proposal_sent_at))
+                    : null;
+                  const ageBadgeClass = proposalAge === null
+                    ? 'bg-gray-100 text-gray-500'
+                    : proposalAge < 7
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : proposalAge < 21
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                        : 'bg-red-50 text-red-700 border border-red-200';
+                  const stageColor = STAGE_COLORS[opp.stage as SalesPipelineStage] || STAGE_COLORS.cold_dm;
+                  const owner = users.find(u => u.id === opp.owner_id);
+                  const winProb = STAGE_WIN_PROB[opp.stage] || 0;
+
+                  return (
+                    <div
+                      key={opp.id}
+                      onClick={() => openSlideOver(opp)}
+                      className={`group bg-white border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow ${atRisk ? 'border-red-300 bg-red-50/30' : 'border-gray-200'}`}
+                    >
+                      {/* Header row: name + at-risk flag */}
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                          <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
+                          <span className="font-semibold truncate">{opp.name}</span>
+                          {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
+                        </div>
+                        {atRisk && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700 shrink-0">
+                            <AlertTriangle className="h-3 w-3" /> At risk
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Stage + value + win-prob row */}
+                      <div className="flex items-center gap-2 mb-3 text-xs">
+                        <Badge className={`${stageColor.bg} ${stageColor.text} pointer-events-none`}>
+                          {STAGE_LABELS[opp.stage as SalesPipelineStage] || opp.stage}
+                        </Badge>
+                        {opp.deal_value ? (
+                          <span className="font-semibold text-emerald-700">${opp.deal_value.toLocaleString()}</span>
+                        ) : (
+                          <span className="text-gray-400">No value set</span>
+                        )}
+                        {winProb > 0 && (
+                          <span className="text-gray-400">· {Math.round(winProb * 100)}% win</span>
+                        )}
+                      </div>
+
+                      {/* Days-since-proposal + last activity */}
+                      <div className="flex items-center gap-3 text-xs mb-2">
+                        <span className={`px-1.5 py-0.5 rounded font-medium ${ageBadgeClass}`}>
+                          {proposalAge === null ? 'Date unknown' : `${proposalAge}d since proposal`}
+                        </span>
+                        {opp.updated_at && (
+                          <span className="text-gray-500">
+                            Last touched {formatDistanceToNow(new Date(opp.updated_at), { addSuffix: true })}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Decision maker + next action */}
+                      <div className="space-y-1 text-xs">
+                        {opp.decision_maker_name && (
+                          <div className="text-gray-600">
+                            <span className="text-gray-400">DM:</span> <span className="font-medium">{opp.decision_maker_name}</span>
+                            {opp.decision_maker_role && <span className="text-gray-400"> · {opp.decision_maker_role}</span>}
+                          </div>
+                        )}
+                        {opp.next_action_at && (
+                          <div className="text-gray-600">
+                            <span className="text-gray-400">Next:</span>{' '}
+                            <span className="font-medium">{format(new Date(opp.next_action_at + 'T00:00:00'), 'MMM d')}</span>
+                            {opp.next_action_notes && <span className="text-gray-500"> — {opp.next_action_notes}</span>}
+                          </div>
+                        )}
+                        {!opp.decision_maker_name && !opp.next_action_at && (
+                          <div className="text-gray-400 italic">No DM or next action set</div>
+                        )}
+                      </div>
+
+                      {/* Footer: owner + actions */}
+                      <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
+                        <span className="text-xs text-gray-500">{owner?.name || 'Unassigned'}</span>
+                        <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                          {opp.proposal_doc_url && (
+                            <a
+                              href={opp.proposal_doc_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-brand hover:underline"
+                              title="Open proposal"
+                            >
+                              <FileText className="h-3.5 w-3.5 inline" />
+                            </a>
+                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 z-[80]">
+                              <DropdownMenuItem onClick={() => openEditDialog(opp)}>
+                                <Edit className="h-4 w-4 mr-2" /> Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleStageChange(opp.id, 'v2_closed_won', opp.stage)}
+                                className="text-emerald-700"
+                              >
+                                <Check className="h-4 w-4 mr-2" /> Mark Closed Won
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleStageChange(opp.id, 'v2_closed_lost', opp.stage)}
+                                className="text-red-600"
+                              >
+                                <X className="h-4 w-4 mr-2" /> Mark Closed Lost
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleStageChange(opp.id, 'nurture', opp.stage)}>
+                                <Clock className="h-4 w-4 mr-2" /> Move to Nurture
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  /**
+   * Compact metric card used by the Metrics tab + Outreach strip.
+   * `tone` lets us color-code green/red without changing layout.
+   */
+  const MetricCard = ({ label, value, hint, tone }: { label: string; value: number | string; hint?: string; tone?: 'good' | 'bad' | 'neutral' }) => {
+    const valueClass =
+      tone === 'good' ? 'text-emerald-700' :
+      tone === 'bad' ? 'text-rose-600' :
+      'text-gray-900';
+    return (
+      <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+        <div className="text-[11px] text-gray-500 uppercase tracking-wide">{label}</div>
+        <div className={`text-2xl font-bold mt-0.5 tabular-nums ${valueClass}`}>{value}</div>
+        {hint && <div className="text-[11px] text-gray-500 mt-0.5">{hint}</div>}
+      </div>
+    );
+  };
+
+  // ============================================
+  // RENDER: Metrics Tab
+  // ============================================
+  // Per-user outreach scorecard + team comparison. Works for any user
+  // the manager picks, defaults to the logged-in user.
+
+  const renderMetricsTab = () => {
+    const selectedId = metricsUserId || user?.id || '';
+    const selectedUser = users.find(u => u.id === selectedId);
+    const m = computeOutreachMetrics(selectedId, metricsRangeDays);
+
+    // Team comparison — every user with at least one opp owned in window
+    const teamRows = users
+      .map(u => ({ user: u, metrics: computeOutreachMetrics(u.id, metricsRangeDays) }))
+      .filter(r => r.metrics.touch1s > 0 || r.metrics.callsBooked > 0)
+      .sort((a, b) => b.metrics.touch1s - a.metrics.touch1s);
+
+    return (
+      <div className="pb-8 space-y-6">
+        {/* Controls */}
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={selectedId} onValueChange={setMetricsUserId}>
+            <SelectTrigger className="h-9 w-56 text-sm focus-brand">
+              <SelectValue placeholder="Select user" />
+            </SelectTrigger>
+            <SelectContent>
+              {users.map(u => (
+                <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={String(metricsRangeDays)} onValueChange={v => setMetricsRangeDays(Number(v) as 7 | 30 | 90)}>
+            <SelectTrigger className="h-9 w-40 text-sm focus-brand">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+              <SelectItem value="90">Last 90 days</SelectItem>
+            </SelectContent>
+          </Select>
+          {metricsBookingsLoading && (
+            <span className="text-xs text-gray-500 flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" /> Loading bookings...
+            </span>
+          )}
+        </div>
+
+        {/* Per-user scorecard */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">{selectedUser?.name || 'Select a user'}</h3>
+              <p className="text-xs text-gray-500">Last {metricsRangeDays} days</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <MetricCard label="Touch 1s sent" value={m.touch1s} hint="First DM sent in window" />
+            <MetricCard label="Replies received" value={m.replies} hint="Moved past cold_dm" />
+            <MetricCard label="Reply rate" value={`${(m.replyRate * 100).toFixed(1)}%`} tone={m.replyRate >= 0.2 ? 'good' : 'neutral'} />
+            <MetricCard label="Qualified" value={m.qualified} hint={`${(m.qualificationRate * 100).toFixed(0)}% of replies · 5-for-5 ≥ 3/5`} />
+            <MetricCard label="Calls booked" value={m.callsBooked} />
+            <MetricCard label="Calls held" value={m.callsHeld} tone="good" />
+            <MetricCard label="No-shows" value={m.noShows} hint={`${(((m.noShows) / (m.callsBooked || 1)) * 100).toFixed(0)}% of bookings`} tone={m.noShows > 0 ? 'bad' : 'neutral'} />
+            <MetricCard label="Show rate" value={`${(m.showRate * 100).toFixed(0)}%`} hint={m.callsPending > 0 ? `${m.callsPending} pending` : undefined} tone={m.showRate >= 0.7 ? 'good' : 'neutral'} />
+          </div>
+        </div>
+
+        {/* Team comparison */}
+        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+            <h4 className="text-sm font-semibold text-gray-900">Team comparison</h4>
+            <span className="text-xs text-gray-500">{teamRows.length} active rep{teamRows.length === 1 ? '' : 's'}</span>
+          </div>
+          {teamRows.length === 0 ? (
+            <div className="text-center py-8 text-sm text-gray-400">
+              No outreach activity in the last {metricsRangeDays} days.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50/50">
+                  <TableHead>Rep</TableHead>
+                  <TableHead className="text-right">Touch 1s</TableHead>
+                  <TableHead className="text-right">Replies</TableHead>
+                  <TableHead className="text-right">Reply %</TableHead>
+                  <TableHead className="text-right">Qualified</TableHead>
+                  <TableHead className="text-right">Booked</TableHead>
+                  <TableHead className="text-right">Held</TableHead>
+                  <TableHead className="text-right">No-show</TableHead>
+                  <TableHead className="text-right">Show %</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {teamRows.map(({ user: u, metrics }) => (
+                  <TableRow key={u.id} className="hover:bg-gray-50">
+                    <TableCell className="font-medium">{u.name}</TableCell>
+                    <TableCell className="text-right tabular-nums">{metrics.touch1s}</TableCell>
+                    <TableCell className="text-right tabular-nums">{metrics.replies}</TableCell>
+                    <TableCell className="text-right tabular-nums">{(metrics.replyRate * 100).toFixed(1)}%</TableCell>
+                    <TableCell className="text-right tabular-nums">{metrics.qualified}</TableCell>
+                    <TableCell className="text-right tabular-nums">{metrics.callsBooked}</TableCell>
+                    <TableCell className="text-right tabular-nums text-emerald-700">{metrics.callsHeld}</TableCell>
+                    <TableCell className="text-right tabular-nums text-rose-600">{metrics.noShows}</TableCell>
+                    <TableCell className="text-right tabular-nums">{(metrics.showRate * 100).toFixed(0)}%</TableCell>
+                  </TableRow>
+                ))}
+                {/* Team totals */}
+                <TableRow className="bg-gray-50 font-semibold">
+                  <TableCell>TEAM TOTAL</TableCell>
+                  <TableCell className="text-right tabular-nums">{teamRows.reduce((s, r) => s + r.metrics.touch1s, 0)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{teamRows.reduce((s, r) => s + r.metrics.replies, 0)}</TableCell>
+                  <TableCell className="text-right tabular-nums">—</TableCell>
+                  <TableCell className="text-right tabular-nums">{teamRows.reduce((s, r) => s + r.metrics.qualified, 0)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{teamRows.reduce((s, r) => s + r.metrics.callsBooked, 0)}</TableCell>
+                  <TableCell className="text-right tabular-nums text-emerald-700">{teamRows.reduce((s, r) => s + r.metrics.callsHeld, 0)}</TableCell>
+                  <TableCell className="text-right tabular-nums text-rose-600">{teamRows.reduce((s, r) => s + r.metrics.noShows, 0)}</TableCell>
+                  <TableCell className="text-right tabular-nums">—</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          )}
+        </div>
+
+        {/* Methodology disclosure — managers always ask "what counts as a reply?" */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs text-gray-600 space-y-1">
+          <p><strong>How metrics are computed:</strong></p>
+          <p>· <strong>Touch 1s sent</strong> — opportunities owned by the rep in <code>cold_dm</code> with <code>bump_number ≥ 1</code> created in the window.</p>
+          <p>· <strong>Replies</strong> — proxy: opps that moved past <code>cold_dm</code> (created or last-updated in window). Improve by logging inbound activities explicitly.</p>
+          <p>· <strong>Qualified</strong> — opps with at least 3 of 5 BANT+ qualification checks marked, set on the opportunity slide-over.</p>
+          <p>· <strong>Calls booked / held / no-shows</strong> — bookings where the booking page is owned by the rep. Mark held / no-show on /crm/meetings after each call.</p>
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================
   // RENDER: Activity Slide-Over
   // ============================================
 
@@ -4185,6 +4778,177 @@ export default function SalesPipelinePage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* 5-for-5 Qualification — BANT+ checkboxes. ≥3/5 counts as a
+                qualified conversation in the Outreach metrics dashboard. */}
+            {(() => {
+              const quals = [
+                { key: 'qual_budget',   label: 'Budget',         hint: 'Confirmed or directional' },
+                { key: 'qual_dm',       label: 'Decision Maker', hint: 'Identified + engaged' },
+                { key: 'qual_timeline', label: 'Timeline',       hint: 'Within ~90 days' },
+                { key: 'qual_scope',    label: 'Scope',          hint: 'Knows what they want' },
+                { key: 'qual_fit',      label: 'Fit',            hint: 'Right vertical/region/size' },
+              ] as const;
+              const checkedCount = quals.filter(q => (opp as any)[q.key]).length;
+              const isQualified = checkedCount >= 3;
+              return (
+                <div className="border-t pt-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      5-for-5 Qualification
+                    </h4>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isQualified ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}>
+                      {checkedCount}/5 {isQualified ? '· Qualified' : ''}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {quals.map(q => {
+                      const checked = !!(opp as any)[q.key];
+                      return (
+                        <label
+                          key={q.key}
+                          className={`flex items-start gap-2 p-2.5 rounded-md border cursor-pointer transition-colors ${checked ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={async (next) => {
+                              const patch = { [q.key]: !!next };
+                              applyOppPatch(opp.id, patch as Partial<SalesPipelineOpportunity>);
+                              try {
+                                await SalesPipelineService.update(opp.id, patch as any);
+                              } catch (err) {
+                                console.error('Error updating qual flag:', err);
+                                applyOppPatch(opp.id, { [q.key]: checked } as Partial<SalesPipelineOpportunity>);
+                              }
+                            }}
+                            className="mt-0.5"
+                          />
+                          <div className="min-w-0">
+                            <div className={`text-sm font-medium ${checked ? 'text-emerald-800' : 'text-gray-700'}`}>{q.label}</div>
+                            <div className="text-[11px] text-gray-500">{q.hint}</div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Post-Proposal Tracking — only shown when proposal_sent_at
+                is set OR the deal is in a post-proposal stage. Inline-
+                editable so users can update without going into edit mode. */}
+            {(opp.proposal_sent_at || ['proposal_sent', 'proposal_call', 'v2_contract'].includes(opp.stage)) && (
+              <div className="border-t pt-6">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Post-Proposal Tracking</h4>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  <div>
+                    <Label className="text-xs text-gray-500">Proposal sent</Label>
+                    <p className="font-medium mt-0.5">
+                      {opp.proposal_sent_at ? (
+                        <>
+                          {format(new Date(opp.proposal_sent_at), 'MMM d, yyyy')}
+                          <span className="text-xs text-gray-400 ml-1">
+                            ({differenceInDays(new Date(), new Date(opp.proposal_sent_at))}d ago)
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Expected close</Label>
+                    <Input
+                      type="date"
+                      value={opp.expected_close_date || ''}
+                      onChange={async (e) => {
+                        const v = e.target.value || null;
+                        applyOppPatch(opp.id, { expected_close_date: v } as Partial<SalesPipelineOpportunity>);
+                        try { await SalesPipelineService.update(opp.id, { expected_close_date: v } as any); }
+                        catch (err) { console.error(err); }
+                      }}
+                      className="h-7 text-sm focus-brand"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Decision maker</Label>
+                    <Input
+                      value={opp.decision_maker_name || ''}
+                      placeholder="Name"
+                      onBlur={async (e) => {
+                        const v = e.target.value.trim() || null;
+                        if (v === opp.decision_maker_name) return;
+                        applyOppPatch(opp.id, { decision_maker_name: v } as Partial<SalesPipelineOpportunity>);
+                        try { await SalesPipelineService.update(opp.id, { decision_maker_name: v } as any); }
+                        catch (err) { console.error(err); }
+                      }}
+                      className="h-7 text-sm focus-brand"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">DM role</Label>
+                    <Input
+                      value={opp.decision_maker_role || ''}
+                      placeholder="e.g. Head of Marketing"
+                      onBlur={async (e) => {
+                        const v = e.target.value.trim() || null;
+                        if (v === opp.decision_maker_role) return;
+                        applyOppPatch(opp.id, { decision_maker_role: v } as Partial<SalesPipelineOpportunity>);
+                        try { await SalesPipelineService.update(opp.id, { decision_maker_role: v } as any); }
+                        catch (err) { console.error(err); }
+                      }}
+                      className="h-7 text-sm focus-brand"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Next action date</Label>
+                    <Input
+                      type="date"
+                      value={opp.next_action_at || ''}
+                      onChange={async (e) => {
+                        const v = e.target.value || null;
+                        applyOppPatch(opp.id, { next_action_at: v } as Partial<SalesPipelineOpportunity>);
+                        try { await SalesPipelineService.update(opp.id, { next_action_at: v } as any); }
+                        catch (err) { console.error(err); }
+                      }}
+                      className="h-7 text-sm focus-brand"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-gray-500">Proposal doc URL</Label>
+                    <Input
+                      value={opp.proposal_doc_url || ''}
+                      placeholder="https://..."
+                      onBlur={async (e) => {
+                        const v = e.target.value.trim() || null;
+                        if (v === opp.proposal_doc_url) return;
+                        applyOppPatch(opp.id, { proposal_doc_url: v } as Partial<SalesPipelineOpportunity>);
+                        try { await SalesPipelineService.update(opp.id, { proposal_doc_url: v } as any); }
+                        catch (err) { console.error(err); }
+                      }}
+                      className="h-7 text-sm focus-brand"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-xs text-gray-500">Next action / notes</Label>
+                    <Textarea
+                      value={opp.next_action_notes || ''}
+                      placeholder="What are we waiting on? What's the next step?"
+                      onBlur={async (e) => {
+                        const v = e.target.value.trim() || null;
+                        if (v === opp.next_action_notes) return;
+                        applyOppPatch(opp.id, { next_action_notes: v } as Partial<SalesPipelineOpportunity>);
+                        try { await SalesPipelineService.update(opp.id, { next_action_notes: v } as any); }
+                        catch (err) { console.error(err); }
+                      }}
+                      rows={2}
+                      className="text-sm focus-brand"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Activity Timeline */}
             <div className="border-t pt-6">
@@ -6063,7 +6827,7 @@ export default function SalesPipelinePage() {
       </Card>
 
       {/* Tabs + Controls */}
-      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery')}>
+      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery' | 'forecast' | 'metrics')}>
         <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <TabsList>
             <TabsTrigger value="overview" className="flex items-center gap-2">
@@ -6096,6 +6860,22 @@ export default function SalesPipelinePage() {
                 ).length;
                 return pipelineCount > 0 ? <Badge variant="secondary" className="ml-1">{pipelineCount}</Badge> : null;
               })()}
+            </TabsTrigger>
+            <TabsTrigger value="forecast" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Forecast
+              {forecastOpps.length > 0 && (
+                <Badge variant="secondary" className="ml-1">{forecastOpps.length}</Badge>
+              )}
+              {forecastKpis.atRiskCount > 0 && (
+                <Badge variant="secondary" className="ml-1 bg-red-100 text-red-700 hover:bg-red-100" title={`${forecastKpis.atRiskCount} at-risk`}>
+                  {forecastKpis.atRiskCount} at-risk
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="metrics" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Metrics
             </TabsTrigger>
             <TabsTrigger value="orbit" className="flex items-center gap-2">
               <RotateCcw className="h-4 w-4" />
@@ -6174,6 +6954,14 @@ export default function SalesPipelinePage() {
             />
           </div>
           {viewMode === 'kanban' ? renderKanban() : renderTable()}
+        </TabsContent>
+
+        <TabsContent value="forecast" className="mt-0">
+          {renderForecastTab()}
+        </TabsContent>
+
+        <TabsContent value="metrics" className="mt-0">
+          {renderMetricsTab()}
         </TabsContent>
 
         <TabsContent value="orbit" className="mt-0">

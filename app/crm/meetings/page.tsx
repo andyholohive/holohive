@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Calendar, Video, MoreHorizontal, XCircle, Copy, ExternalLink, List, CalendarDays, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Calendar, Video, MoreHorizontal, XCircle, Copy, ExternalLink, List, CalendarDays, ChevronLeft, ChevronRight, ArrowLeft, CheckCircle2, UserX } from 'lucide-react';
 import { BookingService, Booking } from '@/lib/bookingService';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -57,6 +57,102 @@ export default function MeetingsPage() {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  /**
+   * Render the status cell. Behavior depends on context:
+   *   - cancelled        → red "Cancelled" badge (terminal)
+   *   - upcoming         → green "Confirmed" badge
+   *   - past + held      → green "Held" badge with revert dropdown
+   *   - past + no_show   → red "No-show" badge with revert dropdown
+   *   - past + pending   → amber "Pending" + inline [Held] [No-show] buttons
+   *
+   * The pending-state UI is the whole point of this column on the past tab —
+   * it nudges the rep to record attendance so the metrics dashboard works.
+   */
+  function renderAttendanceCell(booking: Booking) {
+    if (booking.status === 'cancelled') {
+      return (
+        <Badge variant="destructive" className="text-xs">Cancelled</Badge>
+      );
+    }
+    const isPast = booking.meeting_date < today;
+    if (!isPast) {
+      return (
+        <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">
+          Confirmed
+        </Badge>
+      );
+    }
+    // Past + confirmed
+    if (booking.attendance_status === 'held') {
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="inline-flex">
+              <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 text-xs gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                Held
+              </Badge>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-40">
+            <DropdownMenuItem onClick={() => markAttendance(booking, 'no_show')}>
+              <UserX className="h-3.5 w-3.5 mr-2" /> Change to No-show
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => markAttendance(booking, null)} className="text-gray-500">
+              Clear
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    }
+    if (booking.attendance_status === 'no_show') {
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="inline-flex">
+              <Badge className="bg-rose-100 text-rose-800 hover:bg-rose-100 text-xs gap-1">
+                <UserX className="h-3 w-3" />
+                No-show
+              </Badge>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-40">
+            <DropdownMenuItem onClick={() => markAttendance(booking, 'held')}>
+              <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Change to Held
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => markAttendance(booking, null)} className="text-gray-500">
+              Clear
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    }
+    // Past + confirmed + no attendance recorded
+    return (
+      <div className="flex items-center gap-1">
+        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 text-xs">Pending</Badge>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 w-6 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+          title="Mark as held"
+          onClick={() => markAttendance(booking, 'held')}
+        >
+          <CheckCircle2 className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 w-6 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+          title="Mark as no-show"
+          onClick={() => markAttendance(booking, 'no_show')}
+        >
+          <UserX className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    );
+  }
+
   const filtered = useMemo(() => {
     return bookings.filter((b) => {
       if (activeTab === 'cancelled') return b.status === 'cancelled';
@@ -86,6 +182,25 @@ export default function MeetingsPage() {
   function copyMeetLink(link: string) {
     navigator.clipboard.writeText(link);
     toast({ title: 'Copied', description: 'Meet link copied to clipboard.' });
+  }
+
+  /**
+   * Mark a past meeting as held / no-show. Used by the outreach metrics
+   * dashboard to compute show rate. Optimistic update with revert-on-error.
+   */
+  async function markAttendance(booking: Booking, status: 'held' | 'no_show' | null) {
+    const previous = booking.attendance_status;
+    setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, attendance_status: status } : b));
+    try {
+      await BookingService.markAttendance(booking.id, status);
+      toast({
+        title: status === 'held' ? 'Marked as held' : status === 'no_show' ? 'Marked as no-show' : 'Cleared attendance',
+      });
+    } catch (err) {
+      console.error(err);
+      setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, attendance_status: previous } : b));
+      toast({ title: 'Update failed', variant: 'destructive' });
+    }
   }
 
   function formatDate(dateStr: string) {
@@ -249,16 +364,7 @@ export default function MeetingsPage() {
                         </a>
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          variant={booking.status === 'confirmed' ? 'default' : 'destructive'}
-                          className={
-                            booking.status === 'confirmed'
-                              ? 'bg-green-100 text-green-800 hover:bg-green-100'
-                              : ''
-                          }
-                        >
-                          {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                        </Badge>
+                        {renderAttendanceCell(booking)}
                       </TableCell>
                       <TableCell>
                         {booking.meet_link ? (
@@ -280,7 +386,7 @@ export default function MeetingsPage() {
                       </TableCell>
                       <TableCell>
                         {booking.opportunity?.name ? (
-                          <span className="text-sm">{booking.opportunity.company_name}</span>
+                          <span className="text-sm">{booking.opportunity.name}</span>
                         ) : (
                           <span className="text-gray-400 text-sm">—</span>
                         )}
@@ -422,16 +528,7 @@ export default function MeetingsPage() {
                         {formatTime(booking.start_time)} – {formatTime(booking.end_time)}
                       </span>
                       <span className="text-sm font-medium truncate">{booking.booker_name}</span>
-                      <Badge
-                        variant={booking.status === 'confirmed' ? 'default' : 'destructive'}
-                        className={
-                          booking.status === 'confirmed'
-                            ? 'bg-green-100 text-green-800 hover:bg-green-100'
-                            : ''
-                        }
-                      >
-                        {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                      </Badge>
+                      {renderAttendanceCell(booking)}
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       {booking.meet_link && (

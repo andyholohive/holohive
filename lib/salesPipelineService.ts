@@ -181,6 +181,24 @@ export interface SalesPipelineOpportunity extends CRMOpportunity {
   twitter_handle: string | null;
   twitter_followers: number | null;
   last_signal_at: string | null;
+
+  // Post-Proposal Visibility Fields (migration 051) — used by the
+  // Forecast tab and the stale-proposal reminder rule.
+  expected_close_date: string | null;
+  next_action_at: string | null;
+  next_action_notes: string | null;
+  proposal_doc_url: string | null;
+  decision_maker_name: string | null;
+  decision_maker_role: string | null;
+
+  // 5-for-5 Qualification Fields (migration 052) — defaults align with
+  // BANT+. Relabel via field-options if HoloHive's framework differs.
+  // "Qualified conversation" = >= 3 of these checked.
+  qual_budget: boolean;
+  qual_dm: boolean;
+  qual_timeline: boolean;
+  qual_scope: boolean;
+  qual_fit: boolean;
 }
 
 export type ActivityDirection = 'outbound' | 'inbound';
@@ -223,6 +241,21 @@ export interface CreateSalesPipelineOpportunityData {
   poc_platform?: PocPlatform;
   poc_handle?: string;
   orbit_followup_days?: number;
+
+  // Post-proposal visibility (migration 051)
+  expected_close_date?: string | null;
+  next_action_at?: string | null;
+  next_action_notes?: string | null;
+  proposal_doc_url?: string | null;
+  decision_maker_name?: string | null;
+  decision_maker_role?: string | null;
+
+  // 5-for-5 qualification (migration 052)
+  qual_budget?: boolean;
+  qual_dm?: boolean;
+  qual_timeline?: boolean;
+  qual_scope?: boolean;
+  qual_fit?: boolean;
 }
 
 export interface CreateActivityData {

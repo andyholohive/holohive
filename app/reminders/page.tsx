@@ -31,6 +31,7 @@ const RULE_TYPES: Record<string, { label: string; description: string }> = {
   new_kol_no_gc: { label: 'New KOL - No GC', description: 'New KOLs without group chat connected' },
   new_crm_no_gc: { label: 'New CRM Opp - No GC', description: 'New CRM opps without group chat' },
   google_meeting_reminder: { label: 'Google Meeting Reminders', description: 'DM each connected user before their Google Meet calls' },
+  stale_proposal: { label: 'Stale Proposal', description: 'Flag deals stuck in proposal_sent/proposal_call without recent activity' },
 };
 
 const SCHEDULE_TYPES: Record<string, { label: string; description: string }> = {
@@ -54,6 +55,7 @@ const RULE_EMOJI: Record<string, string> = {
   new_kol_no_gc: '\u{1F517}',
   new_crm_no_gc: '\u{1F517}',
   google_meeting_reminder: '\u{1F4F9}',
+  stale_proposal: '\u{1F4DD}',
 };
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -379,6 +381,31 @@ export default function RemindersPage() {
       case 'form_submission':
         return (
           <p className="text-sm text-gray-500">This rule is event-driven. It routes form submission notifications to the configured chatroom.</p>
+        );
+      case 'stale_proposal':
+        return (
+          <div className="space-y-3">
+            <div>
+              <Label>Proposal age threshold (days)</Label>
+              <Input
+                type="number"
+                className="focus-brand"
+                value={params.proposal_age_days ?? 14}
+                onChange={(e) => setParam('proposal_age_days', parseInt(e.target.value) || 14)}
+              />
+              <p className="text-xs text-gray-500 mt-1">Flag proposals sent at least this many days ago.</p>
+            </div>
+            <div>
+              <Label>Inactivity threshold (days)</Label>
+              <Input
+                type="number"
+                className="focus-brand"
+                value={params.inactivity_days ?? 7}
+                onChange={(e) => setParam('inactivity_days', parseInt(e.target.value) || 7)}
+              />
+              <p className="text-xs text-gray-500 mt-1">AND no activity (updated_at) within this many days.</p>
+            </div>
+          </div>
         );
       case 'google_meeting_reminder': {
         // advance_minutes is an array of positive ints — render as a

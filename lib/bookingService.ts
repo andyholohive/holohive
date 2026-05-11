@@ -49,10 +49,14 @@ export interface Booking {
   meet_link: string | null;
   google_event_id: string | null;
   confirmation_sent: boolean;
+  /** held = the meeting actually happened; no_show = booker didn't show.
+   *  null until manually recorded via the /crm/meetings UI for past bookings.
+   *  Drives the "calls held / no-show" outreach metrics. (migration 052) */
+  attendance_status: 'held' | 'no_show' | null;
   created_at: string;
   // Joined fields
   opportunity?: { name: string | null } | null;
-  booking_page?: { title: string | null; slug: string } | null;
+  booking_page?: { title: string | null; slug: string; user_id?: string } | null;
 }
 
 export interface CreateBookingData {
@@ -301,6 +305,48 @@ export class BookingService {
 
     if (error) throw error;
     return data as Booking;
+  }
+
+  /**
+   * Mark a booking as held or no-show. Pass null to clear. Used by the
+   * /crm/meetings page after the meeting time has passed so the
+   * outreach-metrics dashboard can compute call-held and no-show rates.
+   */
+  static async markAttendance(id: string, status: 'held' | 'no_show' | null): Promise<Booking> {
+    // Cast through `any` because database.types.ts hasn't been
+    // regenerated since migration 052 added the attendance_status
+    // column. Safe — we control the column type via the migration.
+    const { data, error } = await (supabase as any)
+      .from('bookings')
+      .update({ attendance_status: status })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as Booking;
+  }
+
+  /**
+   * Fetch all bookings (any user) within a date range — used by the
+   * Metrics tab in /crm/sales-pipeline to compute per-user calls-booked /
+   * calls-held / no-show numbers without one query per user.
+   *
+   * Joins booking_pages so we can group by user_id (the booking page
+   * owner = the rep who took the meeting).
+   */
+  static async getBookingsForMetrics(fromIso: string, toIso: string): Promise<Booking[]> {
+    const { data, error } = await supabase
+      .from('bookings')
+      .select(`
+        *,
+        booking_page:booking_pages!bookings_booking_page_id_fkey(user_id, slug, title)
+      `)
+      .gte('meeting_date', fromIso.slice(0, 10))
+      .lte('meeting_date', toIso.slice(0, 10))
+      .order('meeting_date', { ascending: false });
+    if (error) throw error;
+    return (data || []) as unknown as Booking[];
   }
 
   /**
