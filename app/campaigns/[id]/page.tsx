@@ -32,6 +32,50 @@ import { FileUploadComponent } from '@/components/campaign/FileUploadComponent';
 import { ReportTabContent } from '@/components/campaign/ReportTabContent';
 
 /**
+ * Columns the user can sort the KOL Dashboard table by. Adding a new
+ * sortable column = add it here + add a case in compareKolByColumn +
+ * make the corresponding TableHead clickable.
+ */
+type KolSortKey =
+  | 'name' | 'followers' | 'region' | 'platform' | 'creator_type'
+  | 'content_type' | 'deliverables' | 'pricing' | 'hh_status' | 'budget_type'
+  | 'budget' | 'paid' | 'date_added';
+
+/**
+ * Per-column comparator. Strings → localeCompare, numbers → numeric,
+ * arrays → join+localeCompare, missing → push to end of asc / top of desc.
+ * Stable ordering for equal values is handled by the caller via
+ * decorate-sort-undecorate.
+ */
+function compareKolByColumn(a: any, b: any, key: KolSortKey): number {
+  const pull = (row: any) => {
+    switch (key) {
+      case 'name':         return row.master_kol?.name || '';
+      case 'followers':    return row.master_kol?.followers ?? null;
+      case 'region':       return row.master_kol?.region || '';
+      case 'platform':     return (row.master_kol?.platform || []).join(', ');
+      case 'creator_type': return (row.master_kol?.creator_type || []).join(', ');
+      case 'content_type': return (row.master_kol?.content_type || []).join(', ');
+      case 'deliverables': return (row.deliverables || row.master_kol?.deliverables || []).join(', ');
+      case 'pricing':      return row.master_kol?.pricing || '';
+      case 'hh_status':    return row.hh_status || '';
+      case 'budget_type':  return row.budget_type || '';
+      case 'budget':       return row.budget ?? null;
+      case 'paid':         return row.paid ?? null;
+      case 'date_added':   return row.created_at ? new Date(row.created_at).getTime() : null;
+      default:             return '';
+    }
+  };
+  const A = pull(a);
+  const B = pull(b);
+  // Nullish always sorts last (ascending) — flips automatically when dir=-1
+  if (A === null || A === undefined || A === '') return 1;
+  if (B === null || B === undefined || B === '') return -1;
+  if (typeof A === 'number' && typeof B === 'number') return A - B;
+  return String(A).localeCompare(String(B));
+}
+
+/**
  * Compact multiselect for use inside Dialogs. Popover + Checkbox list,
  * shows selected items as small badges on the trigger. Self-contained
  * so it can ship alongside the master KOL edit dialog without pulling
@@ -163,6 +207,11 @@ const CampaignDetailsPage = () => {
   const [editingMasterKol, setEditingMasterKol] = useState<MasterKOL | null>(null);
   const [masterKolForm, setMasterKolForm] = useState<Partial<MasterKOL>>({});
   const [savingMasterKol, setSavingMasterKol] = useState(false);
+
+  // Sort state for the KOL Dashboard table view. null key = original order.
+  // Click a column header to set/toggle. Defaults to ascending on first
+  // click; flips to descending on second; clears on third.
+  const [kolSort, setKolSort] = useState<{ key: KolSortKey | null; dir: 'asc' | 'desc' }>({ key: null, dir: 'asc' });
   // Track cell editing for inline edits
   const [editingCell, setEditingCell] = useState<{ row: string; field: string } | null>(null);
   const [editingValue, setEditingValue] = useState<any>(null);
@@ -1333,6 +1382,22 @@ const CampaignDetailsPage = () => {
     return matchesVisibility && matchesSearch && matchesPlatform && matchesRegion && matchesCreatorType && matchesContentType &&
            matchesStatus && matchesBudgetType && matchesFollowers && matchesBudget && matchesPaid;
   });
+
+  // ─── Sortable columns for the KOL Dashboard table view ──────────────
+  // Click a column header to sort; click again to flip direction. Falls
+  // back to original (created/insertion) order when no sort is active.
+  const sortedKOLs = (() => {
+    if (!kolSort.key) return filteredKOLs;
+    const dir = kolSort.dir === 'asc' ? 1 : -1;
+    // Stable sort via decorate-sort-undecorate so equal keys retain order.
+    return [...filteredKOLs]
+      .map((kol, i) => ({ kol, i }))
+      .sort((a, b) => {
+        const cmp = compareKolByColumn(a.kol, b.kol, kolSort.key as KolSortKey);
+        return cmp !== 0 ? cmp * dir : a.i - b.i;
+      })
+      .map(x => x.kol);
+  })();
   useEffect(() => {
     if (campaign?.budget_allocations) {
       setAllocations(campaign.budget_allocations.map(a => ({ ...a })));
@@ -2622,6 +2687,25 @@ const CampaignDetailsPage = () => {
     { value: 'posted', label: 'Posted' }
   ];
   const fieldOptions = KOLService.getFieldOptions();
+
+  /**
+   * Toggle sort on a KOL Dashboard column. asc → desc → cleared cycle
+   * so a third click on the active column returns to insertion order.
+   * Switching to a new column starts at asc.
+   */
+  const toggleKolSort = (key: KolSortKey) => {
+    setKolSort(prev => {
+      if (prev.key !== key) return { key, dir: 'asc' };
+      if (prev.dir === 'asc') return { key, dir: 'desc' };
+      return { key: null, dir: 'asc' };
+    });
+  };
+
+  /** Tiny ▲/▼ glyph for the active column header. */
+  const kolSortIndicator = (key: KolSortKey) => {
+    if (kolSort.key !== key) return null;
+    return <span className="ml-0.5 text-[10px] text-gray-500">{kolSort.dir === 'asc' ? '▲' : '▼'}</span>;
+  };
 
   // ─── Master KOL edit dialog handlers ────────────────────────────────
 
@@ -5507,10 +5591,21 @@ const CampaignDetailsPage = () => {
                               checked={filteredKOLs.length > 0 && filteredKOLs.every(kol => selectedKOLs.includes(kol.id))}
                             />
                           </TableHead>
-                          <TableHead className="sticky bg-gray-50 text-left select-none z-20" style={{ left: '60px', boxShadow: 'inset -1px 0 0 0 #d1d5db' }}>KOL</TableHead>
+                          <TableHead className="sticky bg-gray-50 text-left select-none z-20" style={{ left: '60px', boxShadow: 'inset -1px 0 0 0 #d1d5db' }}>
+                            <button
+                              type="button"
+                              onClick={() => toggleKolSort('name')}
+                              className="hover:underline inline-flex items-center font-medium"
+                              title="Sort by KOL name"
+                            >
+                              KOL{kolSortIndicator('name')}
+                            </button>
+                          </TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                            <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Platform</span>
+                            <div className="flex items-center gap-1 group">
+                              <button type="button" onClick={() => toggleKolSort('platform')} className="hover:underline inline-flex items-center" title="Sort by platform">
+                                Platform{kolSortIndicator('platform')}
+                              </button>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -5558,8 +5653,10 @@ const CampaignDetailsPage = () => {
                             </div>
                           </TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                            <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Followers</span>
+                            <div className="flex items-center gap-1 group">
+                              <button type="button" onClick={() => toggleKolSort('followers')} className="hover:underline inline-flex items-center" title="Sort by followers">
+                                Followers{kolSortIndicator('followers')}
+                              </button>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -5612,8 +5709,10 @@ const CampaignDetailsPage = () => {
                             </div>
                           </TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                            <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Region</span>
+                            <div className="flex items-center gap-1 group">
+                              <button type="button" onClick={() => toggleKolSort('region')} className="hover:underline inline-flex items-center" title="Sort by region">
+                                Region{kolSortIndicator('region')}
+                              </button>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -5662,8 +5761,10 @@ const CampaignDetailsPage = () => {
                             </div>
                           </TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                            <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Creator Type</span>
+                            <div className="flex items-center gap-1 group">
+                              <button type="button" onClick={() => toggleKolSort('creator_type')} className="hover:underline inline-flex items-center" title="Sort by creator type">
+                                Creator Type{kolSortIndicator('creator_type')}
+                              </button>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -5709,8 +5810,10 @@ const CampaignDetailsPage = () => {
                             </div>
                           </TableHead>
                           <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                            <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Status</span>
+                            <div className="flex items-center gap-1 group">
+                              <button type="button" onClick={() => toggleKolSort('hh_status')} className="hover:underline inline-flex items-center" title="Sort by status">
+                                Status{kolSortIndicator('hh_status')}
+                              </button>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -5853,7 +5956,7 @@ const CampaignDetailsPage = () => {
                             </TableCell>
                           </TableRow>
                         ) : (
-                          filteredKOLs.map((campaignKOL, index) => {
+                          sortedKOLs.map((campaignKOL, index) => {
                           return (
                             <TableRow key={campaignKOL.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
                               <TableCell className={`sticky left-0 z-10 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} px-4 py-2 overflow-hidden text-center text-gray-600 group`} style={{ verticalAlign: 'middle', minWidth: '60px', width: '60px', boxShadow: 'inset -1px 0 0 0 #d1d5db' }}>
