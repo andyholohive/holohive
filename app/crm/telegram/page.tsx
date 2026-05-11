@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   MessageSquare,
   RefreshCw,
@@ -37,7 +38,10 @@ import {
   ToggleRight,
   User,
   Users,
-  Megaphone
+  Megaphone,
+  MoreHorizontal,
+  EyeOff,
+  Briefcase,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -57,6 +61,13 @@ interface TelegramChat {
   message_count: number;
   opportunity_id: string | null;
   master_kol_id: string | null;
+  /** Marks the chat as an internal team/working chat. Surfaced under
+   *  the new "Internal" tab. (migration 057) */
+  is_internal: boolean;
+  /** Soft-hide flag — excludes the chat from every tab. Hidden chats
+   *  show up in the "Hidden" tab so the user can unhide later.
+   *  (migration 057) */
+  is_hidden: boolean;
   created_at: string;
   updated_at: string;
   // Joined
@@ -113,6 +124,9 @@ const SAMPLE_CHATS: TelegramChat[] = [
     last_message_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     message_count: 156,
     opportunity_id: null,
+    master_kol_id: null,
+    is_internal: false,
+    is_hidden: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     opportunity: { id: 'opp-1', name: 'Alpha Corp Deal', stage: 'proposal' }
@@ -127,6 +141,9 @@ const SAMPLE_CHATS: TelegramChat[] = [
     last_message_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
     message_count: 89,
     opportunity_id: null,
+    master_kol_id: null,
+    is_internal: false,
+    is_hidden: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     opportunity: null
@@ -141,6 +158,9 @@ const SAMPLE_CHATS: TelegramChat[] = [
     last_message_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
     message_count: 23,
     opportunity_id: null,
+    master_kol_id: null,
+    is_internal: false,
+    is_hidden: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     opportunity: null
@@ -428,6 +448,109 @@ export default function TelegramChatsPage() {
       description: 'Chat ID copied to clipboard',
     });
   };
+
+  // ─── Internal / Hide / Delete handlers (migration 057) ──────────────
+
+  /**
+   * Toggle the is_internal flag. Optimistic — patches local state first,
+   * then writes to DB and rolls back on error.
+   */
+  const handleToggleInternal = async (chat: TelegramChat) => {
+    const next = !chat.is_internal;
+    setChats(prev => prev.map(c => c.id === chat.id ? { ...c, is_internal: next } : c));
+    try {
+      const { error } = await (supabase as any)
+        .from('telegram_chats')
+        .update({ is_internal: next, updated_at: new Date().toISOString() })
+        .eq('id', chat.id);
+      if (error) throw error;
+      toast({ title: next ? 'Marked as internal' : 'Unmarked as internal', description: chat.title || chat.chat_id });
+    } catch (err: any) {
+      console.error('Error toggling internal:', err);
+      setChats(prev => prev.map(c => c.id === chat.id ? { ...c, is_internal: !next } : c));
+      toast({ title: 'Update failed', description: err?.message, variant: 'destructive' });
+    }
+  };
+
+  /**
+   * Toggle the is_hidden flag — soft-hide the chat from every tab
+   * except the Hidden tab. Reversible via the same action.
+   */
+  const handleToggleHidden = async (chat: TelegramChat) => {
+    const next = !chat.is_hidden;
+    setChats(prev => prev.map(c => c.id === chat.id ? { ...c, is_hidden: next } : c));
+    try {
+      const { error } = await (supabase as any)
+        .from('telegram_chats')
+        .update({ is_hidden: next, updated_at: new Date().toISOString() })
+        .eq('id', chat.id);
+      if (error) throw error;
+      toast({ title: next ? 'Hidden' : 'Unhidden', description: chat.title || chat.chat_id });
+    } catch (err: any) {
+      console.error('Error toggling hidden:', err);
+      setChats(prev => prev.map(c => c.id === chat.id ? { ...c, is_hidden: !next } : c));
+      toast({ title: 'Update failed', description: err?.message, variant: 'destructive' });
+    }
+  };
+
+  /**
+   * Hard-delete the row from telegram_chats. The webhook will recreate
+   * it if a new message arrives — for permanent removal the user should
+   * Hide instead. confirm() prompt because this is destructive.
+   */
+  const handleDeleteChat = async (chat: TelegramChat) => {
+    if (!confirm(`Delete "${chat.title || chat.chat_id}" from telegram_chats? The row will be recreated if the chat sends a new message — use Hide if you want it gone for good.`)) {
+      return;
+    }
+    try {
+      const { error } = await (supabase as any)
+        .from('telegram_chats')
+        .delete()
+        .eq('id', chat.id);
+      if (error) throw error;
+      setChats(prev => prev.filter(c => c.id !== chat.id));
+      toast({ title: 'Chat deleted', description: chat.title || chat.chat_id });
+    } catch (err: any) {
+      console.error('Error deleting chat:', err);
+      toast({ title: 'Delete failed', description: err?.message, variant: 'destructive' });
+    }
+  };
+
+  /**
+   * Render the actions dropdown for a chat row. Used in every tab so
+   * the user has consistent access to internal/hide/delete from anywhere.
+   * Matches the existing Card layout — slot it next to the right-side
+   * action buttons (Link to Lead, Link to KOL, etc.).
+   */
+  const renderChatActions = (chat: TelegramChat) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem onClick={() => copyToClipboard(chat.chat_id)}>
+          <Copy className="h-4 w-4 mr-2" />
+          Copy chat ID
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => handleToggleInternal(chat)}>
+          <Briefcase className="h-4 w-4 mr-2" />
+          {chat.is_internal ? 'Unmark as internal' : 'Mark as internal'}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleToggleHidden(chat)}>
+          <EyeOff className="h-4 w-4 mr-2" />
+          {chat.is_hidden ? 'Unhide' : 'Hide from all tabs'}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => handleDeleteChat(chat)} className="text-red-600 focus:text-red-600">
+          <Trash2 className="h-4 w-4 mr-2" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   const openLinkDialog = (chat: TelegramChat) => {
     setSelectedChat(chat);
@@ -862,12 +985,20 @@ export default function TelegramChatsPage() {
   const displayChats = showDemo ? SAMPLE_CHATS : chats;
   const displayMessages = showDemo ? SAMPLE_MESSAGES : messages;
 
+  // Hidden chats live in their own tab. Every other tab filters them
+  // out so they don't pollute the workspace. Internal chats are
+  // similarly excluded from Unassigned (they wouldn't make sense
+  // there — internal isn't a stage of "needs assignment").
+  const hiddenChats = displayChats.filter(chat => chat.is_hidden);
+  const visibleChats = displayChats.filter(chat => !chat.is_hidden);
+
   // Separate group chats from DMs and KOL chats
-  const groupChats = displayChats.filter(chat => chat.chat_type === 'group' || chat.chat_type === 'supergroup');
-  const dmChats = displayChats.filter(chat => chat.chat_type === 'private');
-  const kolChats = displayChats.filter(chat => chat.master_kol_id !== null);
-  const unassignedChats = displayChats.filter(chat => !chat.opportunity_id && !chat.master_kol_id && chat.chat_type !== 'private');
-  const leadsChats = displayChats.filter(chat => chat.opportunity_id !== null);
+  const groupChats = visibleChats.filter(chat => (chat.chat_type === 'group' || chat.chat_type === 'supergroup') && !chat.is_internal);
+  const dmChats = visibleChats.filter(chat => chat.chat_type === 'private');
+  const kolChats = visibleChats.filter(chat => chat.master_kol_id !== null);
+  const internalChats = visibleChats.filter(chat => chat.is_internal);
+  const unassignedChats = visibleChats.filter(chat => !chat.opportunity_id && !chat.master_kol_id && !chat.is_internal && chat.chat_type !== 'private');
+  const leadsChats = visibleChats.filter(chat => chat.opportunity_id !== null);
 
   const filteredGroupChats = groupChats.filter(chat => {
     if (!searchQuery) return true;
@@ -914,6 +1045,24 @@ export default function TelegramChatsPage() {
       chat.title?.toLowerCase().includes(query) ||
       chat.chat_id.includes(query) ||
       chat.opportunity?.name?.toLowerCase().includes(query)
+    );
+  });
+
+  const filteredInternalChats = internalChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query)
+    );
+  });
+
+  const filteredHiddenChats = hiddenChats.filter(chat => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      chat.title?.toLowerCase().includes(query) ||
+      chat.chat_id.includes(query)
     );
   });
 
@@ -966,6 +1115,13 @@ export default function TelegramChatsPage() {
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{leadsChats.length}</Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="internal" className="flex items-center gap-2">
+            <Briefcase className="h-4 w-4" />
+            Internal
+            {internalChats.length > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{internalChats.length}</Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="chats" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Groups
@@ -991,6 +1147,13 @@ export default function TelegramChatsPage() {
             <Terminal className="h-4 w-4" />
             Commands
           </TabsTrigger>
+          {hiddenChats.length > 0 && (
+            <TabsTrigger value="hidden" className="flex items-center gap-2">
+              <EyeOff className="h-4 w-4" />
+              Hidden
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{hiddenChats.length}</Badge>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Unassigned Tab */}
@@ -1140,6 +1303,7 @@ export default function TelegramChatsPage() {
                             <Megaphone className="h-4 w-4 mr-1.5" />
                             Link to KOL
                           </Button>
+                          {renderChatActions(chat)}
                         </div>
                       </div>
                     </CardContent>
@@ -1320,6 +1484,7 @@ export default function TelegramChatsPage() {
                             <Edit className="h-4 w-4 mr-1.5" />
                             Change Lead
                           </Button>
+                          {renderChatActions(chat)}
                         </div>
                       </div>
                     </CardContent>
@@ -1514,6 +1679,7 @@ export default function TelegramChatsPage() {
                           </>
                         )}
                       </Button>
+                      {renderChatActions(chat)}
                     </div>
                   </div>
                 </CardContent>
@@ -1699,6 +1865,7 @@ export default function TelegramChatsPage() {
                               </>
                             )}
                           </Button>
+                          {renderChatActions(chat)}
                         </div>
                       </div>
                     </CardContent>
@@ -2010,6 +2177,167 @@ export default function TelegramChatsPage() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Internal Tab — chats marked as internal team/working chats.
+            Simple compact card list since internal chats don't need
+            Link to Lead / KOL actions. The dropdown menu still gives
+            access to Unmark / Hide / Delete. */}
+        <TabsContent value="internal" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-gray-600">
+              Internal team chats ({internalChats.length} total)
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Input
+                  placeholder="Search internal chats..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="focus-brand pl-10 w-64"
+                />
+              </div>
+              <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {filteredInternalChats.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Briefcase className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {internalChats.length === 0 ? 'No internal chats yet' : 'No matching chats'}
+                </h3>
+                <p className="text-gray-500 max-w-md mx-auto">
+                  {internalChats.length === 0
+                    ? 'Mark a chat as internal from any other tab via the ⋯ menu to track it here.'
+                    : 'Try a different search term.'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredInternalChats.map(chat => {
+                const activity = getActivityStatus(chat.last_message_at);
+                return (
+                  <Card key={chat.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                            <Briefcase className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                            <h3 className="font-semibold text-gray-900 truncate">
+                              {chat.title || 'Unnamed Chat'}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs bg-gray-50">Internal</Badge>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{chat.chat_id}</code>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => copyToClipboard(chat.chat_id)}>
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{formatTimeAgo(chat.last_message_at)}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              <span>{chat.message_count} messages</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">{renderChatActions(chat)}</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Hidden Tab — soft-hidden chats. Only renders when at least
+            one chat is hidden (the TabsTrigger is conditional on the
+            same check). Same compact card pattern as Internal. */}
+        <TabsContent value="hidden" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-gray-600">
+              Hidden chats ({hiddenChats.length} total) — excluded from every other tab
+            </p>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                <Input
+                  placeholder="Search hidden chats..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="focus-brand pl-10 w-64"
+                />
+              </div>
+              <Button variant="outline" onClick={handleRefresh} disabled={refreshing}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {filteredHiddenChats.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <EyeOff className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No matching hidden chats</h3>
+                <p className="text-gray-500 max-w-md mx-auto">Try a different search term.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {filteredHiddenChats.map(chat => {
+                const activity = getActivityStatus(chat.last_message_at);
+                return (
+                  <Card key={chat.id} className="hover:shadow-md transition-shadow opacity-75">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-3 h-3 rounded-full ${activity.color}`} title={activity.label} />
+                            <EyeOff className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                            <h3 className="font-semibold text-gray-700 truncate">
+                              {chat.title || 'Unnamed Chat'}
+                            </h3>
+                            <Badge variant="secondary" className="text-xs">
+                              {(chat.chat_type || 'chat').charAt(0).toUpperCase() + (chat.chat_type || 'chat').slice(1)}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                            <div className="flex items-center gap-1.5">
+                              <Hash className="h-3.5 w-3.5" />
+                              <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">{chat.chat_id}</code>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>{formatTimeAgo(chat.last_message_at)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">{renderChatActions(chat)}</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </TabsContent>
