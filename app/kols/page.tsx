@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -172,6 +173,14 @@ export default function KOLsPage() {
   }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const containerRef = useRef<HTMLDivElement>(null);
+    // Trigger rect captured when the dropdown opens — drives the portal's
+    // fixed coordinates. Recomputed via useLayoutEffect on scroll/resize so
+    // the dropdown follows its trigger if the table scrolls underneath.
+    const [triggerRect, setTriggerRect] = useState<DOMRect | null>(null);
+    // 'down' = dropdown below trigger, 'up' = above. Flips when there's
+    // not enough room below — keeps the panel fully visible even when the
+    // trigger is near the bottom of the viewport.
+    const [placement, setPlacement] = useState<'down' | 'up'>('down');
 
     // Add safety checks
     const safeOptions = Array.isArray(options) ? options : [];
@@ -182,17 +191,38 @@ export default function KOLsPage() {
       option.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    // Position the portal-rendered dropdown relative to its trigger.
+    // Uses fixed positioning so the dropdown escapes any ancestor with
+    // overflow:hidden (e.g. the KOLs table) — the original bug was that
+    // the absolute-positioned panel got clipped by the table container.
+    useLayoutEffect(() => {
+      if (!isOpen) {
+        setTriggerRect(null);
+        return;
+      }
+      const recompute = () => {
+        if (!containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        setTriggerRect(rect);
+        // If there's less than 320px below the trigger, flip up.
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        setPlacement(spaceBelow < 320 && spaceAbove > spaceBelow ? 'up' : 'down');
+      };
+      recompute();
+      // Track scroll on any ancestor — the table scrolls independently
+      // of the page, and the dropdown needs to follow its trigger.
+      window.addEventListener('scroll', recompute, true);
+      window.addEventListener('resize', recompute);
+      return () => {
+        window.removeEventListener('scroll', recompute, true);
+        window.removeEventListener('resize', recompute);
+      };
+    }, [isOpen]);
+
     try {
       return (
         <>
-          {/* Backdrop - covers entire screen, closes on click */}
-          {isOpen && (
-            <div
-              className="fixed inset-0 z-[9998]"
-              onClick={() => onOpenChange?.(false)}
-            />
-          )}
-
           <div ref={containerRef} className={`relative ${className}`}>
             {/* Trigger */}
             <div
@@ -217,56 +247,70 @@ export default function KOLsPage() {
                 </Button>
               )}
             </div>
+          </div>
 
-            {/* Dropdown */}
-            {isOpen && (
+          {/* Dropdown rendered via portal so it escapes table overflow:hidden.
+              Fixed positioning aligned to the captured trigger rect. */}
+          {isOpen && triggerRect && typeof document !== 'undefined' && createPortal(
+            <>
+              {/* Backdrop — covers entire screen, closes on click */}
               <div
-                className="absolute z-[9999] w-[200px] bg-white border border-gray-200 rounded-md shadow-lg mt-1 left-0"
+                className="fixed inset-0 z-[9998]"
+                onClick={() => onOpenChange?.(false)}
+              />
+              <div
+                className="fixed z-[9999] w-[220px] bg-white border border-gray-200 rounded-md shadow-lg"
+                style={{
+                  left: triggerRect.left,
+                  top: placement === 'down' ? triggerRect.bottom + 4 : undefined,
+                  bottom: placement === 'up' ? window.innerHeight - triggerRect.top + 4 : undefined,
+                }}
                 onClick={(e) => e.stopPropagation()}
               >
-            <div className="flex items-center border-b px-3 py-2">
-              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-              <Input
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="border-0 p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-            <div className="max-h-[300px] overflow-auto">
-              {filteredOptions.length === 0 ? (
-                <div className="p-2 text-sm text-muted-foreground">No options found.</div>
-              ) : (
-                filteredOptions.map((option) => (
-                  <div
-                    key={option}
-                    className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-gray-100"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const newSelected = safeSelected.includes(option)
-                        ? safeSelected.filter(item => item !== option)
-                        : [...safeSelected, option];
-                      onSelectedChange(newSelected);
-                    }}
-                  >
-                    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-                      {safeSelected.includes(option) && (
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m5 12 5 5L20 7" />
-                        </svg>
-                      )}
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      {renderOption(option)}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            </div>
-            )}
-          </div>
+                <div className="flex items-center border-b px-3 py-2">
+                  <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                  <Input
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="border-0 p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </div>
+                <div className="max-h-[300px] overflow-y-auto overscroll-contain">
+                  {filteredOptions.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground">No options found.</div>
+                  ) : (
+                    filteredOptions.map((option) => (
+                      <div
+                        key={option}
+                        className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-gray-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const newSelected = safeSelected.includes(option)
+                            ? safeSelected.filter(item => item !== option)
+                            : [...safeSelected, option];
+                          onSelectedChange(newSelected);
+                        }}
+                      >
+                        <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                          {safeSelected.includes(option) && (
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m5 12 5 5L20 7" />
+                            </svg>
+                          )}
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          {renderOption(option)}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>,
+            document.body,
+          )}
         </>
       );
     } catch (error) {
