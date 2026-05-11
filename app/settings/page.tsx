@@ -348,17 +348,18 @@ function SettingsContent() {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
+    // Allow-list to match the bucket's allowed_mime_types — Supabase
+    // rejects mismatches with a confusing "mime type not supported" error.
+    const ALLOWED = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!ALLOWED.includes(file.type)) {
       toast({
-        title: 'Invalid file type',
-        description: 'Please upload an image file.',
+        title: 'Unsupported image format',
+        description: 'Please upload a JPG, PNG, GIF, or WebP image.',
         variant: 'destructive',
       });
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: 'File too large',
@@ -370,79 +371,77 @@ function SettingsContent() {
 
     setUploadingPhoto(true);
 
-    try {
-      // Create unique filename
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+    // File path = {user_id}/{timestamp}.{ext}. The {user_id} prefix
+    // matches the storage RLS policy that gates writes on
+    // (storage.foldername(name))[1] = auth.uid().
+    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+    try {
+      const { error: uploadError } = await supabase.storage
         .from('profile-photos')
         .upload(fileName, file, {
           cacheControl: '3600',
           upsert: true,
+          contentType: file.type,
         });
 
       if (uploadError) {
-        // If bucket doesn't exist, try campaign-report-files as fallback
-        const fallbackFileName = `profile-photos/${user.id}/${Date.now()}.${fileExt}`;
-        const { data: fallbackData, error: fallbackError } = await supabase.storage
-          .from('campaign-report-files')
-          .upload(fallbackFileName, file, {
-            cacheControl: '3600',
-            upsert: true,
-          });
-
-        if (fallbackError) {
-          throw fallbackError;
-        }
-
-        // Get public URL from fallback bucket
-        const { data: { publicUrl } } = supabase.storage
-          .from('campaign-report-files')
-          .getPublicUrl(fallbackFileName);
-
-        // Update user profile with new photo URL
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({ profile_photo_url: publicUrl, updated_at: new Date().toISOString() })
-          .eq('id', user.id);
-
-        if (updateError) throw updateError;
-
-        setFormData(prev => ({ ...prev, profile_photo_url: publicUrl }));
-      } else {
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-          .from('profile-photos')
-          .getPublicUrl(fileName);
-
-        // Update user profile with new photo URL
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({ profile_photo_url: publicUrl, updated_at: new Date().toISOString() })
-          .eq('id', user.id);
-
-        if (updateError) throw updateError;
-
-        setFormData(prev => ({ ...prev, profile_photo_url: publicUrl }));
+        // Surface the real reason instead of a generic "Upload failed".
+        // Common cases: Bucket not found / new row violates RLS / payload
+        // too large. Each tells the user (or you) exactly what to fix.
+        console.error('[settings] profile-photos upload error:', uploadError);
+        toast({
+          title: 'Upload failed',
+          description: uploadError.message || 'Storage rejected the upload.',
+          variant: 'destructive',
+        });
+        return;
       }
 
+      const { data: { publicUrl } } = supabase.storage
+        .from('profile-photos')
+        .getPublicUrl(fileName);
+
+      // Cache-buster — Supabase serves with a 1-hour cache header, so the
+      // <img> wouldn't refresh if you re-uploaded within an hour. Append a
+      // version query param so the URL is always unique per upload.
+      const finalUrl = `${publicUrl}?v=${Date.now()}`;
+
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ profile_photo_url: finalUrl, updated_at: new Date().toISOString() })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('[settings] users update error:', updateError);
+        toast({
+          title: 'Photo uploaded but profile not updated',
+          description: updateError.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setFormData(prev => ({ ...prev, profile_photo_url: finalUrl }));
       await refreshUserProfile();
 
       toast({
         title: 'Photo updated',
         description: 'Your profile photo has been updated successfully.',
       });
-    } catch (error) {
-      console.error('Error uploading photo:', error);
+    } catch (error: any) {
+      console.error('[settings] photo upload exception:', error);
       toast({
         title: 'Upload failed',
-        description: 'Failed to upload profile photo. Please try again.',
+        description: error?.message || 'Unexpected error. Check the browser console.',
         variant: 'destructive',
       });
     } finally {
       setUploadingPhoto(false);
+      // Clear the input so the same file can be re-selected (browsers
+      // dedupe by filename and won't refire onChange for an identical pick).
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
