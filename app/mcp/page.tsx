@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import {
-  Bot, Search, Copy, Check, Sparkles, Target, Building2, Megaphone, Users,
+  Search, Copy, Check, Sparkles, Target, Building2, Megaphone, Users,
   GitBranch, AlertCircle, ListTodo, FileText, BarChart3,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -558,36 +558,32 @@ export default function McpGuidePage() {
   const matchedTools = filteredGroups.reduce((n, g) => n + g.tools.length, 0);
 
   return (
-    <div className="max-w-4xl mx-auto pb-12">
-      {/* ── Hero ───────────────────────────────────────────────────── */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="h-12 w-12 rounded-2xl bg-brand flex items-center justify-center">
-            <Bot className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Claude Cookbook</h1>
-            <p className="text-sm text-gray-500">HoloHive MCP — example prompts for every tool</p>
-          </div>
+    <div className="space-y-6">
+      {/* Header — matches Field Options / Archive tab styling for
+          consistency inside the combined /admin tabbed view. The
+          richer hero (large icon + 3xl heading) was right when this
+          was a standalone page; inside a tab it just adds visual noise
+          on top of the parent TabsList. */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Claude MCP</h2>
+          <p className="text-gray-600">
+            HoloHive&rsquo;s connector for Claude.ai — example prompts for every tool.
+            <span className="text-gray-500"> {totalTools} read-only tools across 8 surfaces.</span>
+          </p>
         </div>
-        <p className="text-base text-gray-700 leading-relaxed max-w-2xl">
-          When you connect HoloHive to Claude.ai, you can ask Claude questions about your prospects,
-          campaigns, KOLs, and CRM in plain English. <strong>25 read-only tools</strong> across 8
-          surfaces — copy any prompt below and paste it into a Claude chat.
-        </p>
-
-        {/* Cross-link to the analytics dashboard — same data, dashboard view */}
-        <div className="mt-4 inline-flex items-center gap-2 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-          <BarChart3 className="h-3.5 w-3.5 text-brand" />
-          <span>Want a one-page snapshot instead of asking Claude?</span>
-          <a href="/analytics" className="text-brand font-semibold hover:underline">
-            Open Analytics →
-          </a>
-        </div>
+        <a
+          href="/analytics"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:underline shrink-0 px-3 py-1.5 border border-brand/30 rounded-md hover:bg-brand/5"
+          title="One-page snapshot instead of asking Claude"
+        >
+          <BarChart3 className="h-3.5 w-3.5" />
+          Open Analytics
+        </a>
       </div>
 
       {/* ── Setup card ─────────────────────────────────────────────── */}
-      <div className="mb-10 rounded-2xl bg-gradient-to-br from-brand/8 to-brand/3 border border-brand/20 p-6">
+      <div className="rounded-2xl bg-gradient-to-br from-brand/8 to-brand/3 border border-brand/20 p-6">
         <div className="flex items-center gap-2 mb-4">
           <span className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-brand text-white text-xs font-bold">
             ⚡
@@ -625,7 +621,7 @@ export default function McpGuidePage() {
       </div>
 
       {/* ── Sticky filter bar ──────────────────────────────────────── */}
-      <div className="sticky top-0 z-10 -mx-4 px-4 py-3 mb-6 bg-white/95 backdrop-blur border-b border-gray-100">
+      <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-white/95 backdrop-blur border-b border-gray-100">
         <div className="space-y-3">
           <div className="flex items-center gap-3 flex-wrap">
             <div className="relative flex-1 min-w-[260px]">
