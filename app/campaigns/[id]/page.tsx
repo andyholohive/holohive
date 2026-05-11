@@ -78,7 +78,10 @@ const CampaignDetailsPage = () => {
   const [editMode, setEditMode] = useState(false);
   const [form, setForm] = useState<CampaignDetails | null>(null);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("information");
+  // KOL Dashboard is the default landing tab — that's what users open
+  // a campaign to look at. "information" was the legacy default but
+  // less useful as a starting point for day-to-day work.
+  const [activeTab, setActiveTab] = useState("kols");
   // Track cell editing for inline edits
   const [editingCell, setEditingCell] = useState<{ row: string; field: string } | null>(null);
   const [editingValue, setEditingValue] = useState<any>(null);
