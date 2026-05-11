@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Copy, ExternalLink, Archive, AlertTriangle, LayoutGrid, List, ChevronLeft, ChevronRight } from "lucide-react";
 import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -307,13 +308,30 @@ export default function CampaignsPage() {
     return matchesClient && matchesSearch && matchesStatus;
   });
 
-  // Count campaigns by status for tab badges
+  // Apply the same client-scope filter the tab badges use, so the
+  // hover preview lists exactly what's counted by the badge next to it.
+  const scopedCampaigns = campaigns.filter(c =>
+    clientIdParam && addParam !== '1' ? c.client_id === clientIdParam : true
+  );
+
+  // Build (status -> [campaign names]) once. Used both for the badge
+  // counts AND for the hover tooltips that preview which campaigns
+  // are in each status. Sorted alphabetically for predictable display.
+  const campaignsByStatus: Record<'all' | 'Planning' | 'Active' | 'Paused' | 'Completed', string[]> = {
+    all:       scopedCampaigns.map(c => c.name).sort((a, b) => a.localeCompare(b)),
+    Planning:  scopedCampaigns.filter(c => c.status === 'Planning').map(c => c.name).sort((a, b) => a.localeCompare(b)),
+    Active:    scopedCampaigns.filter(c => c.status === 'Active').map(c => c.name).sort((a, b) => a.localeCompare(b)),
+    Paused:    scopedCampaigns.filter(c => c.status === 'Paused').map(c => c.name).sort((a, b) => a.localeCompare(b)),
+    Completed: scopedCampaigns.filter(c => c.status === 'Completed').map(c => c.name).sort((a, b) => a.localeCompare(b)),
+  };
+
+  // Count campaigns by status for tab badges (derived from the names map)
   const statusCounts = {
-    all: campaigns.filter(c => clientIdParam && addParam !== '1' ? c.client_id === clientIdParam : true).length,
-    Planning: campaigns.filter(c => c.status === "Planning" && (clientIdParam && addParam !== '1' ? c.client_id === clientIdParam : true)).length,
-    Active: campaigns.filter(c => c.status === "Active" && (clientIdParam && addParam !== '1' ? c.client_id === clientIdParam : true)).length,
-    Paused: campaigns.filter(c => c.status === "Paused" && (clientIdParam && addParam !== '1' ? c.client_id === clientIdParam : true)).length,
-    Completed: campaigns.filter(c => c.status === "Completed" && (clientIdParam && addParam !== '1' ? c.client_id === clientIdParam : true)).length,
+    all:       campaignsByStatus.all.length,
+    Planning:  campaignsByStatus.Planning.length,
+    Active:    campaignsByStatus.Active.length,
+    Paused:    campaignsByStatus.Paused.length,
+    Completed: campaignsByStatus.Completed.length,
   };
 
   // Pagination
@@ -995,41 +1013,56 @@ export default function CampaignsPage() {
       <div className="flex items-center justify-between gap-4">
         <Tabs value={statusFilter} onValueChange={setStatusFilter} className="flex-1">
           <TabsList className="bg-gray-100 p-1 h-auto flex-wrap">
-            <TabsTrigger
-              value="all"
-              className="data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm px-4 py-2"
-            >
-              All
-              <span className="ml-2 text-xs bg-gray-200 data-[state=active]:bg-gray-100 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.all}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="Planning"
-              className="data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm px-4 py-2"
-            >
-              Planning
-              <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.Planning}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="Active"
-              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm px-4 py-2"
-            >
-              Active
-              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.Active}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="Paused"
-              className="data-[state=active]:bg-white data-[state=active]:text-yellow-700 data-[state=active]:shadow-sm px-4 py-2"
-            >
-              Paused
-              <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.Paused}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="Completed"
-              className="data-[state=active]:bg-white data-[state=active]:text-gray-700 data-[state=active]:shadow-sm px-4 py-2"
-            >
-              Completed
-              <span className="ml-2 text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.Completed}</span>
-            </TabsTrigger>
+            {/* Each tab shows a hover tooltip with the campaign names in
+                that status, so the manager can scan what's where without
+                clicking through. delayDuration kept short so it feels
+                responsive but doesn't fire on accidental fly-by hovers. */}
+            <TooltipProvider delayDuration={250}>
+              {([
+                { value: 'all',       label: 'All',       activeTextClass: 'data-[state=active]:text-gray-900', countClass: 'bg-gray-200 data-[state=active]:bg-gray-100' },
+                { value: 'Planning',  label: 'Planning',  activeTextClass: 'data-[state=active]:text-blue-700', countClass: 'bg-blue-100 text-blue-700' },
+                { value: 'Active',    label: 'Active',    activeTextClass: 'data-[state=active]:text-brand',     countClass: 'bg-brand-light text-brand' },
+                { value: 'Paused',    label: 'Paused',    activeTextClass: 'data-[state=active]:text-yellow-700',countClass: 'bg-yellow-100 text-yellow-700' },
+                { value: 'Completed', label: 'Completed', activeTextClass: 'data-[state=active]:text-gray-700', countClass: 'bg-gray-200 text-gray-700' },
+              ] as const).map((t) => {
+                const names = campaignsByStatus[t.value as keyof typeof campaignsByStatus];
+                return (
+                  <Tooltip key={t.value}>
+                    <TooltipTrigger asChild>
+                      <TabsTrigger
+                        value={t.value}
+                        className={`data-[state=active]:bg-white data-[state=active]:shadow-sm px-4 py-2 ${t.activeTextClass}`}
+                      >
+                        {t.label}
+                        <span className={`ml-2 text-xs px-2 py-0.5 rounded-full pointer-events-none ${t.countClass}`}>{names.length}</span>
+                      </TabsTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" align="start" className="max-w-xs p-0">
+                      {names.length === 0 ? (
+                        <div className="px-3 py-2 text-xs text-gray-500 italic">No campaigns</div>
+                      ) : (
+                        <div className="py-1.5 max-h-72 overflow-y-auto">
+                          <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100">
+                            {names.length} {t.label.toLowerCase()} campaign{names.length === 1 ? '' : 's'}
+                          </div>
+                          <ul className="text-xs">
+                            {/* Cap at 50 to keep the popover sane —
+                                anyone with 50+ campaigns in a single
+                                status should be filtering, not scanning. */}
+                            {names.slice(0, 50).map((n) => (
+                              <li key={n} className="px-3 py-1 truncate">{n}</li>
+                            ))}
+                            {names.length > 50 && (
+                              <li className="px-3 py-1 text-gray-400 italic">…and {names.length - 50} more</li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </TooltipProvider>
           </TabsList>
         </Tabs>
         {/* View Toggle */}
