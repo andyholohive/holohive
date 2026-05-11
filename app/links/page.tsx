@@ -26,9 +26,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import {
   Plus, Search, Edit, Trash2, ExternalLink, Link as LinkIcon,
-  ChevronsUpDown, X, ChevronRight, ChevronDown, Building2, BookOpen, Users, Info
+  ChevronsUpDown, X, ChevronRight, ChevronDown, Building2, BookOpen, Users, Info, Clock
 } from 'lucide-react';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { formatDistanceToNow } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { supabase } from '@/lib/supabase';
@@ -90,7 +91,7 @@ export default function LinksPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<'holohive' | 'guide' | 'clients'>('holohive');
+  const [activeTab, setActiveTab] = useState<'holohive' | 'guide' | 'clients' | 'latest'>('holohive');
 
   // Dialog state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -356,6 +357,13 @@ export default function LinksPage() {
       case 'clients':
         tabLinks = links.filter(link => link.client && link.client !== 'Holo Hive');
         break;
+      case 'latest':
+        // Show every link, regardless of client/type. Sort happens at
+        // render time so search/access/type filters can re-narrow without
+        // re-sorting. Initial fetch already returns by created_at DESC,
+        // but we re-sort here defensively in case filters change order.
+        tabLinks = links;
+        break;
     }
 
     return tabLinks;
@@ -438,8 +446,20 @@ export default function LinksPage() {
 
   // Count links per tab
   const holoHiveCount = links.filter(l => l.client === 'Holo Hive').length;
-  const guideCount = links.filter(l => l.link_types.includes('guide')).length;
+  const guideCount = links.filter(l => l.link_types?.includes('guide')).length;
   const clientsCount = links.filter(l => l.client && l.client !== 'Holo Hive').length;
+  const latestCount = links.length;
+
+  // Latest tab — flat list sorted newest first. Reuses filteredLinks
+  // (search + access + type filters still apply) so the user can scope
+  // "latest from a specific client/type" without leaving the tab.
+  const latestSorted = activeTab === 'latest'
+    ? [...filteredLinks].sort((a, b) => {
+        const aT = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bT = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return bT - aT; // newest → oldest
+      })
+    : [];
 
   if (loading) {
     return (
@@ -512,6 +532,14 @@ export default function LinksPage() {
             Clients
             <Badge variant="secondary" className="ml-1 text-xs">{clientsCount}</Badge>
           </TabsTrigger>
+          {/* Latest — flat newest-first view across every link. Useful
+              for "what was added recently" reviews without scanning each
+              client section. Search/Access/Type filters above still apply. */}
+          <TabsTrigger value="latest" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Latest
+            <Badge variant="secondary" className="ml-1 text-xs">{latestCount}</Badge>
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -559,8 +587,136 @@ export default function LinksPage() {
         )}
       </div>
 
-      {/* Grouped Links by Client */}
-      {groups.length === 0 ? (
+      {/* Latest tab — flat newest-first table. Renders independently
+          from the grouped client view because the whole point is to
+          break the by-client grouping and surface chronology. Includes
+          a Client column (rows are mixed across clients) and an Added
+          column with the relative timestamp. */}
+      {activeTab === 'latest' ? (
+        latestSorted.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Clock className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <p className="text-lg font-medium text-gray-900">No links found</p>
+              <p className="text-sm text-gray-500 mt-1">
+                {links.length === 0 ? 'Add your first link to get started' : 'Try adjusting your filters'}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50/50">
+                  <TableHead className="w-[200px]">Name</TableHead>
+                  <TableHead className="w-[140px]">Client</TableHead>
+                  <TableHead className="w-[200px]">URL</TableHead>
+                  <TableHead className="w-[200px]">Link Type</TableHead>
+                  <TableHead className="w-[100px]">Access</TableHead>
+                  <TableHead className="w-[120px]">Added</TableHead>
+                  <TableHead className="w-16 text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {latestSorted.map(link => {
+                  const clientName = (link.client_id && clientMap[link.client_id]) ? clientMap[link.client_id] : (link.client || 'No Client');
+                  const isNoClient = clientName === 'No Client';
+                  return (
+                    <TableRow key={link.id} className="hover:bg-gray-50">
+                      <TableCell className="font-medium">
+                        {link.description ? (
+                          <HoverCard>
+                            <HoverCardTrigger asChild>
+                              <span className="cursor-help flex items-center gap-1">
+                                {link.name}
+                                <Info className="h-3 w-3 text-gray-400" />
+                              </span>
+                            </HoverCardTrigger>
+                            <HoverCardContent className="w-80">
+                              <div className="space-y-1">
+                                <h4 className="text-sm font-semibold">{link.name}</h4>
+                                <p className="text-sm text-gray-600">{link.description}</p>
+                              </div>
+                            </HoverCardContent>
+                          </HoverCard>
+                        ) : (
+                          link.name
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          <Building2 className={`h-3 w-3 ${isNoClient ? 'text-gray-300' : 'text-gray-400'}`} />
+                          <span className={`text-sm ${isNoClient ? 'text-gray-400 italic' : 'text-gray-700'}`}>
+                            {clientName}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline flex items-center gap-1 max-w-[200px] truncate"
+                        >
+                          {link.url.replace(/^https?:\/\//, '').substring(0, 30)}
+                          {link.url.length > 30 ? '...' : ''}
+                          <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                        </a>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {(link.link_types ?? []).length > 0 ? (
+                            (link.link_types ?? []).map(type => (
+                              <Badge key={type} variant="outline" className="text-xs cursor-default">
+                                {getLinkTypeLabel(type)}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`${getAccessBadgeColor(link.access)} cursor-default`}>
+                          {getAccessLabel(link.access)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-gray-500 whitespace-nowrap" title={link.created_at || ''}>
+                        {link.created_at
+                          ? formatDistanceToNow(new Date(link.created_at), { addSuffix: true })
+                          : '—'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">•••</Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => window.open(link.url, '_blank')}>
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              Open Link
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openDialog(link)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDelete(link)} className="text-red-600">
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )
+      ) : (
+      /* Grouped Links by Client (existing tabs) */
+      groups.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <LinkIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
@@ -662,8 +818,8 @@ export default function LinksPage() {
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-wrap gap-1">
-                                {link.link_types.length > 0 ? (
-                                  link.link_types.map(type => (
+                                {(link.link_types ?? []).length > 0 ? (
+                                  (link.link_types ?? []).map(type => (
                                     <Badge key={type} variant="outline" className="text-xs cursor-default">
                                       {getLinkTypeLabel(type)}
                                     </Badge>
@@ -714,6 +870,7 @@ export default function LinksPage() {
             );
           })}
         </div>
+      )
       )}
 
       {/* Add/Edit Dialog */}
