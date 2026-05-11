@@ -178,7 +178,7 @@ export default function SalesPipelinePage() {
   const [actionsSearch, setActionsSearch] = useState('');
   const [pipelineSearch, setPipelineSearch] = useState('');
   const [orbitSearch, setOrbitSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery' | 'forecast' | 'metrics'>('actions');
+  const [activeTab, setActiveTab] = useState<'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery'>('actions');
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('table');
   const [pathFilter, setPathFilter] = useState<'all' | 'closer' | 'sdr'>('all');
   // Overall-tab unified search — broadcasts into Outreach/Pipeline/Orbit
@@ -187,12 +187,18 @@ export default function SalesPipelinePage() {
   const [overallSearch, setOverallSearch] = useState('');
 
   // Metrics tab state — bookings are lazy-loaded the first time the
-  // Metrics tab is opened (or the Outreach metrics strip mounts).
+  // Metrics sub-section is opened (or the Outreach metrics strip mounts).
   // Range is rolling-90-day default which covers most analyst windows.
   const [metricsBookings, setMetricsBookings] = useState<Booking[]>([]);
   const [metricsBookingsLoading, setMetricsBookingsLoading] = useState(false);
   const [metricsRangeDays, setMetricsRangeDays] = useState<7 | 30 | 90>(30);
   const [metricsUserId, setMetricsUserId] = useState<string>('');
+
+  // Top sub-section tabs — Forecast + Metrics live in a separate Tabs
+  // container above the main tab strip (between Weekly Activity Funnel
+  // and Attention Cards). Independent of `activeTab` so users can keep
+  // both views in mind without one resetting the other.
+  const [topSectionTab, setTopSectionTab] = useState<'forecast' | 'metrics'>('forecast');
 
   // DnD state
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -913,12 +919,15 @@ export default function SalesPipelinePage() {
     };
   }, [opportunities, metricsBookings]);
 
-  // Load bookings the first time the user opens Metrics or the Outreach strip.
+  // Load bookings the first time:
+  //   - the user lands on the Outreach tab (for the per-user strip), OR
+  //   - the top sub-section is on Metrics (for the team scorecard).
+  // Pull 90 days once — covers all three range options without refetching.
   useEffect(() => {
-    if (activeTab !== 'metrics' && activeTab !== 'outreach') return;
+    const wantsBookings = activeTab === 'outreach' || topSectionTab === 'metrics';
+    if (!wantsBookings) return;
     if (metricsBookings.length > 0 || metricsBookingsLoading) return;
     setMetricsBookingsLoading(true);
-    // Pull last 90 days — covers all three default range options without refetching.
     const to = new Date();
     const from = new Date();
     from.setDate(from.getDate() - 90);
@@ -926,10 +935,9 @@ export default function SalesPipelinePage() {
       .then(rows => setMetricsBookings(rows))
       .catch(err => console.error('Error loading metrics bookings:', err))
       .finally(() => setMetricsBookingsLoading(false));
-    // Default to current user when first opening Metrics.
     if (!metricsUserId && user?.id) setMetricsUserId(user.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [activeTab, topSectionTab]);
 
   // KPI roll-up at top of Forecast tab.
   const forecastKpis = useMemo(() => {
@@ -2802,7 +2810,14 @@ export default function SalesPipelinePage() {
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-sky-700 uppercase tracking-wide">My outreach · last 30 days</span>
               <button
-                onClick={() => setActiveTab('metrics')}
+                onClick={() => {
+                  setTopSectionTab('metrics');
+                  // Scroll to the top sub-section so the user actually
+                  // sees the Metrics view they just switched to.
+                  if (typeof window !== 'undefined') {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                }}
                 className="text-xs text-sky-700 hover:underline"
               >
                 View team metrics →
@@ -6401,6 +6416,47 @@ export default function SalesPipelinePage() {
         )}
       </div>
 
+      {/* Forecast + Metrics — separate sub-section so the manager-style
+          analytics live above the operational tabs. Independent state
+          (topSectionTab) keeps it from resetting when the user switches
+          main tabs below. */}
+      <div className="bg-white rounded-xl border border-gray-200">
+        <Tabs value={topSectionTab} onValueChange={v => setTopSectionTab(v as 'forecast' | 'metrics')}>
+          <div className="flex items-center justify-between px-5 pt-4 border-b border-gray-100">
+            <TabsList className="bg-transparent p-0 h-auto gap-1">
+              <TabsTrigger
+                value="forecast"
+                className="flex items-center gap-2 data-[state=active]:bg-brand-light data-[state=active]:text-brand data-[state=active]:shadow-none rounded-md px-3 py-1.5 text-sm"
+              >
+                <TrendingUp className="h-4 w-4" />
+                Forecast
+                {forecastOpps.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 text-[10px]">{forecastOpps.length}</Badge>
+                )}
+                {forecastKpis.atRiskCount > 0 && (
+                  <Badge variant="secondary" className="ml-1 bg-red-100 text-red-700 hover:bg-red-100 text-[10px]" title={`${forecastKpis.atRiskCount} at-risk`}>
+                    {forecastKpis.atRiskCount} at-risk
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger
+                value="metrics"
+                className="flex items-center gap-2 data-[state=active]:bg-brand-light data-[state=active]:text-brand data-[state=active]:shadow-none rounded-md px-3 py-1.5 text-sm"
+              >
+                <BarChart3 className="h-4 w-4" />
+                Metrics
+              </TabsTrigger>
+            </TabsList>
+          </div>
+          <TabsContent value="forecast" className="mt-0 p-5 pt-4">
+            {renderForecastTab()}
+          </TabsContent>
+          <TabsContent value="metrics" className="mt-0 p-5 pt-4">
+            {renderMetricsTab()}
+          </TabsContent>
+        </Tabs>
+      </div>
+
       {/* Attention Cards — urgency items for managers (clickable, always unfiltered) */}
       <div className="grid grid-cols-5 gap-3">
         {/* Booking Needed */}
@@ -6827,7 +6883,7 @@ export default function SalesPipelinePage() {
       </Card>
 
       {/* Tabs + Controls */}
-      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery' | 'forecast' | 'metrics')}>
+      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as 'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery')}>
         <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <TabsList>
             <TabsTrigger value="overview" className="flex items-center gap-2">
@@ -6860,22 +6916,6 @@ export default function SalesPipelinePage() {
                 ).length;
                 return pipelineCount > 0 ? <Badge variant="secondary" className="ml-1">{pipelineCount}</Badge> : null;
               })()}
-            </TabsTrigger>
-            <TabsTrigger value="forecast" className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Forecast
-              {forecastOpps.length > 0 && (
-                <Badge variant="secondary" className="ml-1">{forecastOpps.length}</Badge>
-              )}
-              {forecastKpis.atRiskCount > 0 && (
-                <Badge variant="secondary" className="ml-1 bg-red-100 text-red-700 hover:bg-red-100" title={`${forecastKpis.atRiskCount} at-risk`}>
-                  {forecastKpis.atRiskCount} at-risk
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="metrics" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Metrics
             </TabsTrigger>
             <TabsTrigger value="orbit" className="flex items-center gap-2">
               <RotateCcw className="h-4 w-4" />
@@ -6954,14 +6994,6 @@ export default function SalesPipelinePage() {
             />
           </div>
           {viewMode === 'kanban' ? renderKanban() : renderTable()}
-        </TabsContent>
-
-        <TabsContent value="forecast" className="mt-0">
-          {renderForecastTab()}
-        </TabsContent>
-
-        <TabsContent value="metrics" className="mt-0">
-          {renderMetricsTab()}
         </TabsContent>
 
         <TabsContent value="orbit" className="mt-0">
