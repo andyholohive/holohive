@@ -125,10 +125,16 @@ function deltaColor(delta: number): { bg: string; border: string; text: string }
   return { bg: 'hsl(220, 10%, 28%)', border: 'hsl(220, 10%, 22%)', text: '#e5e7eb' };
 }
 
-function TreemapCell(props: TreemapPayload & { onSelect?: (projectId: string) => void }) {
-  const { x = 0, y = 0, width = 0, height = 0, payload, onSelect } = props;
-  if (!payload || width < 4 || height < 4) return null;
-  const { name, mindshare_pct, delta_pct, spark, rank } = payload;
+function TreemapCell(props: any) {
+  const { x = 0, y = 0, width = 0, height = 0, onSelect } = props;
+  // Recharts spreads each node's data fields directly on props (not
+  // under `payload` like Tooltip does). Fall back to props.payload if a
+  // future version changes the convention.
+  const data = props.payload && typeof props.payload === 'object' && 'name' in props.payload
+    ? props.payload
+    : props;
+  const { name, mindshare_pct, delta_pct, spark, rank, project_id } = data;
+  if (width < 4 || height < 4 || !name) return null;
   const colors = deltaColor(delta_pct ?? 0);
 
   // Responsive text sizing — readable on small cells, prominent on large.
@@ -156,8 +162,8 @@ function TreemapCell(props: TreemapPayload & { onSelect?: (projectId: string) =>
 
   return (
     <g
-      onClick={() => onSelect && payload.project_id && onSelect(payload.project_id)}
-      style={{ cursor: onSelect && payload.project_id ? 'pointer' : 'default' }}
+      onClick={() => onSelect && project_id && onSelect(project_id)}
+      style={{ cursor: onSelect && project_id ? 'pointer' : 'default' }}
     >
       <rect
         x={x}
