@@ -108,21 +108,38 @@ interface TreemapPayload {
   rank?: number;
 }
 
-function deltaColor(delta: number): { bg: string; border: string; text: string } {
+function deltaColor(delta: number): { bg: string; border: string; text: string; muted: string } {
   // Anchor saturation to ±5 percentage points; clamp so extreme outliers
   // don't blow out the palette.
   const clamped = Math.max(-5, Math.min(5, delta));
   const intensity = Math.abs(clamped) / 5; // 0..1
   if (delta > 0.1) {
-    // emerald scale
-    const lightness = 35 - intensity * 10; // darker green for stronger gain
-    return { bg: `hsl(152, 60%, ${lightness}%)`, border: `hsl(152, 60%, ${lightness - 8}%)`, text: '#ecfdf5' };
+    // emerald scale — softer hues, lighter on weak gains, deeper on strong
+    const lightness = 42 - intensity * 14;
+    const sat = 38 + intensity * 12;
+    return {
+      bg: `hsl(152, ${sat}%, ${lightness}%)`,
+      border: `hsl(152, ${sat}%, ${lightness - 10}%)`,
+      text: '#f0fdf4',
+      muted: 'rgba(240, 253, 244, 0.72)',
+    };
   }
   if (delta < -0.1) {
-    const lightness = 38 - intensity * 10;
-    return { bg: `hsl(0, 60%, ${lightness}%)`, border: `hsl(0, 60%, ${lightness - 8}%)`, text: '#fef2f2' };
+    const lightness = 44 - intensity * 14;
+    const sat = 42 + intensity * 12;
+    return {
+      bg: `hsl(358, ${sat}%, ${lightness}%)`,
+      border: `hsl(358, ${sat}%, ${lightness - 10}%)`,
+      text: '#fff1f2',
+      muted: 'rgba(255, 241, 242, 0.72)',
+    };
   }
-  return { bg: 'hsl(220, 10%, 28%)', border: 'hsl(220, 10%, 22%)', text: '#e5e7eb' };
+  return {
+    bg: 'hsl(220, 14%, 30%)',
+    border: 'hsl(220, 14%, 22%)',
+    text: '#f1f5f9',
+    muted: 'rgba(241, 245, 249, 0.7)',
+  };
 }
 
 function TreemapCell(props: any) {
@@ -137,96 +154,164 @@ function TreemapCell(props: any) {
   if (width < 4 || height < 4 || !name) return null;
   const colors = deltaColor(delta_pct ?? 0);
 
-  // Responsive text sizing — readable on small cells, prominent on large.
-  const showFullLabel = width > 90 && height > 60;
-  const showSpark = width > 110 && height > 80;
-  const showCrown = rank !== undefined && rank <= 3;
-  // Cap label font size so big cells don't get absurd headers.
-  const fontSize = Math.min(28, Math.max(11, Math.min(width / 8, height / 4)));
-  const pctFontSize = Math.max(9, fontSize * 0.65);
+  // Layout tiers — each adds more decoration as cells get bigger.
+  // Below "small" we show only a centered, abbreviated name.
+  const tier =
+    width > 160 && height > 110 ? 'xl' :
+    width > 110 && height > 80 ? 'lg' :
+    width > 70 && height > 50 ? 'md' :
+    width > 38 && height > 28 ? 'sm' : 'xs';
 
-  // Build the sparkline points relative to this cell. Anchored to the
-  // bottom 35% of the cell so the title stays readable up top.
-  let sparkPoints = '';
-  if (showSpark && Array.isArray(spark) && spark.length > 1) {
+  const showCrown = (rank ?? 999) <= 3 && (tier === 'lg' || tier === 'xl');
+  const positive = (delta_pct ?? 0) > 0.1;
+  const negative = (delta_pct ?? 0) < -0.1;
+
+  // Cap label font size so giant cells don't get absurd headers.
+  const titleSize = tier === 'xl' ? 26 : tier === 'lg' ? 20 : tier === 'md' ? 14 : tier === 'sm' ? 11 : 10;
+  const pctSize = tier === 'xl' ? 16 : tier === 'lg' ? 13 : tier === 'md' ? 11 : 10;
+  const deltaSize = tier === 'xl' ? 12 : 11;
+  const padding = tier === 'xl' ? 16 : tier === 'lg' ? 12 : 8;
+
+  // Build the sparkline as an area underneath a stroke line, pinned to
+  // the bottom 35% of the cell. Title stays in the top-left.
+  let sparkLine = '';
+  let sparkArea = '';
+  const showSpark = (tier === 'lg' || tier === 'xl') && Array.isArray(spark) && spark.length > 1;
+  if (showSpark) {
     const max = Math.max(...spark, 1);
-    const padX = 8;
-    const padTop = height * 0.55;
-    const sparkH = height - padTop - 8;
-    const sparkW = width - padX * 2;
+    const sparkPadX = padding;
+    const sparkBottomPad = padding;
+    const sparkTop = y + height * 0.62;
+    const sparkH = height * 0.32 - sparkBottomPad;
+    const sparkW = width - sparkPadX * 2;
+    const baseY = sparkTop + sparkH;
     const stepX = sparkW / (spark.length - 1);
-    sparkPoints = spark
-      .map((v: number, i: number) => `${(x + padX + i * stepX).toFixed(2)},${(y + padTop + sparkH - (v / max) * sparkH).toFixed(2)}`)
-      .join(' ');
+    const points = spark.map((v: number, i: number) => {
+      const px = x + sparkPadX + i * stepX;
+      const py = sparkTop + sparkH - (v / max) * sparkH;
+      return [px, py] as const;
+    });
+    sparkLine = points.map(([px, py]) => `${px.toFixed(2)},${py.toFixed(2)}`).join(' ');
+    sparkArea =
+      `M ${points[0][0].toFixed(2)},${baseY.toFixed(2)} ` +
+      points.map(([px, py]) => `L ${px.toFixed(2)},${py.toFixed(2)}`).join(' ') +
+      ` L ${points[points.length - 1][0].toFixed(2)},${baseY.toFixed(2)} Z`;
   }
+
+  // Truncate names that won't fit horizontally. Rough proxy: ~7px per char.
+  const truncate = (s: string, max: number) =>
+    s.length <= max ? s : s.slice(0, Math.max(1, max - 1)) + '…';
+  const charsFit = Math.max(3, Math.floor((width - padding * 2) / (titleSize * 0.55)));
+  const displayName = truncate(name, charsFit);
+
+  const deltaSign = positive ? '+' : '';
+  const deltaText = `${deltaSign}${(delta_pct ?? 0).toFixed(2)}%`;
+  const deltaArrow = positive ? '▲' : negative ? '▼' : '·';
 
   return (
     <g
       onClick={() => onSelect && project_id && onSelect(project_id)}
       style={{ cursor: onSelect && project_id ? 'pointer' : 'default' }}
     >
+      {/* Cell background — slight rounding for a more polished look. */}
       <rect
-        x={x}
-        y={y}
-        width={width}
-        height={height}
+        x={x + 1}
+        y={y + 1}
+        width={Math.max(0, width - 2)}
+        height={Math.max(0, height - 2)}
         fill={colors.bg}
         stroke={colors.border}
         strokeWidth={1}
+        rx={6}
+        ry={6}
       />
-      {showCrown && (
-        <g transform={`translate(${x + width - 22}, ${y + 6})`}>
-          <text fontSize={14} fill="#fbbf24">👑</text>
-        </g>
+      {/* Subtle top-left highlight for depth */}
+      <rect
+        x={x + 1}
+        y={y + 1}
+        width={Math.max(0, width - 2)}
+        height={Math.min(24, height - 2)}
+        fill="rgba(255,255,255,0.04)"
+        rx={6}
+        ry={6}
+        style={{ pointerEvents: 'none' }}
+      />
+      {/* Sparkline area + line */}
+      {sparkArea && (
+        <path d={sparkArea} fill={colors.text} opacity={0.08} style={{ pointerEvents: 'none' }} />
       )}
-      {showFullLabel ? (
-        <>
-          <text
-            x={x + 10}
-            y={y + 8 + fontSize * 0.85}
-            fill={colors.text}
-            fontSize={fontSize}
-            fontWeight={700}
-            style={{ pointerEvents: 'none' }}
-          >
-            {name}
-          </text>
-          <text
-            x={x + 10}
-            y={y + 8 + fontSize * 0.85 + pctFontSize + 4}
-            fill={colors.text}
-            fontSize={pctFontSize}
-            fontWeight={500}
-            opacity={0.9}
-            style={{ pointerEvents: 'none' }}
-          >
-            {(mindshare_pct ?? 0).toFixed(2)}%
-          </text>
-        </>
-      ) : (
-        // Tiny cells: show just the project name centered, smaller
+      {sparkLine && (
+        <polyline
+          points={sparkLine}
+          fill="none"
+          stroke={colors.text}
+          strokeWidth={1.5}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          opacity={0.85}
+          style={{ pointerEvents: 'none' }}
+        />
+      )}
+      {showCrown && (
+        <text
+          x={x + width - padding}
+          y={y + padding + 4}
+          fontSize={tier === 'xl' ? 16 : 14}
+          textAnchor="end"
+          style={{ pointerEvents: 'none' }}
+        >
+          👑
+        </text>
+      )}
+      {tier === 'xs' || tier === 'sm' ? (
+        // Tiny cells: just a centered, abbreviated name.
         <text
           x={x + width / 2}
           y={y + height / 2}
           fill={colors.text}
-          fontSize={Math.max(9, Math.min(11, width / 7))}
+          fontSize={titleSize}
           fontWeight={600}
           textAnchor="middle"
           dominantBaseline="middle"
           style={{ pointerEvents: 'none' }}
         >
-          {name}
+          {displayName}
         </text>
-      )}
-      {sparkPoints && (
-        <polyline
-          points={sparkPoints}
-          fill="none"
-          stroke={colors.text}
-          strokeWidth={1}
-          opacity={0.7}
-          style={{ pointerEvents: 'none' }}
-        />
+      ) : (
+        <>
+          <text
+            x={x + padding}
+            y={y + padding + titleSize * 0.85}
+            fill={colors.text}
+            fontSize={titleSize}
+            fontWeight={700}
+            style={{ pointerEvents: 'none', letterSpacing: '-0.01em' }}
+          >
+            {displayName}
+          </text>
+          <text
+            x={x + padding}
+            y={y + padding + titleSize * 0.85 + pctSize + 6}
+            fill={colors.text}
+            fontSize={pctSize}
+            fontWeight={500}
+            style={{ pointerEvents: 'none' }}
+          >
+            {(mindshare_pct ?? 0).toFixed(2)}%
+          </text>
+          {(tier === 'lg' || tier === 'xl') && (
+            <text
+              x={x + padding}
+              y={y + padding + titleSize * 0.85 + pctSize + deltaSize + 22}
+              fill={colors.muted}
+              fontSize={deltaSize}
+              fontWeight={500}
+              style={{ pointerEvents: 'none' }}
+            >
+              {deltaArrow} {deltaText}
+            </text>
+          )}
+        </>
       )}
     </g>
   );
@@ -283,7 +368,7 @@ function GainerLoserPanel({
 // ─── Page ───────────────────────────────────────────────────────────
 
 export default function MindsharePage() {
-  const { userProfile } = useAuth();
+  const { userProfile, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
 
@@ -569,6 +654,18 @@ export default function MindsharePage() {
     await loadLeaderboard();
   };
 
+  // Avoid flashing the admin-gate screen while auth is still resolving —
+  // userProfile is null on first render, which would otherwise paint the
+  // "Admin access required" placeholder for one frame before the real
+  // role arrives.
+  if (authLoading || !userProfile) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] bg-gray-50 flex items-center justify-center">
+        <div className="h-8 w-8 rounded-full border-2 border-gray-300 border-t-gray-600 animate-spin" />
+      </div>
+    );
+  }
+
   if (!isAdmin) {
     return (
       <div className="min-h-[calc(100vh-64px)] bg-gray-50 flex items-center justify-center">
@@ -702,43 +799,64 @@ export default function MindsharePage() {
               {/* Treemap — Kaito-style square map. Cells sized by mention
                   volume, colored by Δ vs prior period. */}
               {treemapItems.length > 0 ? (
-                <div className="bg-gray-900 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1 text-xs">
-                  <button
-                    onClick={() => setTreemapTier('top20')}
-                    className={`px-2.5 py-1 rounded ${treemapTier === 'top20' ? 'bg-emerald-700 text-white' : 'text-gray-400 hover:text-white'}`}
-                  >
-                    Top 20
-                  </button>
-                  <span className="text-gray-600">›</span>
-                  <button
-                    onClick={() => setTreemapTier('top21_50')}
-                    className={`px-2.5 py-1 rounded ${treemapTier === 'top21_50' ? 'bg-emerald-700 text-white' : 'text-gray-400 hover:text-white'}`}
-                  >
-                    Top 21-50
-                  </button>
+                <div
+                  className="rounded-xl p-4 border border-slate-800/60 shadow-inner"
+                  style={{
+                    background: 'linear-gradient(160deg, #0b1220 0%, #0f172a 60%, #111827 100%)',
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-1 text-xs">
+                      <button
+                        onClick={() => setTreemapTier('top20')}
+                        className={`px-3 py-1.5 rounded-md font-medium transition-colors ${treemapTier === 'top20' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}`}
+                      >
+                        Top 20
+                      </button>
+                      <span className="text-slate-600 px-1">›</span>
+                      <button
+                        onClick={() => setTreemapTier('top21_50')}
+                        className={`px-3 py-1.5 rounded-md font-medium transition-colors ${treemapTier === 'top21_50' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}`}
+                      >
+                        Top 21–50
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                      <span className="hidden sm:inline">Cell size = mention volume</span>
+                      <span className="hidden sm:inline text-slate-700">·</span>
+                      <div className="flex items-center gap-2">
+                        <span>Δ vs prior {range === '24h' ? 'day' : range === '7d' ? 'week' : 'month'}:</span>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'hsl(358, 50%, 38%)' }} />
+                          <span className="text-slate-400">down</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'hsl(220, 14%, 30%)' }} />
+                          <span className="text-slate-400">flat</span>
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: 'hsl(152, 46%, 36%)' }} />
+                          <span className="text-slate-400">up</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ width: '100%', height: 520 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <Treemap
+                        data={treemapItems}
+                        dataKey="size"
+                        aspectRatio={16 / 9}
+                        stroke="transparent"
+                        isAnimationActive={false}
+                        content={<TreemapCell onSelect={openDetail} />}
+                      />
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-                <span className="text-[11px] text-gray-500">
-                  Cell size = mention volume · color = Δ vs prior {range === '24h' ? 'day' : range === '7d' ? 'week' : 'month'}
-                </span>
-              </div>
-              <div style={{ width: '100%', height: 500 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <Treemap
-                    data={treemapItems}
-                    dataKey="size"
-                    aspectRatio={4 / 3}
-                    stroke="#0f172a"
-                    isAnimationActive={false}
-                    content={<TreemapCell onSelect={openDetail} />}
-                  />
-                </ResponsiveContainer>
-              </div>
-            </div>
               ) : (
-                <div className="bg-gray-900 rounded-lg p-12 flex items-center justify-center">
-                  <p className="text-sm text-gray-500">No mentions for the current filters.</p>
+                <div className="bg-slate-900 rounded-xl p-12 flex items-center justify-center border border-slate-800/60">
+                  <p className="text-sm text-slate-500">No mentions for the current filters.</p>
                 </div>
               )}
             </div>
