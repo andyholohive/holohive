@@ -295,9 +295,14 @@ export default function MindsharePage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   // Treemap tier toggle — Top 20 vs Top 21-50, mirroring Kaito's split
   const [treemapTier, setTreemapTier] = useState<'top20' | 'top21_50'>('top20');
-  // Language filter — 'all' uses precomputed daily; 'ko' (default for now)
-  // recomputes from tg_mentions joined to monitored channels.
-  const [language, setLanguage] = useState<'all' | 'ko' | 'en' | 'ja' | 'zh' | 'vi'>('ko');
+  // Language filter — defaults to 'all' so the leaderboard uses the
+  // precomputed mindshare_daily (channel-agnostic). Switching to a
+  // specific language requires monitored channels to have channel_tg_id
+  // populated, which only happens once the bot is in those chats and
+  // the webhook bridges telegram_messages.chat_id ↔ monitored channels.
+  // Until then, 'ko' would show 0 because the inner join eliminates
+  // mentions with null channel_id.
+  const [language, setLanguage] = useState<'all' | 'ko' | 'en' | 'ja' | 'zh' | 'vi'>('all');
 
   // Drill-down state — opened from a row click or treemap cell click
   const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
@@ -667,8 +672,10 @@ export default function MindsharePage() {
 
           {/* Gainers / Losers + Treemap row. On large screens the side
               panels sit to the left of the treemap (Kaito layout); on
-              smaller they stack above. */}
-          {!leaderboardLoading && (topGainers.length > 0 || topLosers.length > 0) && (
+              smaller they stack above. Renders whenever the leaderboard
+              has finished loading — the empty-state placeholder below is
+              more useful than hiding the whole block. */}
+          {!leaderboardLoading && (
             <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-3">
               {/* Side panels: gainers on top, losers below */}
               <div className="space-y-3">
