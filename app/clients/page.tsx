@@ -2651,9 +2651,9 @@ export default function ClientsPage() {
                         Add Campaign
                       </Button>
                     )}
-                    {/* Client Tracker — compact row */}
+                    {/* Client Portal — compact row */}
                     <div className="mt-3 pt-3 border-t border-gray-100">
-                      <p className="font-bold text-sm text-gray-700 mb-2">Client Tracker</p>
+                      <p className="font-bold text-sm text-gray-700 mb-2">Client Portal</p>
                       <div className="grid grid-cols-3 gap-2">
                         {/* Context */}
                         <button
