@@ -17,8 +17,9 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import {
   BarChart3, Plus, Trash2, Radio, AlertTriangle, Search, TrendingUp, TrendingDown,
-  Minus, Edit, RefreshCw, Upload, ExternalLink,
+  Minus, Edit, RefreshCw, Upload, ExternalLink, Crown,
 } from 'lucide-react';
+import { Treemap, ResponsiveContainer } from 'recharts';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -87,6 +88,141 @@ function Sparkline({ values }: { values: number[] }) {
   );
 }
 
+// ─── Treemap content renderer ───────────────────────────────────────
+// Each cell shows project name (responsive size), mindshare %, and a
+// crown badge for top-3. Background color encodes Δ vs prior period:
+// green (gain) → red (loss), saturation scaled by magnitude. Recharts
+// passes layout coords (x, y, width, height) plus the node's data.
+
+// Recharts injects these props at render time; declare them all
+// optional so the placeholder JSX (<TreemapCell />) type-checks.
+interface TreemapPayload {
+  payload?: any;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  name?: string;
+  value?: number;
+  index?: number;
+  rank?: number;
+}
+
+function deltaColor(delta: number): { bg: string; border: string; text: string } {
+  // Anchor saturation to ±5 percentage points; clamp so extreme outliers
+  // don't blow out the palette.
+  const clamped = Math.max(-5, Math.min(5, delta));
+  const intensity = Math.abs(clamped) / 5; // 0..1
+  if (delta > 0.1) {
+    // emerald scale
+    const lightness = 35 - intensity * 10; // darker green for stronger gain
+    return { bg: `hsl(152, 60%, ${lightness}%)`, border: `hsl(152, 60%, ${lightness - 8}%)`, text: '#ecfdf5' };
+  }
+  if (delta < -0.1) {
+    const lightness = 38 - intensity * 10;
+    return { bg: `hsl(0, 60%, ${lightness}%)`, border: `hsl(0, 60%, ${lightness - 8}%)`, text: '#fef2f2' };
+  }
+  return { bg: 'hsl(220, 10%, 28%)', border: 'hsl(220, 10%, 22%)', text: '#e5e7eb' };
+}
+
+function TreemapCell(props: TreemapPayload) {
+  const { x = 0, y = 0, width = 0, height = 0, payload } = props;
+  if (!payload || width < 4 || height < 4) return null;
+  const { name, mindshare_pct, delta_pct, spark, rank } = payload;
+  const colors = deltaColor(delta_pct ?? 0);
+
+  // Responsive text sizing — readable on small cells, prominent on large.
+  const showFullLabel = width > 90 && height > 60;
+  const showSpark = width > 110 && height > 80;
+  const showCrown = rank !== undefined && rank <= 3;
+  // Cap label font size so big cells don't get absurd headers.
+  const fontSize = Math.min(28, Math.max(11, Math.min(width / 8, height / 4)));
+  const pctFontSize = Math.max(9, fontSize * 0.65);
+
+  // Build the sparkline points relative to this cell. Anchored to the
+  // bottom 35% of the cell so the title stays readable up top.
+  let sparkPoints = '';
+  if (showSpark && Array.isArray(spark) && spark.length > 1) {
+    const max = Math.max(...spark, 1);
+    const padX = 8;
+    const padTop = height * 0.55;
+    const sparkH = height - padTop - 8;
+    const sparkW = width - padX * 2;
+    const stepX = sparkW / (spark.length - 1);
+    sparkPoints = spark
+      .map((v: number, i: number) => `${(x + padX + i * stepX).toFixed(2)},${(y + padTop + sparkH - (v / max) * sparkH).toFixed(2)}`)
+      .join(' ');
+  }
+
+  return (
+    <g>
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        fill={colors.bg}
+        stroke={colors.border}
+        strokeWidth={1}
+      />
+      {showCrown && (
+        <g transform={`translate(${x + width - 22}, ${y + 6})`}>
+          <text fontSize={14} fill="#fbbf24">👑</text>
+        </g>
+      )}
+      {showFullLabel ? (
+        <>
+          <text
+            x={x + 10}
+            y={y + 8 + fontSize * 0.85}
+            fill={colors.text}
+            fontSize={fontSize}
+            fontWeight={700}
+            style={{ pointerEvents: 'none' }}
+          >
+            {name}
+          </text>
+          <text
+            x={x + 10}
+            y={y + 8 + fontSize * 0.85 + pctFontSize + 4}
+            fill={colors.text}
+            fontSize={pctFontSize}
+            fontWeight={500}
+            opacity={0.9}
+            style={{ pointerEvents: 'none' }}
+          >
+            {(mindshare_pct ?? 0).toFixed(2)}%
+          </text>
+        </>
+      ) : (
+        // Tiny cells: show just the project name centered, smaller
+        <text
+          x={x + width / 2}
+          y={y + height / 2}
+          fill={colors.text}
+          fontSize={Math.max(9, Math.min(11, width / 7))}
+          fontWeight={600}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          style={{ pointerEvents: 'none' }}
+        >
+          {name}
+        </text>
+      )}
+      {sparkPoints && (
+        <polyline
+          points={sparkPoints}
+          fill="none"
+          stroke={colors.text}
+          strokeWidth={1}
+          opacity={0.7}
+          style={{ pointerEvents: 'none' }}
+        />
+      )}
+    </g>
+  );
+}
+
 // ─── Page ───────────────────────────────────────────────────────────
 
 export default function MindsharePage() {
@@ -106,6 +242,8 @@ export default function MindsharePage() {
   const [preTgeOnly, setPreTgeOnly] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('mindshare_pct');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  // Treemap tier toggle — Top 20 vs Top 21-50, mirroring Kaito's split
+  const [treemapTier, setTreemapTier] = useState<'top20' | 'top21_50'>('top20');
 
   const loadLeaderboard = useCallback(async () => {
     setLeaderboardLoading(true);
@@ -150,6 +288,31 @@ export default function MindsharePage() {
     leaderboard.forEach(i => set.add(i.category || 'Uncategorized'));
     return ['all', ...Array.from(set).sort()];
   }, [leaderboard]);
+
+  // Treemap source — same filtering pipeline as the table, but always
+  // sorted by mention count desc so the tier slicing (Top 20 / 21–50)
+  // produces a stable, intuitive partition. Recharts uses `size` as the
+  // area weight; mention_count keeps cells proportional to real volume.
+  const treemapItems = useMemo(() => {
+    let arr = leaderboard;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      arr = arr.filter(i => i.name.toLowerCase().includes(q));
+    }
+    if (categoryFilter !== 'all') {
+      arr = arr.filter(i => (i.category || 'Uncategorized') === categoryFilter);
+    }
+    if (preTgeOnly) arr = arr.filter(i => i.is_pre_tge);
+    arr = [...arr].filter(i => i.mention_count > 0).sort((a, b) => b.mention_count - a.mention_count);
+    const slice = treemapTier === 'top20' ? arr.slice(0, 20) : arr.slice(20, 50);
+    return slice.map((item, idx) => ({
+      ...item,
+      size: item.mention_count,
+      // Rank is global (across the whole filtered set), not slice-relative,
+      // so the "21-50" view doesn't confusingly show #1.
+      rank: arr.findIndex(x => x.project_id === item.project_id) + 1,
+    }));
+  }, [leaderboard, search, categoryFilter, preTgeOnly, treemapTier]);
 
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -398,6 +561,46 @@ export default function MindsharePage() {
               </Button>
             </div>
           </div>
+
+          {/* Treemap — Kaito-style square map. Cells sized by mention
+              volume, colored by Δ vs prior period. Top 20 / 21–50 toggle
+              mirrors Kaito's tier split for the long tail. */}
+          {!leaderboardLoading && treemapItems.length > 0 && (
+            <div className="bg-gray-900 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1 text-xs">
+                  <button
+                    onClick={() => setTreemapTier('top20')}
+                    className={`px-2.5 py-1 rounded ${treemapTier === 'top20' ? 'bg-emerald-700 text-white' : 'text-gray-400 hover:text-white'}`}
+                  >
+                    Top 20
+                  </button>
+                  <span className="text-gray-600">›</span>
+                  <button
+                    onClick={() => setTreemapTier('top21_50')}
+                    className={`px-2.5 py-1 rounded ${treemapTier === 'top21_50' ? 'bg-emerald-700 text-white' : 'text-gray-400 hover:text-white'}`}
+                  >
+                    Top 21-50
+                  </button>
+                </div>
+                <span className="text-[11px] text-gray-500">
+                  Cell size = mention volume · color = Δ vs prior {range === '24h' ? 'day' : range === '7d' ? 'week' : 'month'}
+                </span>
+              </div>
+              <div style={{ width: '100%', height: 500 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <Treemap
+                    data={treemapItems}
+                    dataKey="size"
+                    aspectRatio={4 / 3}
+                    stroke="#0f172a"
+                    isAnimationActive={false}
+                    content={<TreemapCell />}
+                  />
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
 
           <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
             {leaderboardLoading ? (
