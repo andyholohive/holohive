@@ -17,7 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import {
   BarChart3, Plus, Trash2, Radio, AlertTriangle, Search, TrendingUp, TrendingDown,
-  Minus, Edit, RefreshCw, Upload, ExternalLink, Crown,
+  Minus, Edit, RefreshCw, Upload, ExternalLink, Crown, Download,
 } from 'lucide-react';
 import { Treemap, ResponsiveContainer } from 'recharts';
 
@@ -461,16 +461,18 @@ export default function MindsharePage() {
 
   // Top Gainers / Top Losers panels — derived from the same leaderboard
   // data, sorted by delta_pct. Only include items with mentions in the
-  // current window (a project with 0 mentions can't be a "gainer").
+  // current window AND with a delta in the right direction. Otherwise
+  // a 7-project universe lands the same items on both panels (a loser
+  // appearing in Top Gainer is jarring).
   const topGainers = useMemo(() =>
     [...leaderboard]
-      .filter(i => i.mention_count > 0)
+      .filter(i => i.mention_count > 0 && i.delta_pct > 0.01)
       .sort((a, b) => b.delta_pct - a.delta_pct)
       .slice(0, 8)
   , [leaderboard]);
   const topLosers = useMemo(() =>
     [...leaderboard]
-      .filter(i => i.mention_count > 0)
+      .filter(i => i.mention_count > 0 && i.delta_pct < -0.01)
       .sort((a, b) => a.delta_pct - b.delta_pct)
       .slice(0, 8)
   , [leaderboard]);
@@ -503,6 +505,36 @@ export default function MindsharePage() {
   const toggleSort = (k: SortKey) => {
     if (sortKey === k) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortKey(k); setSortDir(k === 'name' ? 'asc' : 'desc'); }
+  };
+
+  // CSV export of the current filtered + sorted view. Handy for
+  // pasting a snapshot into a weekly report or sharing with the team.
+  const exportCsv = () => {
+    if (filteredSorted.length === 0) return;
+    const header = ['Rank', 'Project', 'Category', 'Mentions', 'Mindshare %', 'Δ vs prior %', 'Channels', 'Pre-TGE'];
+    const rows = filteredSorted.map((item, i) => [
+      i + 1,
+      item.name,
+      item.category || '',
+      item.mention_count,
+      item.mindshare_pct.toFixed(2),
+      item.delta_pct.toFixed(2),
+      item.channel_reach,
+      item.is_pre_tge ? 'yes' : 'no',
+    ]);
+    const escape = (v: any) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [header, ...rows].map(r => r.map(escape).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `korean-mindshare-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   const sortIndicator = (k: SortKey) =>
@@ -579,8 +611,10 @@ export default function MindsharePage() {
 
   // ─── Channels tab state ─────────────────────────────────────────
   const [channels, setChannels] = useState<MonitoredChannel[]>([]);
+  const [channelMentionCounts, setChannelMentionCounts] = useState<Record<string, number>>({});
   const [channelsLoading, setChannelsLoading] = useState(true);
   const [channelSearch, setChannelSearch] = useState('');
+  const [channelLanguageFilter, setChannelLanguageFilter] = useState<string>('all');
   const [importText, setImportText] = useState('');
   const [importing, setImporting] = useState(false);
 
@@ -589,6 +623,19 @@ export default function MindsharePage() {
     try {
       const { data } = await supabase.from('tg_monitored_channels').select('*').order('channel_name');
       setChannels((data || []) as MonitoredChannel[]);
+      // Sidecar query for last-7d mention activity per channel — gives
+      // admins a signal for which channels are dead and prunable.
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: activity } = await (supabase as any)
+        .from('tg_mentions')
+        .select('channel_id')
+        .gte('message_date', sevenDaysAgo)
+        .not('channel_id', 'is', null);
+      const counts: Record<string, number> = {};
+      for (const row of (activity || []) as any[]) {
+        counts[row.channel_id] = (counts[row.channel_id] || 0) + 1;
+      }
+      setChannelMentionCounts(counts);
     } catch (err) {
       console.error('Error loading channels:', err);
     } finally {
@@ -596,6 +643,12 @@ export default function MindsharePage() {
     }
   }, []);
   useEffect(() => { if (tab === 'channels') loadChannels(); }, [tab, loadChannels]);
+
+  const channelLanguages = useMemo(() => {
+    const set = new Set<string>();
+    channels.forEach(c => { if (c.language) set.add(c.language); });
+    return Array.from(set).sort();
+  }, [channels]);
 
   const toggleChannel = async (c: MonitoredChannel) => {
     const next = !c.is_active;
@@ -635,23 +688,28 @@ export default function MindsharePage() {
     }
   };
 
-  // Manual scan trigger for admins after onboarding new channels
+  // Manual scan trigger for admins after onboarding new channels.
+  // Hits the admin-session-gated /api/mindshare/scan endpoint so we
+  // don't have to expose CRON_SECRET to the client.
+  const [scanning, setScanning] = useState<false | 'incremental' | 'backfill'>(false);
   const triggerScan = async (backfill = false) => {
-    const secret = window.prompt('Enter CRON_SECRET to trigger scan:');
-    if (!secret) return;
-    const res = await fetch(`/api/cron/mindshare-scan${backfill ? '?backfill=1' : ''}`, {
-      headers: { Authorization: `Bearer ${secret}` },
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      toast({ title: 'Scan failed', description: json.error, variant: 'destructive' });
-      return;
+    if (scanning) return;
+    setScanning(backfill ? 'backfill' : 'incremental');
+    try {
+      const res = await fetch(`/api/mindshare/scan${backfill ? '?backfill=1' : ''}`, { method: 'POST' });
+      const json = await res.json();
+      if (!res.ok) {
+        toast({ title: 'Scan failed', description: json.error, variant: 'destructive' });
+        return;
+      }
+      toast({
+        title: backfill ? 'Backfill complete' : 'Scan complete',
+        description: `${json.messages_scanned} messages scanned, ${json.mentions_added} mentions added`,
+      });
+      await loadLeaderboard();
+    } finally {
+      setScanning(false);
     }
-    toast({
-      title: backfill ? 'Backfill complete' : 'Scan complete',
-      description: `${json.messages_scanned} messages scanned, ${json.mentions_added} mentions added`,
-    });
-    await loadLeaderboard();
   };
 
   // Avoid flashing the admin-gate screen while auth is still resolving —
@@ -679,11 +737,13 @@ export default function MindsharePage() {
 
   // ─── Render ─────────────────────────────────────────────────────
 
-  const filteredChannels = channels.filter(c =>
-    !channelSearch ||
-    c.channel_name.toLowerCase().includes(channelSearch.toLowerCase()) ||
-    (c.channel_username || '').toLowerCase().includes(channelSearch.toLowerCase())
-  );
+  const filteredChannels = channels.filter(c => {
+    if (channelLanguageFilter !== 'all' && c.language !== channelLanguageFilter) return false;
+    if (!channelSearch) return true;
+    const q = channelSearch.toLowerCase();
+    return c.channel_name.toLowerCase().includes(q)
+      || (c.channel_username || '').toLowerCase().includes(q);
+  });
 
   return (
     <div className="space-y-6">
@@ -767,6 +827,15 @@ export default function MindsharePage() {
                 <Switch checked={preTgeOnly} onCheckedChange={setPreTgeOnly} />
                 Pre-TGE only
               </label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportCsv}
+                disabled={filteredSorted.length === 0}
+                title="Export current view to CSV"
+              >
+                <Download className="h-3.5 w-3.5" />
+              </Button>
               <Button variant="outline" size="sm" onClick={loadLeaderboard} title="Refresh">
                 <RefreshCw className="h-3.5 w-3.5" />
               </Button>
@@ -846,7 +915,9 @@ export default function MindsharePage() {
                       <Treemap
                         data={treemapItems}
                         dataKey="size"
-                        aspectRatio={16 / 9}
+                        // Omit aspectRatio so cells fill the full container
+                        // even with very few items. With a fixed aspect,
+                        // recharts leaves an unused band at the bottom.
                         stroke="transparent"
                         isAnimationActive={false}
                         content={<TreemapCell onSelect={openDetail} />}
@@ -1011,22 +1082,39 @@ export default function MindsharePage() {
 
                   {/* Daily mention bars — simple inline SVG so no extra
                       dependency for one chart. Heights normalized to the
-                      window's max. */}
+                      window's max. Y-max + first/last day labels give
+                      enough scale context without a full axis. */}
                   <div className="space-y-1">
-                    <div className="text-xs font-medium text-gray-700">Daily mentions</div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-medium text-gray-700">Daily mentions</div>
+                      {(() => {
+                        const peak = Math.max(...detailData.series.map((d: any) => d.mentions), 0);
+                        return peak > 0 ? (
+                          <div className="text-[10px] text-gray-400">peak: {peak.toLocaleString()}/day</div>
+                        ) : null;
+                      })()}
+                    </div>
                     {(() => {
                       const max = Math.max(...detailData.series.map((d: any) => d.mentions), 1);
                       return (
-                        <div className="flex items-end gap-0.5 h-24 bg-gray-50 rounded p-2">
-                          {detailData.series.map((d: any) => (
-                            <div key={d.day} className="flex-1 flex flex-col items-center justify-end" title={`${d.day}: ${d.mentions} mentions`}>
-                              <div
-                                className={`w-full rounded-t ${d.mentions > 0 ? 'bg-brand' : 'bg-gray-200'}`}
-                                style={{ height: `${(d.mentions / max) * 100}%`, minHeight: d.mentions > 0 ? 2 : 1 }}
-                              />
-                            </div>
-                          ))}
-                        </div>
+                        <>
+                          <div className="flex items-end gap-0.5 h-24 bg-gray-50 rounded p-2 relative">
+                            {/* y-axis tick at top */}
+                            <span className="absolute top-1 left-1 text-[9px] text-gray-300 leading-none">{max}</span>
+                            {detailData.series.map((d: any) => (
+                              <div key={d.day} className="flex-1 flex flex-col items-center justify-end group" title={`${d.day}: ${d.mentions} mentions`}>
+                                <div
+                                  className={`w-full rounded-t transition-opacity ${d.mentions > 0 ? 'bg-brand' : 'bg-gray-200'} group-hover:opacity-80`}
+                                  style={{ height: `${(d.mentions / max) * 100}%`, minHeight: d.mentions > 0 ? 2 : 1 }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex justify-between text-[10px] text-gray-400 px-1">
+                            <span>{detailData.series[0]?.day}</span>
+                            <span>{detailData.series[detailData.series.length - 1]?.day}</span>
+                          </div>
+                        </>
                       );
                     })()}
                   </div>
@@ -1036,15 +1124,32 @@ export default function MindsharePage() {
                     <div className="space-y-1.5">
                       <div className="text-xs font-medium text-gray-700">Top channels</div>
                       <div className="space-y-1">
-                        {detailData.top_channels.map((c: any, i: number) => (
-                          <div key={i} className="flex items-center justify-between text-xs px-2 py-1 bg-gray-50 rounded">
-                            <span className="font-medium text-gray-700">{c.name}</span>
-                            <div className="flex items-center gap-3">
-                              {c.username && <span className="text-gray-400">@{c.username}</span>}
-                              <span className="tabular-nums font-semibold">{c.count}</span>
+                        {detailData.top_channels.map((c: any, i: number) => {
+                          const totalChannelHits = detailData.top_channels.reduce((s: number, x: any) => s + x.count, 0) || 1;
+                          const sharePct = (c.count / totalChannelHits) * 100;
+                          return (
+                            <div key={i} className="flex items-center justify-between text-xs px-2 py-1.5 bg-gray-50 rounded">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-medium text-gray-700 truncate">{c.name}</span>
+                                {c.username && (
+                                  <a
+                                    href={`https://t.me/${String(c.username).replace(/^@/, '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-gray-300 hover:text-blue-500 shrink-0"
+                                    title="Open on Telegram"
+                                  >
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <span className="text-[10px] text-gray-400 tabular-nums">{sharePct.toFixed(0)}%</span>
+                                <span className="tabular-nums font-semibold w-8 text-right">{c.count}</span>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1059,10 +1164,26 @@ export default function MindsharePage() {
                         {detailData.sample_mentions.map((m: any) => (
                           <div key={m.id} className="text-xs p-2.5 border border-gray-200 rounded">
                             <div className="flex items-center justify-between gap-2 mb-1">
-                              <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                                <span>{new Date(m.message_date).toLocaleString()}</span>
-                                {m.channel?.channel_name && <span>· {m.channel.channel_name}</span>}
-                                <Badge variant="outline" className="text-[9px]">{m.matched_keyword}</Badge>
+                              <div className="flex items-center gap-1.5 text-[10px] text-gray-500 min-w-0">
+                                <span className="shrink-0">{new Date(m.message_date).toLocaleString()}</span>
+                                {m.channel?.channel_name && (
+                                  <span className="truncate">
+                                    ·{' '}
+                                    {m.channel.channel_username ? (
+                                      <a
+                                        href={`https://t.me/${String(m.channel.channel_username).replace(/^@/, '')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-gray-500 hover:text-blue-500 underline-offset-2 hover:underline"
+                                      >
+                                        {m.channel.channel_name}
+                                      </a>
+                                    ) : (
+                                      m.channel.channel_name
+                                    )}
+                                  </span>
+                                )}
+                                <Badge variant="outline" className="text-[9px] shrink-0">{m.matched_keyword}</Badge>
                               </div>
                             </div>
                             <p className="text-gray-700 line-clamp-3 whitespace-pre-wrap">{m.message_text}</p>
@@ -1229,8 +1350,16 @@ export default function MindsharePage() {
                 The scanner runs every 30 minutes via Vercel cron. Trigger manually if you just added channels or projects.
               </p>
               <div className="flex flex-col gap-2">
-                <Button variant="outline" onClick={() => triggerScan(false)}>Run incremental scan</Button>
-                <Button variant="outline" onClick={() => triggerScan(true)}>Backfill (rescan all messages)</Button>
+                <Button variant="outline" disabled={!!scanning} onClick={() => triggerScan(false)}>
+                  {scanning === 'incremental' ? (
+                    <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Scanning…</>
+                  ) : 'Run incremental scan'}
+                </Button>
+                <Button variant="outline" disabled={!!scanning} onClick={() => triggerScan(true)}>
+                  {scanning === 'backfill' ? (
+                    <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Backfilling…</>
+                  ) : 'Backfill (rescan all messages)'}
+                </Button>
               </div>
             </div>
           </div>
@@ -1238,7 +1367,21 @@ export default function MindsharePage() {
           {/* Channel list */}
           <div className="bg-white border border-gray-200 rounded-lg">
             <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
-              <h3 className="font-semibold text-sm flex-1">Monitored channels <Badge variant="secondary" className="ml-1 text-xs">{channels.length}</Badge></h3>
+              <h3 className="font-semibold text-sm flex-1">
+                Monitored channels{' '}
+                <Badge variant="secondary" className="ml-1 text-xs">{filteredChannels.length}{filteredChannels.length !== channels.length && ` of ${channels.length}`}</Badge>
+              </h3>
+              {channelLanguages.length > 1 && (
+                <Select value={channelLanguageFilter} onValueChange={setChannelLanguageFilter}>
+                  <SelectTrigger className="h-8 w-32 text-xs focus-brand"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All languages</SelectItem>
+                    {channelLanguages.map(l => (
+                      <SelectItem key={l} value={l}>{l}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
                 <Input value={channelSearch} onChange={(e) => setChannelSearch(e.target.value)} placeholder="Search..." className="pl-8 h-8 w-56 focus-brand" />
@@ -1250,28 +1393,57 @@ export default function MindsharePage() {
               <div className="divide-y divide-gray-50 max-h-[500px] overflow-auto">
                 {filteredChannels.length === 0 ? (
                   <div className="py-12 text-center text-sm text-gray-500">No channels yet. Use the bulk importer above.</div>
-                ) : filteredChannels.map(c => (
-                  <div key={c.id} className={`px-4 py-2.5 flex items-center gap-3 ${!c.is_active ? 'opacity-60' : ''}`}>
-                    <Switch checked={c.is_active} onCheckedChange={() => toggleChannel(c)} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{c.channel_name}</p>
-                      <p className="text-xs text-gray-500">@{c.channel_username}</p>
+                ) : filteredChannels.map(c => {
+                  const hits7d = channelMentionCounts[c.id] || 0;
+                  // Visual signal: dead channels (no hits in 7d) get a
+                  // muted dot so admins can scan and prune.
+                  const activityClass =
+                    hits7d === 0 ? 'bg-gray-200 text-gray-500'
+                    : hits7d < 5 ? 'bg-amber-50 text-amber-700 border border-amber-100'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-100';
+                  return (
+                    <div key={c.id} className={`px-4 py-2.5 flex items-center gap-3 ${!c.is_active ? 'opacity-60' : ''}`}>
+                      <Switch checked={c.is_active} onCheckedChange={() => toggleChannel(c)} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-gray-900 truncate">{c.channel_name}</p>
+                          {c.channel_username && (
+                            <a
+                              href={`https://t.me/${c.channel_username.replace(/^@/, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-gray-300 hover:text-blue-500"
+                              title="Open on Telegram"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500">{c.channel_username ? `@${c.channel_username}` : '—'}</p>
+                      </div>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full tabular-nums ${activityClass}`}
+                        title={`${hits7d} mentions in last 7 days`}
+                      >
+                        {hits7d} / 7d
+                      </span>
+                      <Select value={c.language} onValueChange={(v) => setChannelLanguage(c, v)}>
+                        <SelectTrigger className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ko">ko</SelectItem>
+                          <SelectItem value="en">en</SelectItem>
+                          <SelectItem value="ja">ja</SelectItem>
+                          <SelectItem value="zh">zh</SelectItem>
+                          <SelectItem value="vi">vi</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-gray-400 hover:text-red-500" onClick={() => deleteChannel(c)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                    <Select value={c.language} onValueChange={(v) => setChannelLanguage(c, v)}>
-                      <SelectTrigger className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ko">ko</SelectItem>
-                        <SelectItem value="en">en</SelectItem>
-                        <SelectItem value="ja">ja</SelectItem>
-                        <SelectItem value="zh">zh</SelectItem>
-                        <SelectItem value="vi">vi</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-gray-400 hover:text-red-500" onClick={() => deleteChannel(c)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

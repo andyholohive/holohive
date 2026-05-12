@@ -194,14 +194,39 @@ export async function runMindshareScan(
       matched_keyword: h.matched_keyword,
     }));
 
+    // Dedup against rows that already exist in the touched window so a
+    // backfill (or any re-run that re-processes the same messages)
+    // doesn't double-count. The unique index on
+    // (project_id, message_date, md5(message_text)) backs this up at
+    // the DB level — the in-memory pre-filter just keeps the chunked
+    // insert from failing on a single dupe.
     if (insertable.length > 0) {
-      // Insert in chunks to avoid Postgres parameter limits.
-      const CHUNK = 500;
-      for (let i = 0; i < insertable.length; i += CHUNK) {
-        const slice = insertable.slice(i, i + CHUNK);
-        const { error } = await (supabase as any).from('tg_mentions').insert(slice);
-        if (!error) mentionsAdded += slice.length;
-        else console.error('[mindshare] tg_mentions insert error:', error);
+      const minDate = insertable.reduce((m, h) => h.message_date < m ? h.message_date : m, insertable[0].message_date);
+      const maxDate = insertable.reduce((m, h) => h.message_date > m ? h.message_date : m, insertable[0].message_date);
+      const projectIds = Array.from(new Set(insertable.map(h => h.project_id)));
+      const { data: existingRows } = await (supabase as any)
+        .from('tg_mentions')
+        .select('project_id, message_text, message_date')
+        .in('project_id', projectIds)
+        .gte('message_date', minDate)
+        .lte('message_date', maxDate);
+      const existingKeys = new Set<string>(
+        ((existingRows || []) as any[]).map((r: any) =>
+          `${r.project_id}::${r.message_date}::${r.message_text}`),
+      );
+      const fresh = insertable.filter(h =>
+        !existingKeys.has(`${h.project_id}::${h.message_date}::${h.message_text}`),
+      );
+
+      if (fresh.length > 0) {
+        // Insert in chunks to avoid Postgres parameter limits.
+        const CHUNK = 500;
+        for (let i = 0; i < fresh.length; i += CHUNK) {
+          const slice = fresh.slice(i, i + CHUNK);
+          const { error } = await (supabase as any).from('tg_mentions').insert(slice);
+          if (!error) mentionsAdded += slice.length;
+          else console.error('[mindshare] tg_mentions insert error:', error);
+        }
       }
     }
   }
