@@ -24,8 +24,13 @@ import {
   Target, AlertTriangle, ArrowRight, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronUp,
   Phone, MessageSquare, Calendar, FileText, StickyNote, Zap, RotateCcw, Clock, Edit, Copy, Check, ChevronsUpDown,
   Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown, Paperclip, Eye, Image,
-  Sparkles, Twitter,
+  Sparkles, Twitter, Download, History,
 } from 'lucide-react';
+import { downloadCsv, todayStamp } from '@/lib/csvExport';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
@@ -210,9 +215,48 @@ export default function SalesPipelinePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<CreateSalesPipelineOpportunityData & { next_meeting_at?: string; next_meeting_type?: string }>({ name: '' });
 
+  // Shared confirm dialog — replaces the native browser confirm() in
+  // delete flows. AlertDialog is more accessible, themable, and matches
+  // the rest of the CRM surface area. Set the state to {open: true, ...}
+  // to open; onConfirm runs the destructive action.
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    confirmLabel?: string;
+    onConfirm: () => void | Promise<void>;
+  } | null>(null);
+  const [confirmRunning, setConfirmRunning] = useState(false);
+
   // Activity slide-over
   const [slideOverMode, setSlideOverMode] = useState<'view' | 'edit'>('view');
   const [slideOverOpp, setSlideOverOpp] = useState<SalesPipelineOpportunity | null>(null);
+  // Stage history dialog — restores the timeline view that the old
+  // /crm/pipeline page had. Loaded on demand via getStageHistory().
+  const [stageHistoryOpen, setStageHistoryOpen] = useState(false);
+  const [stageHistory, setStageHistory] = useState<Array<{
+    id: string;
+    from_stage: string | null;
+    to_stage: string;
+    changed_at: string;
+    changed_by: string | null;
+    notes: string | null;
+  }>>([]);
+  const [stageHistoryLoading, setStageHistoryLoading] = useState(false);
+  const openStageHistory = async () => {
+    if (!slideOverOpp) return;
+    setStageHistoryOpen(true);
+    setStageHistoryLoading(true);
+    try {
+      const rows = await CRMService.getStageHistory('opportunity', slideOverOpp.id);
+      setStageHistory(rows as any);
+    } catch (err) {
+      console.error('Error loading stage history:', err);
+      setStageHistory([]);
+    } finally {
+      setStageHistoryLoading(false);
+    }
+  };
   const [activities, setActivities] = useState<CRMActivity[]>([]);
   const [activityForm, setActivityForm] = useState<CreateActivityData>({ opportunity_id: '', type: 'note', title: '' });
   const [activityMeetingDate, setActivityMeetingDate] = useState<string | undefined>(undefined);
@@ -972,7 +1016,7 @@ export default function SalesPipelinePage() {
       void fetchOpportunities();
       void fetchMetrics();
     } catch (err: any) {
-      alert(err.message || 'Error creating opportunity');
+      toast({ title: 'Couldn’t create opportunity', description: err?.message, variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
@@ -991,7 +1035,7 @@ export default function SalesPipelinePage() {
       applyOppPatch(oppId, form as Partial<SalesPipelineOpportunity>);
       void fetchMetrics();
     } catch (err: any) {
-      alert(err.message || 'Error updating opportunity');
+      toast({ title: 'Couldn’t update opportunity', description: err?.message, variant: 'destructive' });
       void fetchOpportunities(); // revert
     } finally {
       setIsSubmitting(false);
@@ -1014,17 +1058,25 @@ export default function SalesPipelinePage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this opportunity?')) return;
-    try {
-      await SalesPipelineService.delete(id);
-      if (slideOverOpp?.id === id) setSlideOverOpp(null);
-      removeOpp(id);
-      void fetchMetrics();
-      if (activeTab === 'outreach') { void fetchOutreach(); void fetchOutreachCount(); }
-    } catch (err) {
-      console.error('Error deleting:', err);
-      void fetchOpportunities(); // revert
-    }
+    setConfirmDialog({
+      open: true,
+      title: 'Delete opportunity?',
+      description: 'This permanently removes the opportunity and all its activity history. This cannot be undone.',
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        try {
+          await SalesPipelineService.delete(id);
+          if (slideOverOpp?.id === id) setSlideOverOpp(null);
+          removeOpp(id);
+          void fetchMetrics();
+          if (activeTab === 'outreach') { void fetchOutreach(); void fetchOutreachCount(); }
+        } catch (err: any) {
+          console.error('Error deleting:', err);
+          toast({ title: 'Couldn’t delete opportunity', description: err?.message, variant: 'destructive' });
+          void fetchOpportunities(); // revert
+        }
+      },
+    });
   };
 
   const handleStageChange = async (oppId: string, newStage: SalesPipelineStage, currentStage: string) => {
@@ -2668,7 +2720,7 @@ export default function SalesPipelinePage() {
       void selected; // satisfy linter on unused
     } catch (err: any) {
       console.error('Error bulk bumping:', err);
-      alert(err.message || 'Error bumping selected opportunities');
+      toast({ title: 'Bulk bump failed', description: err?.message, variant: 'destructive' });
       setSelectedOutreach([]);
     } finally {
       setIsBulkBumping(false);
@@ -2692,7 +2744,7 @@ export default function SalesPipelinePage() {
       void fetchMetrics();
     } catch (err: any) {
       console.error('Error bulk moving to warm:', err);
-      alert(err.message || 'Error moving selected opportunities to warm');
+      toast({ title: 'Couldn’t move to warm', description: err?.message, variant: 'destructive' });
       setSelectedOutreach([]);
       void fetchOpportunities(); // revert
     } finally {
@@ -2702,22 +2754,29 @@ export default function SalesPipelinePage() {
 
   const handleBulkDelete = async () => {
     if (selectedOutreach.length === 0) return;
-    if (!confirm(`Delete ${selectedOutreach.length} selected opportunities? This cannot be undone.`)) return;
-    try {
-      await SalesPipelineService.bulkDelete(selectedOutreach);
-      // Optimistic remove — drop all selected from local state.
-      const selected = new Set(selectedOutreach);
-      setOpportunities(prev => prev.filter(o => !selected.has(o.id)));
-      setSelectedOutreach([]);
-      void fetchOutreach();
-      void fetchOutreachCount();
-      void fetchMetrics();
-    } catch (err: any) {
-      console.error('Error bulk deleting:', err);
-      alert(err.message || 'Error deleting selected opportunities');
-      setSelectedOutreach([]);
-      void fetchOpportunities(); // revert
-    }
+    const count = selectedOutreach.length;
+    setConfirmDialog({
+      open: true,
+      title: `Delete ${count} opportunit${count === 1 ? 'y' : 'ies'}?`,
+      description: 'These opportunities and all their activity history will be permanently removed.',
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        try {
+          await SalesPipelineService.bulkDelete(selectedOutreach);
+          const selected = new Set(selectedOutreach);
+          setOpportunities(prev => prev.filter(o => !selected.has(o.id)));
+          setSelectedOutreach([]);
+          void fetchOutreach();
+          void fetchOutreachCount();
+          void fetchMetrics();
+        } catch (err: any) {
+          console.error('Error bulk deleting:', err);
+          toast({ title: 'Bulk delete failed', description: err?.message, variant: 'destructive' });
+          setSelectedOutreach([]);
+          void fetchOpportunities();
+        }
+      },
+    });
   };
 
   const toggleOutreachSelect = (id: string) => {
@@ -2775,17 +2834,26 @@ export default function SalesPipelinePage() {
 
   const handleOrbitBulkDelete = async () => {
     if (selectedOrbit.length === 0) return;
-    if (!confirm(`Delete ${selectedOrbit.length} selected opportunities? This cannot be undone.`)) return;
+    const count = selectedOrbit.length;
     const ids = selectedOrbit;
-    try {
-      await SalesPipelineService.bulkDelete(ids);
-      setOpportunities(prev => prev.filter(o => !ids.includes(o.id)));
-      setSelectedOrbit([]);
-      void fetchMetrics();
-    } catch (err) {
-      console.error('Error in orbit bulk delete:', err);
-      void fetchOpportunities();
-    }
+    setConfirmDialog({
+      open: true,
+      title: `Delete ${count} opportunit${count === 1 ? 'y' : 'ies'}?`,
+      description: 'These opportunities and all their activity history will be permanently removed.',
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        try {
+          await SalesPipelineService.bulkDelete(ids);
+          setOpportunities(prev => prev.filter(o => !ids.includes(o.id)));
+          setSelectedOrbit([]);
+          void fetchMetrics();
+        } catch (err: any) {
+          console.error('Error in orbit bulk delete:', err);
+          toast({ title: 'Bulk delete failed', description: err?.message, variant: 'destructive' });
+          void fetchOpportunities();
+        }
+      },
+    });
   };
 
   const renderOutreachTab = () => (
@@ -4291,9 +4359,20 @@ export default function SalesPipelinePage() {
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
               {slideOverMode === 'view' ? (
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEditDialog(opp)}>
-                  <Edit className="h-4 w-4" />
-                </Button>
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={openStageHistory}
+                    title="Stage history"
+                  >
+                    <History className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEditDialog(opp)}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                </>
               ) : (
                 <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => { setSlideOverMode('view'); setEditingOpp(null); setForm({ name: '' }); }}>
                   Cancel
@@ -5269,6 +5348,79 @@ export default function SalesPipelinePage() {
         </ScrollArea>
         )}
       </div>
+
+      {/* Stage History dialog — restored from the legacy /crm/pipeline.
+          Sourced from crm_stage_history; recordStageHistory() in
+          crmService writes to it on every updateOpportunity stage change.
+          Z-index above the slide-over (z-[80] > z-[70]) so it floats
+          on top when triggered. */}
+      <Dialog open={stageHistoryOpen} onOpenChange={setStageHistoryOpen}>
+        <DialogContent className="max-w-lg z-[80]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="h-4 w-4 text-brand" />
+              Stage History
+            </DialogTitle>
+            <DialogDescription>
+              Timeline for <span className="font-medium">{slideOverOpp?.name}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[420px]">
+            <div className="space-y-4 py-2">
+              {stageHistoryLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : stageHistory.length === 0 ? (
+                <p className="text-center text-sm text-gray-500 py-6">No history recorded yet.</p>
+              ) : (
+                <div className="relative">
+                  <div className="absolute left-4 top-1 bottom-1 w-0.5 bg-gray-200" />
+                  {stageHistory.map(entry => (
+                    <div key={entry.id} className="relative pl-10 pb-4">
+                      <div className="absolute left-2.5 top-1.5 w-3 h-3 bg-white border-2 border-gray-400 rounded-full" />
+                      <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          {entry.from_stage ? (
+                            <>
+                              <Badge variant="outline" className="text-[10px]">
+                                {STAGE_LABELS[entry.from_stage as SalesPipelineStage] || entry.from_stage}
+                              </Badge>
+                              <ArrowRight className="h-3 w-3 text-gray-400" />
+                              <Badge className="text-[10px]" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                                {STAGE_LABELS[entry.to_stage as SalesPipelineStage] || entry.to_stage}
+                              </Badge>
+                            </>
+                          ) : (
+                            <Badge className="text-[10px]" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                              Created as {STAGE_LABELS[entry.to_stage as SalesPipelineStage] || entry.to_stage}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-gray-500 flex items-center gap-2">
+                          <Clock className="h-3 w-3" />
+                          {format(new Date(entry.changed_at), 'MMM d, yyyy h:mm a')}
+                          {entry.changed_by && (
+                            <>· <span className="text-gray-600">{getUserName(entry.changed_by)}</span></>
+                          )}
+                        </p>
+                        {entry.notes && (
+                          <p className="text-xs text-gray-600 mt-1 whitespace-pre-wrap">{entry.notes}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStageHistoryOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       </>,
       document.body
     );
@@ -6312,7 +6464,29 @@ export default function SalesPipelinePage() {
           <h2 className="text-2xl font-bold text-gray-900">Sales Pipeline</h2>
           <p className="text-gray-600">Playbook-driven sales pipeline</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            title="Export current filtered view as CSV"
+            onClick={() => downloadCsv(filteredOpportunities, [
+              { header: 'Name', accessor: r => r.name },
+              { header: 'Stage', accessor: r => r.stage || '' },
+              { header: 'Bucket', accessor: r => (r as any).bucket || '' },
+              { header: 'Source', accessor: r => (r as any).source || '' },
+              { header: 'Owner', accessor: r => (r as any).owner?.name || (r as any).owner_id || '' },
+              { header: 'POC Handle', accessor: r => (r as any).poc_handle || '' },
+              { header: 'POC Platform', accessor: r => (r as any).poc_platform || '' },
+              { header: 'Deal Value', accessor: r => (r as any).deal_value ?? '' },
+              { header: 'Currency', accessor: r => (r as any).currency || '' },
+              { header: 'Last Contacted', accessor: r => (r as any).last_contacted_at ? new Date((r as any).last_contacted_at).toISOString().slice(0, 10) : '' },
+              { header: 'Next Action', accessor: r => (r as any).next_action_at ? new Date((r as any).next_action_at).toISOString().slice(0, 10) : '' },
+              { header: 'Created', accessor: r => new Date(r.created_at).toISOString().slice(0, 10) },
+            ], `sales-pipeline-${todayStamp()}`)}
+            disabled={filteredOpportunities.length === 0}
+          >
+            <Download className="h-4 w-4 mr-1" /> Export CSV
+          </Button>
           <Button
             onClick={() => { setForm({ name: '', owner_id: user?.id || undefined }); setIsCreateOpen(true); }}
             className="hover:opacity-90"
@@ -7705,6 +7879,44 @@ export default function SalesPipelinePage() {
       {renderTgHandlePrompt()}
       {renderBucketPrompt()}
       {renderActivityLogPrompt()}
+
+      {/* Shared destructive-confirm dialog. Replaces the half-dozen
+          window.confirm() calls that used to live in delete handlers.
+          The action runs with confirmRunning=true so the button shows
+          a spinner and can't be double-clicked. */}
+      <AlertDialog
+        open={!!confirmDialog?.open}
+        onOpenChange={(open) => { if (!open) setConfirmDialog(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialog?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmDialog?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={confirmRunning}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={confirmRunning}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!confirmDialog) return;
+                setConfirmRunning(true);
+                try {
+                  await confirmDialog.onConfirm();
+                  setConfirmDialog(null);
+                } finally {
+                  setConfirmRunning(false);
+                }
+              }}
+            >
+              {confirmRunning ? (
+                <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Working…</>
+              ) : (confirmDialog?.confirmLabel || 'Confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

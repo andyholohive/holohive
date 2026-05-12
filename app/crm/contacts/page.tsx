@@ -13,8 +13,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Plus, Search, Edit, Trash2, UserPlus,
   Mail, MessageSquare, MoreHorizontal, Building2, Handshake, Users, TrendingUp,
-  Filter, ArrowUpDown, X, Link2, Table as TableIcon, LayoutGrid
+  Filter, ArrowUpDown, X, Link2, Table as TableIcon, LayoutGrid, Download
 } from 'lucide-react';
+import { downloadCsv, todayStamp } from '@/lib/csvExport';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -493,6 +494,23 @@ export default function ContactsPage() {
               Clear Filters
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadCsv(filteredContacts, [
+              { header: 'Name', accessor: r => r.name },
+              { header: 'Email', accessor: r => (r as any).email || '' },
+              { header: 'Telegram', accessor: r => (r as any).telegram_id || (r as any).telegram || '' },
+              { header: 'Title', accessor: r => (r as any).title || '' },
+              { header: 'Org', accessor: r => (r as any).partner?.name || (r as any).affiliate?.name || '' },
+              { header: 'Notes', accessor: r => (r as any).notes || '' },
+              { header: 'Created', accessor: r => (r as any).created_at ? new Date((r as any).created_at).toISOString().slice(0, 10) : '' },
+            ], `crm-contacts-${todayStamp()}`)}
+            disabled={filteredContacts.length === 0}
+            title="Download current view as CSV"
+          >
+            <Download className="h-4 w-4 mr-1" /> Export CSV
+          </Button>
         </div>
 
         {/* View Toggle */}

@@ -11,8 +11,9 @@ import { Button } from '@/components/ui/button';
 import {
   Search, Inbox, Clock, DollarSign, User, Mail, MessageSquare,
   Target, Calendar, ChevronDown, ChevronUp, ExternalLink, RefreshCw, Loader2,
-  ArrowRight, CheckCircle2,
+  ArrowRight, CheckCircle2, Download,
 } from 'lucide-react';
+import { downloadCsv, todayStamp } from '@/lib/csvExport';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -355,6 +356,26 @@ export default function SubmissionsPage() {
               <SelectItem value="converted">Converted</SelectItem>
             </SelectContent>
           </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadCsv(filtered, [
+              { header: 'Date', accessor: r => new Date(r.created_at).toISOString() },
+              { header: 'Name', accessor: r => r.name },
+              { header: 'Project', accessor: r => r.project_name },
+              { header: 'Role', accessor: r => r.role },
+              { header: 'Email', accessor: r => r.email },
+              { header: 'Telegram', accessor: r => r.telegram },
+              { header: 'Funding', accessor: r => r.funding },
+              { header: 'Timeline', accessor: r => r.timeline },
+              { header: 'Goals', accessor: r => r.goals },
+              { header: 'Converted', accessor: r => convertedIds.has(r.id) ? 'yes' : 'no' },
+            ], `contact-submissions-${todayStamp()}`)}
+            disabled={filtered.length === 0}
+            title="Download current view as CSV"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
           <Button
             variant="outline"
             size="sm"

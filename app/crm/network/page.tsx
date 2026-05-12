@@ -19,8 +19,9 @@ import { KpiCard } from '@/components/ui/kpi-card';
 import {
   Plus, Search, Edit, Trash2, Users, Handshake,
   Building2, Mail, MoreHorizontal, History, X, Link as LinkIcon, ArrowRight, MessageSquare,
-  Filter, ArrowUpDown, Phone, LayoutGrid, TableIcon
+  Filter, ArrowUpDown, Phone, LayoutGrid, TableIcon, Download
 } from 'lucide-react';
+import { downloadCsv, todayStamp } from '@/lib/csvExport';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
@@ -1217,6 +1218,48 @@ export default function NetworkPage() {
             Clear Filters
           </Button>
         )}
+        {/* CSV export of the active tab's current filtered view. The
+            partner/affiliate tables share enough fields to use the same
+            shape modulo a couple of columns, so we branch on activeTab
+            and emit the appropriate header row. */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-auto"
+          title="Download current view as CSV"
+          onClick={() => {
+            if (activeTab === 'partners') {
+              downloadCsv(filteredPartners, [
+                { header: 'Name', accessor: r => r.name },
+                { header: 'Category', accessor: r => r.category || '' },
+                { header: 'Focus', accessor: r => (r as any).focus || '' },
+                { header: 'Status', accessor: r => r.status },
+                { header: 'POC Name', accessor: r => (r as any).poc_name || '' },
+                { header: 'POC Email', accessor: r => (r as any).poc_email || '' },
+                { header: 'POC Telegram', accessor: r => (r as any).poc_telegram || '' },
+                { header: 'Last Contacted', accessor: r => (r as any).last_contacted_at ? new Date((r as any).last_contacted_at).toISOString().slice(0, 10) : '' },
+                { header: 'Created', accessor: r => new Date(r.created_at).toISOString().slice(0, 10) },
+              ], `crm-partners-${todayStamp()}`);
+            } else {
+              downloadCsv(filteredAffiliates, [
+                { header: 'Name', accessor: r => r.name },
+                { header: 'Affiliation', accessor: r => (r as any).affiliation || '' },
+                { header: 'Category', accessor: r => (r as any).category || '' },
+                { header: 'Status', accessor: r => r.status || '' },
+                { header: 'Commission Model', accessor: r => (r as any).commission_model || '' },
+                { header: 'Commission Rate', accessor: r => (r as any).commission_rate ?? '' },
+                { header: 'POC Name', accessor: r => (r as any).poc_name || '' },
+                { header: 'POC Email', accessor: r => (r as any).poc_email || '' },
+                { header: 'POC Telegram', accessor: r => (r as any).poc_telegram || '' },
+                { header: 'Last Contacted', accessor: r => (r as any).last_contacted_at ? new Date((r as any).last_contacted_at).toISOString().slice(0, 10) : '' },
+                { header: 'Created', accessor: r => new Date(r.created_at).toISOString().slice(0, 10) },
+              ], `crm-affiliates-${todayStamp()}`);
+            }
+          }}
+          disabled={(activeTab === 'partners' ? filteredPartners.length : filteredAffiliates.length) === 0}
+        >
+          <Download className="h-4 w-4 mr-1" /> Export CSV
+        </Button>
       </div>
 
       {/* Tabs */}
