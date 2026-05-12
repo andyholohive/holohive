@@ -22,6 +22,7 @@ import {
   Filter, ArrowUpDown, Phone, LayoutGrid, TableIcon, Download
 } from 'lucide-react';
 import { downloadCsv, todayStamp } from '@/lib/csvExport';
+import { supabase } from '@/lib/supabase';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
@@ -82,6 +83,11 @@ export default function NetworkPage() {
 
   const [partners, setPartners] = useState<CRMPartner[]>([]);
   const [affiliates, setAffiliates] = useState<CRMAffiliate[]>([]);
+  // Per-affiliate opportunity counts so we can show a "Linked deals"
+  // badge on each affiliate row. crm_activities only links to opps,
+  // not partners/affiliates, so the closest "activity" signal we have
+  // for an affiliate is "how many deals are flowing through them?".
+  const [affiliateOppCounts, setAffiliateOppCounts] = useState<Record<string, { total: number; open: number; won: number }>>({});
   const [contacts, setContacts] = useState<CRMContact[]>([]);
   const [allContactLinks, setAllContactLinks] = useState<CRMContactLink[]>([]);
   const [users, setUsers] = useState<{ id: string; name: string | null; email: string }[]>([]);
@@ -231,18 +237,33 @@ export default function NetworkPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [parts, affs, conts, contactLinks, usersData] = await Promise.all([
+      const [parts, affs, conts, contactLinks, usersData, oppCountsResp] = await Promise.all([
         CRMService.getAllPartners(),
         CRMService.getAllAffiliates(),
         CRMService.getAllContacts(),
         CRMService.getAllContactLinks(),
-        UserService.getAllUsers()
+        UserService.getAllUsers(),
+        // Single query: every opportunity with an affiliate_id, with stage
+        // so we can split into open/won. ~1k row scan is fine; if this
+        // grows we can move it server-side.
+        supabase
+          .from('crm_opportunities')
+          .select('affiliate_id, stage')
+          .not('affiliate_id', 'is', null),
       ]);
       setPartners(parts);
       setAffiliates(affs);
       setContacts(conts);
       setAllContactLinks(contactLinks);
       setUsers(usersData.map(u => ({ id: u.id, name: u.name, email: u.email })));
+      const counts: Record<string, { total: number; open: number; won: number }> = {};
+      for (const row of (oppCountsResp.data || []) as Array<{ affiliate_id: string; stage: string }>) {
+        const bucket = counts[row.affiliate_id] || (counts[row.affiliate_id] = { total: 0, open: 0, won: 0 });
+        bucket.total++;
+        if (row.stage === 'v2_closed_won' || row.stage === 'closed_won') bucket.won++;
+        else if (row.stage !== 'v2_closed_lost' && row.stage !== 'closed_lost') bucket.open++;
+      }
+      setAffiliateOppCounts(counts);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -2007,6 +2028,26 @@ export default function NetworkPage() {
                               >
                                 <Users className="h-4 w-4 text-gray-400" />
                                 <span className="font-medium">{affiliate.name}</span>
+                                {(() => {
+                                  const c = affiliateOppCounts[affiliate.id];
+                                  if (!c || c.total === 0) return null;
+                                  // Open count is the active-deal signal — won
+                                  // is interesting but tertiary.
+                                  return (
+                                    <span
+                                      className="text-[10px] tabular-nums px-1.5 py-0.5 rounded bg-brand-light text-brand"
+                                      title={`${c.total} linked opportunit${c.total === 1 ? 'y' : 'ies'} (${c.open} open · ${c.won} won)`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        // Deep-link to the sales pipeline filtered by this affiliate.
+                                        // Sales pipeline doesn't yet read the param — forward-looking.
+                                        window.location.href = `/crm/sales-pipeline?affiliate=${affiliate.id}`;
+                                      }}
+                                    >
+                                      {c.open > 0 ? `${c.open} open` : `${c.total} deals`}
+                                    </span>
+                                  );
+                                })()}
                               </div>
                             )}
                           </TableCell>
@@ -2201,7 +2242,22 @@ export default function NetworkPage() {
                           <Users className="h-5 w-5 text-purple-600" />
                         </div>
                         <div>
-                          <CardTitle className="text-base">{affiliate.name}</CardTitle>
+                          <CardTitle className="text-base flex items-center gap-2">
+                            {affiliate.name}
+                            {(() => {
+                              const c = affiliateOppCounts[affiliate.id];
+                              if (!c || c.total === 0) return null;
+                              return (
+                                <span
+                                  className="text-[10px] tabular-nums px-1.5 py-0.5 rounded bg-brand-light text-brand cursor-pointer"
+                                  title={`${c.total} linked opportunit${c.total === 1 ? 'y' : 'ies'} (${c.open} open · ${c.won} won)`}
+                                  onClick={() => { window.location.href = `/crm/sales-pipeline?affiliate=${affiliate.id}`; }}
+                                >
+                                  {c.open > 0 ? `${c.open} open` : `${c.total} deals`}
+                                </span>
+                              );
+                            })()}
+                          </CardTitle>
                           {affiliate.affiliation && (
                             <p className="text-sm text-gray-500">{affiliate.affiliation}</p>
                           )}

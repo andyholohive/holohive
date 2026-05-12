@@ -16,8 +16,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Calendar, Video, MoreHorizontal, XCircle, Copy, ExternalLink, List, CalendarDays, ChevronLeft, ChevronRight, ArrowLeft, CheckCircle2, UserX } from 'lucide-react';
+import { Calendar, Video, MoreHorizontal, XCircle, Copy, ExternalLink, List, CalendarDays, ChevronLeft, ChevronRight, ArrowLeft, CheckCircle2, UserX, User } from 'lucide-react';
 import { BookingService, Booking } from '@/lib/bookingService';
+import { UserService } from '@/lib/userService';
+import { useAuth } from '@/contexts/AuthContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import {
   startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek,
@@ -28,6 +31,8 @@ type TabFilter = 'upcoming' | 'past' | 'cancelled';
 type ViewMode = 'table' | 'calendar';
 
 export default function MeetingsPage() {
+  const { userProfile } = useAuth();
+  const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabFilter>('upcoming');
@@ -36,16 +41,33 @@ export default function MeetingsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  // User picker — admins can view any teammate's meetings; everyone
+  // else is locked to their own. 'me' is a sentinel that means
+  // "current user", so we don't have to wait for userProfile to render.
+  const [users, setUsers] = useState<Array<{ id: string; name: string | null; email: string }>>([]);
+  const [viewUserId, setViewUserId] = useState<string>('me');
   const { toast } = useToast();
 
   useEffect(() => {
     loadBookings();
-  }, []);
+  }, [viewUserId, userProfile?.id]);
+
+  // Load the user list once admins have arrived. Skip for non-admins
+  // (they can't change the picker anyway).
+  useEffect(() => {
+    if (!isAdmin) return;
+    UserService.getAllUsers()
+      .then(rows => setUsers(rows.map(u => ({ id: u.id, name: u.name, email: u.email }))))
+      .catch(err => console.error('Error loading user list:', err));
+  }, [isAdmin]);
 
   async function loadBookings() {
     try {
       setLoading(true);
-      const data = await BookingService.getMyBookings();
+      const targetUserId = viewUserId === 'me' ? (userProfile?.id || null) : viewUserId;
+      const data = targetUserId
+        ? await BookingService.getBookingsForUser(targetUserId)
+        : await BookingService.getMyBookings();
       setBookings(data);
     } catch (err) {
       console.error('Error loading bookings:', err);
@@ -261,12 +283,39 @@ export default function MeetingsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <Calendar className="h-6 w-6 text-brand" />
-          Meetings
-        </h2>
-        <p className="text-gray-600 mt-1">View and manage your booked meetings.</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            <Calendar className="h-6 w-6 text-brand" />
+            Meetings
+          </h2>
+          <p className="text-gray-600 mt-1">
+            {viewUserId === 'me'
+              ? 'View and manage your booked meetings.'
+              : `Viewing ${(users.find(u => u.id === viewUserId)?.name || 'teammate')}'s booked meetings.`}
+          </p>
+        </div>
+        {/* Admin-only viewer-as picker. Shown only when there's
+            something to switch to (more than just the current user). */}
+        {isAdmin && users.length > 1 && (
+          <Select value={viewUserId} onValueChange={setViewUserId}>
+            <SelectTrigger className="h-9 w-56 text-sm focus-brand">
+              <User className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="me">My meetings</SelectItem>
+              {users
+                .filter(u => u.id !== userProfile?.id)
+                .sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email))
+                .map(u => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name || u.email}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Tab Filters + View Toggle. Tabs use the shadcn <Tabs> component

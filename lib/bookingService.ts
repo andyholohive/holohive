@@ -205,12 +205,20 @@ export class BookingService {
   static async getMyBookings(): Promise<Booking[]> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return [];
+    return this.getBookingsForUser(user.id);
+  }
 
-    // Get user's booking page IDs
+  /**
+   * Same as getMyBookings but for an arbitrary user. Used by the
+   * Meetings page when an admin wants to view a teammate's calendar.
+   * RLS still applies, so non-admin callers will get empty results
+   * for users they don't own.
+   */
+  static async getBookingsForUser(userId: string): Promise<Booking[]> {
     const { data: pages } = await supabase
       .from('booking_pages')
       .select('id')
-      .eq('user_id', user.id);
+      .eq('user_id', userId);
 
     if (!pages || pages.length === 0) return [];
 

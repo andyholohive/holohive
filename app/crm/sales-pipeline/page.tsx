@@ -325,6 +325,8 @@ export default function SalesPipelinePage() {
   const [outreachAllTotal, setOutreachAllTotal] = useState(0);
   const [selectedOutreach, setSelectedOutreach] = useState<string[]>([]);
   const [isBulkBumping, setIsBulkBumping] = useState(false);
+  const [isBulkReassigning, setIsBulkReassigning] = useState(false);
+  const [bulkOwnerOpen, setBulkOwnerOpen] = useState(false);
   const [isBulkMoving, setIsBulkMoving] = useState(false);
   // Orbit-tab multi-select — mirrors selectedOutreach. Bulk handlers below.
   const [selectedOrbit, setSelectedOrbit] = useState<string[]>([]);
@@ -2779,6 +2781,37 @@ export default function SalesPipelinePage() {
     });
   };
 
+  // Reassign owner_id on every selected outreach opportunity. Comes
+  // up when rebalancing the SDR pool (someone leaves, new SDR ramps
+  // up, etc.) — without this you'd have to open each opp individually.
+  const handleBulkReassignOwner = async (newOwnerId: string | null, ownerLabel: string) => {
+    if (selectedOutreach.length === 0 || isBulkReassigning) return;
+    setIsBulkReassigning(true);
+    try {
+      const ids = [...selectedOutreach];
+      await SalesPipelineService.bulkUpdateOwner(ids, newOwnerId);
+      // Optimistic local patch — server is authoritative but the table
+      // re-render is what the user is waiting for.
+      setOpportunities(prev => prev.map(o =>
+        ids.includes(o.id) ? { ...o, owner_id: newOwnerId, updated_at: new Date().toISOString() } : o,
+      ));
+      setSelectedOutreach([]);
+      setBulkOwnerOpen(false);
+      toast({
+        title: 'Owner reassigned',
+        description: `${ids.length} opportunit${ids.length === 1 ? 'y' : 'ies'} → ${ownerLabel}`,
+      });
+      void fetchOutreach();
+      void fetchMetrics();
+    } catch (err: any) {
+      console.error('Error in bulk owner reassign:', err);
+      toast({ title: 'Reassign failed', description: err?.message, variant: 'destructive' });
+      void fetchOpportunities();
+    } finally {
+      setIsBulkReassigning(false);
+    }
+  };
+
   const toggleOutreachSelect = (id: string) => {
     setSelectedOutreach(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
@@ -3030,6 +3063,52 @@ export default function SalesPipelinePage() {
             {isBulkMoving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ArrowRight className="h-3 w-3 mr-1" />}
             Move to Warm
           </Button>
+          {/* Bulk owner reassign — searchable list of teammates with TG ids
+              first (more useful), then everyone else. "Unassigned" clears
+              the owner. */}
+          <Popover open={bulkOwnerOpen} onOpenChange={setBulkOwnerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                disabled={isBulkReassigning}
+              >
+                {isBulkReassigning
+                  ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  : <Users className="h-3 w-3 mr-1" />}
+                Reassign
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-0" align="end">
+              <Command>
+                <CommandInput placeholder="Reassign to..." />
+                <CommandList>
+                  <CommandEmpty>No matches.</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      value="__unassigned__"
+                      onSelect={() => handleBulkReassignOwner(null, 'Unassigned')}
+                    >
+                      <span className="text-gray-500 italic">Unassigned</span>
+                    </CommandItem>
+                    {users.map(u => (
+                      <CommandItem
+                        key={u.id}
+                        value={`${u.name || ''} ${u.email}`}
+                        onSelect={() => handleBulkReassignOwner(u.id, u.name || u.email)}
+                      >
+                        <div className="flex flex-col">
+                          <span>{u.name || u.email}</span>
+                          {u.name && <span className="text-[10px] text-gray-400">{u.email}</span>}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
           <Button
             variant="outline"
             size="sm"

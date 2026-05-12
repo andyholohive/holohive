@@ -854,6 +854,24 @@ export class SalesPipelineService {
     }
   }
 
+  /**
+   * Reassign owner_id on multiple opportunities at once. Used when
+   * rebalancing the SDR pool (e.g. someone leaves, new SDR onboards).
+   * Pass `null` to clear the owner.
+   */
+  static async bulkUpdateOwner(ids: string[], ownerId: string | null): Promise<void> {
+    const now = new Date().toISOString();
+    // Single .in() update is atomic-ish in Postgrest and avoids N round-trips.
+    const { error } = await supabase
+      .from('crm_opportunities')
+      .update({ owner_id: ownerId, updated_at: now })
+      .in('id', ids);
+    if (error) {
+      console.error('Error in bulk owner reassign:', error);
+      throw error;
+    }
+  }
+
   // ----------------------------------------
   // SALES DM TEMPLATES
   // ----------------------------------------
