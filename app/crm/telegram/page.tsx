@@ -237,8 +237,31 @@ export default function TelegramChatsPage() {
   const [commandForm, setCommandForm] = useState({ command: '', response: '', description: '', image_url: '', team_only: false });
   const [savingCommand, setSavingCommand] = useState(false);
 
-  // Active tab
-  const [activeTab, setActiveTab] = useState('unassigned');
+  // Team-member Telegram IDs — used to compute "needs reply" by
+  // distinguishing team messages from external (customer/lead) ones.
+  // Loaded once on mount alongside chats/messages.
+  const [teamTelegramIds, setTeamTelegramIds] = useState<Set<string>>(new Set());
+
+  // Active tab — persisted in localStorage so reloads don't yank you
+  // back to "Unassigned". Lazy initializer reads the saved value once
+  // on first mount; we don't read on every render.
+  const TG_TAB_STORAGE_KEY = 'crm.telegram.activeTab';
+  const VALID_TG_TABS = new Set([
+    'unassigned', 'leads', 'internal', 'clients', 'chats', 'dms', 'kols', 'commands', 'hidden',
+  ]);
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'unassigned';
+    try {
+      const saved = localStorage.getItem(TG_TAB_STORAGE_KEY);
+      return saved && VALID_TG_TABS.has(saved) ? saved : 'unassigned';
+    } catch {
+      return 'unassigned';
+    }
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try { localStorage.setItem(TG_TAB_STORAGE_KEY, activeTab); } catch {}
+  }, [activeTab]);
 
   useEffect(() => {
     fetchData();
@@ -246,7 +269,7 @@ export default function TelegramChatsPage() {
   }, []);
 
   const fetchData = async () => {
-    await Promise.all([fetchChats(), fetchMessages(), fetchOpportunities(), fetchMasterKOLs(), fetchClients()]);
+    await Promise.all([fetchChats(), fetchMessages(), fetchOpportunities(), fetchMasterKOLs(), fetchClients(), fetchTeamTelegramIds()]);
   };
 
   const fetchChats = async () => {
@@ -447,6 +470,27 @@ export default function TelegramChatsPage() {
       setMessages(grouped);
     } catch (error) {
       console.error('Error fetching messages:', error);
+    }
+  };
+
+  // Pull the set of team-member Telegram IDs from the users table. A
+  // chat "needs reply" when its most recent message is from someone
+  // NOT in this set — i.e. an external counterparty waiting on us.
+  const fetchTeamTelegramIds = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('telegram_id')
+        .not('telegram_id', 'is', null);
+      if (error) throw error;
+      const ids = new Set<string>(
+        ((data || []) as Array<{ telegram_id: string | null }>)
+          .map(u => (u.telegram_id || '').trim())
+          .filter(Boolean),
+      );
+      setTeamTelegramIds(ids);
+    } catch (err) {
+      console.error('Error fetching team telegram IDs:', err);
     }
   };
 
@@ -1086,6 +1130,38 @@ export default function TelegramChatsPage() {
   const unassignedChats = visibleChats.filter(chat => !chat.opportunity_id && !chat.master_kol_id && !chat.client_id && !chat.is_internal && chat.chat_type !== 'private');
   const leadsChats = visibleChats.filter(chat => chat.opportunity_id !== null);
 
+  // ── "Needs reply" detection ───────────────────────────────────────
+  // A chat needs reply if its most recent message in the past 7 days
+  // came from someone OUTSIDE the team. Internal chats are excluded —
+  // those are team↔team and the asymmetric concept doesn't apply.
+  // Time window keeps stale chats from forever-flagging as "unread".
+  const NEEDS_REPLY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+  const chatsNeedingReply = new Set<string>();
+  if (teamTelegramIds.size > 0) {
+    const cutoff = Date.now() - NEEDS_REPLY_WINDOW_MS;
+    for (const chat of visibleChats) {
+      if (chat.is_internal) continue;
+      const recent = (displayMessages[chat.chat_id] || [])[0];
+      if (!recent) continue;
+      const tsRaw = recent.message_date ? new Date(recent.message_date).getTime() : 0;
+      if (!tsRaw || tsRaw < cutoff) continue;
+      const fromId = (recent.from_user_id || '').toString();
+      // No from_user_id ⇒ unknown sender; skip rather than guessing.
+      if (!fromId) continue;
+      if (!teamTelegramIds.has(fromId)) {
+        chatsNeedingReply.add(chat.chat_id);
+      }
+    }
+  }
+  const needsReplyCount = (list: typeof visibleChats) =>
+    list.reduce((n, c) => n + (chatsNeedingReply.has(c.chat_id) ? 1 : 0), 0);
+  const unassignedNeedsReply = needsReplyCount(unassignedChats);
+  const leadsNeedsReply = needsReplyCount(leadsChats);
+  const clientNeedsReply = needsReplyCount(clientChats);
+  const groupNeedsReply = needsReplyCount(groupChats);
+  const dmNeedsReply = needsReplyCount(dmChats);
+  const kolNeedsReply = needsReplyCount(kolChats);
+
   const filteredGroupChats = groupChats.filter(chat => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -1203,12 +1279,18 @@ export default function TelegramChatsPage() {
             {unassignedChats.length > 0 && (
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{unassignedChats.length}</Badge>
             )}
+            {unassignedNeedsReply > 0 && (
+              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-red-500 text-white border-0 hover:bg-red-500" title={`${unassignedNeedsReply} chat${unassignedNeedsReply === 1 ? '' : 's'} awaiting reply`}>{unassignedNeedsReply}</Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="leads" className="flex items-center gap-2">
             <LinkIcon className="h-4 w-4" />
             Leads
             {leadsChats.length > 0 && (
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{leadsChats.length}</Badge>
+            )}
+            {leadsNeedsReply > 0 && (
+              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-red-500 text-white border-0 hover:bg-red-500" title={`${leadsNeedsReply} chat${leadsNeedsReply === 1 ? '' : 's'} awaiting reply`}>{leadsNeedsReply}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="internal" className="flex items-center gap-2">
@@ -1224,12 +1306,18 @@ export default function TelegramChatsPage() {
             {clientChats.length > 0 && (
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{clientChats.length}</Badge>
             )}
+            {clientNeedsReply > 0 && (
+              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-red-500 text-white border-0 hover:bg-red-500" title={`${clientNeedsReply} chat${clientNeedsReply === 1 ? '' : 's'} awaiting reply`}>{clientNeedsReply}</Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="chats" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Groups
             {groupChats.length > 0 && (
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{groupChats.length}</Badge>
+            )}
+            {groupNeedsReply > 0 && (
+              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-red-500 text-white border-0 hover:bg-red-500" title={`${groupNeedsReply} chat${groupNeedsReply === 1 ? '' : 's'} awaiting reply`}>{groupNeedsReply}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="dms" className="flex items-center gap-2">
@@ -1238,12 +1326,18 @@ export default function TelegramChatsPage() {
             {dmChats.length > 0 && (
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{dmChats.length}</Badge>
             )}
+            {dmNeedsReply > 0 && (
+              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-red-500 text-white border-0 hover:bg-red-500" title={`${dmNeedsReply} chat${dmNeedsReply === 1 ? '' : 's'} awaiting reply`}>{dmNeedsReply}</Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="kols" className="flex items-center gap-2">
             <Megaphone className="h-4 w-4" />
             KOLs
             {kolChats.length > 0 && (
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{kolChats.length}</Badge>
+            )}
+            {kolNeedsReply > 0 && (
+              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-red-500 text-white border-0 hover:bg-red-500" title={`${kolNeedsReply} chat${kolNeedsReply === 1 ? '' : 's'} awaiting reply`}>{kolNeedsReply}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="commands" className="flex items-center gap-2">

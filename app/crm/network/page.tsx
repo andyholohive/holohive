@@ -162,6 +162,7 @@ export default function NetworkPage() {
   const [filterPartnerStatus, setFilterPartnerStatus] = useState<string>('all');
   const [filterPartnerCategory, setFilterPartnerCategory] = useState<string>('all');
   const [filterAffiliateStatus, setFilterAffiliateStatus] = useState<string>('all');
+  const [filterAffiliateCategory, setFilterAffiliateCategory] = useState<string>('all');
 
   // Sort state
   const [sortBy, setSortBy] = useState<string>('created_desc');
@@ -847,6 +848,11 @@ export default function NetworkPage() {
       return true;
     })
     .sort((a, b) => {
+      // Recent contact sorts treat missing dates as oldest (so they sink
+      // to the bottom on _desc and surface on _asc — both behaviors are
+      // useful for "who haven't I talked to in a while?").
+      const lastA = (a as any).last_contacted_at ? new Date((a as any).last_contacted_at).getTime() : 0;
+      const lastB = (b as any).last_contacted_at ? new Date((b as any).last_contacted_at).getTime() : 0;
       switch (sortBy) {
         case 'created_desc':
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -856,6 +862,15 @@ export default function NetworkPage() {
           return a.name.localeCompare(b.name);
         case 'name_desc':
           return b.name.localeCompare(a.name);
+        case 'last_contacted_desc':
+          return lastB - lastA;
+        case 'last_contacted_asc':
+          // Push never-contacted (0) to the very top — "stalest first"
+          // means rows with no contact date are even staler.
+          if (lastA === 0 && lastB === 0) return 0;
+          if (lastA === 0) return -1;
+          if (lastB === 0) return 1;
+          return lastA - lastB;
         default:
           return 0;
       }
@@ -869,9 +884,15 @@ export default function NetworkPage() {
       if (filterAffiliateStatus !== 'all' && a.status !== filterAffiliateStatus) {
         return false;
       }
+      if (filterAffiliateCategory !== 'all') {
+        if (filterAffiliateCategory === 'none' && (a as any).category) return false;
+        if (filterAffiliateCategory !== 'none' && (a as any).category !== filterAffiliateCategory) return false;
+      }
       return true;
     })
     .sort((a, b) => {
+      const lastA = (a as any).last_contacted_at ? new Date((a as any).last_contacted_at).getTime() : 0;
+      const lastB = (b as any).last_contacted_at ? new Date((b as any).last_contacted_at).getTime() : 0;
       switch (sortBy) {
         case 'created_desc':
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -881,6 +902,13 @@ export default function NetworkPage() {
           return a.name.localeCompare(b.name);
         case 'name_desc':
           return b.name.localeCompare(a.name);
+        case 'last_contacted_desc':
+          return lastB - lastA;
+        case 'last_contacted_asc':
+          if (lastA === 0 && lastB === 0) return 0;
+          if (lastA === 0) return -1;
+          if (lastB === 0) return 1;
+          return lastA - lastB;
         default:
           return 0;
       }
@@ -888,13 +916,14 @@ export default function NetworkPage() {
 
   // Check if any filters are active
   const hasActiveFilters = (activeTab === 'partners' && (filterPartnerStatus !== 'all' || filterPartnerCategory !== 'all')) ||
-    (activeTab === 'affiliates' && filterAffiliateStatus !== 'all');
+    (activeTab === 'affiliates' && (filterAffiliateStatus !== 'all' || filterAffiliateCategory !== 'all'));
 
   // Clear all filters
   const clearFilters = () => {
     setFilterPartnerStatus('all');
     setFilterPartnerCategory('all');
     setFilterAffiliateStatus('all');
+    setFilterAffiliateCategory('all');
     setSearchTerm('');
   };
 
@@ -1138,17 +1167,31 @@ export default function NetworkPage() {
           </>
         )}
         {activeTab === 'affiliates' && (
-          <Select value={filterAffiliateStatus} onValueChange={setFilterAffiliateStatus}>
-            <SelectTrigger className="w-36 h-9 text-sm focus-brand">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="new">New</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
+          <>
+            <Select value={filterAffiliateStatus} onValueChange={setFilterAffiliateStatus}>
+              <SelectTrigger className="w-36 h-9 text-sm focus-brand">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterAffiliateCategory} onValueChange={setFilterAffiliateCategory}>
+              <SelectTrigger className="w-40 h-9 text-sm focus-brand">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="service_provider">Service Provider</SelectItem>
+                <SelectItem value="investor_vc">Investor / VC</SelectItem>
+                <SelectItem value="project">Project</SelectItem>
+                <SelectItem value="none">No Category</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
         )}
         <div className="h-6 w-px bg-gray-300" />
         <div className="flex items-center gap-2">
@@ -1156,14 +1199,16 @@ export default function NetworkPage() {
           <span className="text-sm text-gray-600">Sort:</span>
         </div>
         <Select value={sortBy} onValueChange={setSortBy}>
-          <SelectTrigger className="w-40 h-9 text-sm focus-brand">
+          <SelectTrigger className="w-48 h-9 text-sm focus-brand">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="created_desc">Newest First</SelectItem>
             <SelectItem value="created_asc">Oldest First</SelectItem>
-            <SelectItem value="name_asc">Name A-Z</SelectItem>
-            <SelectItem value="name_desc">Name Z-A</SelectItem>
+            <SelectItem value="name_asc">Name A–Z</SelectItem>
+            <SelectItem value="name_desc">Name Z–A</SelectItem>
+            <SelectItem value="last_contacted_desc">Recently contacted</SelectItem>
+            <SelectItem value="last_contacted_asc">Stalest first</SelectItem>
           </SelectContent>
         </Select>
         {hasActiveFilters && (
