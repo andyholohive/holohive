@@ -130,6 +130,10 @@ export default function RemindersPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingRule, setDeletingRule] = useState<ReminderRule | null>(null);
+  // Filter the rule list to just the unconfigured ones (rules still
+  // using PLACEHOLDER_CHAT_ID). Toggled from the banner so admins
+  // can find them in one click instead of scanning the list.
+  const [showUnconfiguredOnly, setShowUnconfiguredOnly] = useState(false);
 
   const fetchTgChats = useCallback(async () => {
     const { data } = await supabase
@@ -246,8 +250,11 @@ export default function RemindersPage() {
     setTesting(ruleType);
     setTestResult(null);
     try {
-      const res = await fetch(`/api/cron/reminders?test_rule=${ruleType}`, {
-        headers: { 'Authorization': `Bearer ${window.prompt('Enter CRON_SECRET to test:', '')}` },
+      // Hits the admin-session-gated /api/reminders/test endpoint so we
+      // don't have to prompt the user for CRON_SECRET on every click.
+      // (The Vercel cron endpoint still uses bearer-token auth.)
+      const res = await fetch(`/api/reminders/test?rule=${encodeURIComponent(ruleType)}`, {
+        method: 'POST',
       });
       const data = await res.json();
       setTestResult(data);
@@ -577,23 +584,76 @@ export default function RemindersPage() {
         </Button>
       </div>
 
-      {/* Rules List */}
-      <div className="grid gap-4">
-        {rules.length === 0 ? (
-          <div className="text-center py-12">
-            <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-600 mb-4">No reminders configured. Create your first reminder to get started.</p>
+      {/* Unconfigured-rules banner — rules with PLACEHOLDER_CHAT_ID are
+          silently skipped by the cron engine (lib/reminderService.ts:231),
+          which used to be invisible to anyone managing the list. Now we
+          surface the count up front and let them filter to just those
+          rows. */}
+      {(() => {
+        const unconfiguredCount = rules.filter(r => r.telegram_chat_id === 'PLACEHOLDER_CHAT_ID').length;
+        if (unconfiguredCount === 0) return null;
+        return (
+          <div className="flex items-start gap-3 px-4 py-3 rounded-lg border border-amber-200 bg-amber-50">
+            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-amber-900">
+                {unconfiguredCount} of {rules.length} rule{rules.length === 1 ? '' : 's'} {unconfiguredCount === 1 ? 'is' : 'are'} unconfigured
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                These rules won&apos;t fire until you set a Telegram chat ID. Open the rule, paste the chat ID, and save.
+              </p>
+            </div>
             <Button
-              onClick={openCreate}
-              className="hover:opacity-90"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
+              size="sm"
+              variant="outline"
+              className="border-amber-300 text-amber-800 hover:bg-amber-100 shrink-0"
+              onClick={() => setShowUnconfiguredOnly(v => !v)}
             >
-              <Plus className="h-4 w-4 mr-2" />
-              Create Your First Reminder
+              {showUnconfiguredOnly ? 'Show all rules' : 'Show only these'}
             </Button>
           </div>
-        ) : (
-          rules.map((rule) => (
+        );
+      })()}
+
+      {/* Rules List */}
+      <div className="grid gap-4">
+        {(() => {
+          const visibleRules = showUnconfiguredOnly
+            ? rules.filter(r => r.telegram_chat_id === 'PLACEHOLDER_CHAT_ID')
+            : rules;
+          if (rules.length === 0) {
+            return (
+              <div className="text-center py-12">
+                <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-600 mb-4">No reminders configured. Create your first reminder to get started.</p>
+                <Button
+                  onClick={openCreate}
+                  className="hover:opacity-90"
+                  style={{ backgroundColor: '#3e8692', color: 'white' }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Your First Reminder
+                </Button>
+              </div>
+            );
+          }
+          if (visibleRules.length === 0) {
+            return (
+              <div className="text-center py-10 bg-emerald-50 border border-emerald-100 rounded-lg">
+                <CheckCircle className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
+                <p className="text-sm font-medium text-emerald-800">All rules are configured.</p>
+                <Button
+                  variant="link"
+                  size="sm"
+                  onClick={() => setShowUnconfiguredOnly(false)}
+                  className="text-emerald-700"
+                >
+                  Show all rules
+                </Button>
+              </div>
+            );
+          }
+          return visibleRules.map((rule) => (
             <Card key={rule.id} className={`hover:shadow-md transition-shadow ${!rule.is_active ? 'opacity-60' : ''}`}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
@@ -706,8 +766,8 @@ export default function RemindersPage() {
                 </div>
               </CardContent>
             </Card>
-          ))
-        )}
+          ));
+        })()}
       </div>
 
       {/* Edit/Create Dialog */}
