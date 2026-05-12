@@ -125,8 +125,8 @@ function deltaColor(delta: number): { bg: string; border: string; text: string }
   return { bg: 'hsl(220, 10%, 28%)', border: 'hsl(220, 10%, 22%)', text: '#e5e7eb' };
 }
 
-function TreemapCell(props: TreemapPayload) {
-  const { x = 0, y = 0, width = 0, height = 0, payload } = props;
+function TreemapCell(props: TreemapPayload & { onSelect?: (projectId: string) => void }) {
+  const { x = 0, y = 0, width = 0, height = 0, payload, onSelect } = props;
   if (!payload || width < 4 || height < 4) return null;
   const { name, mindshare_pct, delta_pct, spark, rank } = payload;
   const colors = deltaColor(delta_pct ?? 0);
@@ -155,7 +155,10 @@ function TreemapCell(props: TreemapPayload) {
   }
 
   return (
-    <g>
+    <g
+      onClick={() => onSelect && payload.project_id && onSelect(payload.project_id)}
+      style={{ cursor: onSelect && payload.project_id ? 'pointer' : 'default' }}
+    >
       <rect
         x={x}
         y={y}
@@ -223,6 +226,54 @@ function TreemapCell(props: TreemapPayload) {
   );
 }
 
+// ─── Top Gainer / Top Loser side panel ─────────────────────────────
+// Compact stacked-row table with Δ1d/Δ7d/Δ30d hidden behind a single
+// most-relevant Δ value (matches whichever range the leaderboard is on).
+// Click a row to open the drill-down for that project.
+
+function GainerLoserPanel({
+  title,
+  variant,
+  items,
+  onSelect,
+}: {
+  title: string;
+  variant: 'gain' | 'loss';
+  items: LeaderboardItem[];
+  onSelect: (projectId: string) => void;
+}) {
+  const isGain = variant === 'gain';
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className={`px-3 py-2 border-b border-gray-100 flex items-center justify-between ${isGain ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+        <h4 className={`text-xs font-semibold uppercase tracking-wider ${isGain ? 'text-emerald-700' : 'text-rose-700'}`}>{title}</h4>
+        {isGain ? <TrendingUp className="h-3.5 w-3.5 text-emerald-600" /> : <TrendingDown className="h-3.5 w-3.5 text-rose-600" />}
+      </div>
+      {items.length === 0 ? (
+        <div className="px-3 py-6 text-center text-xs text-gray-400">No data</div>
+      ) : (
+        <div className="divide-y divide-gray-50">
+          {items.map((item) => (
+            <button
+              key={item.project_id}
+              onClick={() => onSelect(item.project_id)}
+              className="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-medium text-gray-900 truncate">{item.name}</div>
+                <div className="text-[10px] text-gray-500">{item.mindshare_pct.toFixed(2)}% mindshare</div>
+              </div>
+              <div className={`text-xs font-semibold tabular-nums ${item.delta_pct > 0 ? 'text-emerald-600' : item.delta_pct < 0 ? 'text-rose-600' : 'text-gray-400'}`}>
+                {item.delta_pct > 0 ? '+' : ''}{item.delta_pct.toFixed(2)}%
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ───────────────────────────────────────────────────────────
 
 export default function MindsharePage() {
@@ -244,11 +295,34 @@ export default function MindsharePage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   // Treemap tier toggle — Top 20 vs Top 21-50, mirroring Kaito's split
   const [treemapTier, setTreemapTier] = useState<'top20' | 'top21_50'>('top20');
+  // Language filter — 'all' uses precomputed daily; 'ko' (default for now)
+  // recomputes from tg_mentions joined to monitored channels.
+  const [language, setLanguage] = useState<'all' | 'ko' | 'en' | 'ja' | 'zh' | 'vi'>('ko');
+
+  // Drill-down state — opened from a row click or treemap cell click
+  const [detailProjectId, setDetailProjectId] = useState<string | null>(null);
+  const [detailData, setDetailData] = useState<any>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+
+  const openDetail = useCallback(async (projectId: string) => {
+    setDetailProjectId(projectId);
+    setDetailLoading(true);
+    setDetailData(null);
+    try {
+      const res = await fetch(`/api/mindshare/projects/${projectId}/detail?range=${range}`);
+      const json = await res.json();
+      setDetailData(json);
+    } catch (err) {
+      console.error('Error loading detail:', err);
+    } finally {
+      setDetailLoading(false);
+    }
+  }, [range]);
 
   const loadLeaderboard = useCallback(async () => {
     setLeaderboardLoading(true);
     try {
-      const res = await fetch(`/api/mindshare/leaderboard?range=${range}`);
+      const res = await fetch(`/api/mindshare/leaderboard?range=${range}&language=${language}`);
       const json = await res.json();
       setLeaderboard(json.items || []);
       setTotalMentions(json.total_mentions || 0);
@@ -257,7 +331,7 @@ export default function MindsharePage() {
     } finally {
       setLeaderboardLoading(false);
     }
-  }, [range]);
+  }, [range, language]);
 
   useEffect(() => { loadLeaderboard(); }, [loadLeaderboard]);
 
@@ -288,6 +362,22 @@ export default function MindsharePage() {
     leaderboard.forEach(i => set.add(i.category || 'Uncategorized'));
     return ['all', ...Array.from(set).sort()];
   }, [leaderboard]);
+
+  // Top Gainers / Top Losers panels — derived from the same leaderboard
+  // data, sorted by delta_pct. Only include items with mentions in the
+  // current window (a project with 0 mentions can't be a "gainer").
+  const topGainers = useMemo(() =>
+    [...leaderboard]
+      .filter(i => i.mention_count > 0)
+      .sort((a, b) => b.delta_pct - a.delta_pct)
+      .slice(0, 8)
+  , [leaderboard]);
+  const topLosers = useMemo(() =>
+    [...leaderboard]
+      .filter(i => i.mention_count > 0)
+      .sort((a, b) => a.delta_pct - b.delta_pct)
+      .slice(0, 8)
+  , [leaderboard]);
 
   // Treemap source — same filtering pipeline as the table, but always
   // sorted by mention count desc so the tier slicing (Top 20 / 21–50)
@@ -552,6 +642,19 @@ export default function MindsharePage() {
                   </SelectContent>
                 </Select>
               )}
+              <Select value={language} onValueChange={(v) => setLanguage(v as any)}>
+                <SelectTrigger className="h-9 w-32 text-sm focus-brand">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All languages</SelectItem>
+                  <SelectItem value="ko">한국어 (Korean)</SelectItem>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="ja">日本語</SelectItem>
+                  <SelectItem value="zh">中文</SelectItem>
+                  <SelectItem value="vi">Tiếng Việt</SelectItem>
+                </SelectContent>
+              </Select>
               <label className="flex items-center gap-1.5 text-xs text-gray-600 px-2 py-1 border border-gray-200 rounded-md cursor-pointer">
                 <Switch checked={preTgeOnly} onCheckedChange={setPreTgeOnly} />
                 Pre-TGE only
@@ -562,11 +665,31 @@ export default function MindsharePage() {
             </div>
           </div>
 
-          {/* Treemap — Kaito-style square map. Cells sized by mention
-              volume, colored by Δ vs prior period. Top 20 / 21–50 toggle
-              mirrors Kaito's tier split for the long tail. */}
-          {!leaderboardLoading && treemapItems.length > 0 && (
-            <div className="bg-gray-900 rounded-lg p-3">
+          {/* Gainers / Losers + Treemap row. On large screens the side
+              panels sit to the left of the treemap (Kaito layout); on
+              smaller they stack above. */}
+          {!leaderboardLoading && (topGainers.length > 0 || topLosers.length > 0) && (
+            <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-3">
+              {/* Side panels: gainers on top, losers below */}
+              <div className="space-y-3">
+                <GainerLoserPanel
+                  title="Top Gainer"
+                  variant="gain"
+                  items={topGainers}
+                  onSelect={openDetail}
+                />
+                <GainerLoserPanel
+                  title="Top Loser"
+                  variant="loss"
+                  items={topLosers}
+                  onSelect={openDetail}
+                />
+              </div>
+
+              {/* Treemap — Kaito-style square map. Cells sized by mention
+                  volume, colored by Δ vs prior period. */}
+              {treemapItems.length > 0 ? (
+                <div className="bg-gray-900 rounded-lg p-3">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1 text-xs">
                   <button
@@ -595,10 +718,16 @@ export default function MindsharePage() {
                     aspectRatio={4 / 3}
                     stroke="#0f172a"
                     isAnimationActive={false}
-                    content={<TreemapCell />}
+                    content={<TreemapCell onSelect={openDetail} />}
                   />
                 </ResponsiveContainer>
               </div>
+            </div>
+              ) : (
+                <div className="bg-gray-900 rounded-lg p-12 flex items-center justify-center">
+                  <p className="text-sm text-gray-500">No mentions for the current filters.</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -664,7 +793,7 @@ export default function MindsharePage() {
                         : <Minus className="h-3 w-3 text-gray-400" />;
                     const deltaColor = item.delta_pct > 0.5 ? 'text-emerald-600' : item.delta_pct < -0.5 ? 'text-rose-600' : 'text-gray-500';
                     return (
-                      <TableRow key={item.project_id} className="hover:bg-gray-50">
+                      <TableRow key={item.project_id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openDetail(item.project_id)}>
                         <TableCell className="text-gray-400 font-medium">{idx + 1}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -704,6 +833,117 @@ export default function MindsharePage() {
               </Table>
             )}
           </div>
+
+          {/* Drill-down dialog — opened from row click or treemap cell.
+              Shows project metadata, daily mention chart, top channels,
+              and a sample of recent matching messages. */}
+          <Dialog open={!!detailProjectId} onOpenChange={(open) => { if (!open) { setDetailProjectId(null); setDetailData(null); } }}>
+            <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+              {detailLoading ? (
+                <div className="space-y-3 py-4">
+                  <Skeleton className="h-6 w-48" />
+                  <Skeleton className="h-32 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                </div>
+              ) : !detailData ? (
+                <div className="py-8 text-center text-sm text-gray-500">Couldn&apos;t load detail.</div>
+              ) : (
+                <>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      {detailData.project.name}
+                      {detailData.project.client && (
+                        <Badge variant="outline" className="text-[10px] bg-brand-light text-brand border-brand/30">
+                          Client: {detailData.project.client.name}
+                        </Badge>
+                      )}
+                      {detailData.project.is_pre_tge && (
+                        <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">Pre-TGE</Badge>
+                      )}
+                      {detailData.project.twitter_handle && (
+                        <a
+                          href={`https://x.com/${detailData.project.twitter_handle.replace(/^@/, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-gray-400 hover:text-blue-500"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {detailData.total_mentions_in_window.toLocaleString()} mentions
+                      between {detailData.period.from} and {detailData.period.to}
+                      {detailData.project.category && <> · <span className="font-medium">{detailData.project.category}</span></>}
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {/* Daily mention bars — simple inline SVG so no extra
+                      dependency for one chart. Heights normalized to the
+                      window's max. */}
+                  <div className="space-y-1">
+                    <div className="text-xs font-medium text-gray-700">Daily mentions</div>
+                    {(() => {
+                      const max = Math.max(...detailData.series.map((d: any) => d.mentions), 1);
+                      return (
+                        <div className="flex items-end gap-0.5 h-24 bg-gray-50 rounded p-2">
+                          {detailData.series.map((d: any) => (
+                            <div key={d.day} className="flex-1 flex flex-col items-center justify-end" title={`${d.day}: ${d.mentions} mentions`}>
+                              <div
+                                className={`w-full rounded-t ${d.mentions > 0 ? 'bg-brand' : 'bg-gray-200'}`}
+                                style={{ height: `${(d.mentions / max) * 100}%`, minHeight: d.mentions > 0 ? 2 : 1 }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Top channels */}
+                  {detailData.top_channels.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="text-xs font-medium text-gray-700">Top channels</div>
+                      <div className="space-y-1">
+                        {detailData.top_channels.map((c: any, i: number) => (
+                          <div key={i} className="flex items-center justify-between text-xs px-2 py-1 bg-gray-50 rounded">
+                            <span className="font-medium text-gray-700">{c.name}</span>
+                            <div className="flex items-center gap-3">
+                              {c.username && <span className="text-gray-400">@{c.username}</span>}
+                              <span className="tabular-nums font-semibold">{c.count}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sample mentions */}
+                  <div className="space-y-1.5">
+                    <div className="text-xs font-medium text-gray-700">Recent mentions ({detailData.sample_mentions.length})</div>
+                    {detailData.sample_mentions.length === 0 ? (
+                      <div className="text-xs text-gray-400 italic px-2 py-3">No matching messages in this window.</div>
+                    ) : (
+                      <div className="space-y-1.5 max-h-72 overflow-y-auto">
+                        {detailData.sample_mentions.map((m: any) => (
+                          <div key={m.id} className="text-xs p-2.5 border border-gray-200 rounded">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
+                                <span>{new Date(m.message_date).toLocaleString()}</span>
+                                {m.channel?.channel_name && <span>· {m.channel.channel_name}</span>}
+                                <Badge variant="outline" className="text-[9px]">{m.matched_keyword}</Badge>
+                              </div>
+                            </div>
+                            <p className="text-gray-700 line-clamp-3 whitespace-pre-wrap">{m.message_text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         {/* ─── Projects ────────────────────────────────────────── */}

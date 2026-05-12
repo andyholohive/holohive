@@ -38,6 +38,10 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const range = (url.searchParams.get('range') || '7d') as '24h' | '7d' | '30d';
   const days = range === '24h' ? 1 : range === '7d' ? 7 : 30;
+  // Language filter — 'all' uses the precomputed mindshare_daily (fast).
+  // Specific languages recompute from tg_mentions joined with the channel
+  // table on the fly. Slower but accurate for whatever channel scope.
+  const language = (url.searchParams.get('language') || 'all').toLowerCase();
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -63,18 +67,52 @@ export async function GET(request: Request) {
   // Earliest of the three boundaries decides the lower bound.
   const lowerBound = sparkStart < priorStart ? sparkStart : priorStart;
 
-  const [{ data: dailyRows }, { data: projects }] = await Promise.all([
-    (supabase as any)
-      .from('mindshare_daily')
-      .select('project_id, day, mention_count, channel_reach')
-      .gte('day', lowerBound)
-      .lte('day', currentEnd)
-      .order('day', { ascending: true }),
+  // For 'all' language: read the precomputed daily aggregate (fast path).
+  // For a specific language: recompute from tg_mentions joined to
+  // tg_monitored_channels, filtered to that language. Slower but accurate
+  // — channel volume is small (≤ a few hundred channels typically).
+  const [dailyRowsResp, projectsResp] = await Promise.all([
+    language === 'all'
+      ? (supabase as any)
+          .from('mindshare_daily')
+          .select('project_id, day, mention_count, channel_reach')
+          .gte('day', lowerBound)
+          .lte('day', currentEnd)
+          .order('day', { ascending: true })
+      : (supabase as any)
+          .from('tg_mentions')
+          .select('project_id, message_date, channel_id, channel:tg_monitored_channels!inner(language)')
+          .gte('message_date', lowerBound + 'T00:00:00')
+          .lte('message_date', currentEnd + 'T23:59:59')
+          .not('project_id', 'is', null)
+          .eq('channel.language', language),
     (supabase as any)
       .from('mindshare_projects')
       .select('id, name, client_id, category, is_pre_tge, twitter_handle, website_url, is_active')
       .eq('is_active', true),
   ]);
+
+  // Reshape per-mention rows into the same daily-row shape so the rest
+  // of the function works uniformly.
+  let dailyRows: any[] = [];
+  if (language === 'all') {
+    dailyRows = (dailyRowsResp.data || []) as any[];
+  } else {
+    const dailyMap = new Map<string, { mentions: number; channels: Set<string> }>();
+    for (const m of (dailyRowsResp.data || []) as any[]) {
+      const day = (m.message_date as string).slice(0, 10);
+      const key = `${m.project_id}::${day}`;
+      let bucket = dailyMap.get(key);
+      if (!bucket) { bucket = { mentions: 0, channels: new Set() }; dailyMap.set(key, bucket); }
+      bucket.mentions++;
+      if (m.channel_id) bucket.channels.add(m.channel_id);
+    }
+    dailyRows = Array.from(dailyMap.entries()).map(([k, v]) => {
+      const [project_id, day] = k.split('::');
+      return { project_id, day, mention_count: v.mentions, channel_reach: v.channels.size };
+    });
+  }
+  const projects = projectsResp.data;
 
   type DailyRow = { project_id: string; day: string; mention_count: number; channel_reach: number };
   type Project  = { id: string; name: string; client_id: string | null; category: string | null; is_pre_tge: boolean; twitter_handle: string | null; website_url: string | null };
