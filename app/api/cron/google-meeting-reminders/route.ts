@@ -130,12 +130,25 @@ export async function GET(request: Request) {
       const startMs = new Date(ev.start).getTime();
       const minutesUntil = (startMs - now) / 60_000;
 
-      // Determine which offsets this event currently sits in. For offset N,
-      // we fire when minutes-until-meeting ∈ [N, N+5].
-      // (For N=0: meeting starting now or up to 5 min from now.)
+      // Determine which offsets this event currently sits in. The cron
+      // runs every 5 minutes, so the firing window has to be ~5 min wide
+      // to guarantee at least one cron run catches each meeting. The
+      // dedupe table fires on the FIRST matching run, so the window
+      // placement decides how early/late the reminder lands.
+      //
+      // Old window [N, N+5] always fired at the EARLIEST matching run,
+      // making reminders land up to 5 minutes EARLY (a "10-min before"
+      // reminder for a 12:00 meeting would fire at 11:45 instead of 11:50).
+      //
+      // New window [N - 2, N + 3] is centered roughly on N, so for ideal
+      // cron timing the reminder lands within ±2 min of the target. For
+      // N=10 (10-min before): fires when meeting is 8-13 min away. Worst
+      // case 3 min early, 2 min late. For N=0 ("at start"): fires when
+      // meeting is starting now or up to 3 min away (or up to 2 min into
+      // the meeting if cron lags).
       const firingOffsets: number[] = [];
       Array.from(offsets).forEach((offset) => {
-        if (minutesUntil >= offset && minutesUntil <= offset + 5) {
+        if (minutesUntil >= offset - 2 && minutesUntil <= offset + 3) {
           firingOffsets.push(offset);
         }
       });
