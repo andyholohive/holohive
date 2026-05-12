@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/google-meeting-reminders",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/mindshare-scan",
+      "schedule": "*/30 * * * *"
     }
   ]
 }
