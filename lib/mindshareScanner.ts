@@ -165,30 +165,34 @@ export async function runMindshareScan(
     }
   }
 
-  // 7. Insert hits into tg_mentions. Look up channel_id (uuid) from
-  //    telegram_chats since tg_mentions references it. Skip rows where
-  //    we can't resolve a channel — they wouldn't satisfy the FK.
+  // 7. Insert hits into tg_mentions. channel_id (FK → tg_monitored_channels.id)
+  //    is set when we can match telegram_messages.chat_id against
+  //    tg_monitored_channels.channel_tg_id; falls back to NULL otherwise
+  //    (column is nullable). channel_reach metric will undercount until
+  //    the channel_tg_id values are populated, but mention_count stays
+  //    accurate either way.
   let mentionsAdded = 0;
   if (hits.length > 0) {
     const distinctChatIds = Array.from(new Set(hits.map(h => h.chat_id)));
-    const { data: chatRows } = await (supabase as any)
-      .from('telegram_chats')
-      .select('id, chat_id')
-      .in('chat_id', distinctChatIds);
-    const chatIdToUuid = new Map<string, string>(
-      ((chatRows || []) as any[]).map(c => [c.chat_id, c.id]),
+    const { data: monitoredRows } = await (supabase as any)
+      .from('tg_monitored_channels')
+      .select('id, channel_tg_id')
+      .in('channel_tg_id', distinctChatIds);
+    const chatIdToMonitoredUuid = new Map<string, string>(
+      ((monitoredRows || []) as any[])
+        .filter(r => r.channel_tg_id)
+        .map(r => [r.channel_tg_id, r.id]),
     );
 
-    const insertable = hits
-      .filter(h => chatIdToUuid.has(h.chat_id))
-      .map(h => ({
-        project_id: h.project_id,
-        client_id: h.client_id,
-        channel_id: chatIdToUuid.get(h.chat_id)!,
-        message_text: h.message_text,
-        message_date: h.message_date,
-        matched_keyword: h.matched_keyword,
-      }));
+    const insertable = hits.map(h => ({
+      project_id: h.project_id,
+      client_id: h.client_id,
+      // null when chat isn't linked to a monitored channel record yet
+      channel_id: chatIdToMonitoredUuid.get(h.chat_id) ?? null,
+      message_text: h.message_text,
+      message_date: h.message_date,
+      matched_keyword: h.matched_keyword,
+    }));
 
     if (insertable.length > 0) {
       // Insert in chunks to avoid Postgres parameter limits.
@@ -230,6 +234,10 @@ export async function runMindshareScan(
         counts.set(key, bucket);
       }
       bucket.mentions++;
+      // Only count non-null channel_ids — until tg_monitored_channels has
+      // channel_tg_id populated for the chats the bot is in, channel_id
+      // will mostly be NULL and channel_reach will be 0. mention_count
+      // is the primary metric and stays correct.
       if (r.channel_id) bucket.channels.add(r.channel_id);
     }
 
