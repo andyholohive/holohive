@@ -2499,18 +2499,21 @@ export default function SalesPipelinePage() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-gray-50/50">
+                        {/* Path / Temp / BAMFAM columns removed 2026-05-13
+                            (manager wanted a cleaner pipeline table).
+                            Underlying fields still live on the opportunity
+                            row — BAMFAM warnings remain in the slide-over
+                            and Actions tab; temperature still drives the
+                            sort options. Just not surfaced as columns. */}
                         <TableHead className="w-10"></TableHead>
                         <TableHead>Name</TableHead>
                         <TableHead className="w-[180px]">POC</TableHead>
                         <TableHead className="w-[70px]">Bucket</TableHead>
-                        <TableHead className="w-[70px]">Path</TableHead>
-                        <TableHead className="w-[90px]">Temp</TableHead>
                         <TableHead className="w-[110px]">Value</TableHead>
                         <TableHead className="w-[100px]">Owner</TableHead>
                         <TableHead className="w-[100px]">TG Handle</TableHead>
                         {stage === 'cold_dm' && <TableHead className="w-[80px]">Bumps</TableHead>}
                         {stage === 'warm' && <TableHead className="w-[90px]">Type</TableHead>}
-                        <TableHead className="w-[70px]">BAMFAM</TableHead>
                         <TableHead className="w-[50px]"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -2518,7 +2521,7 @@ export default function SalesPipelinePage() {
                       <SortableContext items={stageOpps.map(o => o.id)} strategy={verticalListSortingStrategy}>
                         {stageOpps.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={12} className="text-center text-sm text-gray-400 py-8">
+                            <TableCell colSpan={9} className="text-center text-sm text-gray-400 py-8">
                               No opportunities in this stage
                             </TableCell>
                           </TableRow>
@@ -2561,22 +2564,8 @@ export default function SalesPipelinePage() {
                                   </span>
                                 )}
                               </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="text-xs">
-                                  {opp.dm_account === 'closer' ? 'C' : opp.dm_account === 'sdr' ? 'S' : 'O'}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1">
-                                  <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div
-                                      className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-green-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-red-400'}`}
-                                      style={{ width: `${opp.temperature_score}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-xs text-gray-400">{opp.temperature_score}</span>
-                                </div>
-                              </TableCell>
+                              {/* Path (dm_account) + Temp (temperature_score) columns
+                                  removed from the pipeline table 2026-05-13. */}
                               <TableCell>
                                 {editingCell?.id === opp.id && editingCell.field === 'deal_value' ? (
                                   <Input
@@ -2627,15 +2616,10 @@ export default function SalesPipelinePage() {
                                   )}
                                 </TableCell>
                               )}
-                              <TableCell>
-                                {isBAMFAM(opp) ? (
-                                  <span className="text-red-600 flex items-center gap-1">
-                                    <AlertTriangle className="h-3.5 w-3.5" />
-                                  </span>
-                                ) : (
-                                  <span className="text-green-600 text-xs">OK</span>
-                                )}
-                              </TableCell>
+                              {/* BAMFAM column removed from the pipeline table
+                                  2026-05-13. The flag is still computed via
+                                  isBAMFAM() and surfaced in the slide-over
+                                  + Actions tab. */}
                               <TableCell>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
@@ -3909,12 +3893,13 @@ export default function SalesPipelinePage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-gray-50/50">
+                      {/* DM (dm_account) + Temp columns removed 2026-05-13
+                          for visual consistency with the pipeline table.
+                          Fields still exist on the row, just not surfaced. */}
                       <TableHead className="w-10"></TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead className="w-[180px]">POC</TableHead>
                       <TableHead className="w-[70px]">Bucket</TableHead>
-                      <TableHead className="w-[70px]">DM</TableHead>
-                      <TableHead className="w-[90px]">Temp</TableHead>
                       <TableHead className="w-[110px]">Value</TableHead>
                       <TableHead className="w-[100px]">Owner</TableHead>
                       <TableHead className="w-[120px]">Time in Orbit</TableHead>
@@ -3925,7 +3910,7 @@ export default function SalesPipelinePage() {
                   <TableBody>
                     {group.opps.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center text-sm text-gray-400 py-8">
+                        <TableCell colSpan={9} className="text-center text-sm text-gray-400 py-8">
                           No opportunities
                         </TableCell>
                       </TableRow>
@@ -3958,22 +3943,8 @@ export default function SalesPipelinePage() {
                             </span>
                           )}
                         </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {opp.dm_account === 'closer' ? 'C' : opp.dm_account === 'sdr' ? 'S' : 'O'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-green-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-red-400'}`}
-                                style={{ width: `${opp.temperature_score}%` }}
-                              />
-                            </div>
-                            <span className="text-xs text-gray-400">{opp.temperature_score}</span>
-                          </div>
-                        </TableCell>
+                        {/* DM (dm_account) + Temp cells removed 2026-05-13
+                            to match the trimmed orbit header. */}
                         <TableCell>
                           {opp.deal_value ? (
                             <span className="font-semibold text-emerald-600">${opp.deal_value.toLocaleString()}</span>
@@ -4486,18 +4457,14 @@ export default function SalesPipelinePage() {
                   <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Name *</Label>
                   <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Company or contact name" className="focus-brand" />
                 </div>
+                {/* Path (dm_account) field removed 2026-05-13 — kept the
+                    DB column intact (existing rows still have a value),
+                    but it's no longer surfaced in the slide-over edit
+                    form. Bucket takes the left slot; new Twitter Handle
+                    input on the right. Temperature slider also removed —
+                    the score auto-updates from activity, so manual
+                    override was rarely used. */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Path</Label>
-                    <Select value={form.dm_account || 'sdr'} onValueChange={v => setForm(f => ({ ...f, dm_account: v as DmAccount }))}>
-                      <SelectTrigger className="focus-brand"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="closer">Closer (Path A)</SelectItem>
-                        <SelectItem value="sdr">SDR (Path B)</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                   <div className="grid gap-2">
                     <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Bucket</Label>
                     <Select value={form.bucket || ''} onValueChange={v => setForm(f => ({ ...f, bucket: v as Bucket }))}>
@@ -4509,10 +4476,15 @@ export default function SalesPipelinePage() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-                <div className="grid gap-2">
-                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Temperature: {form.temperature_score || 50}</Label>
-                  <input type="range" min="0" max="100" value={form.temperature_score || 50} onChange={e => setForm(f => ({ ...f, temperature_score: parseInt(e.target.value) }))} className="w-full accent-brand" />
+                  <div className="grid gap-2">
+                    <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Project Twitter</Label>
+                    <Input
+                      value={form.twitter_handle || ''}
+                      onChange={e => setForm(f => ({ ...f, twitter_handle: e.target.value }))}
+                      placeholder="@handle or https://x.com/handle"
+                      className="focus-brand"
+                    />
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="grid gap-2">
@@ -5586,6 +5558,20 @@ export default function SalesPipelinePage() {
                     className="focus-brand"
                   />
                 </div>
+              </div>
+
+              {/* Project Twitter — the project-level X/Twitter URL or
+                  handle. Populated here so the Twitter "+" affordance
+                  on the row hover (renderProjectNameSuffix) becomes a
+                  resolved link. */}
+              <div className="grid gap-2">
+                <Label>Project Twitter</Label>
+                <Input
+                  value={form.twitter_handle || ''}
+                  onChange={e => setForm(f => ({ ...f, twitter_handle: e.target.value }))}
+                  placeholder="@handle or https://x.com/handle"
+                  className="focus-brand"
+                />
               </div>
               <div className="grid gap-2">
                 <Label>Owner</Label>

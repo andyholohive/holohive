@@ -241,6 +241,7 @@ export interface CreateSalesPipelineOpportunityData {
   poc_platform?: PocPlatform;
   poc_handle?: string;
   orbit_followup_days?: number;
+  twitter_handle?: string | null;
 
   // Post-proposal visibility (migration 051)
   expected_close_date?: string | null;
