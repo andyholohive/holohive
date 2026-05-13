@@ -20,7 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Plus, Minus, Search, Trash2, X, LayoutGrid, TableIcon, GripVertical, Loader2,
+  Plus, UserPlus, Minus, Search, Trash2, X, LayoutGrid, TableIcon, GripVertical, Loader2,
   Target, AlertTriangle, ArrowRight, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronUp,
   Phone, MessageSquare, Calendar, FileText, StickyNote, Zap, RotateCcw, Clock, Edit, Copy, Check, ChevronsUpDown,
   Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown, Paperclip, Eye, Image,
@@ -3227,7 +3227,12 @@ export default function SalesPipelinePage() {
                               setIsCreateOpen(true);
                             }}
                           >
-                            <Plus className="h-3.5 w-3.5" />
+                            {/* UserPlus instead of Plus so the icon matches
+                                the semantics — this adds another contact to
+                                an existing project, distinct from the header
+                                "+ New Opportunity" which creates a fresh
+                                project from scratch. */}
+                            <UserPlus className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ) : (
