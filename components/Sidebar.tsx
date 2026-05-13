@@ -520,7 +520,11 @@ export default function Sidebar({ children }: SidebarProps) {
               {/* Workspace Section */}
               {!guestHideSection(['/daily-standup', '/tasks']) && (
                 <CollapsibleSection id="workspace" icon={Briefcase}>
-                  <NavItem href="/daily-standup" icon={CheckCircle} label="Daily Stand-Up" />
+                  {/* Daily Stand-Up hidden from the sidebar 2026-05-13 —
+                      the page still exists at /daily-standup; just no
+                      longer surfaced as a top-level nav. Restore the
+                      NavItem below if/when the team wants it back. */}
+                  {/* <NavItem href="/daily-standup" icon={CheckCircle} label="Daily Stand-Up" /> */}
                   <NavItem href="/tasks" icon={ListTodo} label="HQ" />
                   {/* HQ sub-nav — visible only when expanded AND on an HQ
                       child route. Templates (msg) + SOPs were promoted in
