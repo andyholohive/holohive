@@ -816,17 +816,31 @@ export default function SalesPipelinePage() {
   // so a deal set to nurture would silently drop out of the daily view.
   const allNurtureOpps = useMemo(() => opportunities.filter(o => o.stage === 'nurture'), [opportunities]);
   const orbitOpps = useMemo(() => orbitSearch ? allOrbitOpps.filter(o => matchesSearch(o, orbitSearch)) : allOrbitOpps, [allOrbitOpps, orbitSearch]);
-  // Orbit grouping — same shape as the Outreach grouping above so rows
-  // with the same project name collapse into a single "header" cell
-  // with the rest of the POCs nested under it. Per-reason because each
-  // reason renders its own table.
-  const orbitByReason = useMemo(() => ORBIT_REASONS.map(r => {
-    const opps = orbitOpps.filter(o => o.orbit_reason === r.value);
-    const sortedOpps = [...opps].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    const nameCounts = new Map<string, number>();
-    sortedOpps.forEach(o => nameCounts.set(o.name || '', (nameCounts.get(o.name || '') || 0) + 1));
-    return { ...r, opps, sortedOpps, nameCounts };
-  }), [orbitOpps]);
+  // Orbit grouping — flat 2026-05-14. The previous per-reason split
+  // caused two problems:
+  //   1. Opps created directly at stage=orbit (no reason picked yet)
+  //      had orbit_reason=null and matched none of the reason buckets,
+  //      so they silently disappeared from the UI.
+  //   2. The team consistently said the per-reason categorization
+  //      wasn't useful as a layout dimension — they just want to see
+  //      all orbit opps and the reason as a tag.
+  // Now we show one flat table sorted by name (so same-project POCs
+  // cluster) with a "Reason" badge column on each row. orbit_reason
+  // still gets set via the orbit prompt on stage transitions — we
+  // just don't use it to partition the view anymore.
+  const sortedOrbit = useMemo(
+    () => [...orbitOpps].sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+    [orbitOpps],
+  );
+  const orbitNameCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    sortedOrbit.forEach(o => counts.set(o.name || '', (counts.get(o.name || '') || 0) + 1));
+    return counts;
+  }, [sortedOrbit]);
+  const orbitTotalValue = useMemo(
+    () => orbitOpps.reduce((s, o) => s + (o.deal_value || 0), 0),
+    [orbitOpps],
+  );
 
   // Memoized outreach grouping — sort by name and count POCs per project
   const { sortedOutreach, outreachNameCounts } = useMemo(() => {
@@ -3921,76 +3935,63 @@ export default function SalesPipelinePage() {
           </Button>
         </div>
       )}
-      {orbitByReason.map(group => {
-        const isCollapsed = collapsedStages.has(`orbit_${group.value}`);
-        const groupValue = group.opps.reduce((s, o) => s + (o.deal_value || 0), 0);
-
-        return (
-          <div key={group.value} className="mb-6">
-            {/* Group Header */}
-            <div
-              onClick={() => {
-                const next = new Set(collapsedStages);
-                const key = `orbit_${group.value}`;
-                isCollapsed ? next.delete(key) : next.add(key);
-                setCollapsedStages(next);
-              }}
-              className={`flex items-center justify-between px-4 py-3 bg-orange-50 ${isCollapsed ? 'rounded-lg' : 'rounded-t-lg'} border border-orange-200 ${isCollapsed ? '' : 'border-b-0'} cursor-pointer select-none transition-all`}
-            >
-              <div className="flex items-center gap-2">
-                {isCollapsed ? <ChevronRight className="h-4 w-4 text-orange-700" /> : <ChevronDown className="h-4 w-4 text-orange-700" />}
-                <h4 className="font-semibold text-orange-700">{group.label}</h4>
-                <Badge variant="secondary" className="text-xs font-medium">{group.opps.length}</Badge>
-              </div>
-              {groupValue > 0 && (
-                <span className="text-sm font-medium text-gray-600">
-                  ${groupValue.toLocaleString()}
-                </span>
-              )}
+      {/* Flat orbit view — one table for every orbit opp regardless of
+          reason. Reason is shown as a badge column on each row instead
+          of being used as the layout dimension (the per-reason split
+          used to drop opps with no reason — see comment on sortedOrbit
+          above). The orange header band keeps the visual identity of
+          the section without partitioning the rows. */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between px-4 py-3 bg-orange-50 rounded-t-lg border border-orange-200 border-b-0">
+          <div className="flex items-center gap-2">
+            <RotateCcw className="h-4 w-4 text-orange-700" />
+            <h4 className="font-semibold text-orange-700">Orbit</h4>
+            <Badge variant="secondary" className="text-xs font-medium">{sortedOrbit.length}</Badge>
+          </div>
+          {orbitTotalValue > 0 && (
+            <span className="text-sm font-medium text-gray-600">
+              ${orbitTotalValue.toLocaleString()}
+            </span>
+          )}
+        </div>
+        <div className="bg-white rounded-b-lg border border-gray-200 border-t-0">
+          {sortedOrbit.length === 0 ? (
+            <div className="text-center text-sm text-gray-400 py-10">
+              No opportunities in orbit.
             </div>
-
-            {!isCollapsed && (
-              <div className="bg-white rounded-b-lg border border-gray-200 border-t-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50/50">
-                      {/* DM (dm_account) + Temp columns removed 2026-05-13
-                          for visual consistency with the pipeline table.
-                          Fields still exist on the row, just not surfaced. */}
-                      <TableHead className="w-10"></TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead className="w-[180px]">POC</TableHead>
-                      <TableHead className="w-[70px]">Bucket</TableHead>
-                      <TableHead className="w-[110px]">Value</TableHead>
-                      <TableHead className="w-[100px]">Owner</TableHead>
-                      {/* Source surfaced 2026-05-14 — matches Outreach
-                          + Pipeline tables so origin is visible across
-                          the whole sales surface. */}
-                      <TableHead className="w-[100px]">Source</TableHead>
-                      <TableHead className="w-[120px]">Time in Orbit</TableHead>
-                      <TableHead className="w-[120px]">Last Contacted</TableHead>
-                      <TableHead className="w-[50px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {group.opps.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={10} className="text-center text-sm text-gray-400 py-8">
-                          No opportunities
-                        </TableCell>
-                      </TableRow>
-                    ) : group.sortedOpps.map((opp, index) => {
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50/50">
+                  <TableHead className="w-10"></TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="w-[180px]">POC</TableHead>
+                  <TableHead className="w-[70px]">Bucket</TableHead>
+                  <TableHead className="w-[110px]">Value</TableHead>
+                  <TableHead className="w-[100px]">Owner</TableHead>
+                  <TableHead className="w-[100px]">Source</TableHead>
+                  {/* Reason tag — replaces the old per-reason table
+                      grouping. Always shown so unclassified orbit opps
+                      still surface (with "—"). */}
+                  <TableHead className="w-[140px]">Reason</TableHead>
+                  <TableHead className="w-[120px]">Time in Orbit</TableHead>
+                  <TableHead className="w-[120px]">Last Contacted</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                    {sortedOrbit.map((opp, index) => {
                       const isChecked = selectedOrbit.includes(opp.id);
                       // Project-name grouping — mirrors the Outreach pattern.
                       // First row in a same-named cluster shows the project
                       // header + POC count + add-POC button; subsequent rows
                       // hide the name cell so the visual hierarchy is
                       // "project → POCs under it" instead of repeated names.
-                      const prevName = index > 0 ? group.sortedOpps[index - 1].name : null;
-                      const nextName = index < group.sortedOpps.length - 1 ? group.sortedOpps[index + 1].name : null;
+                      const prevName = index > 0 ? sortedOrbit[index - 1].name : null;
+                      const nextName = index < sortedOrbit.length - 1 ? sortedOrbit[index + 1].name : null;
                       const isFirstInGroup = opp.name !== prevName;
                       const isLastInGroup = opp.name !== nextName;
-                      const groupCount = group.nameCounts.get(opp.name || '') || 1;
+                      const groupCount = orbitNameCounts.get(opp.name || '') || 1;
                       return (
                       <TableRow
                         key={opp.id}
@@ -4065,6 +4066,18 @@ export default function SalesPipelinePage() {
                         </TableCell>
                         <TableCell>{renderOwnerCell(opp)}</TableCell>
                         <TableCell className="text-gray-500 text-xs capitalize">{opp.source?.replace('_', ' ') || '—'}</TableCell>
+                        {/* Reason tag — surfaces orbit_reason even for opps
+                            that didn't have it set (those used to vanish
+                            entirely from the per-reason layout). */}
+                        <TableCell>
+                          {opp.orbit_reason ? (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-orange-50 text-orange-700 border border-orange-200">
+                              {ORBIT_REASONS.find(r => r.value === opp.orbit_reason)?.label || opp.orbit_reason}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-gray-500">{opp.updated_at ? formatDistanceToNow(new Date(opp.updated_at)) : '—'}</TableCell>
                         <TableCell className="text-gray-500">{opp.last_contacted_at ? formatDistanceToNow(new Date(opp.last_contacted_at), { addSuffix: true }) : '—'}</TableCell>
                         <TableCell>
@@ -4093,12 +4106,10 @@ export default function SalesPipelinePage() {
                     })}
                   </TableBody>
                 </Table>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        );
-      })}
-    </div>
+        </div>
   );
 
   // ============================================
