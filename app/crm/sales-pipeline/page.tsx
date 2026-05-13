@@ -3235,12 +3235,15 @@ export default function SalesPipelinePage() {
                 <TableHead className="w-10"></TableHead>
                 <TableHead className="min-w-[160px]">Name</TableHead>
                 <TableHead className="w-[200px] max-w-[200px]">POC</TableHead>
-                <TableHead className="w-[80px]">Bumps</TableHead>
                 <TableHead className="w-[150px]">TG Handle</TableHead>
                 <TableHead className="w-[80px]">Source</TableHead>
                 <TableHead className="w-[100px]">Owner</TableHead>
                 <TableHead className="w-[90px]">Created</TableHead>
-                <TableHead className="w-[130px]">Last Bump</TableHead>
+                {/* Combined "Last engaged · next move" — merges the old
+                    Bumps + Last Bump columns and adds the action hint
+                    from getNextAction so users have engagement history
+                    AND the recommended next move in one place. */}
+                <TableHead className="w-[260px]">Last engaged · next move</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -3336,41 +3339,75 @@ export default function SalesPipelinePage() {
                     <TableCell className="whitespace-nowrap max-w-[200px] overflow-hidden">
                       {renderPocCell(opp, 'max-w-[150px]')}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <span className="text-sm">{opp.bump_number}/4</span>
-                        <div className="flex gap-0.5">
-                          {[1, 2, 3, 4].map(i => (
-                            <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= opp.bump_number ? 'bg-sky-500' : 'bg-gray-200'}`} />
-                          ))}
-                        </div>
-                      </div>
-                    </TableCell>
+                    {/* Old Bumps cell removed 2026-05-14 — merged into the
+                        new "Last engaged · next move" cell at the right. */}
                     <TableCell className="text-gray-500 whitespace-nowrap">{opp.tg_handle || '—'}</TableCell>
                     <TableCell className="text-gray-500 text-xs capitalize">{opp.source?.replace('_', ' ') || '—'}</TableCell>
                     <TableCell>{renderOwnerCell(opp)}</TableCell>
                     <TableCell className="text-gray-500 text-xs">
                       {opp.created_at ? format(new Date(opp.created_at), 'MMM d') : '—'}
                     </TableCell>
-                    <TableCell className="text-gray-500 text-xs" onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center gap-1.5">
-                        <span>{opp.last_bump_date ? formatDistanceToNow(new Date(opp.last_bump_date), { addSuffix: true }) : '—'}</span>
-                        <div className="relative group/bump inline-flex">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 px-1.5 text-sky-600 hover:text-sky-700 hover:bg-sky-50"
-                            onClick={() => handleRecordBump(opp.id)}
-                            disabled={isBumping}
-                          >
-                            <Zap className="h-3 w-3" />
-                          </Button>
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1 text-white text-[11px] rounded-md whitespace-nowrap opacity-0 pointer-events-none group-hover/bump:opacity-100 transition-opacity z-50" style={{ backgroundColor: '#3e8692' }}>
-                            Record bump #{opp.bump_number + 1}
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent" style={{ borderTopColor: '#3e8692' }} />
+                    {/* Combined "Last engaged · next move" cell.
+                        Top row: bump dots + count, last-engagement timestamp,
+                                 and the Zap button to record another bump.
+                        Bottom row: the recommended next move from
+                                 getNextAction (same logic the Actions tab
+                                 uses), color-coded by priority.
+                        Stops click propagation so the inline buttons don't
+                        bubble into openSlideOver. */}
+                    <TableCell className="text-xs" onClick={e => e.stopPropagation()}>
+                      {(() => {
+                        const action = getNextAction(opp);
+                        const lastEngaged = opp.last_bump_date || opp.last_contacted_at;
+                        const lastEngagedLabel = lastEngaged
+                          ? formatDistanceToNow(new Date(lastEngaged), { addSuffix: true })
+                          : 'Not engaged yet';
+                        // Days-since-last for amber-warning at 3+ days.
+                        const daysSinceLast = lastEngaged
+                          ? Math.floor((Date.now() - new Date(lastEngaged).getTime()) / 86_400_000)
+                          : null;
+                        const stale = daysSinceLast !== null && daysSinceLast >= 3;
+                        const priorityColor =
+                          action.priority === 'urgent' ? 'text-red-600'
+                          : action.priority === 'high' ? 'text-amber-600'
+                          : action.priority === 'medium' ? 'text-sky-700'
+                          : 'text-gray-500';
+                        return (
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            {/* Top row */}
+                            <div className="flex items-center gap-1.5 whitespace-nowrap">
+                              <span className="text-gray-700 tabular-nums">{opp.bump_number}/4</span>
+                              <div className="flex gap-0.5">
+                                {[1, 2, 3, 4].map(i => (
+                                  <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= opp.bump_number ? 'bg-sky-500' : 'bg-gray-200'}`} />
+                                ))}
+                              </div>
+                              <span className={`text-[11px] ${stale ? 'text-amber-600 font-medium' : 'text-gray-500'}`}>
+                                · {lastEngagedLabel}
+                              </span>
+                              <div className="relative group/bump inline-flex ml-auto">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-1.5 text-sky-600 hover:text-sky-700 hover:bg-sky-50"
+                                  onClick={() => handleRecordBump(opp.id)}
+                                  disabled={isBumping}
+                                >
+                                  <Zap className="h-3 w-3" />
+                                </Button>
+                                <div className="absolute bottom-full right-0 mb-1.5 px-2.5 py-1 text-white text-[11px] rounded-md whitespace-nowrap opacity-0 pointer-events-none group-hover/bump:opacity-100 transition-opacity z-50" style={{ backgroundColor: '#3e8692' }}>
+                                  Record bump #{opp.bump_number + 1}
+                                </div>
+                              </div>
+                            </div>
+                            {/* Next-move hint (from Actions tab logic) */}
+                            <div className={`text-[11px] leading-tight ${priorityColor}`}>
+                              <span className="font-medium">{action.label}</span>
+                              {action.hint && <span className="text-gray-500"> · {action.hint}</span>}
+                            </div>
                           </div>
-                        </div>
-                      </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell onClick={e => e.stopPropagation()}>
                       <DropdownMenu>
