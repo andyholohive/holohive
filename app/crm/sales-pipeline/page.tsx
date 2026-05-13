@@ -1031,11 +1031,38 @@ export default function SalesPipelinePage() {
     if (!form.name.trim()) return;
     setIsSubmitting(true);
     try {
-      await SalesPipelineService.create({ ...form, stage: form.stage || ('cold_dm' as OpportunityStage), temperature_score: form.temperature_score ?? 50 });
+      // Capture the created row so we can optimistically append before
+      // the background refetch resolves. Without this the user sees a
+      // stale view for ~300-800ms (getAll paginates 1k+ rows), which
+      // reads as "the opp didn't get created" → manual page refresh.
+      const created = await SalesPipelineService.create({
+        ...form,
+        stage: form.stage || ('cold_dm' as OpportunityStage),
+        temperature_score: form.temperature_score ?? 50,
+      });
       setIsCreateOpen(false);
       setForm({ name: '' });
-      // Need server-generated id + computed fields, so refetch opps
-      // (not the rest of the resources). Metrics in parallel.
+
+      // Optimistic append into the global opportunities slice — covers
+      // Pipeline / Orbit / Overview which all derive from it.
+      if (created?.id) {
+        setOpportunities(prev => {
+          // Guard against double-insert from a fast refetch landing first.
+          if (prev.some(o => o.id === created.id)) return prev;
+          return [created as SalesPipelineOpportunity, ...prev];
+        });
+      }
+
+      // Outreach has its own paginated state (outreachOpps) separate from
+      // the global opportunities list — refetch it explicitly so a newly-
+      // created cold_dm opp shows up in the Outreach tab too.
+      if ((created?.stage || form.stage || 'cold_dm') === 'cold_dm') {
+        void fetchOutreach();
+        void fetchOutreachCount();
+      }
+
+      // Background reconciliation — pulls server-side computed fields
+      // (composite_score etc.) and overwrites the optimistic row.
       void fetchOpportunities();
       void fetchMetrics();
     } catch (err: any) {
