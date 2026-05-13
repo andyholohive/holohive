@@ -4001,6 +4001,11 @@ export default function SalesPipelinePage() {
                       grouping. Always shown so unclassified orbit opps
                       still surface (with "—"). */}
                   <TableHead className="w-[140px]">Reason</TableHead>
+                  {/* Next check-in surfaces the Orbit Tracking section's
+                      next_action_at on the table so users can scan
+                      "what's due today/this week" without opening each
+                      slide-over. Overdue dates render in red. */}
+                  <TableHead className="w-[120px]">Next check-in</TableHead>
                   <TableHead className="w-[120px]">Time in Orbit</TableHead>
                   <TableHead className="w-[120px]">Last Contacted</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
@@ -4104,6 +4109,22 @@ export default function SalesPipelinePage() {
                           ) : (
                             <span className="text-gray-400 text-xs">—</span>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            if (!opp.next_action_at) return <span className="text-gray-400 text-xs">—</span>;
+                            const checkin = new Date(opp.next_action_at + 'T00:00:00');
+                            const today = new Date(); today.setHours(0, 0, 0, 0);
+                            const overdue = checkin < today;
+                            const isToday = checkin.getTime() === today.getTime();
+                            return (
+                              <span className={`text-xs ${overdue ? 'text-red-600 font-medium' : isToday ? 'text-amber-600 font-medium' : 'text-gray-700'}`}>
+                                {format(checkin, 'MMM d')}
+                                {overdue && ' · overdue'}
+                                {isToday && ' · today'}
+                              </span>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell className="text-gray-500">{opp.updated_at ? formatDistanceToNow(new Date(opp.updated_at)) : '—'}</TableCell>
                         <TableCell className="text-gray-500">{opp.last_contacted_at ? formatDistanceToNow(new Date(opp.last_contacted_at), { addSuffix: true }) : '—'}</TableCell>
@@ -5204,6 +5225,126 @@ export default function SalesPipelinePage() {
                 </div>
               </div>
             </div>
+
+            {/* Orbit Tracking — shown when stage='orbit'. Mirrors the
+                Post-Proposal Tracking pattern but framed for keeping
+                tabs on a deal we're not actively pursuing. The
+                next-check-in fields reuse next_action_at +
+                next_action_notes (an opp can't be both orbit AND
+                post-proposal, so the columns can serve double duty
+                without conflict). */}
+            {opp.stage === 'orbit' && (() => {
+              const checkinDate = opp.next_action_at ? new Date(opp.next_action_at + 'T00:00:00') : null;
+              const today = new Date(); today.setHours(0, 0, 0, 0);
+              const isOverdue = !!checkinDate && checkinDate < today;
+              const isToday = !!checkinDate && checkinDate.getTime() === today.getTime();
+              return (
+                <div className="border-t pt-6">
+                  <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <RotateCcw className="h-3.5 w-3.5 text-orange-600" />
+                    Orbit Tracking
+                  </h4>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                    <div>
+                      <Label className="text-xs text-gray-500">Next check-in</Label>
+                      {/* Reuses next_action_at — same DATE column as Post-
+                          Proposal's "Next action date". Stage exclusivity
+                          means the two contexts never share a row. */}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="focus-brand justify-start text-left font-normal w-full h-7 text-sm"
+                            style={{
+                              borderColor: isOverdue ? '#fecaca' : '#e5e7eb',
+                              backgroundColor: isOverdue ? '#fef2f2' : 'white',
+                              color: opp.next_action_at ? (isOverdue ? '#b91c1c' : '#111827') : '#9ca3af',
+                            }}
+                          >
+                            <Calendar className="mr-2 h-3.5 w-3.5" />
+                            {opp.next_action_at
+                              ? `${format(checkinDate!, 'MMM d, yyyy')}${isOverdue ? ' · overdue' : isToday ? ' · today' : ''}`
+                              : 'Select date'}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                          <CalendarPicker
+                            mode="single"
+                            selected={checkinDate || undefined}
+                            onSelect={async (date) => {
+                              const v = date
+                                ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                                : null;
+                              applyOppPatch(opp.id, { next_action_at: v } as Partial<SalesPipelineOpportunity>);
+                              try { await SalesPipelineService.update(opp.id, { next_action_at: v } as any); }
+                              catch (err) { console.error(err); }
+                            }}
+                            initialFocus
+                            classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                            modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-500">Reason</Label>
+                      <Select
+                        value={opp.orbit_reason || ''}
+                        onValueChange={async (v) => {
+                          const nextVal = v || null;
+                          if (nextVal === (opp.orbit_reason || null)) return;
+                          applyOppPatch(opp.id, { orbit_reason: nextVal } as Partial<SalesPipelineOpportunity>);
+                          try { await SalesPipelineService.update(opp.id, { orbit_reason: nextVal } as any); }
+                          catch (err) { console.error(err); }
+                        }}
+                      >
+                        <SelectTrigger className="h-7 text-sm focus-brand"><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent>
+                          {ORBIT_REASONS.map(r => (
+                            <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-500">Time in orbit</Label>
+                      <p className="font-medium mt-1.5 text-sm">
+                        {opp.bucket_changed_at || opp.updated_at
+                          ? formatDistanceToNow(new Date(opp.bucket_changed_at || opp.updated_at))
+                          : <span className="text-gray-400">—</span>}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-500">Last contacted</Label>
+                      <p className="font-medium mt-1.5 text-sm">
+                        {opp.last_contacted_at
+                          ? formatDistanceToNow(new Date(opp.last_contacted_at), { addSuffix: true })
+                          : <span className="text-gray-400">—</span>}
+                      </p>
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-xs text-gray-500">What to watch for</Label>
+                      {/* Reuses next_action_notes. Free-form so users can
+                          drop signals like "Korea announcement", "Series
+                          A", "exchange listing", or full context paragraphs. */}
+                      <Textarea
+                        value={opp.next_action_notes || ''}
+                        placeholder="e.g. Watching for Korea expansion announcement, Series A raise, or exchange listing — message them when any of these hit."
+                        onBlur={async (e) => {
+                          const v = e.target.value.trim() || null;
+                          if (v === opp.next_action_notes) return;
+                          applyOppPatch(opp.id, { next_action_notes: v } as Partial<SalesPipelineOpportunity>);
+                          try { await SalesPipelineService.update(opp.id, { next_action_notes: v } as any); }
+                          catch (err) { console.error(err); }
+                        }}
+                        rows={2}
+                        className="text-sm focus-brand"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Post-Proposal Tracking — only shown when proposal_sent_at
                 is set OR the deal is in a post-proposal stage. Inline-
