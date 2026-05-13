@@ -1088,6 +1088,36 @@ export default function SalesPipelinePage() {
     });
   };
 
+  // Auto-log an inbound "Replied" activity when a cold-outreach opp
+  // moves from cold_dm into warm. The premise: outbound DM → no reply
+  // = stays in cold_dm. They move to warm precisely because they
+  // replied. SalesPipelineService.createActivity already auto-stamps
+  // last_reply_at + last_contacted_at on inbound messages, so we just
+  // need to write the activity row — no separate milestone update
+  // here. Scoped to source='cold_outreach' so we don't mis-log
+  // warm-ups from inbound/referral/event sources where the warming
+  // isn't a reply event.
+  const autoLogColdOutreachReply = async (opp: SalesPipelineOpportunity) => {
+    if (opp.source !== 'cold_outreach') return;
+    try {
+      await SalesPipelineService.createActivity({
+        opportunity_id: opp.id,
+        type: 'message',
+        direction: 'inbound',
+        title: 'Replied',
+        description: 'Auto-logged when moved from Cold DM to Warm.',
+      });
+      // Optimistic local patch so the funnel + last-reply timestamps
+      // update immediately without a refetch.
+      applyOppPatch(opp.id, {
+        last_reply_at: new Date().toISOString(),
+        last_contacted_at: new Date().toISOString(),
+      } as Partial<SalesPipelineOpportunity>);
+    } catch (err) {
+      console.error('Error auto-logging reply on cold→warm:', err);
+    }
+  };
+
   const handleStageChange = async (oppId: string, newStage: SalesPipelineStage, currentStage: string) => {
     const oppName = opportunities.find(o => o.id === oppId)?.name || '';
     if (newStage === 'orbit') {
@@ -1137,6 +1167,13 @@ export default function SalesPipelinePage() {
       // Note: co-owners are now assigned in the activity log popup when booking a meeting
       await SalesPipelineService.update(oppId, updateData);
       applyOppPatch(oppId, updateData);
+      // Cold-outreach replied — auto-log the inbound activity so the
+      // funnel + activity timeline reflect the reply without anyone
+      // having to remember to log it manually.
+      if (currentStage === 'cold_dm' && newStage === 'warm') {
+        const opp = opportunities.find(o => o.id === oppId);
+        if (opp) await autoLogColdOutreachReply(opp);
+      }
       void fetchMetrics();
       if (activeTab === 'outreach') { void fetchOutreach(); void fetchOutreachCount(); }
     } catch (err) {
@@ -2724,6 +2761,13 @@ export default function SalesPipelinePage() {
     if (selectedOutreach.length === 0 || isBulkMoving) return;
     setIsBulkMoving(true);
     try {
+      // Snapshot which selected opps are cold-outreach + currently in
+      // cold_dm BEFORE the bulk update, so we can auto-log the inbound
+      // reply for each of them after. Same logic as the single-row
+      // handleStageChange path — keep them consistent.
+      const candidatesForReplyLog = opportunities.filter(o =>
+        selectedOutreach.includes(o.id) && o.stage === 'cold_dm' && o.source === 'cold_outreach',
+      );
       await SalesPipelineService.bulkUpdateStage(selectedOutreach, 'warm');
       // Optimistic: patch all selected to warm; server is authoritative
       // but the local state update is enough for the kanban to update.
@@ -2732,6 +2776,10 @@ export default function SalesPipelinePage() {
         selected.has(o.id) ? { ...o, stage: 'warm' as OpportunityStage, updated_at: new Date().toISOString() } : o,
       ));
       setSelectedOutreach([]);
+      // Fire-and-forget the reply-log writes. Parallelised so the bulk
+      // action doesn't slow down for the count of opps. Each one
+      // individually wraps its own try/catch via autoLogColdOutreachReply.
+      void Promise.all(candidatesForReplyLog.map(opp => autoLogColdOutreachReply(opp)));
       void fetchOutreach();
       void fetchOutreachCount();
       void fetchMetrics();
