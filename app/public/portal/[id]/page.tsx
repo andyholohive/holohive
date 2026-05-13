@@ -333,18 +333,45 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
 
   // Shared email authorization check (matches campaign page pattern)
   const isEmailAuthorized = (inputEmail: string): boolean => {
-    if (!clientEmail) return false;
+    return resolveAuthorizationReason(inputEmail) !== null;
+  };
+
+  // Like isEmailAuthorized but returns which rule passed (or null if
+  // none). Used by the access-log call so admins can see "Bob got in
+  // by domain" vs "Bob got in by exact-email match".
+  const resolveAuthorizationReason = (
+    inputEmail: string
+  ): 'exact' | 'approved_email' | 'same_domain' | 'approved_domain' | null => {
+    if (!clientEmail) return null;
     const emailLower = inputEmail.toLowerCase();
     const clientEmailLower = clientEmail.toLowerCase();
     const inputDomain = emailLower.split('@')[1];
     const clientDomain = clientEmailLower.split('@')[1];
 
-    const isClientEmail = emailLower === clientEmailLower;
-    const isApprovedEmail = approvedEmails.some(e => e.toLowerCase() === emailLower);
-    const isSameDomain = inputDomain === clientDomain;
-    const isApprovedDomain = approvedDomains.some(d => inputDomain === d.toLowerCase());
+    if (emailLower === clientEmailLower) return 'exact';
+    if (approvedEmails.some(e => e.toLowerCase() === emailLower)) return 'approved_email';
+    if (inputDomain && inputDomain === clientDomain) return 'same_domain';
+    if (inputDomain && approvedDomains.some(d => inputDomain === d.toLowerCase())) return 'approved_domain';
+    return null;
+  };
 
-    return isClientEmail || isApprovedEmail || isSameDomain || isApprovedDomain;
+  // Fire-and-forget POST to the access-log endpoint. Failures are
+  // intentionally swallowed — logging is observability, not critical
+  // path; we never want a logging hiccup to block portal access.
+  const logPortalAccess = async (
+    inputEmail: string,
+    via: 'exact' | 'approved_email' | 'same_domain' | 'approved_domain' | 'cache'
+  ) => {
+    if (!clientId || !inputEmail) return;
+    try {
+      await fetch('/api/portal/log-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: clientId, email: inputEmail, authorized_via: via }),
+      });
+    } catch {
+      // intentional silence — see comment above
+    }
   };
 
   // Check if user is already authenticated via cache
@@ -363,6 +390,9 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
             setIsAuthenticated(true);
             setWelcomePhase('enter');
             setShowWelcome(true);
+            // Returning visitor — record as 'cache' so admins can see
+            // re-visits separately from fresh authentications.
+            void logPortalAccess(cachedEmail, 'cache');
             requestAnimationFrame(() => {
               setTimeout(() => setWelcomePhase('ready'), 50);
             });
@@ -414,12 +444,16 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       return;
     }
 
-    if (!isEmailAuthorized(email)) {
+    const reason = resolveAuthorizationReason(email);
+    if (!reason) {
       setEmailError('This email address is not authorized to access this portal');
       return;
     }
 
     saveAuthToCache(email);
+    // Stamp the audit log with whichever rule passed. Don't await — the
+    // portal shouldn't wait on observability before rendering.
+    void logPortalAccess(email, reason);
     setIsAuthenticated(true);
     setWelcomePhase('enter');
     setShowWelcome(true);

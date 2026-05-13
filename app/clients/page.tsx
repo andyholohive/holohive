@@ -193,6 +193,17 @@ export default function ClientsPage() {
   const [saveTemplateName, setSaveTemplateName] = useState('');
   const [clientApprovedDomains, setClientApprovedDomains] = useState<string[]>([]);
   const [contextDomainInput, setContextDomainInput] = useState('');
+  // Portal access tracking state. portalAccessSummary is a per-client
+  // count of visits in the last 30d (used to drive the badge on the
+  // "Visits" tile); the modal lazy-loads the full list on open.
+  const [portalAccessSummary, setPortalAccessSummary] = useState<
+    Record<string, { count_30d: number; last_at: string | null }>
+  >({});
+  const [accessLogModalClient, setAccessLogModalClient] = useState<ClientWithAccess | null>(null);
+  const [accessLogRows, setAccessLogRows] = useState<
+    Array<{ id: string; email: string; authorized_via: string; accessed_at: string; user_agent: string | null; ip_address: string | null }>
+  >([]);
+  const [accessLogLoading, setAccessLogLoading] = useState(false);
   // New client form state
   const [newClient, setNewClient] = useState({
     name: '',
@@ -296,6 +307,31 @@ export default function ClientsPage() {
     }
   };
 
+  // Lazy-load the full access log for a client when the admin opens
+  // the Visits modal. We don't want to fetch this for every client on
+  // the initial /clients load — the page already does 11 parallel
+  // queries — so it stays modal-scoped.
+  const openAccessLogModal = async (client: ClientWithAccess) => {
+    setAccessLogModalClient(client);
+    setAccessLogRows([]);
+    setAccessLogLoading(true);
+    try {
+      const { data, error } = await (supabase as any)
+        .from('portal_access_log')
+        .select('id, email, authorized_via, accessed_at, user_agent, ip_address')
+        .eq('client_id', client.id)
+        .order('accessed_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setAccessLogRows((data || []) as any);
+    } catch (err) {
+      console.error('Error loading portal access log:', err);
+      toast({ title: 'Error', description: 'Failed to load access log.', variant: 'destructive' });
+    } finally {
+      setAccessLogLoading(false);
+    }
+  };
+
   const copyPortalLink = () => {
     if (!clientToShare) return;
     const portalUrl = `${window.location.origin}/public/portal/${clientToShare.slug || clientToShare.id}`;
@@ -379,6 +415,11 @@ export default function ClientsPage() {
       // round-trips (~5-8s on slow connections); now one round-trip
       // window. Promise.all rejects if any fails — wrap in try so a
       // single 4xx from a stale row doesn't blank the whole page.
+      // Pull the last 30 days of portal access log alongside the rest.
+      // Cheap because of the (client_id, accessed_at DESC) index, and
+      // it lets us render an "N visits / 7d" badge on every card
+      // without an extra round-trip when the page mounts.
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const [
         allCampaigns,
         allOpportunities,
@@ -390,6 +431,7 @@ export default function ClientsPage() {
         milestoneRes,
         templateRes,
         mindshareRes,
+        portalAccessRes,
       ] = await Promise.all([
         CampaignService.getCampaignsByClientIds(clientIds) as Promise<any[]>,
         CRMService.getAllOpportunities(),
@@ -401,6 +443,10 @@ export default function ClientsPage() {
         supabase.from('client_milestones').select('*').order('display_order', { ascending: true }),
         supabase.from('milestone_templates').select('*').order('is_default', { ascending: false }).order('name'),
         supabase.from('client_mindshare_config').select('client_id, is_enabled'),
+        (supabase as any).from('portal_access_log')
+          .select('client_id, accessed_at')
+          .gte('accessed_at', thirtyDaysAgo)
+          .order('accessed_at', { ascending: false }),
       ]);
 
       // Build the campaigns-by-status map per client
@@ -485,6 +531,19 @@ export default function ClientsPage() {
         msEnabled[mc.client_id] = mc.is_enabled;
       }
       setClientMindshareEnabled(msEnabled);
+
+      // Portal access summary — count + most-recent timestamp per
+      // client. Rows are already sorted desc, so first encounter is
+      // the latest visit. Cast through unknown because portal_access_log
+      // is too new to be in the generated database.types — the runtime
+      // shape is exactly what we select above.
+      const accessSummary: Record<string, { count_30d: number; last_at: string | null }> = {};
+      for (const row of ((portalAccessRes.data || []) as unknown as Array<{ client_id: string; accessed_at: string }>)) {
+        const bucket = accessSummary[row.client_id] || (accessSummary[row.client_id] = { count_30d: 0, last_at: null });
+        bucket.count_30d++;
+        if (!bucket.last_at) bucket.last_at = row.accessed_at;
+      }
+      setPortalAccessSummary(accessSummary);
     } catch (err) {
       setError('Failed to load clients');
     } finally {
@@ -2654,7 +2713,7 @@ export default function ClientsPage() {
                     {/* Client Portal — compact row */}
                     <div className="mt-3 pt-3 border-t border-gray-100">
                       <p className="font-bold text-sm text-gray-700 mb-2">Client Portal</p>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-4 gap-2">
                         {/* Context */}
                         <button
                           onClick={() => openContextModal(client)}
@@ -2694,6 +2753,27 @@ export default function ClientsPage() {
                             <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-gray-300" />
                           )}
                         </button>
+                        {/* Visits — portal_access_log readout. Badge
+                            shows the last-30-day count; click opens the
+                            full log modal. Empty state is a gray dot
+                            so the tile still looks set up. */}
+                        <button
+                          onClick={() => openAccessLogModal(client)}
+                          className="flex flex-col items-center gap-1.5 p-2.5 rounded-lg border border-gray-200 hover:border-brand hover:bg-brand-light/30 transition-colors group relative"
+                          title={portalAccessSummary[client.id]?.last_at
+                            ? `Last visit: ${new Date(portalAccessSummary[client.id]!.last_at!).toLocaleString()}`
+                            : 'No visits yet'}
+                        >
+                          <Eye className="h-4 w-4 text-gray-400 group-hover:text-brand" />
+                          <span className="text-[11px] font-medium text-gray-600 group-hover:text-brand">Visits</span>
+                          {(portalAccessSummary[client.id]?.count_30d || 0) > 0 ? (
+                            <span className="absolute top-1.5 right-1.5 bg-brand text-white text-[9px] font-bold rounded-full h-4 px-1 min-w-[16px] flex items-center justify-center">
+                              {portalAccessSummary[client.id]!.count_30d}
+                            </span>
+                          ) : (
+                            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-gray-300" />
+                          )}
+                        </button>
                       </div>
                     </div>
                   </CardContent>
@@ -2722,6 +2802,88 @@ export default function ClientsPage() {
               >
                 Archive Client
               </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Access Log Dialog — read-only audit of who has visited the
+            public portal. Sourced from portal_access_log; admin-only
+            via RLS (see migration 064). Cap at 200 most-recent rows
+            for UI snappiness; we can add pagination if anyone scrolls
+            to the bottom. */}
+        <Dialog open={!!accessLogModalClient} onOpenChange={(open) => { if (!open) setAccessLogModalClient(null); }}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-4 w-4 text-brand" />
+                Portal visits — {accessLogModalClient?.name}
+              </DialogTitle>
+              <DialogDescription>
+                Who has accessed this client&apos;s public portal, when, and which allowlist rule let them in.
+              </DialogDescription>
+            </DialogHeader>
+            {accessLogLoading ? (
+              <div className="space-y-2 py-4">
+                {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+              </div>
+            ) : accessLogRows.length === 0 ? (
+              <div className="py-8 text-center text-sm text-gray-500">
+                No portal visits recorded yet.
+                <p className="text-xs text-gray-400 mt-1">
+                  Share the portal link via the <Share2 className="inline h-3 w-3" /> icon to start tracking.
+                </p>
+              </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-medium">When</th>
+                      <th className="px-3 py-2 text-left font-medium">Email</th>
+                      <th className="px-3 py-2 text-left font-medium">Via</th>
+                      <th className="px-3 py-2 text-left font-medium">IP</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {accessLogRows.map(row => {
+                      // Pretty labels for the authorization-rule enum.
+                      // 'cache' = returning visitor on a still-valid
+                      // 24h localStorage token, distinct from a fresh
+                      // login.
+                      const viaLabel =
+                        row.authorized_via === 'exact' ? 'Primary email'
+                        : row.authorized_via === 'approved_email' ? 'Approved email'
+                        : row.authorized_via === 'same_domain' ? 'Same domain'
+                        : row.authorized_via === 'approved_domain' ? 'Approved domain'
+                        : row.authorized_via === 'cache' ? 'Returning'
+                        : row.authorized_via;
+                      const viaColor =
+                        row.authorized_via === 'exact' ? 'bg-emerald-50 text-emerald-700'
+                        : row.authorized_via === 'cache' ? 'bg-gray-50 text-gray-600'
+                        : 'bg-blue-50 text-blue-700';
+                      return (
+                        <tr key={row.id} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-xs text-gray-600 whitespace-nowrap">
+                            {new Date(row.accessed_at).toLocaleString()}
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-900">{row.email}</td>
+                          <td className="px-3 py-2">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${viaColor}`}>
+                              {viaLabel}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-400 font-mono">
+                            {row.ip_address || '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAccessLogModalClient(null)}>Close</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
