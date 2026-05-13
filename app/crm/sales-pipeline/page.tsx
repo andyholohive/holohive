@@ -816,10 +816,17 @@ export default function SalesPipelinePage() {
   // so a deal set to nurture would silently drop out of the daily view.
   const allNurtureOpps = useMemo(() => opportunities.filter(o => o.stage === 'nurture'), [opportunities]);
   const orbitOpps = useMemo(() => orbitSearch ? allOrbitOpps.filter(o => matchesSearch(o, orbitSearch)) : allOrbitOpps, [allOrbitOpps, orbitSearch]);
-  const orbitByReason = useMemo(() => ORBIT_REASONS.map(r => ({
-    ...r,
-    opps: orbitOpps.filter(o => o.orbit_reason === r.value),
-  })), [orbitOpps]);
+  // Orbit grouping — same shape as the Outreach grouping above so rows
+  // with the same project name collapse into a single "header" cell
+  // with the rest of the POCs nested under it. Per-reason because each
+  // reason renders its own table.
+  const orbitByReason = useMemo(() => ORBIT_REASONS.map(r => {
+    const opps = orbitOpps.filter(o => o.orbit_reason === r.value);
+    const sortedOpps = [...opps].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const nameCounts = new Map<string, number>();
+    sortedOpps.forEach(o => nameCounts.set(o.name || '', (nameCounts.get(o.name || '') || 0) + 1));
+    return { ...r, opps, sortedOpps, nameCounts };
+  }), [orbitOpps]);
 
   // Memoized outreach grouping — sort by name and count POCs per project
   const { sortedOutreach, outreachNameCounts } = useMemo(() => {
@@ -3914,10 +3921,24 @@ export default function SalesPipelinePage() {
                           No opportunities
                         </TableCell>
                       </TableRow>
-                    ) : group.opps.map(opp => {
+                    ) : group.sortedOpps.map((opp, index) => {
                       const isChecked = selectedOrbit.includes(opp.id);
+                      // Project-name grouping — mirrors the Outreach pattern.
+                      // First row in a same-named cluster shows the project
+                      // header + POC count + add-POC button; subsequent rows
+                      // hide the name cell so the visual hierarchy is
+                      // "project → POCs under it" instead of repeated names.
+                      const prevName = index > 0 ? group.sortedOpps[index - 1].name : null;
+                      const nextName = index < group.sortedOpps.length - 1 ? group.sortedOpps[index + 1].name : null;
+                      const isFirstInGroup = opp.name !== prevName;
+                      const isLastInGroup = opp.name !== nextName;
+                      const groupCount = group.nameCounts.get(opp.name || '') || 1;
                       return (
-                      <TableRow key={opp.id} className="group hover:bg-gray-50 cursor-pointer" onClick={() => openSlideOver(opp)}>
+                      <TableRow
+                        key={opp.id}
+                        className={`group hover:bg-gray-50 cursor-pointer ${!isFirstInGroup ? 'border-t-0' : ''} ${isLastInGroup && groupCount > 1 ? 'border-b-2 border-b-gray-200' : ''}`}
+                        onClick={() => openSlideOver(opp)}
+                      >
                         <TableCell className="w-10" onClick={e => e.stopPropagation()}>
                           <div className="flex items-center justify-center">
                             <Checkbox
@@ -3926,12 +3947,44 @@ export default function SalesPipelinePage() {
                             />
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Building2 className="h-4 w-4 text-gray-400" />
-                            <span className="font-medium">{opp.name}</span>
-                            {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
-                          </div>
+                        <TableCell className={!isFirstInGroup ? 'pt-0' : ''}>
+                          {isFirstInGroup ? (
+                            <div className="flex items-center gap-2 whitespace-nowrap overflow-hidden">
+                              <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
+                              <span className="font-medium truncate">{opp.name}</span>
+                              {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
+                              {groupCount > 1 && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium shrink-0 whitespace-nowrap">{groupCount} POCs</span>
+                              )}
+                              {/* Add-another-POC button on hover — same
+                                  affordance the Outreach table has. Pre-
+                                  fills the create form with the same
+                                  project context. */}
+                              <button
+                                className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400 hover:text-brand"
+                                title="Add another POC for this project"
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setForm({
+                                    name: opp.name,
+                                    stage: 'orbit' as OpportunityStage,
+                                    dm_account: opp.dm_account,
+                                    bucket: opp.bucket || undefined,
+                                    source: opp.source || undefined,
+                                    owner_id: opp.owner_id || undefined,
+                                    co_owner_ids: opp.co_owner_ids || undefined,
+                                    referrer: opp.referrer || undefined,
+                                    affiliate_id: opp.affiliate_id || undefined,
+                                  });
+                                  setIsCreateOpen(true);
+                                }}
+                              >
+                                <UserPlus className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="pl-8 text-gray-300 text-xs">└</div>
+                          )}
                         </TableCell>
                         <TableCell className="whitespace-nowrap max-w-[180px] overflow-hidden">
                           {renderPocCell(opp, 'max-w-[120px]')}
