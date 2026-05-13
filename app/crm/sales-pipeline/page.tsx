@@ -5017,17 +5017,43 @@ export default function SalesPipelinePage() {
                   </div>
                   <div>
                     <Label className="text-xs text-gray-500">Expected close</Label>
-                    <Input
-                      type="date"
-                      value={opp.expected_close_date || ''}
-                      onChange={async (e) => {
-                        const v = e.target.value || null;
-                        applyOppPatch(opp.id, { expected_close_date: v } as Partial<SalesPipelineOpportunity>);
-                        try { await SalesPipelineService.update(opp.id, { expected_close_date: v } as any); }
-                        catch (err) { console.error(err); }
-                      }}
-                      className="h-7 text-sm focus-brand"
-                    />
+                    {/* Swapped from native <input type="date"> to the
+                        Popover + CalendarPicker pattern used by the rest
+                        of the slide-over (e.g. Meeting Date above) so the
+                        UI is consistent. Stored value remains YYYY-MM-DD
+                        because expected_close_date is a DATE column. */}
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="focus-brand justify-start text-left font-normal w-full h-7 text-sm"
+                          style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: opp.expected_close_date ? '#111827' : '#9ca3af' }}
+                        >
+                          <Calendar className="mr-2 h-3.5 w-3.5" />
+                          {opp.expected_close_date
+                            ? format(new Date(opp.expected_close_date + 'T00:00:00'), 'MMM d, yyyy')
+                            : 'Select date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                        <CalendarPicker
+                          mode="single"
+                          selected={opp.expected_close_date ? new Date(opp.expected_close_date + 'T00:00:00') : undefined}
+                          onSelect={async (date) => {
+                            // Convert back to YYYY-MM-DD (DATE column, not timestamp).
+                            const v = date
+                              ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                              : null;
+                            applyOppPatch(opp.id, { expected_close_date: v } as Partial<SalesPipelineOpportunity>);
+                            try { await SalesPipelineService.update(opp.id, { expected_close_date: v } as any); }
+                            catch (err) { console.error(err); }
+                          }}
+                          initialFocus
+                          classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                          modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div>
                     <Label className="text-xs text-gray-500">Decision maker</Label>
@@ -5061,17 +5087,37 @@ export default function SalesPipelinePage() {
                   </div>
                   <div>
                     <Label className="text-xs text-gray-500">Next action date</Label>
-                    <Input
-                      type="date"
-                      value={opp.next_action_at || ''}
-                      onChange={async (e) => {
-                        const v = e.target.value || null;
-                        applyOppPatch(opp.id, { next_action_at: v } as Partial<SalesPipelineOpportunity>);
-                        try { await SalesPipelineService.update(opp.id, { next_action_at: v } as any); }
-                        catch (err) { console.error(err); }
-                      }}
-                      className="h-7 text-sm focus-brand"
-                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="focus-brand justify-start text-left font-normal w-full h-7 text-sm"
+                          style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: opp.next_action_at ? '#111827' : '#9ca3af' }}
+                        >
+                          <Calendar className="mr-2 h-3.5 w-3.5" />
+                          {opp.next_action_at
+                            ? format(new Date(opp.next_action_at + 'T00:00:00'), 'MMM d, yyyy')
+                            : 'Select date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+                        <CalendarPicker
+                          mode="single"
+                          selected={opp.next_action_at ? new Date(opp.next_action_at + 'T00:00:00') : undefined}
+                          onSelect={async (date) => {
+                            const v = date
+                              ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+                              : null;
+                            applyOppPatch(opp.id, { next_action_at: v } as Partial<SalesPipelineOpportunity>);
+                            try { await SalesPipelineService.update(opp.id, { next_action_at: v } as any); }
+                            catch (err) { console.error(err); }
+                          }}
+                          initialFocus
+                          classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                          modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div>
                     <Label className="text-xs text-gray-500">Proposal doc URL</Label>
