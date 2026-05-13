@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { createClient } from '@supabase/supabase-js';
-import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users, BarChart3, Table as TableIcon, CreditCard, CheckCircle, Globe, Flag, FileText, Search, ChevronDown } from 'lucide-react';
+import { List, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Users, BarChart3, Table as TableIcon, CreditCard, CheckCircle, Globe, Flag, FileText, Search, ChevronDown, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -244,6 +244,42 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     status: [] as string[]
   });
 
+  // ── Sortable column state ────────────────────────────────────────
+  // Mirrors the KOL Dashboard pattern from /campaigns/[id]/page.tsx:
+  // three-state cycle per column (asc → desc → cleared). Stable
+  // ordering for equal-key rows is guaranteed by a
+  // decorate-sort-undecorate pass below.
+  type KolSortKey =
+    | 'name' | 'platform' | 'followers' | 'region' | 'creator_type'
+    | 'hh_status' | 'content_count';
+  type ContentSortKey =
+    | 'kol' | 'platform' | 'type' | 'status' | 'activation_date'
+    | 'impressions' | 'likes' | 'retweets' | 'comments' | 'bookmarks';
+
+  const [kolSort, setKolSort] = useState<{ key: KolSortKey | null; dir: 'asc' | 'desc' }>({ key: null, dir: 'asc' });
+  const [contentSort, setContentSort] = useState<{ key: ContentSortKey | null; dir: 'asc' | 'desc' }>({ key: null, dir: 'asc' });
+
+  const toggleKolSort = (key: KolSortKey) => {
+    setKolSort(prev => {
+      if (prev.key !== key) return { key, dir: 'asc' };
+      if (prev.dir === 'asc') return { key, dir: 'desc' };
+      return { key: null, dir: 'asc' };
+    });
+  };
+  const toggleContentSort = (key: ContentSortKey) => {
+    setContentSort(prev => {
+      if (prev.key !== key) return { key, dir: 'asc' };
+      if (prev.dir === 'asc') return { key, dir: 'desc' };
+      return { key: null, dir: 'asc' };
+    });
+  };
+
+  // Tiny sort indicator — directional arrow when active, faint
+  // bidirectional arrow when not (telegraphs the column is sortable).
+  const sortIcon = (active: boolean, dir: 'asc' | 'desc') => active
+    ? (dir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)
+    : <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />;
+
   // Filter and search KOLs
   const filteredKOLs = kols.filter(kol => {
     // Search filter
@@ -322,6 +358,81 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
 
     return matchesSearch && matchesPlatform && matchesType && matchesStatus;
   });
+
+  // ── Apply column sort to the filtered arrays ─────────────────────
+  // Nullish always sorts last on asc (and first on desc as a natural
+  // consequence) — that keeps "—" rows out of the user's way when
+  // they're scanning for the biggest / smallest values.
+  const compareNullable = (a: any, b: any, dirMul: number): number => {
+    const aMissing = a === null || a === undefined || a === '';
+    const bMissing = b === null || b === undefined || b === '';
+    if (aMissing && bMissing) return 0;
+    if (aMissing) return 1;
+    if (bMissing) return -1;
+    if (typeof a === 'number' && typeof b === 'number') return (a - b) * dirMul;
+    return String(a).localeCompare(String(b)) * dirMul;
+  };
+
+  const sortedKOLs = (() => {
+    if (!kolSort.key) return filteredKOLs;
+    const dirMul = kolSort.dir === 'asc' ? 1 : -1;
+    // Pre-compute content counts per KOL so the comparator stays cheap.
+    const contentCountByKolId = new Map<string, number>();
+    for (const c of contents) {
+      if (c.campaign_kols_id) {
+        contentCountByKolId.set(c.campaign_kols_id, (contentCountByKolId.get(c.campaign_kols_id) || 0) + 1);
+      }
+    }
+    const pull = (row: any): any => {
+      switch (kolSort.key) {
+        case 'name':         return row.master_kol?.name || '';
+        case 'platform':     return (row.master_kol?.platform || []).join(', ');
+        case 'followers':    return row.master_kol?.followers ?? null;
+        case 'region':       return row.master_kol?.region || '';
+        case 'creator_type': return (row.master_kol?.creator_type || []).join(', ');
+        case 'hh_status':    return row.hh_status || '';
+        case 'content_count': return contentCountByKolId.get(row.id) || 0;
+        default:             return '';
+      }
+    };
+    return [...filteredKOLs]
+      .map((kol, i) => ({ kol, i }))
+      .sort((a, b) => {
+        const cmp = compareNullable(pull(a.kol), pull(b.kol), dirMul);
+        return cmp !== 0 ? cmp : a.i - b.i;
+      })
+      .map(x => x.kol);
+  })();
+
+  const sortedContents = (() => {
+    if (!contentSort.key) return filteredContents;
+    const dirMul = contentSort.dir === 'asc' ? 1 : -1;
+    const pull = (row: any): any => {
+      switch (contentSort.key) {
+        case 'kol': {
+          const kol = kols.find(k => k.id === row.campaign_kols_id);
+          return kol?.master_kol?.name || '';
+        }
+        case 'platform':        return row.platform || '';
+        case 'type':            return row.type || '';
+        case 'status':          return row.status || '';
+        case 'activation_date': return row.activation_date ? new Date(row.activation_date).getTime() : null;
+        case 'impressions':     return row.impressions ?? null;
+        case 'likes':           return row.likes ?? null;
+        case 'retweets':        return row.retweets ?? null;
+        case 'comments':        return row.comments ?? null;
+        case 'bookmarks':       return row.bookmarks ?? null;
+        default:                return '';
+      }
+    };
+    return [...filteredContents]
+      .map((c, i) => ({ c, i }))
+      .sort((a, b) => {
+        const cmp = compareNullable(pull(a.c), pull(b.c), dirMul);
+        return cmp !== 0 ? cmp : a.i - b.i;
+      })
+      .map(x => x.c);
+  })();
 
   // Cache key for this specific campaign
   const cacheKey = `campaign_auth_${campaignId}`;
@@ -1264,10 +1375,18 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                         <TableHeader>
                           <TableRow className="bg-gray-50 border-b border-gray-200">
                             <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
-                            <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">KOL</TableHead>
+                            <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">
+                              <button type="button" onClick={() => toggleKolSort('name')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by KOL name">
+                                <span>KOL</span>
+                                {sortIcon(kolSort.key === 'name', kolSort.dir)}
+                              </button>
+                            </TableHead>
                             <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                              <div className="flex items-center gap-1 cursor-pointer group">
-                                <span>Platform</span>
+                              <div className="flex items-center gap-1 group">
+                                <button type="button" onClick={() => toggleKolSort('platform')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Platform">
+                                  <span>Platform</span>
+                                  {sortIcon(kolSort.key === 'platform', kolSort.dir)}
+                                </button>
                                 <Popover>
                                   <PopoverTrigger asChild>
                                     <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -1315,8 +1434,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </div>
                             </TableHead>
                             <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                              <div className="flex items-center gap-1 cursor-pointer group">
-                                <span>Followers</span>
+                              <div className="flex items-center gap-1 group">
+                                <button type="button" onClick={() => toggleKolSort('followers')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Followers">
+                                  <span>Followers</span>
+                                  {sortIcon(kolSort.key === 'followers', kolSort.dir)}
+                                </button>
                                 <Popover>
                                   <PopoverTrigger asChild>
                                     <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -1369,8 +1491,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </div>
                             </TableHead>
                             <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                              <div className="flex items-center gap-1 cursor-pointer group">
-                                <span>Region</span>
+                              <div className="flex items-center gap-1 group">
+                                <button type="button" onClick={() => toggleKolSort('region')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Region">
+                                  <span>Region</span>
+                                  {sortIcon(kolSort.key === 'region', kolSort.dir)}
+                                </button>
                                 <Popover>
                                   <PopoverTrigger asChild>
                                     <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -1419,11 +1544,19 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </div>
                             </TableHead>
                             {campaign?.share_creator_type && (
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Creator Type</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <button type="button" onClick={() => toggleKolSort('creator_type')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Creator Type">
+                                  <span>Creator Type</span>
+                                  {sortIcon(kolSort.key === 'creator_type', kolSort.dir)}
+                                </button>
+                              </TableHead>
                             )}
                             <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                              <div className="flex items-center gap-1 cursor-pointer group">
-                                <span>Status</span>
+                              <div className="flex items-center gap-1 group">
+                                <button type="button" onClick={() => toggleKolSort('hh_status')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Status">
+                                  <span>Status</span>
+                                  {sortIcon(kolSort.key === 'hh_status', kolSort.dir)}
+                                </button>
                                 <Popover>
                                   <PopoverTrigger asChild>
                                     <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -1470,14 +1603,19 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 )}
                               </div>
                             </TableHead>
-                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content</TableHead>
+                            <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <button type="button" onClick={() => toggleKolSort('content_count')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by content count">
+                                <span>Content</span>
+                                {sortIcon(kolSort.key === 'content_count', kolSort.dir)}
+                              </button>
+                            </TableHead>
                             {campaign?.share_kol_notes && (
                               <TableHead className="relative bg-gray-50 select-none">Notes</TableHead>
                             )}
                           </TableRow>
                         </TableHeader>
                         <TableBody className="bg-white">
-                          {filteredKOLs.length === 0 ? (
+                          {sortedKOLs.length === 0 ? (
                             <TableRow>
                               <TableCell colSpan={(campaign?.share_creator_type ? 10 : 9) + (campaign?.share_kol_notes ? 1 : 0)} className="text-center py-12">
                                 <div className="flex flex-col items-center justify-center text-gray-500">
@@ -1509,7 +1647,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               </TableCell>
                             </TableRow>
                           ) : (
-                            filteredKOLs.map((campaignKOL, index) => {
+                            sortedKOLs.map((campaignKOL, index) => {
                               return (
                                 <TableRow key={campaignKOL.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
                                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center text-gray-600`} style={{ verticalAlign: 'middle' }}>
@@ -1931,10 +2069,18 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                           <TableHeader>
                             <TableRow className="bg-gray-50 border-b border-gray-200">
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">KOL</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">
+                                <button type="button" onClick={() => toggleContentSort('kol')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by KOL name">
+                                  <span>KOL</span>
+                                  {sortIcon(contentSort.key === 'kol', contentSort.dir)}
+                                </button>
+                              </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                                <div className="flex items-center gap-1 cursor-pointer group">
-                                  <span>Platform</span>
+                                <div className="flex items-center gap-1 group">
+                                  <button type="button" onClick={() => toggleContentSort('platform')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Platform">
+                                    <span>Platform</span>
+                                    {sortIcon(contentSort.key === 'platform', contentSort.dir)}
+                                  </button>
                                   <Popover>
                                     <PopoverTrigger asChild>
                                       <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -1982,8 +2128,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 </div>
                               </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                                <div className="flex items-center gap-1 cursor-pointer group">
-                                  <span>Type</span>
+                                <div className="flex items-center gap-1 group">
+                                  <button type="button" onClick={() => toggleContentSort('type')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Type">
+                                    <span>Type</span>
+                                    {sortIcon(contentSort.key === 'type', contentSort.dir)}
+                                  </button>
                                   <Popover>
                                     <PopoverTrigger asChild>
                                       <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -2029,8 +2178,11 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 </div>
                               </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                                <div className="flex items-center gap-1 cursor-pointer group">
-                                  <span>Status</span>
+                                <div className="flex items-center gap-1 group">
+                                  <button type="button" onClick={() => toggleContentSort('status')} className="flex items-center gap-1 hover:text-gray-900" title="Sort by Status">
+                                    <span>Status</span>
+                                    {sortIcon(contentSort.key === 'status', contentSort.dir)}
+                                  </button>
                                   <Popover>
                                     <PopoverTrigger asChild>
                                       <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -2075,20 +2227,50 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Activation Date</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <button type="button" onClick={() => toggleContentSort('activation_date')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Activation Date">
+                                  <span>Activation Date</span>
+                                  {sortIcon(contentSort.key === 'activation_date', contentSort.dir)}
+                                </button>
+                              </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content Link</TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Impressions</TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Likes</TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Retweets</TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Comments</TableHead>
-                              <TableHead className={`relative bg-gray-50 ${campaign?.share_content_notes ? 'border-r border-gray-200' : ''} select-none`}>Bookmarks</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <button type="button" onClick={() => toggleContentSort('impressions')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Impressions">
+                                  <span>Impressions</span>
+                                  {sortIcon(contentSort.key === 'impressions', contentSort.dir)}
+                                </button>
+                              </TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <button type="button" onClick={() => toggleContentSort('likes')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Likes">
+                                  <span>Likes</span>
+                                  {sortIcon(contentSort.key === 'likes', contentSort.dir)}
+                                </button>
+                              </TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <button type="button" onClick={() => toggleContentSort('retweets')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Retweets">
+                                  <span>Retweets</span>
+                                  {sortIcon(contentSort.key === 'retweets', contentSort.dir)}
+                                </button>
+                              </TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <button type="button" onClick={() => toggleContentSort('comments')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Comments">
+                                  <span>Comments</span>
+                                  {sortIcon(contentSort.key === 'comments', contentSort.dir)}
+                                </button>
+                              </TableHead>
+                              <TableHead className={`relative bg-gray-50 ${campaign?.share_content_notes ? 'border-r border-gray-200' : ''} select-none`}>
+                                <button type="button" onClick={() => toggleContentSort('bookmarks')} className="flex items-center gap-1 group hover:text-gray-900" title="Sort by Bookmarks">
+                                  <span>Bookmarks</span>
+                                  {sortIcon(contentSort.key === 'bookmarks', contentSort.dir)}
+                                </button>
+                              </TableHead>
                               {campaign?.share_content_notes && (
                                 <TableHead className="relative bg-gray-50 select-none">Notes</TableHead>
                               )}
                             </TableRow>
                           </TableHeader>
                           <TableBody className="bg-white">
-                            {filteredContents.length === 0 ? (
+                            {sortedContents.length === 0 ? (
                               <TableRow>
                                 <TableCell colSpan={12 + (campaign?.share_content_notes ? 1 : 0)} className="text-center py-12">
                                   <div className="flex flex-col items-center justify-center text-gray-500">
@@ -2113,7 +2295,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                 </TableCell>
                               </TableRow>
                             ) : (
-                              filteredContents.map((content, index) => {
+                              sortedContents.map((content, index) => {
                                 const kol = kols.find(k => k.id === content.campaign_kols_id);
                                 return (
                                   <TableRow key={content.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
