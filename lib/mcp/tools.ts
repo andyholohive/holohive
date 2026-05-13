@@ -119,7 +119,9 @@ export async function listRecentProspects(
     const fundingStr = funding?.amount_usd ? ` · ${formatMoney(funding.amount_usd)}${funding.round ? ` ${funding.round}` : ''}` : '';
     const koreaListed = snap.post_korea_listing_at ? ` · 📍 ${String(snap.post_korea_listing_exchange || '').toUpperCase()}` : '';
     const statusBadge = r.status && r.status !== 'needs_review' ? ` [${r.status}]` : '';
-    return `• ${r.name}${r.symbol ? ` ($${r.symbol})` : ''} — ${tier}${statusBadge} · ${r.source || '—'}${fundingStr}${koreaListed} · ${relTime(r.created_at)}`;
+    // UUID prefix so the caller can chain into get_prospect_detail without
+    // a second query. Same fix as search_kols / list_top_kols.
+    return `• [${r.id}] ${r.name}${r.symbol ? ` ($${r.symbol})` : ''} — ${tier}${statusBadge} · ${r.source || '—'}${fundingStr}${koreaListed} · ${relTime(r.created_at)}`;
   });
 
   const filterLabel = [
@@ -128,7 +130,7 @@ export async function listRecentProspects(
     args.source,
   ].filter(Boolean).join(', ');
   const filterSuffix = filterLabel ? ` (${filterLabel})` : '';
-  return `${rows.length} prospect(s) in last ${args.days}d${filterSuffix}, sorted by ${args.sort_by}:\n\n${lines.join('\n')}`;
+  return `${rows.length} prospect(s) in last ${args.days}d${filterSuffix}, sorted by ${args.sort_by}:\n\n${lines.join('\n')}\n\nUse the UUID in [brackets] to call get_prospect_detail for full scoring, signals, and links.`;
 }
 
 // ─── Tool: get_prospect_detail ────────────────────────────────────────
@@ -218,10 +220,11 @@ export async function listActiveCampaigns(
 
   const lines = rows.map(c => {
     const clientName = c.clients?.name || '—';
-    return `• ${c.name} (${clientName}) — ${c.status} · ${formatMoney(c.total_budget)} · ${c.region || '—'} · mgr: ${c.manager || '—'} · started ${relTime(c.start_date)}`;
+    // UUID prefix → chains into get_campaign_detail / list_campaign_kols.
+    return `• [${c.id}] ${c.name} (${clientName}) — ${c.status} · ${formatMoney(c.total_budget)} · ${c.region || '—'} · mgr: ${c.manager || '—'} · started ${relTime(c.start_date)}`;
   });
 
-  return `${rows.length} active campaign(s):\n\n${lines.join('\n')}`;
+  return `${rows.length} active campaign(s):\n\n${lines.join('\n')}\n\nUse the UUID in [brackets] to call get_campaign_detail, list_campaign_kols, or get_campaign_payments.`;
 }
 
 // ─── Tool: search_kols ────────────────────────────────────────────────
@@ -266,10 +269,14 @@ export async function searchKols(
   const lines = rows.map(k => {
     const niches = Array.isArray(k.niche) && k.niche.length ? ` · ${k.niche.slice(0, 3).join('/')}` : '';
     const plats = Array.isArray(k.platform) && k.platform.length ? ` · ${k.platform.join('+')}` : '';
-    return `• ${k.name} — ${k.tier || '?'} tier · ${fmtFollowers(k.followers)} followers · ${k.region || '—'}${niches}${plats}${k.in_house ? ` · in-house: ${k.in_house}` : ''}`;
+    // Emit the UUID so the caller can pivot to get_kol_detail without
+    // a second search. Without this, the schema description for
+    // get_kol_detail ("from list_top_kols or search_kols") is a lie —
+    // the UUID isn't anywhere in the response.
+    return `• [${k.id}] ${k.name} — ${k.tier || '?'} tier · ${fmtFollowers(k.followers)} followers · ${k.region || '—'}${niches}${plats}${k.in_house ? ` · in-house: ${k.in_house}` : ''}`;
   });
 
-  return `${rows.length} KOL(s) matching "${args.query}":\n\n${lines.join('\n')}`;
+  return `${rows.length} KOL(s) matching "${args.query}":\n\n${lines.join('\n')}\n\nUse the UUID in [brackets] to call get_kol_detail for full info (link, wallet, pricing, etc.).`;
 }
 
 // ─── Tool: get_kr_listings ────────────────────────────────────────────
@@ -604,9 +611,11 @@ export async function listCrmOpportunities(
     const score = r.composite_score != null ? ` · score ${r.composite_score}` : '';
     const lastContact = r.last_contacted_at ? ` · contacted ${relTime(r.last_contacted_at)}` : ' · never contacted';
     const poc = r.poc_handle ? ` · @${r.poc_handle}` : '';
-    return `• ${r.name} [${r.stage}]${value}${score}${poc}${lastContact}`;
+    // UUID prefix → chains into get_opportunity_detail. Stage moves to
+    // `stage=...` notation so the brackets stay UUID-only.
+    return `• [${r.id}] ${r.name} · stage=${r.stage}${value}${score}${poc}${lastContact}`;
   });
-  return `${rows.length} CRM opportunity(s):\n\n${lines.join('\n')}`;
+  return `${rows.length} CRM opportunity(s):\n\n${lines.join('\n')}\n\nUse the UUID in [brackets] to call get_opportunity_detail for full scoring, timeline, and qualification flags.`;
 }
 
 // ─── Tool: get_opportunity_detail ─────────────────────────────────────
@@ -830,10 +839,10 @@ export async function crmFollowupsDue(
     const value = r.deal_value ? ` · ${formatMoney(r.deal_value)}` : '';
     const score = r.composite_score != null ? ` · score ${r.composite_score}` : '';
     const poc = r.poc_handle ? ` · @${r.poc_handle}` : '';
-    return `• ${r.name} [${r.stage}]${value}${score}${poc} — ${lastContact}`;
+    return `• [${r.id}] ${r.name} · stage=${r.stage}${value}${score}${poc} — ${lastContact}`;
   });
 
-  return `${rows.length} opportunity(s) needing follow-up (>${args.threshold_days}d since contact):\n\n${lines.join('\n')}`;
+  return `${rows.length} opportunity(s) needing follow-up (>${args.threshold_days}d since contact):\n\n${lines.join('\n')}\n\nUse the UUID in [brackets] to call get_opportunity_detail.`;
 }
 
 // ─── Tool: get_promoted_opportunity_for_prospect ─────────────────────
@@ -922,11 +931,13 @@ export async function listClients(
   if (rows.length === 0) return `No clients match.`;
 
   const lines = rows.map(c => {
-    const status = !c.is_active ? ' [inactive]' : c.archived_at ? ' [archived]' : '';
+    // status moves to `status=` notation so the leading [brackets]
+    // stay UUID-only across all list tools.
+    const status = !c.is_active ? ' · status=inactive' : c.archived_at ? ' · status=archived' : '';
     const onboard = c.onboarding_call_held ? '✓ onboarded' : c.onboarding_call_date ? `onboarding ${c.onboarding_call_date}` : 'not onboarded';
-    return `• ${c.name}${status} — ${c.location || '—'} · ${c.email} · ${onboard}`;
+    return `• [${c.id}] ${c.name}${status} — ${c.location || '—'} · ${c.email} · ${onboard}`;
   });
-  return `${rows.length} client(s):\n\n${lines.join('\n')}`;
+  return `${rows.length} client(s):\n\n${lines.join('\n')}\n\nUse the UUID in [brackets] to call get_client_detail or summarize_client.`;
 }
 
 // ─── Tool: get_client_detail ──────────────────────────────────────────
@@ -1198,11 +1209,14 @@ export async function listCampaignKols(
     const k = r.master_kols || {};
     const budget = r.allocated_budget ? ` · ${formatMoney(r.allocated_budget)}` : '';
     const paid = r.paid ? ` paid:${formatMoney(r.paid)}` : '';
-    const status = `[hh:${r.hh_status || 'untriaged'} · client:${r.client_status || 'untriaged'}]`;
+    // The UUID surfaced here is the master_kol.id so the caller can
+    // pivot to get_kol_detail. campaign_kols.id is internal — usually
+    // not what callers need.
+    const status = `hh=${r.hh_status || 'untriaged'} · client=${r.client_status || 'untriaged'}`;
     const hidden = r.hidden ? ' (hidden)' : '';
-    return `• ${k.name || '?'} — ${k.tier || '?'} tier · ${fmtFollowers(k.followers)} followers · ${k.region || '—'} ${status}${budget}${paid}${hidden}`;
+    return `• [${k.id || '—'}] ${k.name || '?'} — ${k.tier || '?'} tier · ${fmtFollowers(k.followers)} followers · ${k.region || '—'} · ${status}${budget}${paid}${hidden}`;
   });
-  return `${rows.length} KOL(s) in this campaign:\n\n${lines.join('\n')}`;
+  return `${rows.length} KOL(s) in this campaign:\n\n${lines.join('\n')}\n\nUse the UUID in [brackets] to call get_kol_detail for full info on any KOL.`;
 }
 
 // ─── Tool: get_campaign_payments ─────────────────────────────────────
@@ -1329,9 +1343,11 @@ export async function listTopKols(
     const plats = Array.isArray(k.platform) && k.platform.length ? ` · ${k.platform.join('+')}` : '';
     const inHouse = k.in_house ? ` · in-house: ${k.in_house}` : '';
     const rating = k.rating != null ? ` · ★${k.rating}` : '';
-    return `• ${k.name} — ${k.tier || '?'} tier · ${fmtFollowers(k.followers)} followers · ${k.region || '—'}${niches}${plats}${inHouse}${rating}`;
+    // UUID up front for the same reason as search_kols — the caller
+    // needs it to chain into get_kol_detail.
+    return `• [${k.id}] ${k.name} — ${k.tier || '?'} tier · ${fmtFollowers(k.followers)} followers · ${k.region || '—'}${niches}${plats}${inHouse}${rating}`;
   });
-  return `${rows.length} KOL(s):\n\n${lines.join('\n')}`;
+  return `${rows.length} KOL(s):\n\n${lines.join('\n')}\n\nUse the UUID in [brackets] to call get_kol_detail for full info (link, wallet, pricing, etc.).`;
 }
 
 // ─── Tool: get_kol_detail ─────────────────────────────────────────────
@@ -1443,10 +1459,10 @@ export async function listTeamTasks(
           return ` · due ${new Date(t.due_date).toISOString().slice(0, 10)}`;
         })()
       : '';
-    const priority = t.priority && t.priority !== 'normal' ? ` [${t.priority}]` : '';
-    return `• ${t.task_name} [${t.status}]${priority}${due}${owner}`;
+    const priority = t.priority && t.priority !== 'normal' ? ` · priority=${t.priority}` : '';
+    return `• [${t.id}] ${t.task_name} · status=${t.status}${priority}${due}${owner}`;
   });
-  return `${rows.length} task(s):\n\n${lines.join('\n')}`;
+  return `${rows.length} task(s):\n\n${lines.join('\n')}\n\nUse the UUID in [brackets] to call get_task_detail.`;
 }
 
 // ─── Tool: get_task_detail ────────────────────────────────────────────
@@ -1534,7 +1550,7 @@ export async function listFormSubmissions(
   const lines = rows.map(r => {
     const who = r.submitted_by_name || r.submitted_by_email || 'anonymous';
     const formName = r.forms?.name || 'Unknown form';
-    return `• ${formName} — submitted by ${who} · ${relTime(r.submitted_at)}`;
+    return `• [${r.id}] ${formName} — submitted by ${who} · ${relTime(r.submitted_at)}`;
   });
 
   // Per-form breakdown helps when many forms in one window
@@ -1548,7 +1564,7 @@ export async function listFormSubmissions(
     .map(([k, n]) => `${k}: ${n}`)
     .join(', ');
 
-  return `${rows.length} form submission(s) in last ${args.days}d (${breakdown}):\n\n${lines.join('\n')}`;
+  return `${rows.length} form submission(s) in last ${args.days}d (${breakdown}):\n\n${lines.join('\n')}\n\nUse the UUID in [brackets] to call get_form_submission_detail for the full response payload.`;
 }
 
 // ─── Tool: get_form_submission_detail ─────────────────────────────────
