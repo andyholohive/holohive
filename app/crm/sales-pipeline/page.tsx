@@ -2556,6 +2556,11 @@ export default function SalesPipelinePage() {
                         <TableHead className="w-[110px]">Value</TableHead>
                         <TableHead className="w-[100px]">Owner</TableHead>
                         <TableHead className="w-[100px]">TG Handle</TableHead>
+                        {/* Source surfaced across every stage 2026-05-14 —
+                            previously only the Outreach (cold_dm) table
+                            showed it. Useful in Warm/Pipeline/Closed too
+                            so it's clear where each deal originated. */}
+                        <TableHead className="w-[100px]">Source</TableHead>
                         {stage === 'cold_dm' && <TableHead className="w-[80px]">Bumps</TableHead>}
                         {stage === 'warm' && <TableHead className="w-[90px]">Type</TableHead>}
                         <TableHead className="w-[50px]"></TableHead>
@@ -2565,7 +2570,7 @@ export default function SalesPipelinePage() {
                       <SortableContext items={stageOpps.map(o => o.id)} strategy={verticalListSortingStrategy}>
                         {stageOpps.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={9} className="text-center text-sm text-gray-400 py-8">
+                            <TableCell colSpan={10} className="text-center text-sm text-gray-400 py-8">
                               No opportunities in this stage
                             </TableCell>
                           </TableRow>
@@ -2637,6 +2642,7 @@ export default function SalesPipelinePage() {
                               </TableCell>
                               <TableCell>{renderOwnerCell(opp)}</TableCell>
                               <TableCell className="text-gray-500">{opp.tg_handle || '—'}</TableCell>
+                              <TableCell className="text-gray-500 text-xs capitalize">{opp.source?.replace('_', ' ') || '—'}</TableCell>
                               {stage === 'cold_dm' && (
                                 <TableCell>
                                   <div className="flex items-center gap-1">
@@ -3957,6 +3963,10 @@ export default function SalesPipelinePage() {
                       <TableHead className="w-[70px]">Bucket</TableHead>
                       <TableHead className="w-[110px]">Value</TableHead>
                       <TableHead className="w-[100px]">Owner</TableHead>
+                      {/* Source surfaced 2026-05-14 — matches Outreach
+                          + Pipeline tables so origin is visible across
+                          the whole sales surface. */}
+                      <TableHead className="w-[100px]">Source</TableHead>
                       <TableHead className="w-[120px]">Time in Orbit</TableHead>
                       <TableHead className="w-[120px]">Last Contacted</TableHead>
                       <TableHead className="w-[50px]"></TableHead>
@@ -3965,7 +3975,7 @@ export default function SalesPipelinePage() {
                   <TableBody>
                     {group.opps.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center text-sm text-gray-400 py-8">
+                        <TableCell colSpan={10} className="text-center text-sm text-gray-400 py-8">
                           No opportunities
                         </TableCell>
                       </TableRow>
@@ -4054,6 +4064,7 @@ export default function SalesPipelinePage() {
                           )}
                         </TableCell>
                         <TableCell>{renderOwnerCell(opp)}</TableCell>
+                        <TableCell className="text-gray-500 text-xs capitalize">{opp.source?.replace('_', ' ') || '—'}</TableCell>
                         <TableCell className="text-gray-500">{opp.updated_at ? formatDistanceToNow(new Date(opp.updated_at)) : '—'}</TableCell>
                         <TableCell className="text-gray-500">{opp.last_contacted_at ? formatDistanceToNow(new Date(opp.last_contacted_at), { addSuffix: true }) : '—'}</TableCell>
                         <TableCell>
