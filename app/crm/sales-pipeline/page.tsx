@@ -931,7 +931,14 @@ export default function SalesPipelinePage() {
 
   /**
    * Compute metrics for a single user over a date range.
-   * Touch 1s   = cold_dm opps owned by user, bump_number ≥ 1, created in window.
+   * Touch 1s   = opps owned by user that have had ≥1 outbound message
+   *              (bump_number ≥ 1) and were created in window.
+   *              NOTE: stage filter removed 2026-05-14. Previously this
+   *              only counted opps still in cold_dm, which meant the
+   *              moment a prospect replied (and moved to warm) they
+   *              dropped out of the denominator → reply rate jumped up
+   *              artificially. Replies are by definition a subset of
+   *              touch 1s, so they belong in the denominator.
    * Replies   = opps owned by user that are in any stage past cold_dm
    *             (proxy for "got a reply"), created in window.
    * Qualified = opps owned by user with ≥3 of 5 qual_* checks, updated in window.
@@ -947,8 +954,12 @@ export default function SalesPipelinePage() {
     const inWindow = (iso: string | null | undefined) =>
       !!iso && new Date(iso).getTime() >= cutoffMs;
 
+    // Bumps don't change touch1s — bump_number being 1, 2, 3, or 4 all
+    // qualify the opp identically as "we've started outreach". Replies
+    // don't change touch1s either — once a prospect is touched, they
+    // stay in the denominator regardless of subsequent stage.
     const touch1s = userOpps.filter(o =>
-      o.stage === 'cold_dm' && o.bump_number >= 1 && inWindow(o.created_at)
+      o.bump_number >= 1 && inWindow(o.created_at)
     ).length;
 
     // "Got a reply" proxy: opp moved past cold_dm and was either created
@@ -7064,7 +7075,7 @@ export default function SalesPipelinePage() {
               hint: string;
             };
             const steps: Step[] = [
-              { label: 'Outreach',     count: salesFunnel.outreach,       colorClass: 'bg-sky-50 text-sky-700 border-sky-200',           hint: 'Distinct opps we sent an outbound message or bump to' },
+              { label: 'Outreach',     count: salesFunnel.outreach,       colorClass: 'bg-sky-50 text-sky-700 border-sky-200',           hint: 'New prospects we first messaged in this window. Bumps to existing prospects don\'t count — Reply Rate stays stable as you bump.' },
               { label: 'Replies',      count: salesFunnel.replies,        colorClass: 'bg-purple-50 text-purple-700 border-purple-200',  hint: 'Distinct opps that wrote back (inbound message)' },
               { label: 'Calls Booked', count: salesFunnel.calls_booked,   colorClass: 'bg-amber-50 text-amber-700 border-amber-200',     hint: 'Meetings logged with a future date' },
               { label: 'Calls Taken',  count: salesFunnel.calls_taken,    colorClass: 'bg-orange-50 text-orange-700 border-orange-200',  hint: 'Meetings logged without a future date (= happened)' },

@@ -17,9 +17,16 @@ export const dynamic = 'force-dynamic';
  *
  * Sources per metric:
  *
- *   - outreach:      DISTINCT opportunity_id from crm_activities WHERE
- *                    direction='outbound' AND type IN ('message','bump')
- *                    AND created_at >= since
+ *   - outreach:      DISTINCT opportunity_id whose FIRST outbound activity
+ *                    (across all time) lands inside the window. Bumping an
+ *                    already-counted prospect doesn't move this — only
+ *                    adding a fresh prospect to outreach does. Makes Reply
+ *                    Rate (= replies / outreach) stable as you bump existing
+ *                    rows; it only changes when a new touch-1 is added or
+ *                    when one of the existing in-window touches replies.
+ *                    [Changed 2026-05-14 — was "any outbound in window"
+ *                    which inflated the denominator when old prospects
+ *                    got bumped, making the rate drift down for no reason.]
  *   - replies:       DISTINCT opportunity_id from crm_activities WHERE
  *                    direction='inbound' AND type='message'
  *                    AND created_at >= since
@@ -57,19 +64,20 @@ export async function GET(request: Request) {
   const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
   const now = new Date().toISOString();
 
-  // Five queries in parallel. Outbound + inbound queries fetch
-  // opportunity_id rows (not just counts) so we can dedupe — one opp
-  // DM'd 5 times shouldn't count as 5 outreaches. The activity volume
-  // is bounded (~500/week historically), well under the 1000-row PG
-  // default cap; we set limit=2000 defensively.
+  // Five queries in parallel. Outbound is now an ALL-TIME pull (not
+  // window-filtered) so we can compute MIN(created_at) per opp client-
+  // side and pick the ones whose first-touch lands inside the window.
+  // Activity volume is bounded (~3k outbound rows historically); the
+  // limit=10000 gives plenty of headroom. Inbound stays window-filtered
+  // since we just want distinct repliers in the period.
   const [outboundRes, inboundRes, meetingsRes, proposalsRes] = await Promise.all([
     (supabase as any)
       .from('crm_activities')
-      .select('opportunity_id')
+      .select('opportunity_id, created_at')
       .eq('direction', 'outbound')
       .in('type', ['message', 'bump'])
-      .gte('created_at', since)
-      .limit(2000),
+      .order('created_at', { ascending: true })
+      .limit(10000),
     (supabase as any)
       .from('crm_activities')
       .select('opportunity_id')
@@ -92,9 +100,27 @@ export async function GET(request: Request) {
       .gte('proposal_sent_at', since),
   ]);
 
-  // Distinct opps from each direction
+  // Distinct opps helper — used for the inbound side (window-scoped).
   const distinctOpps = (rows: Array<{ opportunity_id: string | null }> | null): number =>
     new Set((rows || []).map(r => r.opportunity_id).filter(Boolean)).size;
+
+  // First-touch outreach — group ALL outbound activities by opp_id,
+  // take the earliest, and count those whose earliest lands inside the
+  // window. Iterating in order(created_at asc) means the first time we
+  // see an opp_id IS its first outbound activity.
+  const firstTouchPerOpp = new Map<string, string>(); // opp_id → ISO created_at
+  for (const row of (outboundRes.data || []) as Array<{ opportunity_id: string | null; created_at: string }>) {
+    if (!row.opportunity_id) continue;
+    if (!firstTouchPerOpp.has(row.opportunity_id)) {
+      firstTouchPerOpp.set(row.opportunity_id, row.created_at);
+    }
+  }
+  // Array.from() around .values() — tsconfig's downlevelIteration is
+  // off so `for (const ts of map.values())` won't compile.
+  let outreachCount = 0;
+  for (const ts of Array.from(firstTouchPerOpp.values())) {
+    if (ts >= since) outreachCount++;
+  }
 
   const meetings: Array<{ id: string; next_step_date: string | null }> = meetingsRes.data || [];
   // Meeting was logged as scheduled in the future = booked (call hasn't
@@ -120,7 +146,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     window_days: windowDays,
     since_iso: since,
-    outreach:       distinctOpps(outboundRes.data),
+    outreach:       outreachCount,
     replies:        distinctOpps(inboundRes.data),
     calls_booked:   callsBooked,
     calls_taken:    callsTaken,
