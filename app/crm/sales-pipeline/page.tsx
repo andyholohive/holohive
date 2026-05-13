@@ -3208,8 +3208,16 @@ export default function SalesPipelinePage() {
                           {groupCount > 1 && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium shrink-0 whitespace-nowrap">{groupCount} POCs</span>
                           )}
+                          {/* Sits inline right next to the Twitter +
+                              from renderProjectNameSuffix instead of
+                              floating at the far-right of the cell —
+                              the two affordances ("add twitter handle"
+                              and "add another POC") are related, so
+                              grouping them reduces eye travel. Removed
+                              the ml-auto that previously pushed this
+                              all the way right. */}
                           <button
-                            className="shrink-0 ml-auto opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400 hover:text-brand"
+                            className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400 hover:text-brand"
                             title="Add another POC for this project"
                             onClick={e => {
                               e.stopPropagation();
@@ -3229,9 +3237,9 @@ export default function SalesPipelinePage() {
                           >
                             {/* UserPlus instead of Plus so the icon matches
                                 the semantics — this adds another contact to
-                                an existing project, distinct from the header
-                                "+ New Opportunity" which creates a fresh
-                                project from scratch. */}
+                                an existing project. The Twitter button next
+                                to it uses Plus (it adds an attribute, not
+                                another row). */}
                             <UserPlus className="h-3.5 w-3.5" />
                           </button>
                         </div>
