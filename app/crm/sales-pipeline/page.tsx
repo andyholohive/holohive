@@ -7281,34 +7281,17 @@ export default function SalesPipelinePage() {
 
         <TabsContent value="overview" className="mt-0">
           <div className="space-y-4 pb-8">
-            {/* Unified search — broadcasts into Outreach/Pipeline/Orbit so
-                one query scopes all three sections at once. Per-tab searches
-                still work independently when the user is on a specific tab. */}
-            <div className="flex items-center gap-2 sticky top-0 z-20 bg-white py-2 -mt-2 -mx-1 px-1">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                <Input
-                  value={overallSearch}
-                  onChange={(e) => setOverallSearch(e.target.value)}
-                  placeholder="Search across Outreach, Pipeline, and Orbit..."
-                  className="pl-9 focus-brand"
-                />
-                {overallSearch && (
-                  <button
-                    onClick={() => setOverallSearch('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 inline-flex items-center justify-center rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-                    title="Clear search"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-              {overallSearch && (
-                <span className="text-xs text-gray-500">
-                  Filtering all sections by &ldquo;{overallSearch}&rdquo;
-                </span>
-              )}
-            </div>
+            {/* Unified-search header removed 2026-05-13. The page was
+                rendering two stacked search bars when an Overall section
+                was expanded — one global broadcaster here and one per-
+                section search inside renderOutreachTab / renderTable /
+                renderOrbitTab. Per-section search is the more useful
+                default (each panel filters independently), so we hide
+                this top bar. The overallSearch state + broadcast
+                useEffect are intentionally left in place so individual
+                section searches still drive their own filters without
+                a state-shape change; if we want the global search back
+                later, just un-hide this block. */}
 
             {/* Outreach Section */}
             <div className="border border-gray-200 rounded-lg overflow-hidden">
