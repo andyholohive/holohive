@@ -235,6 +235,27 @@ export default function TasksPage() {
   const dragColRef = useRef<ColumnKey | null>(null);
   const dragOverColRef = useRef<ColumnKey | null>(null);
 
+  // Single-vs-double-click disambiguation for the task name cell.
+  // Single click should open the detail modal; double click should
+  // start inline rename. Both onClick and onDoubleClick fire on a
+  // dblclick in browsers, so we delay the single-click action briefly
+  // and cancel it if a second click arrives — standard pattern.
+  const nameClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleTaskNameClick = (task: Task) => {
+    if (nameClickTimerRef.current) clearTimeout(nameClickTimerRef.current);
+    nameClickTimerRef.current = setTimeout(() => {
+      nameClickTimerRef.current = null;
+      openForm(task);
+    }, 220);
+  };
+  const handleTaskNameDoubleClick = (task: Task) => {
+    if (nameClickTimerRef.current) {
+      clearTimeout(nameClickTimerRef.current);
+      nameClickTimerRef.current = null;
+    }
+    startEditing(task.id, 'task_name', task.task_name);
+  };
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem(COLUMN_ORDER_KEY);
@@ -727,8 +748,16 @@ export default function TasksPage() {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span
-                      className="text-gray-900 font-medium line-clamp-2 cursor-pointer inline-flex items-center gap-1.5"
-                      onDoubleClick={() => startEditing(task.id, 'task_name', task.task_name)}
+                      className="text-gray-900 font-medium line-clamp-2 cursor-pointer inline-flex items-center gap-1.5 hover:text-brand transition-colors"
+                      // Single click opens the full detail modal — primary
+                      // affordance for users who want to see / edit
+                      // everything about a task. Double-click stays the
+                      // power-user shortcut for inline-renaming, debounced
+                      // via the shared timer so the modal doesn't open
+                      // when the user is actually double-clicking.
+                      onClick={() => handleTaskNameClick(task)}
+                      onDoubleClick={(e) => { e.stopPropagation(); handleTaskNameDoubleClick(task); }}
+                      title="Click to expand · Double-click to rename inline"
                     >
                       {task.task_name}
                       {deliverableProgress[task.id] && (
@@ -767,9 +796,10 @@ export default function TasksPage() {
               </TooltipProvider>
             ) : (
               <span
-                className="text-gray-900 font-medium line-clamp-2 cursor-pointer inline-flex items-center gap-1.5"
-                onDoubleClick={() => startEditing(task.id, 'task_name', task.task_name)}
-                title="Double-click to edit"
+                className="text-gray-900 font-medium line-clamp-2 cursor-pointer inline-flex items-center gap-1.5 hover:text-brand transition-colors"
+                onClick={() => handleTaskNameClick(task)}
+                onDoubleClick={(e) => { e.stopPropagation(); handleTaskNameDoubleClick(task); }}
+                title="Click to expand · Double-click to rename inline"
               >
                 {task.task_name}
                 {deliverableProgress[task.id] && (
