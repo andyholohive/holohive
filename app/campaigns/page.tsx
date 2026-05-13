@@ -1397,7 +1397,7 @@ export default function CampaignsPage() {
                 <p className="text-xs text-blue-600 mt-2">Use the client's email address as the password to access the public campaign view</p>
               </div>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="share-creator-type"
@@ -1417,6 +1417,31 @@ export default function CampaignsPage() {
                 />
                 <Label htmlFor="share-creator-type" className="text-sm font-medium cursor-pointer">
                   Share Creator Type for KOLs
+                </Label>
+              </div>
+              {/* Per-content-piece notes — gated by campaigns.share_content_notes.
+                  Adds a Notes column to the Contents table on the public view.
+                  Off by default so editor commentary stays internal unless
+                  explicitly opted in (migration 065). */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="share-content-notes"
+                  checked={(sharingCampaign as any)?.share_content_notes || false}
+                  onCheckedChange={async (checked) => {
+                    if (sharingCampaign?.id) {
+                      try {
+                        await CampaignService.updateCampaign(sharingCampaign.id, {
+                          share_content_notes: checked as boolean,
+                        } as any);
+                        setSharingCampaign({ ...sharingCampaign, share_content_notes: checked as boolean } as any);
+                      } catch (error) {
+                        console.error('Error updating campaign:', error);
+                      }
+                    }
+                  }}
+                />
+                <Label htmlFor="share-content-notes" className="text-sm font-medium cursor-pointer">
+                  Share Notes on Content Pieces
                 </Label>
               </div>
             </div>

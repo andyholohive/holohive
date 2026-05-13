@@ -11050,6 +11050,31 @@ const CampaignDetailsPage = () => {
                   Share KOL Notes
                 </Label>
               </div>
+              {/* Sibling to share_kol_notes — same idea, but for the
+                  per-content-piece notes column on the Contents table
+                  in the public view. Gated by campaigns.share_content_notes
+                  (migration 065). */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="share-content-notes"
+                  checked={(campaign as any)?.share_content_notes || false}
+                  onCheckedChange={async (checked) => {
+                    if (campaign?.id) {
+                      try {
+                        await CampaignService.updateCampaign(campaign.id, {
+                          share_content_notes: checked as boolean,
+                        } as any);
+                        setCampaign({ ...campaign, share_content_notes: checked as boolean } as any);
+                      } catch (error) {
+                        console.error('Error updating campaign:', error);
+                      }
+                    }
+                  }}
+                />
+                <Label htmlFor="share-content-notes" className="text-sm font-medium cursor-pointer">
+                  Share Notes on Content Pieces
+                </Label>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="share-campaign-link">Share Link</Label>

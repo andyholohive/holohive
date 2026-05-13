@@ -34,6 +34,7 @@ type Campaign = {
   budget_allocations?: { id: string; region: string; allocated_budget: number }[];
   share_creator_type?: boolean | null;
   share_kol_notes?: boolean | null;
+  share_content_notes?: boolean | null;
 };
 
 type CampaignKOL = {
@@ -68,6 +69,7 @@ type ContentItem = {
   retweets: number | null;
   comments: number | null;
   bookmarks: number | null;
+  notes: string | null;
 };
 
 const formatDate = (dateString: string) =>
@@ -633,6 +635,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         budget_allocations: (campaignData.campaign_budget_allocations || []).map((b: any) => ({ id: b.id, region: b.region, allocated_budget: b.allocated_budget })),
         share_creator_type: campaignData.share_creator_type || false,
         share_kol_notes: campaignData.share_kol_notes || false,
+        share_content_notes: (campaignData as any).share_content_notes || false,
       };
       setCampaign(normalizedCampaign);
 
@@ -2078,13 +2081,16 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Likes</TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Retweets</TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Comments</TableHead>
-                              <TableHead className="relative bg-gray-50 select-none">Bookmarks</TableHead>
+                              <TableHead className={`relative bg-gray-50 ${campaign?.share_content_notes ? 'border-r border-gray-200' : ''} select-none`}>Bookmarks</TableHead>
+                              {campaign?.share_content_notes && (
+                                <TableHead className="relative bg-gray-50 select-none">Notes</TableHead>
+                              )}
                             </TableRow>
                           </TableHeader>
                           <TableBody className="bg-white">
                             {filteredContents.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={12} className="text-center py-12">
+                                <TableCell colSpan={12 + (campaign?.share_content_notes ? 1 : 0)} className="text-center py-12">
                                   <div className="flex flex-col items-center justify-center text-gray-500">
                                     <FileText className="h-12 w-12 mb-4 text-gray-300" />
                                     <p className="text-lg font-medium mb-2">No content matches your filters</p>
@@ -2180,9 +2186,16 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                                       {content.comments ? formatFollowers(content.comments) : '-'}
                                     </TableCell>
-                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
+                                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} ${campaign?.share_content_notes ? 'border-r border-gray-200' : ''} p-2 overflow-hidden`}>
                                       {content.bookmarks ? formatFollowers(content.bookmarks) : '-'}
                                     </TableCell>
+                                    {campaign?.share_content_notes && (
+                                      <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
+                                        <div className="text-sm text-gray-600 max-w-xs whitespace-pre-wrap">
+                                          {content.notes || <span className="text-gray-400 italic">-</span>}
+                                        </div>
+                                      </TableCell>
+                                    )}
                                   </TableRow>
                                 );
                               })
