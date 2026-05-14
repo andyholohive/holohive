@@ -2986,7 +2986,13 @@ export default function SalesPipelinePage() {
     });
   };
 
-  const renderOutreachTab = () => (
+  // hideSearch=true is passed when this same render fn is embedded
+  // inside the Overall tab — there, the unified search bar at the top
+  // already drives the outreach filter (via the overallSearch
+  // useEffect), so a second search input here would be a duplicate.
+  // The standalone Outreach tab doesn't have the unified search, so
+  // it keeps its own search bar (default).
+  const renderOutreachTab = (hideSearch: boolean = false) => (
     <div className="pb-8">
       {/* Personal metrics strip — shows the current user's last-30-day
           outreach scorecard above their work surface. Self-feedback loop
@@ -3077,15 +3083,17 @@ export default function SalesPipelinePage() {
 
       {/* Filters */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search cold DMs..."
-            defaultValue={outreachFilters.searchTerm}
-            onChange={e => handleOutreachSearch(e.target.value)}
-            className="pl-9 h-9 text-sm focus-brand"
-          />
-        </div>
+        {!hideSearch && (
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search cold DMs..."
+              defaultValue={outreachFilters.searchTerm}
+              onChange={e => handleOutreachSearch(e.target.value)}
+              className="pl-9 h-9 text-sm focus-brand"
+            />
+          </div>
+        )}
         <Select
           value={outreachFilters.dm_account || 'all'}
           onValueChange={v => { setOutreachFilters(prev => ({ ...prev, dm_account: v === 'all' ? undefined : v as DmAccount })); setOutreachPage(1); setSelectedOutreach([]); }}
@@ -7714,17 +7722,37 @@ export default function SalesPipelinePage() {
 
         <TabsContent value="overview" className="mt-0">
           <div className="space-y-4 pb-8">
-            {/* Unified-search header removed 2026-05-13. The page was
-                rendering two stacked search bars when an Overall section
-                was expanded — one global broadcaster here and one per-
-                section search inside renderOutreachTab / renderTable /
-                renderOrbitTab. Per-section search is the more useful
-                default (each panel filters independently), so we hide
-                this top bar. The overallSearch state + broadcast
-                useEffect are intentionally left in place so individual
-                section searches still drive their own filters without
-                a state-shape change; if we want the global search back
-                later, just un-hide this block. */}
+            {/* Unified search — broadcasts into Outreach/Pipeline/Orbit
+                via the overallSearch useEffect (defined near the top of
+                this file). Restored 2026-05-14 alongside hiding the
+                Outreach sub-section's own search bar — together those
+                two changes mean the user types once at the top and all
+                three sections filter as one. */}
+            <div className="flex items-center gap-2 sticky top-0 z-20 bg-white py-2 -mt-2 -mx-1 px-1">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                <Input
+                  value={overallSearch}
+                  onChange={(e) => setOverallSearch(e.target.value)}
+                  placeholder="Search across Outreach, Pipeline, and Orbit..."
+                  className="pl-9 focus-brand"
+                />
+                {overallSearch && (
+                  <button
+                    onClick={() => setOverallSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 inline-flex items-center justify-center rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                    title="Clear search"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {overallSearch && (
+                <span className="text-xs text-gray-500">
+                  Filtering all sections by &ldquo;{overallSearch}&rdquo;
+                </span>
+              )}
+            </div>
 
             {/* Outreach Section */}
             <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -7741,7 +7769,9 @@ export default function SalesPipelinePage() {
               </button>
               {overviewSections.outreach && (
                 <div className="border-t border-gray-200">
-                  {renderOutreachTab()}
+                  {/* Pass hideSearch — the unified search at the top of the
+                      Overall tab already drives this section's filter. */}
+                  {renderOutreachTab(true)}
                 </div>
               )}
             </div>
