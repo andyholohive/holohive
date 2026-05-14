@@ -2652,6 +2652,34 @@ export default function SalesPipelinePage() {
                                     <Building2 className="h-4 w-4 text-gray-400" />
                                     <span className="font-medium">{opp.name}</span>
                                     {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
+                                    {/* Add-another-POC affordance — same as
+                                        the Outreach and Orbit tables. The new
+                                        POC starts at cold_dm since they
+                                        haven't been contacted yet (you can
+                                        change it in the dialog before saving
+                                        if the new POC is already engaged). */}
+                                    <button
+                                      className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400 hover:text-brand"
+                                      title="Add another POC for this project"
+                                      onClick={e => {
+                                        e.stopPropagation();
+                                        setForm({
+                                          name: opp.name,
+                                          stage: 'cold_dm' as OpportunityStage,
+                                          dm_account: opp.dm_account,
+                                          bucket: opp.bucket || undefined,
+                                          source: opp.source || undefined,
+                                          owner_id: opp.owner_id || undefined,
+                                          co_owner_ids: opp.co_owner_ids || undefined,
+                                          referrer: opp.referrer || undefined,
+                                          affiliate_id: opp.affiliate_id || undefined,
+                                          twitter_handle: opp.twitter_handle || undefined,
+                                        });
+                                        setIsCreateOpen(true);
+                                      }}
+                                    >
+                                      <UserPlus className="h-3.5 w-3.5" />
+                                    </button>
                                   </div>
                                 )}
                               </TableCell>
@@ -3339,6 +3367,7 @@ export default function SalesPipelinePage() {
                                 co_owner_ids: opp.co_owner_ids || undefined,
                                 referrer: opp.referrer || undefined,
                                 affiliate_id: opp.affiliate_id || undefined,
+                                twitter_handle: opp.twitter_handle || undefined,
                               });
                               setIsCreateOpen(true);
                             }}
@@ -4122,6 +4151,7 @@ export default function SalesPipelinePage() {
                                     co_owner_ids: opp.co_owner_ids || undefined,
                                     referrer: opp.referrer || undefined,
                                     affiliate_id: opp.affiliate_id || undefined,
+                                    twitter_handle: opp.twitter_handle || undefined,
                                   });
                                   setIsCreateOpen(true);
                                 }}
