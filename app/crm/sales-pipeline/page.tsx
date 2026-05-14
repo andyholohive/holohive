@@ -2566,6 +2566,14 @@ export default function SalesPipelinePage() {
           const colors = STAGE_COLORS[stage];
           const isCollapsed = collapsedStages.has(stage);
           const stageValue = stageOpps.reduce((s, o) => s + (o.deal_value || 0), 0);
+          // Project-name grouping (mirrors Outreach + Orbit) — same-name
+          // opps cluster, first row per cluster shows the project header,
+          // continuation rows hide the name. Sorting by name supersedes
+          // the previous intra-stage drag-drop reorder; cross-stage drag
+          // still works via the outer DndContext.
+          const sortedStageOpps = [...stageOpps].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          const stageNameCounts = new Map<string, number>();
+          sortedStageOpps.forEach(o => stageNameCounts.set(o.name || '', (stageNameCounts.get(o.name || '') || 0) + 1));
 
           return (
             <div key={stage} className="mb-6">
@@ -2619,21 +2627,25 @@ export default function SalesPipelinePage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      <SortableContext items={stageOpps.map(o => o.id)} strategy={verticalListSortingStrategy}>
-                        {stageOpps.length === 0 ? (
+                        {sortedStageOpps.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={10} className="text-center text-sm text-gray-400 py-8">
                               No opportunities in this stage
                             </TableCell>
                           </TableRow>
-                        ) : stageOpps.map(opp => (
-                          <SortableTableRow
+                        ) : sortedStageOpps.map((opp, index) => {
+                          const prevName = index > 0 ? sortedStageOpps[index - 1].name : null;
+                          const nextName = index < sortedStageOpps.length - 1 ? sortedStageOpps[index + 1].name : null;
+                          const isFirstInGroup = opp.name !== prevName;
+                          const isLastInGroup = opp.name !== nextName;
+                          const groupCount = stageNameCounts.get(opp.name || '') || 1;
+                          return (
+                          <TableRow
                             key={opp.id}
-                            id={opp.id}
-                            className="group hover:bg-gray-50 cursor-pointer"
+                            className={`group hover:bg-gray-50 cursor-pointer ${!isFirstInGroup ? 'border-t-0' : ''} ${isLastInGroup && groupCount > 1 ? 'border-b-2 border-b-gray-200' : ''}`}
                             onClick={() => openSlideOver(opp)}
                           >
-                              <TableCell>
+                              <TableCell className={!isFirstInGroup ? 'pt-0' : ''}>
                                 {editingCell?.id === opp.id && editingCell.field === 'name' ? (
                                   <Input
                                     value={editingValue}
@@ -2644,20 +2656,19 @@ export default function SalesPipelinePage() {
                                     autoFocus
                                     onClick={e => e.stopPropagation()}
                                   />
-                                ) : (
+                                ) : isFirstInGroup ? (
                                   <div
                                     onClick={e => { e.stopPropagation(); setEditingCell({ id: opp.id, field: 'name' }); setEditingValue(opp.name); }}
-                                    className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 rounded px-2 py-1 -mx-2 -my-1"
+                                    className="flex items-center gap-2 cursor-pointer hover:bg-gray-100 rounded px-2 py-1 -mx-2 -my-1 whitespace-nowrap overflow-hidden"
                                   >
-                                    <Building2 className="h-4 w-4 text-gray-400" />
-                                    <span className="font-medium">{opp.name}</span>
+                                    <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
+                                    <span className="font-medium truncate">{opp.name}</span>
                                     {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
+                                    {groupCount > 1 && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium shrink-0 whitespace-nowrap">{groupCount} POCs</span>
+                                    )}
                                     {/* Add-another-POC affordance — same as
-                                        the Outreach and Orbit tables. The new
-                                        POC starts at cold_dm since they
-                                        haven't been contacted yet (you can
-                                        change it in the dialog before saving
-                                        if the new POC is already engaged). */}
+                                        the Outreach and Orbit tables. */}
                                     <button
                                       className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 flex items-center justify-center rounded hover:bg-gray-200 text-gray-400 hover:text-brand"
                                       title="Add another POC for this project"
@@ -2681,6 +2692,8 @@ export default function SalesPipelinePage() {
                                       <UserPlus className="h-3.5 w-3.5" />
                                     </button>
                                   </div>
+                                ) : (
+                                  <div className="pl-8 text-gray-300 text-xs">└</div>
                                 )}
                               </TableCell>
                               <TableCell className="whitespace-nowrap max-w-[180px] overflow-hidden">
@@ -2776,9 +2789,9 @@ export default function SalesPipelinePage() {
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </TableCell>
-                          </SortableTableRow>
-                        ))}
-                      </SortableContext>
+                          </TableRow>
+                          );
+                        })}
                     </TableBody>
                   </Table>
                 </div>
