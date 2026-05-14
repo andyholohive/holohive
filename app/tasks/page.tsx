@@ -759,6 +759,14 @@ export default function TasksPage() {
                       onDoubleClick={(e) => { e.stopPropagation(); handleTaskNameDoubleClick(task); }}
                       title="Click to expand · Double-click to rename inline"
                     >
+                      {task.short_id && (
+                        <span
+                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-gray-100 text-gray-600 flex-shrink-0"
+                          title={`Short ID — type "/done ${task.short_id}" in Telegram to close`}
+                        >
+                          {task.short_id}
+                        </span>
+                      )}
                       {task.task_name}
                       {deliverableProgress[task.id] && (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand/10 text-brand flex-shrink-0">
@@ -801,6 +809,14 @@ export default function TasksPage() {
                 onDoubleClick={(e) => { e.stopPropagation(); handleTaskNameDoubleClick(task); }}
                 title="Click to expand · Double-click to rename inline"
               >
+                {task.short_id && (
+                  <span
+                    className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold bg-gray-100 text-gray-600 flex-shrink-0"
+                    title={`Short ID — type "/done ${task.short_id}" in Telegram to close`}
+                  >
+                    {task.short_id}
+                  </span>
+                )}
                 {task.task_name}
                 {deliverableProgress[task.id] && (
                   <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-brand/10 text-brand flex-shrink-0">

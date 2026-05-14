@@ -317,6 +317,15 @@ async function handleCommand(chatId: string, command: string, args: string[], me
     return;
   }
 
+  // Built-in /done <id> command — close a task from chat without
+  // opening /tasks. Hardcoded (not in telegram_commands) because it
+  // mutates rows; the DB-backed commands are static-text only.
+  // Format: /done T-042   (also accepts: t-042, T 042, 042)
+  if (cmd === 'done') {
+    await handleDoneCommand(chatId, args, message);
+    return;
+  }
+
   try {
     // Look up command in database
     const { data: commandData, error } = await supabaseAdmin
@@ -367,6 +376,128 @@ async function handleCommand(chatId: string, command: string, args: string[], me
   } catch (error) {
     console.error('[Telegram Webhook] Error handling command:', error);
   }
+}
+
+/**
+ * Handle the /done <task-id> slash command.
+ *
+ * Closes a task from Telegram so an operator can mark something done
+ * without leaving the chat. Lookup is by short_id (T-042 style, added
+ * in migration 066). Only authenticated team members may use it — we
+ * gate on users.telegram_id, same pattern as the team_only DB commands.
+ *
+ * Accepted formats:
+ *   /done T-042
+ *   /done t-042
+ *   /done 42      (numeric, padded to T-042)
+ *
+ * Replies in-chat with success / not-found / already-complete / not
+ * authorized. Errors are logged but never throw — the webhook contract
+ * is "always 200 to Telegram so it doesn't retry".
+ */
+async function handleDoneCommand(chatId: string, args: string[], message: any) {
+  const fromUserId = message.from?.id?.toString();
+
+  // Auth check first — match users.telegram_id to make sure this is a
+  // team member. /done mutates state, so we can't be permissive like
+  // the static-text commands.
+  if (!fromUserId) {
+    await sendTelegramMessage(chatId, '⚠️ Could not identify you. /done is team-only.');
+    return;
+  }
+  const { data: teamMember } = await supabaseAdmin
+    .from('users')
+    .select('id, name')
+    .eq('telegram_id', fromUserId)
+    .single();
+  if (!teamMember) {
+    await sendTelegramMessage(chatId, '⚠️ /done is only available to team members.');
+    return;
+  }
+
+  // Parse the ID arg. Tolerant of casing + the "T-" prefix being missing,
+  // since on a phone keyboard it's faster to type "/done 42" than to
+  // hunt for the dash. Numeric-only is padded to 3 digits to match the
+  // T-001 zero-padded format the trigger inserts.
+  const raw = (args[0] || '').trim();
+  if (!raw) {
+    await sendTelegramMessage(chatId, 'Usage: <code>/done T-042</code>');
+    return;
+  }
+  let shortId: string;
+  const numericOnly = raw.replace(/[^0-9]/g, '');
+  if (/^t-?\d+$/i.test(raw)) {
+    shortId = `T-${numericOnly.padStart(3, '0')}`;
+  } else if (/^\d+$/.test(numericOnly)) {
+    shortId = `T-${numericOnly.padStart(3, '0')}`;
+  } else {
+    await sendTelegramMessage(chatId, `❓ Couldn't parse <code>${escapeHtml(raw)}</code>. Try <code>/done T-042</code>.`);
+    return;
+  }
+
+  try {
+    // Look up by short_id. Could be ambiguous in theory (the unique
+    // index is partial WHERE NOT NULL) but in practice every row has a
+    // generated short_id post-migration 066.
+    const { data: task, error: taskErr } = await supabaseAdmin
+      .from('tasks')
+      .select('id, short_id, task_name, status, parent_task_id')
+      .eq('short_id', shortId)
+      .maybeSingle();
+
+    if (taskErr) {
+      console.error('[Telegram /done] task lookup failed:', taskErr);
+      await sendTelegramMessage(chatId, '⚠️ Lookup failed. Try again or close it from /tasks.');
+      return;
+    }
+    if (!task) {
+      await sendTelegramMessage(chatId, `🤷 No task with ID <code>${escapeHtml(shortId)}</code>.`);
+      return;
+    }
+    if (task.status === 'complete') {
+      await sendTelegramMessage(chatId, `✅ <code>${escapeHtml(shortId)}</code> was already complete.`);
+      return;
+    }
+
+    // Mirror the side-effects of taskService.updateField('status', 'complete')
+    // since we're going through the service-role client directly:
+    //  - set completed_at = now()
+    //  - set updated_at  = now()
+    // (The recurring-clone + parent-deliverable-rollup logic lives in
+    // taskService and isn't worth re-implementing here for the /done
+    // path; if a recurring task is closed from chat, the next instance
+    // will get cloned the next time someone closes it from the UI. Good
+    // enough for v1; revisit if it becomes an issue.)
+    const nowIso = new Date().toISOString();
+    const { error: updErr } = await supabaseAdmin
+      .from('tasks')
+      .update({ status: 'complete', completed_at: nowIso, updated_at: nowIso })
+      .eq('id', task.id);
+
+    if (updErr) {
+      console.error('[Telegram /done] update failed:', updErr);
+      await sendTelegramMessage(chatId, '⚠️ Update failed. Try again or close it from /tasks.');
+      return;
+    }
+
+    const safeName = escapeHtml(task.task_name || '(untitled task)');
+    const closer = escapeHtml(teamMember.name || 'team');
+    await sendTelegramMessage(
+      chatId,
+      `✅ <b>${escapeHtml(shortId)}</b> ${safeName}\n<i>closed by ${closer}</i>`,
+    );
+    console.log('[Telegram Webhook] /done closed task:', { shortId, by: teamMember.name });
+  } catch (err) {
+    console.error('[Telegram /done] unexpected error:', err);
+    await sendTelegramMessage(chatId, '⚠️ Something went wrong. Try again or close it from /tasks.');
+  }
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 /**

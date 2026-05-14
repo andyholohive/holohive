@@ -2,6 +2,10 @@ import { supabase } from './supabase';
 
 export type Task = {
   id: string;
+  // Human-typeable short ID (T-001, T-002, ...). Auto-assigned by the
+  // tasks_assign_short_id trigger on insert (migration 066). Used by
+  // the Telegram bot for /done <id> and shown on the row in the UI.
+  short_id: string | null;
   task_name: string;
   assigned_to: string | null;
   assigned_to_name: string | null;
@@ -193,6 +197,31 @@ export class TaskService {
     }).catch(err => console.warn('[tasks] notify-assignment failed:', err));
   }
 
+  /**
+   * Best-effort fire-and-forget Telegram announcement for a task field
+   * change. Posts to the chat configured on the `task_changed` reminder
+   * rule. The server-side endpoint formats the human-readable diff
+   * ("status: in_progress → complete", "due date: May 15 → May 20") and
+   * is idempotent — calling twice for the same change is harmless
+   * because the message dedupe is at the rule + task + field level.
+   *
+   * Only fires on the three "shift visibility" fields the doc cares
+   * about: status, due_date, assigned_to. We pass the previous values
+   * so the server can compose a meaningful diff message.
+   */
+  private static notifyChange(
+    taskId: string,
+    changes: { status?: string | null; due_date?: string | null; assigned_to?: string | null },
+    prev: { status?: string | null; due_date?: string | null; assigned_to?: string | null },
+  ): void {
+    if (typeof window === 'undefined') return;
+    fetch('/api/tasks/notify-changed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_id: taskId, changes, prev }),
+    }).catch(err => console.warn('[tasks] notify-changed failed:', err));
+  }
+
   static async createTask(task: Partial<TaskInsert>): Promise<Task> {
     try {
       const { data, error } = await supabase
@@ -218,6 +247,21 @@ export class TaskService {
    */
   static async updateTask(id: string, updates: TaskUpdate): Promise<Task> {
     try {
+      // Snapshot previous values for the change announcer. Only need the
+      // three "shift visibility" fields the doc cares about. Skipping
+      // the fetch if none of them are in `updates` keeps the path cheap
+      // for high-frequency edits like comment-only saves.
+      const willAnnounce = 'status' in updates || 'due_date' in updates || 'assigned_to' in updates;
+      let prev: { status?: string | null; due_date?: string | null; assigned_to?: string | null } | null = null;
+      if (willAnnounce) {
+        const { data: existing } = await supabase
+          .from('tasks')
+          .select('status, due_date, assigned_to')
+          .eq('id', id)
+          .single();
+        if (existing) prev = existing;
+      }
+
       // Handle completed_at logic on status change
       const payload: Record<string, any> = {
         ...updates,
@@ -257,6 +301,18 @@ export class TaskService {
         this.notifyAssignment(updatedTask.id);
       }
 
+      // Auto-shift announcer — fire to the configured task_changed
+      // chat for any of (status / due_date / assigned_to) that actually
+      // changed. The server endpoint composes the diff message and
+      // skips no-op writes (e.g. saving the same value twice).
+      if (willAnnounce && prev) {
+        const changed: typeof prev = {};
+        if ('status' in updates && (updates.status ?? null) !== (prev.status ?? null)) changed.status = updates.status as any;
+        if ('due_date' in updates && (updates.due_date ?? null) !== (prev.due_date ?? null)) changed.due_date = updates.due_date as any;
+        if ('assigned_to' in updates && (updates.assigned_to ?? null) !== (prev.assigned_to ?? null)) changed.assigned_to = updates.assigned_to as any;
+        if (Object.keys(changed).length > 0) this.notifyChange(updatedTask.id, changed, prev);
+      }
+
       return updatedTask;
     } catch (error) {
       console.error('Error updating task:', error);
@@ -287,6 +343,18 @@ export class TaskService {
    */
   static async updateField(id: string, field: string, value: any): Promise<void> {
     try {
+      // Snapshot previous value if we'll need it for the announcer.
+      const announceField = field === 'status' || field === 'due_date' || field === 'assigned_to';
+      let prev: { status?: string | null; due_date?: string | null; assigned_to?: string | null } | null = null;
+      if (announceField) {
+        const { data: existing } = await supabase
+          .from('tasks')
+          .select('status, due_date, assigned_to')
+          .eq('id', id)
+          .single();
+        if (existing) prev = existing;
+      }
+
       const payload: Record<string, any> = {
         [field]: value,
         updated_at: new Date().toISOString(),
@@ -323,6 +391,17 @@ export class TaskService {
       // assignee don't spam them.
       if (field === 'assigned_to' && value) {
         this.notifyAssignment(id);
+      }
+
+      // Auto-shift announcer for the three visibility fields. Only
+      // fires if the value actually changed (skips re-saves of the same
+      // value). Same single-field shape that updateTask uses, just
+      // narrowed to one field at a time.
+      if (announceField && prev) {
+        const prevVal = (prev as any)[field] ?? null;
+        if ((value ?? null) !== prevVal) {
+          this.notifyChange(id, { [field]: value } as any, prev);
+        }
       }
     } catch (error) {
       console.error('Error updating task field:', error);

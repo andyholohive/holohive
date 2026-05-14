@@ -57,9 +57,13 @@ export async function POST(request: Request) {
 
   // Pull the task + the assignee's telegram + the actor's name (so the
   // DM can read "Andy assigned you a task" instead of just "you got a task").
+  // NOTE: column is `task_name`, not `title`. This was a long-standing
+  // typo that silently broke assignment DMs (the .select() succeeds but
+  // task.title comes back undefined, so the message read "(untitled task)"
+  // for every assignment). Fixed alongside building notify-changed.
   const { data: task, error: taskErr } = await (supabase as any)
     .from('tasks')
-    .select('id, title, description, due_date, priority, assigned_to, last_assignee_notified_to, parent_task_id')
+    .select('id, task_name, short_id, description, due_date, priority, assigned_to, last_assignee_notified_to, parent_task_id')
     .eq('id', taskId)
     .single();
 
@@ -117,7 +121,10 @@ export async function POST(request: Request) {
   // accept ?id=. The /tasks page itself is the right landing spot.
   const taskUrl = `${baseUrl}/tasks`;
 
-  const safeTitle = escapeHtml(task.title || '(untitled task)');
+  // Prefer "T-042 Bump @daniel" over the bare name so the assignee can
+  // /done it from the chat without scrolling back to find the ID.
+  const idPrefix = task.short_id ? `${task.short_id} ` : '';
+  const safeTitle = escapeHtml(`${idPrefix}${task.task_name || '(untitled task)'}`);
   const dueLine = task.due_date
     ? `\n\u{1F4C5} <b>Due:</b> ${escapeHtml(new Date(task.due_date).toLocaleDateString())}`
     : '';
