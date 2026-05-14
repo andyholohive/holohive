@@ -57,6 +57,13 @@ export async function POST(request: NextRequest) {
       await handleMyChatMember(update.my_chat_member);
     }
 
+    // Handle inline-keyboard button clicks. /task uses these for the
+    // ✅ Create / ❌ Cancel confirm flow; routed by callback_data prefix
+    // so we can add more interactive features without restructuring.
+    if (update.callback_query) {
+      await handleCallbackQuery(update.callback_query);
+    }
+
     // Telegram expects a 200 OK response
     return NextResponse.json({ ok: true });
   } catch (error: any) {
@@ -326,6 +333,14 @@ async function handleCommand(chatId: string, command: string, args: string[], me
     return;
   }
 
+  // Built-in /task <natural language> command — AI-parses the body
+  // into a structured task, posts a preview with confirm buttons, and
+  // creates the task on ✅ click. Same team-only gate as /done.
+  if (cmd === 'task') {
+    await handleTaskCommand(chatId, message);
+    return;
+  }
+
   try {
     // Look up command in database
     const { data: commandData, error } = await supabaseAdmin
@@ -498,6 +513,414 @@ function escapeHtml(s: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+/**
+ * Handle the /task <natural language> slash command.
+ *
+ * Flow:
+ *   1. Auth (team-only via users.telegram_id)
+ *   2. Pull body (everything after "/task ")
+ *   3. Resolve any @-mentions to a users.id (entity-aware)
+ *   4. Call Claude to extract WHAT/WHY/WHEN/GOOD-LOOKS-LIKE
+ *   5. INSERT into pending_tasks
+ *   6. Post preview message with ✅ Create / ❌ Cancel inline keyboard
+ *
+ * On button click: handleTaskCallback runs (separate update from
+ * Telegram), looks up the pending row, executes the chosen action,
+ * and edits the preview message to show the outcome.
+ *
+ * The preview message is sent to the SAME chat the /task came from,
+ * not to a configured chat. This is a personal/team interaction, not
+ * a broadcast — the team chat learns about the task via the existing
+ * notify-changed announcer once it's actually created.
+ */
+async function handleTaskCommand(chatId: string, message: any) {
+  const fromUserId = message.from?.id?.toString();
+
+  // Same auth pattern as /done — must be a team member.
+  if (!fromUserId) {
+    await sendTelegramMessage(chatId, '⚠️ Could not identify you. /task is team-only.');
+    return;
+  }
+  const { data: teamMember } = await supabaseAdmin
+    .from('users')
+    .select('id, name')
+    .eq('telegram_id', fromUserId)
+    .single();
+  if (!teamMember) {
+    await sendTelegramMessage(chatId, '⚠️ /task is only available to team members.');
+    return;
+  }
+
+  // Extract the body — everything after "/task ". split-then-rejoin
+  // handles both "/task foo bar" and "/task@holo_hive_bot foo bar".
+  const fullText = (message.text || '').trim();
+  const firstSpace = fullText.indexOf(' ');
+  const body = firstSpace === -1 ? '' : fullText.slice(firstSpace + 1).trim();
+
+  if (!body) {
+    await sendTelegramMessage(
+      chatId,
+      'Usage: <code>/task @person describe the task, deadline, and why</code>\n' +
+      'Example: <code>/task @daniel write OST recap brief by Fri, for client pitch Thu</code>'
+    );
+    return;
+  }
+
+  // ── Pre-resolve assignee from @-mentions BEFORE calling Claude ──
+  // The doc spec is "tag person" so we expect exactly one mention.
+  // If the user forgot to tag, the parser will note it and the
+  // preview will warn — but we still let them confirm-without-assignee
+  // since some tasks are legitimately unassigned (research a thing).
+  const { resolveAssigneeFromMessage } = await import('@/lib/telegramAssigneeResolver');
+  const assignee = await resolveAssigneeFromMessage(
+    supabaseAdmin,
+    fullText,
+    message.entities,
+  );
+
+  // ── Acknowledge while Claude works (1-2s typical) ──────────────
+  await sendTelegramMessage(chatId, '🤔 Parsing task...');
+
+  // ── Pull team roster for Claude's clarification context ────────
+  const { data: roster } = await supabaseAdmin
+    .from('users')
+    .select('id, name, telegram_username')
+    .not('telegram_id', 'is', null);
+
+  // ── Parse ──────────────────────────────────────────────────────
+  let parsed;
+  try {
+    const { parseTaskFromText } = await import('@/lib/taskParser');
+    parsed = await parseTaskFromText({
+      body,
+      assignee: assignee ? { user_id: assignee.user_id, name: assignee.name } : null,
+      teamMembers: (roster || []) as any,
+    });
+  } catch (err: any) {
+    console.error('[Telegram /task] parse failed:', err);
+    await sendTelegramMessage(chatId, '⚠️ Couldn\'t parse that. Try being more specific.');
+    return;
+  }
+
+  // ── Store pending row ──────────────────────────────────────────
+  const pendingPayload = {
+    created_by_user_id: (teamMember as any).id,
+    origin_chat_id: chatId,
+    origin_message_id: message.message_id ?? null,
+    origin_thread_id: message.message_thread_id ?? null,
+    parsed: {
+      ...parsed,
+      assignee_user_id: assignee?.user_id ?? null,
+      assignee_name: assignee?.name ?? null,
+    },
+    raw_text: body,
+  };
+  const { data: pending, error: pendingErr } = await (supabaseAdmin as any)
+    .from('pending_tasks')
+    .insert(pendingPayload)
+    .select('id')
+    .single();
+  if (pendingErr || !pending) {
+    console.error('[Telegram /task] pending insert failed:', pendingErr);
+    await sendTelegramMessage(chatId, '⚠️ Couldn\'t stage the task. Try again.');
+    return;
+  }
+
+  // ── Compose preview ────────────────────────────────────────────
+  const previewLines: string[] = [];
+  previewLines.push(`📝 <b>${escapeHtml(parsed.task_name)}</b>`);
+  previewLines.push('');
+  previewLines.push(`<b>Assignee:</b> ${assignee ? escapeHtml(assignee.name) : '<i>(none — tag with @handle)</i>'}`);
+  previewLines.push(`<b>Due:</b> ${parsed.due_date ? escapeHtml(parsed.due_date) : '<i>not set</i>'}`);
+  if (parsed.why) previewLines.push(`<b>Why:</b> ${escapeHtml(parsed.why)}`);
+  if (parsed.good_looks_like) previewLines.push(`<b>Reference:</b> ${escapeHtml(parsed.good_looks_like)}`);
+  if (parsed.description) previewLines.push(`<b>Notes:</b> ${escapeHtml(parsed.description)}`);
+  if (parsed.clarification_needed) {
+    previewLines.push('');
+    previewLines.push(`⚠️ <i>${escapeHtml(parsed.clarification_needed)}</i>`);
+  }
+
+  await sendTelegramMessageWithButtons(
+    chatId,
+    previewLines.join('\n'),
+    [
+      [
+        { text: '✅ Create', callback_data: `task:create:${pending.id}` },
+        { text: '❌ Cancel', callback_data: `task:cancel:${pending.id}` },
+      ],
+    ],
+    message.message_thread_id,
+  );
+}
+
+/**
+ * Top-level dispatcher for inline-keyboard button clicks. Routes by
+ * the first segment of callback_data (we use "<feature>:<action>:<id>").
+ */
+async function handleCallbackQuery(cq: any) {
+  const data: string = cq.data || '';
+  const callbackId: string = cq.id;
+
+  if (data.startsWith('task:')) {
+    await handleTaskCallback(cq);
+    return;
+  }
+
+  // Unknown callback — dismiss the spinner so the button doesn't hang.
+  await answerCallbackQuery(callbackId);
+}
+
+/**
+ * Handle the ✅ Create / ❌ Cancel buttons on a /task preview.
+ *
+ * Anti-grief: only the user who created the pending task can act on
+ * it. Other chat members get a "not yours" toast.
+ */
+async function handleTaskCallback(cq: any) {
+  const callbackId: string = cq.id;
+  const data: string = cq.data || '';
+  const [, action, pendingId] = data.split(':');
+  const clickerTgId = cq.from?.id?.toString();
+  const messageChatId = cq.message?.chat?.id?.toString();
+  const messageId = cq.message?.message_id;
+
+  if (!pendingId || !clickerTgId || !messageChatId || !messageId) {
+    await answerCallbackQuery(callbackId, 'Invalid button.');
+    return;
+  }
+
+  // Look up the pending row.
+  const { data: pending } = await (supabaseAdmin as any)
+    .from('pending_tasks')
+    .select('*')
+    .eq('id', pendingId)
+    .maybeSingle();
+
+  if (!pending) {
+    await answerCallbackQuery(callbackId, 'This task already expired.');
+    await editMessageText(messageChatId, messageId, '⏳ <i>Pending task no longer available.</i>');
+    return;
+  }
+
+  // Verify the clicker is the creator. Resolve their telegram_id → users.id.
+  const { data: clicker } = await supabaseAdmin
+    .from('users')
+    .select('id, name')
+    .eq('telegram_id', clickerTgId)
+    .single();
+
+  if (!clicker || (clicker as any).id !== pending.created_by_user_id) {
+    await answerCallbackQuery(callbackId, 'Only the task creator can confirm.');
+    return;
+  }
+
+  if (action === 'cancel') {
+    await (supabaseAdmin as any).from('pending_tasks').delete().eq('id', pendingId);
+    await editMessageText(messageChatId, messageId, '❌ <i>Cancelled.</i>');
+    await answerCallbackQuery(callbackId, 'Cancelled');
+    return;
+  }
+
+  if (action === 'create') {
+    const parsed = pending.parsed as any;
+
+    // Insert the actual task. The tasks_assign_short_id trigger
+    // (migration 066) auto-stamps short_id on insert. Mirror the
+    // status / created_by defaults that taskService.createTask sets.
+    const insertPayload: Record<string, any> = {
+      task_name: parsed.task_name,
+      assigned_to: parsed.assignee_user_id || null,
+      assigned_to_name: parsed.assignee_name || null,
+      due_date: parsed.due_date || null,
+      description: parsed.description || parsed.why || null,
+      status: 'todo',
+      priority: 'medium',
+      created_by: (clicker as any).id,
+      created_by_name: (clicker as any).name,
+    };
+
+    const { data: createdTask, error: createErr } = await (supabaseAdmin as any)
+      .from('tasks')
+      .insert(insertPayload)
+      .select('id, short_id, task_name, assigned_to')
+      .single();
+
+    if (createErr || !createdTask) {
+      console.error('[Telegram /task] task insert failed:', createErr);
+      await answerCallbackQuery(callbackId, 'Failed to create.');
+      await editMessageText(messageChatId, messageId, '⚠️ <i>Failed to create task. Check logs.</i>');
+      return;
+    }
+
+    // Fire the assignee DM (server-side equivalent of taskService's
+    // notifyAssignment). We can't hit /api/tasks/notify-assignment
+    // because that endpoint requires a user session cookie, which we
+    // don't have in a webhook context. So we inline the same logic.
+    if (createdTask.assigned_to) {
+      await sendAssignmentDmInline(createdTask.id, (clicker as any).name);
+    }
+
+    // Delete the pending row — task is now live.
+    await (supabaseAdmin as any).from('pending_tasks').delete().eq('id', pendingId);
+
+    // Edit the preview to show the outcome (and the assigned short_id).
+    const lines = [
+      `✅ <b>Created ${escapeHtml(createdTask.short_id || '')}</b> ${escapeHtml(createdTask.task_name)}`,
+      `<i>by ${escapeHtml((clicker as any).name)}</i>`,
+    ];
+    await editMessageText(messageChatId, messageId, lines.join('\n'));
+    await answerCallbackQuery(callbackId, 'Created!');
+    return;
+  }
+
+  await answerCallbackQuery(callbackId, 'Unknown action.');
+}
+
+/**
+ * Send the assignment DM to the new assignee. Server-side mirror of
+ * what /api/tasks/notify-assignment does — read the assignee's
+ * telegram_id, send them a formatted DM, mark last_assignee_notified_to
+ * so subsequent edits don't re-DM. Used by the /task confirm flow
+ * since that endpoint requires user-session auth we don't have here.
+ */
+async function sendAssignmentDmInline(taskId: string, actorName: string) {
+  try {
+    // Re-fetch with the fields we need (we got a narrow select earlier).
+    const { data: task } = await (supabaseAdmin as any)
+      .from('tasks')
+      .select('id, short_id, task_name, assigned_to, due_date, priority, last_assignee_notified_to')
+      .eq('id', taskId)
+      .single();
+
+    if (!task?.assigned_to) return;
+    if (task.last_assignee_notified_to === task.assigned_to) return;
+
+    const { data: assignee } = await supabaseAdmin
+      .from('users')
+      .select('id, name, telegram_id')
+      .eq('id', task.assigned_to)
+      .single();
+
+    if (!assignee || !(assignee as any).telegram_id) return;
+
+    const idPrefix = task.short_id ? `${task.short_id} ` : '';
+    const safeTitle = escapeHtml(`${idPrefix}${task.task_name || '(untitled task)'}`);
+    const dueLine = task.due_date
+      ? `\n📅 <b>Due:</b> ${escapeHtml(task.due_date)}`
+      : '';
+    const priorityLine = task.priority
+      ? `\n🔥 <b>Priority:</b> ${escapeHtml(String(task.priority))}`
+      : '';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
+      ? (process.env.NEXT_PUBLIC_BASE_URL.startsWith('http')
+          ? process.env.NEXT_PUBLIC_BASE_URL
+          : `https://${process.env.NEXT_PUBLIC_BASE_URL}`)
+      : (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+
+    const dmText =
+      `📋 <b>New task assigned to you</b> by <b>${escapeHtml(actorName)}</b>\n` +
+      `\n<b>${safeTitle}</b>` +
+      dueLine +
+      priorityLine +
+      `\n\n🔗 <a href="${baseUrl}/tasks">Open HQ</a>`;
+
+    await sendTelegramMessage((assignee as any).telegram_id, dmText);
+
+    await (supabaseAdmin as any)
+      .from('tasks')
+      .update({ last_assignee_notified_to: task.assigned_to })
+      .eq('id', taskId);
+  } catch (err) {
+    console.error('[Telegram /task] DM-assignee inline failed:', err);
+  }
+}
+
+/**
+ * Send a Telegram message with an inline keyboard. Buttons are arranged
+ * row-by-row — pass [[btn1, btn2]] for a single row of two buttons.
+ */
+async function sendTelegramMessageWithButtons(
+  chatId: string,
+  text: string,
+  buttons: Array<Array<{ text: string; callback_data: string }>>,
+  threadId?: number,
+) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) return false;
+  try {
+    const body: Record<string, any> = {
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: buttons },
+    };
+    if (threadId) body.message_thread_id = threadId;
+    const res = await fetch(
+      `https://api.telegram.org/bot${botToken}/sendMessage`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    );
+    if (!res.ok) {
+      console.error('[Telegram Webhook] sendMessageWithButtons error:', await res.json().catch(() => ({})));
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[Telegram Webhook] sendMessageWithButtons threw:', err);
+    return false;
+  }
+}
+
+/**
+ * Edit a previously-sent message. Used to update the /task preview
+ * after the user clicks ✅/❌ — replaces the buttons + body with the
+ * outcome ("Created T-068" or "Cancelled"). Strips the inline keyboard
+ * so the buttons disappear, preventing double-clicks.
+ */
+async function editMessageText(chatId: string, messageId: number, text: string) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) return false;
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${botToken}/editMessageText`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, message_id: messageId, text, parse_mode: 'HTML' }),
+      },
+    );
+    if (!res.ok) {
+      console.error('[Telegram Webhook] editMessageText error:', await res.json().catch(() => ({})));
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[Telegram Webhook] editMessageText threw:', err);
+    return false;
+  }
+}
+
+/**
+ * Acknowledge a callback_query so Telegram clears the loading spinner
+ * on the user's button. Optional `text` shows as a brief toast — useful
+ * for "Only the creator can confirm" and similar flash-feedback.
+ */
+async function answerCallbackQuery(callbackQueryId: string, text?: string) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) return;
+  try {
+    await fetch(
+      `https://api.telegram.org/bot${botToken}/answerCallbackQuery`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callback_query_id: callbackQueryId, text: text || undefined }),
+      },
+    );
+  } catch (err) {
+    console.error('[Telegram Webhook] answerCallbackQuery threw:', err);
+  }
 }
 
 /**
