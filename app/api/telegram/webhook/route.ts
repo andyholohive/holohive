@@ -565,10 +565,25 @@ async function handleMessage(message: any) {
   if (fromId && !isFromBot) {
     const { data: teamMember } = await supabaseAdmin
       .from('users')
-      .select('id')
+      .select('id, telegram_username')
       .eq('telegram_id', fromId)
       .single();
     isTeamMember = !!teamMember;
+
+    // Opportunistically refresh telegram_username so /task can resolve
+    // @-mentions to user IDs. Only writes when the value is missing or
+    // has changed (Telegram lets users rename their handle), so steady-
+    // state messages don't generate spurious UPDATEs. Best-effort —
+    // never block downstream processing on the write.
+    if (teamMember && fromUsername && (teamMember as any).telegram_username !== fromUsername) {
+      supabaseAdmin
+        .from('users')
+        .update({ telegram_username: fromUsername })
+        .eq('id', (teamMember as any).id)
+        .then(({ error: updErr }) => {
+          if (updErr) console.warn('[Telegram Webhook] telegram_username refresh failed:', updErr.message);
+        });
+    }
   }
 
   // Determine which field to update:
