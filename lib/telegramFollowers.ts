@@ -53,27 +53,16 @@ export function parseTelegramChannelUsername(link: string | null): string | null
 }
 
 /**
- * Telegram Bot API response for getChat on a channel. Trimmed to the
- * fields we actually use; full shape is at
- * https://core.telegram.org/bots/api#chat
- */
-interface TelegramChatResponse {
-  id: number;
-  type: 'private' | 'group' | 'supergroup' | 'channel';
-  title?: string;
-  username?: string;
-}
-
-/**
  * Fetch a public channel's current subscriber count via the Telegram
- * Bot API. Two-call sequence:
+ * Bot API.
  *
- *   1. getChat — confirms the channel exists + we can see it. Returns
- *      type/title metadata; we use this to filter out invalid links.
- *   2. getChatMemberCount — returns the actual subscriber number.
- *
- * Done as two calls because getChat alone doesn't return member_count
- * for channels (only for chats the bot is a member of).
+ * Single API call to getChatMemberCount — returns the integer
+ * directly. Earlier version did a getChat sanity-check first, but at
+ * ~450ms per Telegram round-trip that doubled the cron's runtime
+ * past the Vercel function limit on the full roster. Dropped because
+ * getChatMemberCount returns the same "Bad Request: chat not found"
+ * error message when the channel doesn't exist, so we lose nothing
+ * by skipping the validation call.
  *
  * Returns null on any failure — caller logs + skips. Common failures:
  *   - channel renamed (404 on @oldusername)
@@ -86,8 +75,10 @@ export interface TelegramFollowerResult {
   follower_count: number | null;
   /** Populated when something went wrong; null on success. */
   error: string | null;
-  /** Telegram's channel title — useful for the operator log so you
-   *  can spot "wait, that's not the right channel" mismatches. */
+  /** Reserved for future use — earlier version captured channel
+   *  title but the extra API call wasn't worth the latency. Kept
+   *  in the interface so the cron's notes string doesn't need to
+   *  change when/if we re-add it. */
   channel_title: string | null;
 }
 
@@ -98,43 +89,15 @@ export async function fetchTelegramFollowerCount(
   const chatId = `@${username}`;
   const apiBase = `https://api.telegram.org/bot${botToken}`;
 
-  // Step 1: getChat for sanity check + title.
-  let chatTitle: string | null = null;
-  try {
-    const chatRes = await fetch(`${apiBase}/getChat?chat_id=${encodeURIComponent(chatId)}`);
-    const chatData = await chatRes.json();
-    if (!chatData.ok) {
-      return {
-        username,
-        follower_count: null,
-        error: chatData.description || `getChat failed (${chatRes.status})`,
-        channel_title: null,
-      };
-    }
-    const chat = chatData.result as TelegramChatResponse;
-    chatTitle = chat.title || null;
-    // Defensive: if Telegram returns something other than a channel
-    // (e.g. "supergroup") it's still queryable by member count, so we
-    // don't reject. We only reject for type=private which means the
-    // bot can't see it.
-    if (chat.type === 'private') {
-      return {
-        username,
-        follower_count: null,
-        error: 'Channel is private',
-        channel_title: chatTitle,
-      };
-    }
-  } catch (err) {
-    return {
-      username,
-      follower_count: null,
-      error: err instanceof Error ? err.message : 'getChat threw',
-      channel_title: null,
-    };
-  }
-
-  // Step 2: getChatMemberCount for the actual number.
+  // Single API call — getChatMemberCount alone is enough. Earlier
+  // version called getChat first for a "sanity check + title" but
+  // that doubled the per-KOL latency (~900ms vs ~450ms) and pushed
+  // the cron over Vercel's 60s function limit on the full 85-KOL
+  // run. The error message from getChatMemberCount is identical to
+  // getChat's when a channel doesn't exist ("Bad Request: chat not
+  // found"), so we lose nothing by dropping the second call. Title
+  // is no longer captured — the notes field on the snapshot just
+  // omits it.
   try {
     const countRes = await fetch(`${apiBase}/getChatMemberCount?chat_id=${encodeURIComponent(chatId)}`);
     const countData = await countRes.json();
@@ -143,7 +106,7 @@ export async function fetchTelegramFollowerCount(
         username,
         follower_count: null,
         error: countData.description || `getChatMemberCount failed (${countRes.status})`,
-        channel_title: chatTitle,
+        channel_title: null,
       };
     }
     const count = Number(countData.result);
@@ -152,21 +115,21 @@ export async function fetchTelegramFollowerCount(
         username,
         follower_count: null,
         error: `Unparseable count: ${countData.result}`,
-        channel_title: chatTitle,
+        channel_title: null,
       };
     }
     return {
       username,
       follower_count: count,
       error: null,
-      channel_title: chatTitle,
+      channel_title: null,
     };
   } catch (err) {
     return {
       username,
       follower_count: null,
       error: err instanceof Error ? err.message : 'getChatMemberCount threw',
-      channel_title: chatTitle,
+      channel_title: null,
     };
   }
 }

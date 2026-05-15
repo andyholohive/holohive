@@ -6,10 +6,12 @@ import {
 } from '@/lib/telegramFollowers';
 
 export const dynamic = 'force-dynamic';
-// 60s is plenty for ~85 channels (we sleep ~50ms between calls = ~5s
-// of API time + Supabase upserts). Bump if the roster grows past
-// ~1000 channels.
-export const maxDuration = 60;
+// Vercel Pro caps serverless functions at 300s; bump to 120 for
+// safety. Real-world per-KOL latency is ~450ms (one Telegram API
+// call + one Supabase upsert), so 85 KOLs ≈ 38s. The headroom
+// covers slow network + future roster growth past ~250 KOLs without
+// a redeploy. Drop back to 60 if Vercel pricing/limits change.
+export const maxDuration = 120;
 
 /**
  * GET /api/cron/snapshot-tg-followers
