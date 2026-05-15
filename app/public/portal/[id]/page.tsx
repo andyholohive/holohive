@@ -1451,8 +1451,18 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </Card>
         )}
 
-        {/* Campaign Onboarding Milestones */}
-        {milestones.length > 0 && (
+        {/* Campaign Onboarding Milestones — only show after the client
+            has submitted the onboarding form. Without this gate the
+            action board appears alongside the "Complete Your Onboarding"
+            banner above (line 1429), which contradicts itself: the
+            banner says "fill the form" while the action board acts as
+            if onboarding is already done.
+            `hasOnboardingResponse === true` (not `!== false`) avoids a
+            flash-of-wrong-content for un-onboarded clients during the
+            initial check. checkOnboardingStatus() defaults to true on
+            "no form configured" or transient errors, so the gate fails
+            open in those cases. */}
+        {milestones.length > 0 && hasOnboardingResponse === true && (
           <Card id="section-milestones" className="border-0 shadow-lg rounded-xl overflow-hidden mb-10">
             <CardContent className="p-6 sm:p-8">
               <div className="flex items-center justify-between mb-6">
