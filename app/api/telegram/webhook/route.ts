@@ -91,9 +91,22 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Send a message to a Telegram chat
+ * Send a message to a Telegram chat.
+ *
+ * threadId: when provided, posts the message into a forum-topic
+ * thread within the chat. REQUIRED for replies to commands typed
+ * inside topics (supergroups with topics enabled) — without it,
+ * the response falls back to the supergroup's General feed instead
+ * of the topic the user is in. Every command handler should pull
+ * this from `message.message_thread_id` (or `cq.message.message_thread_id`
+ * for callbacks) and pass it through.
  */
-async function sendTelegramMessage(chatId: string, text: string, parseMode: 'HTML' | 'Markdown' = 'HTML') {
+async function sendTelegramMessage(
+  chatId: string,
+  text: string,
+  parseMode: 'HTML' | 'Markdown' = 'HTML',
+  threadId?: number,
+) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   if (!botToken) {
     console.error('[Telegram Webhook] Bot token not configured');
@@ -101,16 +114,18 @@ async function sendTelegramMessage(chatId: string, text: string, parseMode: 'HTM
   }
 
   try {
+    const body: Record<string, any> = {
+      chat_id: chatId,
+      text,
+      parse_mode: parseMode,
+    };
+    if (threadId) body.message_thread_id = threadId;
     const response = await fetch(
       `https://api.telegram.org/bot${botToken}/sendMessage`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          parse_mode: parseMode
-        })
+        body: JSON.stringify(body)
       }
     );
 
@@ -120,7 +135,7 @@ async function sendTelegramMessage(chatId: string, text: string, parseMode: 'HTM
       return false;
     }
 
-    console.log('[Telegram Webhook] Sent reply to chat:', chatId);
+    console.log('[Telegram Webhook] Sent reply to chat:', chatId, threadId ? `(thread ${threadId})` : '');
     return true;
   } catch (error) {
     console.error('[Telegram Webhook] Error sending message:', error);
@@ -129,9 +144,16 @@ async function sendTelegramMessage(chatId: string, text: string, parseMode: 'HTM
 }
 
 /**
- * Send a photo with caption to a Telegram chat
+ * Send a photo with caption to a Telegram chat.
+ * threadId behavior matches sendTelegramMessage — see comment there.
  */
-async function sendTelegramPhoto(chatId: string, photoUrl: string, caption: string, parseMode: 'HTML' | 'Markdown' = 'HTML') {
+async function sendTelegramPhoto(
+  chatId: string,
+  photoUrl: string,
+  caption: string,
+  parseMode: 'HTML' | 'Markdown' = 'HTML',
+  threadId?: number,
+) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   if (!botToken) {
     console.error('[Telegram Webhook] Bot token not configured');
@@ -139,17 +161,19 @@ async function sendTelegramPhoto(chatId: string, photoUrl: string, caption: stri
   }
 
   try {
+    const body: Record<string, any> = {
+      chat_id: chatId,
+      photo: photoUrl,
+      caption,
+      parse_mode: parseMode,
+    };
+    if (threadId) body.message_thread_id = threadId;
     const response = await fetch(
       `https://api.telegram.org/bot${botToken}/sendPhoto`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          photo: photoUrl,
-          caption,
-          parse_mode: parseMode
-        })
+        body: JSON.stringify(body)
       }
     );
 
@@ -159,7 +183,7 @@ async function sendTelegramPhoto(chatId: string, photoUrl: string, caption: stri
       return false;
     }
 
-    console.log('[Telegram Webhook] Sent photo to chat:', chatId);
+    console.log('[Telegram Webhook] Sent photo to chat:', chatId, threadId ? `(thread ${threadId})` : '');
     return true;
   } catch (error) {
     console.error('[Telegram Webhook] Error sending photo:', error);
@@ -299,6 +323,13 @@ async function handleCommand(chatId: string, command: string, args: string[], me
   // Remove leading slash and bot mention
   const cmd = command.toLowerCase().replace(/^\//, '').replace('@holo_hive_bot', '');
 
+  // Forum-topic thread ID — undefined for plain chats / supergroup
+  // General. Every reply below threads through this so responses land
+  // back in the topic the command came from, not the supergroup's
+  // main feed. Single extraction here; sub-handlers re-extract from
+  // the message they receive (kept consistent for clarity).
+  const replyThreadId: number | undefined = message.message_thread_id || undefined;
+
   // Built-in /test command - sends chat ID and thread ID to Andy Lee
   if (cmd === 'test') {
     const ANDY_LEE_TELEGRAM_ID = '6281931733';
@@ -314,11 +345,11 @@ async function handleCommand(chatId: string, command: string, args: string[], me
       `<b>Chat Title:</b> ${chatTitle}\n` +
       `<b>Triggered by:</b> ${fromUser}`;
 
-    // Send to Andy Lee's DM
+    // Send to Andy Lee's DM (no threadId — DMs don't have topics).
     await sendTelegramMessage(ANDY_LEE_TELEGRAM_ID, response);
 
-    // Send confirmation in the original chat
-    await sendTelegramMessage(chatId, '✅ Chat info sent to Andy Lee.');
+    // Send confirmation in the original chat (in topic if applicable).
+    await sendTelegramMessage(chatId, '✅ Chat info sent to Andy Lee.', 'HTML', replyThreadId);
 
     console.log('[Telegram Webhook] Executed /test command:', { chatId, threadId, sentTo: 'Andy Lee' });
     return;
@@ -371,7 +402,7 @@ async function handleCommand(chatId: string, command: string, args: string[], me
 
       if (!fromUserId) {
         console.log('[Telegram Webhook] Team-only command rejected: no user ID');
-        await sendTelegramMessage(chatId, 'This command is only available to team members.');
+        await sendTelegramMessage(chatId, 'This command is only available to team members.', 'HTML', replyThreadId);
         return;
       }
 
@@ -384,7 +415,7 @@ async function handleCommand(chatId: string, command: string, args: string[], me
 
       if (teamError || !teamMember) {
         console.log('[Telegram Webhook] Team-only command rejected: user not a team member', fromUserId);
-        await sendTelegramMessage(chatId, 'This command is only available to team members.');
+        await sendTelegramMessage(chatId, 'This command is only available to team members.', 'HTML', replyThreadId);
         return;
       }
 
@@ -393,9 +424,9 @@ async function handleCommand(chatId: string, command: string, args: string[], me
 
     // Send photo with caption if image_url exists, otherwise just send message
     if (commandData.image_url) {
-      await sendTelegramPhoto(chatId, commandData.image_url, commandData.response);
+      await sendTelegramPhoto(chatId, commandData.image_url, commandData.response, 'HTML', replyThreadId);
     } else {
-      await sendTelegramMessage(chatId, commandData.response);
+      await sendTelegramMessage(chatId, commandData.response, 'HTML', replyThreadId);
     }
     console.log('[Telegram Webhook] Executed command:', cmd);
   } catch (error) {
@@ -421,15 +452,19 @@ async function handleCommand(chatId: string, command: string, args: string[], me
  * is "always 200 to Telegram so it doesn't retry".
  */
 async function handleDoneCommand(chatId: string, args: string[], message: any) {
+  // Pull thread first — every reply below needs to land in the topic
+  // the command came from (not the supergroup's main feed).
+  const threadId: number | undefined = message.message_thread_id || undefined;
+
   const teamMember = await resolveTeamMember(message);
   if (!teamMember) {
-    await sendTelegramMessage(chatId, '⚠️ /done is only available to team members.');
+    await sendTelegramMessage(chatId, '⚠️ /done is only available to team members.', 'HTML', threadId);
     return;
   }
 
   const raw = args.join(' ').trim();
   if (!raw) {
-    await sendTelegramMessage(chatId, 'Usage: <code>/done T-042</code> or <code>/done bump daniel</code>');
+    await sendTelegramMessage(chatId, 'Usage: <code>/done T-042</code> or <code>/done bump daniel</code>', 'HTML', threadId);
     return;
   }
 
@@ -444,7 +479,7 @@ async function handleDoneCommand(chatId: string, args: string[], message: any) {
   const looksLikeId = /^t-?\d+$/i.test(raw) || /^\d+$/.test(raw);
   if (looksLikeId) {
     const shortId = `T-${numericOnly.padStart(3, '0')}`;
-    await closeByShortIdAndReply(chatId, shortId, teamMember);
+    await closeByShortIdAndReply(chatId, shortId, teamMember, threadId);
     return;
   }
 
@@ -465,13 +500,13 @@ async function handleDoneCommand(chatId: string, args: string[], message: any) {
   }>;
 
   if (rows.length === 0) {
-    await sendTelegramMessage(chatId, `🤷 No open task matching <code>${escapeHtml(raw)}</code>.`);
+    await sendTelegramMessage(chatId, `🤷 No open task matching <code>${escapeHtml(raw)}</code>.`, 'HTML', threadId);
     return;
   }
 
   if (rows.length === 1) {
     const t = rows[0];
-    await closeByDbIdAndReply(chatId, t.id, teamMember);
+    await closeByDbIdAndReply(chatId, t.id, teamMember, threadId);
     return;
   }
 
@@ -483,7 +518,7 @@ async function handleDoneCommand(chatId: string, args: string[], message: any) {
     text: truncateButton(`${t.short_id || ''} ${t.task_name}${t.due_date ? ` · ${shortDueLabel(t.due_date)}` : ''}`.trim()),
     callback_data: `done:${t.id}`,
   }]);
-  await sendTelegramMessageWithButtons(chatId, pickerLines.join('\n'), buttons);
+  await sendTelegramMessageWithButtons(chatId, pickerLines.join('\n'), buttons, threadId);
 }
 
 /**
@@ -494,6 +529,7 @@ async function closeByShortIdAndReply(
   chatId: string,
   shortId: string,
   teamMember: { id: string; name: string },
+  threadId?: number,
 ) {
   const { data: task, error: taskErr } = await (supabaseAdmin as any)
     .from('tasks')
@@ -502,18 +538,18 @@ async function closeByShortIdAndReply(
     .maybeSingle();
   if (taskErr) {
     console.error('[Telegram /done] task lookup failed:', taskErr);
-    await sendTelegramMessage(chatId, '⚠️ Lookup failed. Try again or close it from /tasks.');
+    await sendTelegramMessage(chatId, '⚠️ Lookup failed. Try again or close it from /tasks.', 'HTML', threadId);
     return;
   }
   if (!task) {
-    await sendTelegramMessage(chatId, `🤷 No task with ID <code>${escapeHtml(shortId)}</code>.`);
+    await sendTelegramMessage(chatId, `🤷 No task with ID <code>${escapeHtml(shortId)}</code>.`, 'HTML', threadId);
     return;
   }
   if (task.status === 'complete') {
-    await sendTelegramMessage(chatId, `✅ <code>${escapeHtml(shortId)}</code> was already complete.`);
+    await sendTelegramMessage(chatId, `✅ <code>${escapeHtml(shortId)}</code> was already complete.`, 'HTML', threadId);
     return;
   }
-  await closeByDbIdAndReply(chatId, task.id, teamMember);
+  await closeByDbIdAndReply(chatId, task.id, teamMember, threadId);
 }
 
 /**
@@ -532,6 +568,7 @@ async function closeByDbIdAndReply(
   chatId: string,
   taskDbId: string,
   teamMember: { id: string; name: string },
+  threadId?: number,
 ) {
   const { data: task, error: fetchErr } = await (supabaseAdmin as any)
     .from('tasks')
@@ -539,13 +576,15 @@ async function closeByDbIdAndReply(
     .eq('id', taskDbId)
     .maybeSingle();
   if (fetchErr || !task) {
-    await sendTelegramMessage(chatId, '⚠️ Task not found.');
+    await sendTelegramMessage(chatId, '⚠️ Task not found.', 'HTML', threadId);
     return;
   }
   if (task.status === 'complete') {
     await sendTelegramMessage(
       chatId,
       `✅ <code>${escapeHtml(task.short_id || taskDbId)}</code> was already complete.`,
+      'HTML',
+      threadId,
     );
     return;
   }
@@ -556,7 +595,7 @@ async function closeByDbIdAndReply(
     .eq('id', taskDbId);
   if (updErr) {
     console.error('[Telegram /done] update failed:', updErr);
-    await sendTelegramMessage(chatId, '⚠️ Update failed. Try again or close it from /tasks.');
+    await sendTelegramMessage(chatId, '⚠️ Update failed. Try again or close it from /tasks.', 'HTML', threadId);
     return;
   }
   const safeName = escapeHtml(task.task_name || '(untitled task)');
@@ -564,6 +603,8 @@ async function closeByDbIdAndReply(
   await sendTelegramMessage(
     chatId,
     `✅ <b>${escapeHtml(task.short_id || '')}</b> ${safeName}\n<i>closed by ${closer}</i>`,
+    'HTML',
+    threadId,
   );
   console.log('[Telegram Webhook] /done closed task:', { taskDbId, shortId: task.short_id, by: teamMember.name });
 }
@@ -611,9 +652,11 @@ function escapeHtml(s: string): string {
  * open tasks, that's a triage problem, not a UI problem.
  */
 async function handleTasksCommand(chatId: string, args: string[], message: any) {
+  const threadId: number | undefined = message.message_thread_id || undefined;
+
   const teamMember = await resolveTeamMember(message);
   if (!teamMember) {
-    await sendTelegramMessage(chatId, '⚠️ /tasks is only available to team members.');
+    await sendTelegramMessage(chatId, '⚠️ /tasks is only available to team members.', 'HTML', threadId);
     return;
   }
 
@@ -623,7 +666,7 @@ async function handleTasksCommand(chatId: string, args: string[], message: any) 
   const teamWide = flags.has('all');
   const overdueOnly = flags.has('overdue');
 
-  await renderTasksList(chatId, teamMember, { teamWide, overdueOnly });
+  await renderTasksList(chatId, teamMember, { teamWide, overdueOnly, threadId });
 }
 
 /**
@@ -638,7 +681,7 @@ async function handleTasksCommand(chatId: string, args: string[], message: any) 
 async function renderTasksList(
   chatId: string,
   teamMember: { id: string; name: string },
-  opts: { teamWide: boolean; overdueOnly: boolean; editMessageId?: number },
+  opts: { teamWide: boolean; overdueOnly: boolean; editMessageId?: number; threadId?: number },
 ) {
   const todayIso = new Date().toISOString().slice(0, 10);
 
@@ -656,9 +699,11 @@ async function renderTasksList(
   if (error) {
     const msg = `⚠️ Couldn't load tasks: ${error.message}`;
     if (opts.editMessageId) {
+      // editMessageText doesn't need threadId — message_id is unique
+      // within the chat regardless of which topic it's in.
       await editMessageText(chatId, opts.editMessageId, msg);
     } else {
-      await sendTelegramMessage(chatId, msg);
+      await sendTelegramMessage(chatId, msg, 'HTML', opts.threadId);
     }
     return;
   }
@@ -693,7 +738,7 @@ async function renderTasksList(
     if (opts.editMessageId) {
       await editMessageText(chatId, opts.editMessageId, msg);
     } else {
-      await sendTelegramMessage(chatId, msg);
+      await sendTelegramMessage(chatId, msg, 'HTML', opts.threadId);
     }
     return;
   }
@@ -721,7 +766,7 @@ async function renderTasksList(
   if (opts.editMessageId) {
     await editMessageTextWithButtons(chatId, opts.editMessageId, text, buttons);
   } else {
-    await sendTelegramMessageWithButtons(chatId, text, buttons);
+    await sendTelegramMessageWithButtons(chatId, text, buttons, opts.threadId);
   }
 }
 
@@ -789,11 +834,12 @@ function truncateButton(s: string): string {
  * notify-changed announcer once it's actually created.
  */
 async function handleTaskCommand(chatId: string, message: any) {
+  const threadId: number | undefined = message.message_thread_id || undefined;
   const fromUserId = message.from?.id?.toString();
 
   // Same auth pattern as /done — must be a team member.
   if (!fromUserId) {
-    await sendTelegramMessage(chatId, '⚠️ Could not identify you. /task is team-only.');
+    await sendTelegramMessage(chatId, '⚠️ Could not identify you. /task is team-only.', 'HTML', threadId);
     return;
   }
   const { data: teamMember } = await supabaseAdmin
@@ -802,7 +848,7 @@ async function handleTaskCommand(chatId: string, message: any) {
     .eq('telegram_id', fromUserId)
     .single();
   if (!teamMember) {
-    await sendTelegramMessage(chatId, '⚠️ /task is only available to team members.');
+    await sendTelegramMessage(chatId, '⚠️ /task is only available to team members.', 'HTML', threadId);
     return;
   }
 
@@ -816,7 +862,9 @@ async function handleTaskCommand(chatId: string, message: any) {
     await sendTelegramMessage(
       chatId,
       'Usage: <code>/task @person describe the task, deadline, and why</code>\n' +
-      'Example: <code>/task @daniel write OST recap brief by Fri, for client pitch Thu</code>'
+      'Example: <code>/task @daniel write OST recap brief by Fri, for client pitch Thu</code>',
+      'HTML',
+      threadId,
     );
     return;
   }
@@ -834,7 +882,7 @@ async function handleTaskCommand(chatId: string, message: any) {
   );
 
   // ── Acknowledge while Claude works (1-2s typical) ──────────────
-  await sendTelegramMessage(chatId, '🤔 Parsing task...');
+  await sendTelegramMessage(chatId, '🤔 Parsing task...', 'HTML', threadId);
 
   // ── Pull team roster for Claude's clarification context ────────
   const { data: roster } = await supabaseAdmin
@@ -853,7 +901,7 @@ async function handleTaskCommand(chatId: string, message: any) {
     });
   } catch (err: any) {
     console.error('[Telegram /task] parse failed:', err);
-    await sendTelegramMessage(chatId, '⚠️ Couldn\'t parse that. Try being more specific.');
+    await sendTelegramMessage(chatId, '⚠️ Couldn\'t parse that. Try being more specific.', 'HTML', threadId);
     return;
   }
 
@@ -877,7 +925,7 @@ async function handleTaskCommand(chatId: string, message: any) {
     .single();
   if (pendingErr || !pending) {
     console.error('[Telegram /task] pending insert failed:', pendingErr);
-    await sendTelegramMessage(chatId, '⚠️ Couldn\'t stage the task. Try again.');
+    await sendTelegramMessage(chatId, '⚠️ Couldn\'t stage the task. Try again.', 'HTML', threadId);
     return;
   }
 
