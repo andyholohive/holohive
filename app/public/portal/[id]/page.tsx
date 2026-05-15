@@ -1022,6 +1022,19 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
   const activeMilestone = milestones.find(m => m.status === 'active');
   const portalPhase: 'kickoff' | 'discovery' | 'tracker' = activeMilestone ? 'discovery' : completedMilestones === milestones.length && milestones.length > 0 ? 'tracker' : 'kickoff';
 
+  // Until the client submits the onboarding form, EVERY content section
+  // below the banner stays hidden — the form prompt has to be the only
+  // visible call-to-action so they can't ignore it. Used in place of
+  // raw `portalPhase !== 'kickoff'` checks throughout the JSX below.
+  // `hasOnboardingResponse === true` (not `!== false`) means we hide
+  // during the initial null/loading state too — avoids a flash of
+  // content for un-onboarded clients before the check completes.
+  // checkOnboardingStatus() defaults to true on "no form configured"
+  // or transient errors, so this fails open in those cases (sections
+  // still show even if the lookup hiccups).
+  const onboardingComplete = hasOnboardingResponse === true;
+  const showAdvancedSections = portalPhase !== 'kickoff' && onboardingComplete;
+
   // KOL live status metrics
   const kolsSecured = kolRoster.filter(k => k.status === 'Onboarded' || k.status === 'Concluded').length;
   const contentLive = kolRoster.filter(k => k.contentLinks.length > 0).length;
@@ -1425,8 +1438,13 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </p>
         </div>
 
-        {/* Onboarding Banner — only in kickoff phase */}
-        {portalPhase === 'kickoff' && hasOnboardingResponse === false && onboardingFormSlug && (
+        {/* Onboarding Banner — shows in EVERY phase whenever the form
+            hasn't been submitted. Originally gated to kickoff phase
+            only, but the team often sets up milestones (which moves
+            portalPhase to 'discovery') BEFORE the client fills the
+            form, which silently hid the banner. The form-prompt has
+            to override anything else when not filled. */}
+        {hasOnboardingResponse === false && onboardingFormSlug && (
           <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10 bg-gradient-to-r from-brand/10 to-brand/5">
             <CardContent className="flex items-center justify-between py-6">
               <div className="flex items-center gap-4">
@@ -1844,7 +1862,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         )}
 
         {/* Stats Cards — discovery & tracker only */}
-        {portalPhase !== 'kickoff' && <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-10">
+        {showAdvancedSections && <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-10">
           <Card className="group relative hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-0 shadow-md overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-brand/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
             <CardContent className="pt-6 pb-5 relative">
@@ -1906,7 +1924,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           </Card>
 
           {/* Live KOL Status Metrics — shown in discovery/tracker when KOLs exist */}
-          {portalPhase !== 'kickoff' && kolRoster.length > 0 && (
+          {showAdvancedSections && kolRoster.length > 0 && (
             <>
               <Card className="group relative hover:shadow-lg hover:-translate-y-1 transition-all duration-300 border-0 shadow-md overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
@@ -1942,7 +1960,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         </div>}
 
         {/* Weekly Status Section — discovery & tracker only */}
-        {portalPhase !== 'kickoff' && weeklyUpdates.length > 0 && (
+        {showAdvancedSections && weeklyUpdates.length > 0 && (
           <Card className="border-0 shadow-lg rounded-xl overflow-hidden mb-10 border-l-4 border-l-brand">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
@@ -2019,7 +2037,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         )}
 
         {/* Form Submissions & Resources Row — discovery & tracker only */}
-        {portalPhase !== 'kickoff' && (formSubmissions.length > 0 || (clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url)) || clientLinks.length > 0 || formAttachments.length > 0) && (
+        {showAdvancedSections && (formSubmissions.length > 0 || (clientContext && (clientContext.telegram_url || clientContext.shared_drive_url || clientContext.gtm_sync_url)) || clientLinks.length > 0 || formAttachments.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
             {/* Form Submissions */}
             {formSubmissions.length > 0 && (
@@ -2305,7 +2323,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         )}
 
         {/* Campaigns Section — discovery & tracker only */}
-        {portalPhase !== 'kickoff' && <Card id="section-campaigns" className="border-0 shadow-lg rounded-xl overflow-hidden mt-10">
+        {showAdvancedSections && <Card id="section-campaigns" className="border-0 shadow-lg rounded-xl overflow-hidden mt-10">
           <CardHeader className="bg-white border-b border-gray-100 pb-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <CardTitle className="text-xl font-bold text-gray-900">Your Campaigns</CardTitle>
@@ -2464,7 +2482,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         </Card>}
 
         {/* KOL Roster — tracker only */}
-        {portalPhase === 'tracker' && kolRoster.length > 0 && (
+        {portalPhase === 'tracker' && onboardingComplete && kolRoster.length > 0 && (
           <Card id="section-kol-roster" className="border-0 shadow-lg rounded-xl overflow-hidden mt-8">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
@@ -2557,7 +2575,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         )}
 
         {/* Meeting Notes Section — discovery & tracker only */}
-        {portalPhase !== 'kickoff' && meetingNotes.length > 0 && (
+        {showAdvancedSections && meetingNotes.length > 0 && (
           <Card className="border-0 shadow-lg rounded-xl overflow-hidden mt-8">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
@@ -2649,7 +2667,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         </Dialog>
 
         {/* Decision Log Section — discovery & tracker only */}
-        {portalPhase !== 'kickoff' && decisionLog.length > 0 && (
+        {showAdvancedSections && decisionLog.length > 0 && (
           <Card className="border-0 shadow-lg rounded-xl overflow-hidden mt-8">
             <CardHeader className="bg-white border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
