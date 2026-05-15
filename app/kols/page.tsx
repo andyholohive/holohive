@@ -15,6 +15,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare, Maximize2 } from "lucide-react";
 import { KolProfileModal } from "@/components/kols/KolProfileModal";
+import { computeRosterScores, tierForScore, type KolScoreResult } from "@/lib/kolScoringEngine";
+import type { KolDeliverable } from "@/lib/kolDeliverableService";
+import type { KolChannelSnapshot } from "@/lib/kolChannelSnapshotService";
 import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -121,6 +124,17 @@ export default function KOLsPage() {
   // KOL profile modal — opens via the expand icon in the Name cell.
   // Houses the Deliverables and Call Logs sections per Phase 2 spec.
   const [profileModalKol, setProfileModalKol] = useState<MasterKOL | null>(null);
+
+  // Phase 3: composite Score per KOL, computed from deliverables +
+  // snapshots in bulk and normalized across the roster. We pull the
+  // raw rows once on mount and recompute when either side changes.
+  // ScoreMap shape: kol.id → KolScoreResult (with .score being
+  // null when below the deliverables threshold).
+  const [scoreMap, setScoreMap] = useState<Map<string, KolScoreResult>>(new Map());
+  // Bumped whenever the modal reports a deliverable or snapshot
+  // change — triggers a refetch + recompute. Cheap because the bulk
+  // queries are small (at <500 KOLs, total payload ~few hundred KB).
+  const [scoreRefreshNonce, setScoreRefreshNonce] = useState(0);
 
   // Sticky scrollbar state
   const [stickyScrollbar, setStickyScrollbar] = useState<{
@@ -418,6 +432,61 @@ export default function KOLsPage() {
     fetchLatestCosts();
     fetchProjectsPerKol();
   }, []);
+
+  // Score recomputation effect — runs on initial mount and whenever
+  // the modal bumps scoreRefreshNonce (i.e. a deliverable or snapshot
+  // was added/deleted). Scoped pull (last 12 months of snapshots,
+  // last 1000 deliverables) so we never page-load megabytes.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [delivRes, snapRes] = await Promise.all([
+          (supabase as any)
+            .from("kol_deliverables")
+            .select("*")
+            .order("date_posted", { ascending: false })
+            .limit(2000),
+          (supabase as any)
+            .from("kol_channel_snapshots")
+            .select("*")
+            .gte("snapshot_date", new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
+            .order("snapshot_date", { ascending: false }),
+        ]);
+        if (cancelled) return;
+
+        // Group by kol_id for the scoring engine. Build maps once
+        // rather than filtering per KOL inside the loop.
+        const delivByKol = new Map<string, KolDeliverable[]>();
+        for (const d of (delivRes.data || []) as KolDeliverable[]) {
+          if (!delivByKol.has(d.kol_id)) delivByKol.set(d.kol_id, []);
+          delivByKol.get(d.kol_id)!.push(d);
+        }
+        const snapByKol = new Map<string, KolChannelSnapshot[]>();
+        for (const s of (snapRes.data || []) as KolChannelSnapshot[]) {
+          if (!snapByKol.has(s.kol_id)) snapByKol.set(s.kol_id, []);
+          snapByKol.get(s.kol_id)!.push(s);
+        }
+
+        // Build the roster input. We score every KOL, even ones with
+        // zero data — they get score=null with "Insufficient data"
+        // rather than disappearing from the map.
+        const roster = kols.map((k) => ({
+          kol_id: k.id,
+          deliverables: delivByKol.get(k.id) || [],
+          snapshots: snapByKol.get(k.id) || [],
+        }));
+
+        const scores = computeRosterScores(roster);
+        if (!cancelled) setScoreMap(scores);
+      } catch (err) {
+        console.error("Failed to compute KOL scores:", err);
+      }
+    })();
+    return () => { cancelled = true; };
+    // kols is a dep so we recompute when the list changes (filter,
+    // pagination, edit). scoreRefreshNonce is the modal's signal.
+  }, [kols, scoreRefreshNonce]);
 
   // Debounce search term for performance (300ms delay)
   useEffect(() => {
@@ -3034,14 +3103,31 @@ export default function KOLsPage() {
                     </div>
                   </TableCell>
                   )}
-                  {/* Score: placeholder until Phase 3 wires the composite
-                      formula. Show "—" rather than fake numbers; the badge
-                      lands when min 3 deliverables exist per spec. */}
-                  {visibleColumns.score && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                    <div className="truncate text-xs text-gray-400" title="Score will populate once kol_deliverables data is logged (Phase 3)">—</div>
-                  </TableCell>
-                  )}
+                  {/* Score: composite (0-100) with tier badge, computed
+                      by computeRosterScores. Shows "—" with a tooltip
+                      reason when below the 3-deliverables threshold. */}
+                  {visibleColumns.score && (() => {
+                    const result = scoreMap.get(kol.id);
+                    return (
+                      <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                        {result?.score != null ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-semibold text-gray-900">{result.score}</span>
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${tierForScore(result.score).classes}`}>
+                              {tierForScore(result.score).label}
+                            </span>
+                          </div>
+                        ) : (
+                          <div
+                            className="text-xs text-gray-400"
+                            title={result?.reason || "Score requires deliverables data."}
+                          >
+                            —
+                          </div>
+                        )}
+                      </TableCell>
+                    );
+                  })()}
                   {/* Projects: auto-derived from campaign_kols (NOT the
                       manual projects_worked_together column). Each chip
                       links to the campaign — quick pivot from "who is
@@ -3234,6 +3320,13 @@ export default function KOLsPage() {
           setKols((prev) => prev.map((k) => (k.id === updated.id ? updated : k)));
           setProfileModalKol(updated);
         }}
+        // Pass through the pre-computed score so the Overview tab can
+        // show the composite + per-dimension breakdown without
+        // re-fetching everything.
+        score={profileModalKol ? scoreMap.get(profileModalKol.id) : null}
+        // When a deliverable or snapshot changes inside the modal,
+        // bump the nonce so the parent refetches + recomputes scores.
+        onMetricsChanged={() => setScoreRefreshNonce((n) => n + 1)}
       />
 
       {/* 4. Add Dialog for single delete at the bottom of the component */}

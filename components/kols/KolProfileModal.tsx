@@ -31,6 +31,12 @@ import {
   type KolCallLog,
   type CreateKolCallLogInput,
 } from "@/lib/kolCallLogService";
+import {
+  KolChannelSnapshotService,
+  type KolChannelSnapshot,
+  type CreateKolChannelSnapshotInput,
+} from "@/lib/kolChannelSnapshotService";
+import { tierForScore, type KolScoreResult } from "@/lib/kolScoringEngine";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
@@ -60,6 +66,12 @@ interface KolProfileModalProps {
   onClose: () => void;
   /** Called when KOL data was edited (e.g. notes) so parent can refresh. */
   onKolChanged?: (updated: MasterKOL) => void;
+  /** Pre-computed score from the parent's roster-wide normalization.
+   *  Optional — if absent the Overview tab shows a placeholder. */
+  score?: KolScoreResult | null;
+  /** Bumped by the parent when snapshots/deliverables change so the
+   *  parent can re-run computeRosterScores. Optional callback. */
+  onMetricsChanged?: () => void;
 }
 
 export function KolProfileModal({
@@ -67,6 +79,8 @@ export function KolProfileModal({
   isOpen,
   onClose,
   onKolChanged,
+  score,
+  onMetricsChanged,
 }: KolProfileModalProps) {
   if (!kol) return null;
 
@@ -91,18 +105,23 @@ export function KolProfileModal({
         </DialogHeader>
 
         <Tabs defaultValue="overview" className="mt-2">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="deliverables">Deliverables</TabsTrigger>
+            <TabsTrigger value="snapshots">Snapshots</TabsTrigger>
             <TabsTrigger value="calls">Call Logs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="mt-4">
-            <OverviewTab kol={kol} onKolChanged={onKolChanged} />
+            <OverviewTab kol={kol} onKolChanged={onKolChanged} score={score} />
           </TabsContent>
 
           <TabsContent value="deliverables" className="mt-4">
-            <DeliverablesTab kolId={kol.id} />
+            <DeliverablesTab kolId={kol.id} onMetricsChanged={onMetricsChanged} />
+          </TabsContent>
+
+          <TabsContent value="snapshots" className="mt-4">
+            <SnapshotsTab kolId={kol.id} onMetricsChanged={onMetricsChanged} />
           </TabsContent>
 
           <TabsContent value="calls" className="mt-4">
@@ -119,9 +138,11 @@ export function KolProfileModal({
 function OverviewTab({
   kol,
   onKolChanged,
+  score,
 }: {
   kol: MasterKOL;
   onKolChanged?: (updated: MasterKOL) => void;
+  score?: KolScoreResult | null;
 }) {
   const [notes, setNotes] = useState(kol.description || "");
   const [savingNotes, setSavingNotes] = useState(false);
@@ -164,8 +185,36 @@ function OverviewTab({
         />
         <Field label="Group Chat" value={kol.group_chat ? "Yes" : "No"} />
         <Field label="Pricing" value={kol.pricing || "—"} />
-        <Field label="Score" value={<span className="text-gray-400">— (Phase 3)</span>} />
+        <Field
+          label="Score"
+          value={
+            score?.score != null ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="font-semibold">{score.score}</span>
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${tierForScore(score.score).classes}`}>
+                  {tierForScore(score.score).label}
+                </span>
+              </span>
+            ) : (
+              <span className="text-gray-400" title={score?.reason || undefined}>
+                {score?.reason ? "Insufficient data" : "—"}
+              </span>
+            )
+          }
+        />
       </div>
+
+      {/* Per-dimension breakdown — only when a score exists. Helps the
+          team understand WHY a KOL scored a given number. */}
+      {score?.score != null && score.dimensions && (
+        <div className="grid grid-cols-5 gap-2 p-3 bg-white border border-gray-200 rounded-md">
+          <DimensionBar label="Engagement" value={score.dimensions.engagement_quality} />
+          <DimensionBar label="Reach" value={score.dimensions.reach_efficiency} />
+          <DimensionBar label="Channel" value={score.dimensions.channel_health} />
+          <DimensionBar label="Growth" value={score.dimensions.growth_trajectory} />
+          <DimensionBar label="Activation" value={score.dimensions.activation_impact} />
+        </div>
+      )}
 
       {/* Notes field — editable here. The /kols list also exposes this
           as the "Notes" column, but inline-editing a textarea in a
@@ -194,6 +243,35 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+/**
+ * Single dimension bar in the score breakdown — shows the dimension
+ * name + a 0-100 progress bar + the numeric score. Color-codes by
+ * value for at-a-glance reading (red <30, yellow 30-50, blue 50-70,
+ * green 70+).
+ */
+function DimensionBar({ label, value }: { label: string; value: number | null }) {
+  if (value == null) return (
+    <div className="text-center">
+      <div className="text-[10px] text-gray-500 uppercase">{label}</div>
+      <div className="text-xs text-gray-300">—</div>
+    </div>
+  );
+  const color =
+    value >= 70 ? "bg-emerald-500" :
+    value >= 50 ? "bg-blue-500" :
+    value >= 30 ? "bg-yellow-500" :
+    "bg-red-500";
+  return (
+    <div className="text-center">
+      <div className="text-[10px] text-gray-500 uppercase truncate" title={label}>{label}</div>
+      <div className="mt-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+        <div className={`h-full ${color} transition-all`} style={{ width: `${value}%` }} />
+      </div>
+      <div className="text-[10px] text-gray-700 mt-0.5">{value}</div>
+    </div>
+  );
+}
+
 /* ─────────────────────────── Deliverables tab ─────────────────────────── */
 
 interface CampaignOption {
@@ -201,7 +279,7 @@ interface CampaignOption {
   name: string;
 }
 
-function DeliverablesTab({ kolId }: { kolId: string }) {
+function DeliverablesTab({ kolId, onMetricsChanged }: { kolId: string; onMetricsChanged?: () => void }) {
   const [list, setList] = useState<KolDeliverable[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -241,6 +319,7 @@ function DeliverablesTab({ kolId }: { kolId: string }) {
     setList((prev) => [row, ...prev]);
     setShowAddForm(false);
     toast({ title: "Deliverable logged" });
+    onMetricsChanged?.();
   };
 
   const handleDelete = async (id: string) => {
@@ -249,6 +328,7 @@ function DeliverablesTab({ kolId }: { kolId: string }) {
     setList((prev) => prev.filter((d) => d.id !== id));
     try {
       await KolDeliverableService.delete(id);
+      onMetricsChanged?.();
     } catch {
       setList(previous);
       toast({ title: "Failed to delete", variant: "destructive" });
@@ -471,6 +551,220 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
       <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">{label}</label>
       {children}
     </div>
+  );
+}
+
+/* ─────────────────────────── Snapshots tab ─────────────────────────── */
+
+function SnapshotsTab({ kolId, onMetricsChanged }: { kolId: string; onMetricsChanged?: () => void }) {
+  const [list, setList] = useState<KolChannelSnapshot[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const { toast } = useToast();
+
+  const refresh = async () => {
+    try {
+      const rows = await KolChannelSnapshotService.getForKol(kolId);
+      setList(rows);
+    } catch {
+      toast({ title: "Failed to load snapshots", variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setLoading(true);
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kolId]);
+
+  const handleAdded = async (row: KolChannelSnapshot) => {
+    // Re-fetch instead of prepending — UPSERT can replace an existing
+    // row at the same (kol, month), and we want to reflect that
+    // correctly without doing the dedupe ourselves.
+    setShowAddForm(false);
+    toast({ title: "Snapshot saved" });
+    await refresh();
+    onMetricsChanged?.();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this snapshot?")) return;
+    const previous = list;
+    setList((prev) => prev.filter((s) => s.id !== id));
+    try {
+      await KolChannelSnapshotService.delete(id);
+      onMetricsChanged?.();
+    } catch {
+      setList(previous);
+      toast({ title: "Failed to delete", variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gray-500">
+          {list.length} monthly snapshot{list.length === 1 ? "" : "s"} logged.
+          {list.length < 2 && (
+            <span className="ml-1 text-amber-600">
+              Growth Trajectory needs ≥2 to compute.
+            </span>
+          )}
+        </p>
+        {!showAddForm && (
+          <Button size="sm" variant="outline" onClick={() => setShowAddForm(true)}>
+            <Plus className="h-3 w-3 mr-1" /> Add Snapshot
+          </Button>
+        )}
+      </div>
+
+      {showAddForm && (
+        <SnapshotForm
+          kolId={kolId}
+          onCancel={() => setShowAddForm(false)}
+          onSaved={handleAdded}
+        />
+      )}
+
+      {loading ? (
+        <p className="text-xs text-gray-500">Loading…</p>
+      ) : list.length === 0 ? (
+        <p className="text-xs text-gray-500 italic p-4 bg-gray-50 rounded-md text-center">
+          No snapshots yet. Log a monthly snapshot to feed the Channel Health and Growth Trajectory score dimensions.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {list.map((s) => (
+            <SnapshotRow key={s.id} s={s} onDelete={() => handleDelete(s.id)} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SnapshotRow({ s, onDelete }: { s: KolChannelSnapshot; onDelete: () => void }) {
+  // Snapshot dates are stored as YYYY-MM-DD (always 1st of month per
+  // spec). Display as "Mon YYYY" since the day is meaningless.
+  const monthLabel = (() => {
+    const d = new Date(s.snapshot_date + "T00:00:00");
+    return isNaN(d.getTime()) ? s.snapshot_date : d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  })();
+  return (
+    <div className="border border-gray-200 rounded-md p-3 bg-white">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-semibold">{monthLabel}</span>
+            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">
+              {s.follower_count.toLocaleString()} followers
+            </span>
+          </div>
+          <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
+            <Stat label="Avg Views" value={s.avg_views_per_post} />
+            <Stat label="Avg Forwards" value={s.avg_forwards_per_post} />
+            <Stat label="Avg Reactions" value={s.avg_reactions_per_post} />
+            <Stat label="Posts/Wk" value={s.posting_frequency != null ? Number(s.posting_frequency) : null} />
+          </div>
+          {s.notes && <p className="mt-2 text-xs text-gray-600 italic">"{s.notes}"</p>}
+        </div>
+        <Button size="sm" variant="ghost" onClick={onDelete} title="Delete">
+          <Trash2 className="h-3 w-3 text-red-500" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SnapshotForm({
+  kolId,
+  onCancel,
+  onSaved,
+}: {
+  kolId: string;
+  onCancel: () => void;
+  onSaved: (row: KolChannelSnapshot) => void;
+}) {
+  // Default to the first of the current month — matches the spec's
+  // "snapshot_date = first of month" convention.
+  const firstOfMonth = (() => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().slice(0, 10);
+  })();
+  const [snapshotDate, setSnapshotDate] = useState(firstOfMonth);
+  const [followerCount, setFollowerCount] = useState<string>("");
+  const [avgViews, setAvgViews] = useState<string>("");
+  const [avgForwards, setAvgForwards] = useState<string>("");
+  const [avgReactions, setAvgReactions] = useState<string>("");
+  const [postingFreq, setPostingFreq] = useState<string>("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
+
+  const numOrNull = (s: string): number | null => {
+    if (!s.trim()) return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const followers = numOrNull(followerCount);
+    if (followers == null || followers < 0) {
+      toast({ title: "Follower count is required", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    const input: CreateKolChannelSnapshotInput = {
+      kol_id: kolId,
+      snapshot_date: snapshotDate,
+      follower_count: followers,
+      avg_views_per_post: numOrNull(avgViews),
+      avg_forwards_per_post: numOrNull(avgForwards),
+      avg_reactions_per_post: numOrNull(avgReactions),
+      posting_frequency: numOrNull(postingFreq),
+      notes: notes.trim() || null,
+    };
+    try {
+      const row = await KolChannelSnapshotService.upsert(input);
+      onSaved(row);
+    } catch {
+      toast({ title: "Failed to save snapshot", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="border border-gray-200 rounded-md p-3 bg-gray-50 space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <FormField label="Snapshot Month *">
+          <Input type="date" value={snapshotDate} onChange={(e) => setSnapshotDate(e.target.value)} className="h-8 text-xs" />
+        </FormField>
+        <FormField label="Follower Count *">
+          <Input type="number" min={0} value={followerCount} onChange={(e) => setFollowerCount(e.target.value)} className="h-8 text-xs" placeholder="e.g. 12500" />
+        </FormField>
+      </div>
+      <div className="grid grid-cols-4 gap-2">
+        <FormField label="Avg Views"><Input type="number" value={avgViews} onChange={(e) => setAvgViews(e.target.value)} className="h-8 text-xs" /></FormField>
+        <FormField label="Avg Forwards"><Input type="number" value={avgForwards} onChange={(e) => setAvgForwards(e.target.value)} className="h-8 text-xs" /></FormField>
+        <FormField label="Avg Reactions"><Input type="number" value={avgReactions} onChange={(e) => setAvgReactions(e.target.value)} className="h-8 text-xs" /></FormField>
+        <FormField label="Posts/Week"><Input type="number" step="0.1" value={postingFreq} onChange={(e) => setPostingFreq(e.target.value)} className="h-8 text-xs" /></FormField>
+      </div>
+      <FormField label="Notes">
+        <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-[50px] text-xs" placeholder="e.g. KOL took a 2-week break, posting frequency dipped" />
+      </FormField>
+      <div className="flex justify-end gap-2 pt-1">
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={saving}>Cancel</Button>
+        <Button type="submit" size="sm" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+      </div>
+      <p className="text-[10px] text-gray-500 mt-1">
+        Tip: Saving the same month twice updates the existing entry (no duplicates).
+      </p>
+    </form>
   );
 }
 
