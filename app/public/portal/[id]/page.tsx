@@ -58,6 +58,9 @@ type Client = {
   email: string;
   slug: string | null;
   logo_url: string | null;
+  /** When false, suppresses the floating Bell + Recent Activity dropdown.
+   *  Added in migration 074. Per-client opt-out (default true at the DB). */
+  show_activity_notifications?: boolean;
 };
 
 type MeetingNote = {
@@ -261,7 +264,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           // Fetch client email
           const { data, error } = await supabasePublic
             .from('clients')
-            .select('id, name, email, slug, logo_url, approved_emails, approved_domains')
+            .select('id, name, email, slug, logo_url, approved_emails, approved_domains, show_activity_notifications')
             .eq('id', idOrSlug)
             .is('archived_at', null)
             .single();
@@ -279,7 +282,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           // Fetch by slug
           const { data, error } = await supabasePublic
             .from('clients')
-            .select('id, name, email, slug, logo_url, approved_emails, approved_domains')
+            .select('id, name, email, slug, logo_url, approved_emails, approved_domains, show_activity_notifications')
             .eq('slug', idOrSlug)
             .is('archived_at', null)
             .single();
@@ -2712,8 +2715,12 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         </div>
       </main>
 
-      {/* Floating Activity Button + Dropdown */}
-      {recentActivities.length > 0 && (
+      {/* Floating Activity Button + Dropdown.
+          Hidden when the client has show_activity_notifications=false
+          (migration 074). Default true preserves existing behavior;
+          per-client opt-out for clients who've asked to silence the
+          notification surface (currently Altura). */}
+      {recentActivities.length > 0 && client?.show_activity_notifications !== false && (
         <div className="fixed top-[73px] left-0 right-0 z-40 pointer-events-none">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-end">
             <div className="pointer-events-auto relative mt-3">
