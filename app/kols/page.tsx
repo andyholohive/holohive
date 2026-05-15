@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare } from "lucide-react";
+import { Search, Plus, Crown, Save, X, Trash2, Star, Globe, Flag, Menu, Filter, Settings, ChevronLeft, ChevronRight, ChevronDown, MessageSquare, Maximize2 } from "lucide-react";
+import { KolProfileModal } from "@/components/kols/KolProfileModal";
 import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -116,6 +117,10 @@ export default function KOLsPage() {
 
   // 2. Add state for bulk delete dialog
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
+
+  // KOL profile modal — opens via the expand icon in the Name cell.
+  // Houses the Deliverables and Call Logs sections per Phase 2 spec.
+  const [profileModalKol, setProfileModalKol] = useState<MasterKOL | null>(null);
 
   // Sticky scrollbar state
   const [stickyScrollbar, setStickyScrollbar] = useState<{
@@ -2950,6 +2955,20 @@ export default function KOLsPage() {
                                 <span className="text-red-500 font-bold" title="Not updated in 90+ days">!</span>
                               )}
                               {renderEditableCell(kol.name, 'name', kol.id, 'text')}
+                              {/* Expand icon — opens the profile modal
+                                  (Deliverables + Call Logs + Overview).
+                                  Phase 2 of the May 2026 KOL overhaul.
+                                  Sits AFTER the inline-editable name so
+                                  double-click-to-rename still works on
+                                  the name itself. */}
+                              <button
+                                type="button"
+                                onClick={() => setProfileModalKol(kol)}
+                                className="ml-1 opacity-40 hover:opacity-100 transition-opacity flex-shrink-0"
+                                title="Open KOL profile (deliverables + call logs)"
+                              >
+                                <Maximize2 className="h-3 w-3 text-gray-600" />
+                              </button>
                             </>
                           );
                         })()}
@@ -3202,6 +3221,21 @@ export default function KOLsPage() {
           />
         );
       })()}
+      {/* KOL Profile modal — Phase 2 of the May 2026 KOL overhaul.
+          Lifted out of any inline render path so opening it doesn't
+          re-mount on every row update. */}
+      <KolProfileModal
+        kol={profileModalKol}
+        isOpen={profileModalKol !== null}
+        onClose={() => setProfileModalKol(null)}
+        onKolChanged={(updated) => {
+          // Keep the list in sync with edits made in the modal (notes
+          // field). Optimistic — we already trust the modal's save call.
+          setKols((prev) => prev.map((k) => (k.id === updated.id ? updated : k)));
+          setProfileModalKol(updated);
+        }}
+      />
+
       {/* 4. Add Dialog for single delete at the bottom of the component */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
