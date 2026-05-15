@@ -144,7 +144,22 @@ export class TelegramService {
     try {
       const params: any = {
         url: webhookUrl,
-        allowed_updates: ['message', 'edited_message'],
+        // Telegram only sends update types listed here. Missing entries
+        // = silently dropped → handler never runs → buttons spin forever.
+        // The webhook handler (app/api/telegram/webhook/route.ts) uses:
+        //   - message / edited_message — every chat message
+        //   - channel_post — broadcast channel posts
+        //   - my_chat_member — bot was added/removed/promoted in a chat
+        //   - callback_query — inline-keyboard button clicks (/task confirm,
+        //     /tasks list buttons, /done picker buttons). REQUIRED for any
+        //     interactive button feature.
+        allowed_updates: [
+          'message',
+          'edited_message',
+          'channel_post',
+          'my_chat_member',
+          'callback_query',
+        ],
         drop_pending_updates: true // Don't process old messages
       };
 
