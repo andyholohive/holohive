@@ -454,9 +454,16 @@ export default function ListsPage() {
 
   const fetchKOLs = async () => {
     try {
+      // `rating` was dropped from master_kols in migration 071. Selecting
+      // it here previously made the whole query throw with "column does
+      // not exist" → allKOLs stayed empty → the New/Edit List dialog
+      // showed "No KOLs found." Removed; the rating-based filter +
+      // star-rating column further down in this file are already
+      // soft-degraded (read kol.rating which is undefined post-migration,
+      // so filter is a no-op and stars render empty).
       const { data, error } = await supabase
         .from('master_kols')
-        .select('id, name, platform, followers, region, link, creator_type, rating')
+        .select('id, name, platform, followers, region, link, creator_type')
         .is('archived_at', null)
         .order('name');
 
