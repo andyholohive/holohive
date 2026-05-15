@@ -1126,14 +1126,30 @@ async function handleTaskCallback(cq: any) {
     // Insert the actual task. The tasks_assign_short_id trigger
     // (migration 066) auto-stamps short_id on insert. Mirror the
     // status / created_by defaults that taskService.createTask sets.
+    //
+    // Three NOT-NULL columns + one enum-style value need to be filled
+    // explicitly — empirically discovered when the first prod /task
+    // confirm 500'd:
+    //   - status: actual valid value is 'to_do' (with underscore), not
+    //     'todo'. The DB default is 'to_do' but we set it explicitly
+    //     to be self-documenting.
+    //   - frequency: NOT NULL with no default. Tasks created from chat
+    //     are one-off by definition (recurring tasks need cadence
+    //     metadata that /task doesn't capture). 'one-time' matches the
+    //     vocabulary the rest of the app uses.
+    //   - task_type: NOT NULL with no default. 'General' is the
+    //     existing catch-all bucket — users can recategorize from the
+    //     /tasks UI later.
     const insertPayload: Record<string, any> = {
       task_name: parsed.task_name,
       assigned_to: parsed.assignee_user_id || null,
       assigned_to_name: parsed.assignee_name || null,
       due_date: parsed.due_date || null,
       description: parsed.description || parsed.why || null,
-      status: 'todo',
+      status: 'to_do',
       priority: 'medium',
+      frequency: 'one-time',
+      task_type: 'General',
       created_by: (clicker as any).id,
       created_by_name: (clicker as any).name,
     };
