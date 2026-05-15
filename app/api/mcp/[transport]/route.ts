@@ -1,6 +1,7 @@
 import { createMcpHandler } from 'mcp-handler';
 import { z } from 'zod';
 import { authenticateMcpRequest, unauthorizedResponse } from '@/lib/mcp/auth';
+import { mcpAuthStorage } from '@/lib/mcp/context';
 import {
   getServiceClient,
   listRecentProspects,
@@ -46,6 +47,14 @@ import {
   getTaskDetail, getTaskDetailSchema,
   listFormSubmissions, listFormSubmissionsSchema,
   getFormSubmissionDetail, getFormSubmissionDetailSchema,
+  // KOL overhaul Phase 4 — deliverables / score / snapshots / call logs
+  // (the first four are read-only; logDeliverable + logCall write).
+  getKolDeliverables, getKolDeliverablesSchema,
+  getKolScore, getKolScoreSchema,
+  getKolChannelSnapshot, getKolChannelSnapshotSchema,
+  getKolCallLog, getKolCallLogSchema,
+  logDeliverable, logDeliverableSchema,
+  logCall, logCallSchema,
 } from '@/lib/mcp/tools';
 
 export const dynamic = 'force-dynamic';
@@ -306,11 +315,79 @@ const handler = createMcpHandler(
 
     server.tool(
       'get_kol_detail',
-      'Full info on one KOL by UUID — tier, region, follower count, platforms, niche, content type, deliverables, pricing, in-house status, link, wallet, community/group-chat flags, description.',
+      'Full info on one KOL by UUID — region, follower count, platforms, niche, content type, deliverables, pricing, in-house status, link, wallet, community/group-chat flags, description.',
       getKolDetailSchema,
       async (args) => {
         const supabase = getServiceClient();
         const text = await getKolDetail(supabase, args);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    // ─── KOL deliverables / score / snapshots / call logs (Phase 4) ─
+
+    server.tool(
+      'get_kol_deliverables',
+      'List logged deliverables (per-brief outcomes) for one KOL. Each row shows brief number, topic, post link, post date, and engagement metrics (24h/48h views, forwards, reactions, activations). Optionally filter by campaign_id to see just one campaign\'s worth of work.',
+      getKolDeliverablesSchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await getKolDeliverables(supabase, args);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    server.tool(
+      'get_kol_score',
+      'Composite Score (0-100) + tier badge (S/A/B/C/D) for one KOL, with the per-dimension breakdown (Engagement Quality, Reach Efficiency, Channel Health, Growth Trajectory, Activation Impact). Each dimension is min-max normalized against the whole roster, so scores are always relative. Returns "Insufficient data" if the KOL has fewer than 3 logged deliverables.',
+      getKolScoreSchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await getKolScore(supabase, args);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    server.tool(
+      'get_kol_channel_snapshot',
+      'Recent monthly channel-health snapshots for one KOL — follower count, avg views/forwards/reactions per post, posting frequency. Default returns just the latest; use the history param to pull more for trend analysis.',
+      getKolChannelSnapshotSchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await getKolChannelSnapshot(supabase, args);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    server.tool(
+      'get_kol_call_log',
+      'Call log entries for one KOL — date, type (First Onboarding / Repeat Onboarding / Check-in), project, and any of: notes (debrief), market intel, recommended angle, feedback on HoloHive. Reverse chronological.',
+      getKolCallLogSchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await getKolCallLog(supabase, args);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    server.tool(
+      'log_deliverable',
+      'WRITE: Log a new deliverable for a KOL on a campaign. Requires kol_id, campaign_id, brief_number, brief_topic, post_link, date_brief_sent, date_posted. Engagement metrics (views_24h/48h, forwards, reactions, activation_participants) are optional but feed the composite Score formula. Always confirm with the user before calling — this inserts a row into kol_deliverables and is attributed to your OAuth user.',
+      logDeliverableSchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await logDeliverable(supabase, args);
+        return { content: [{ type: 'text', text }] };
+      },
+    );
+
+    server.tool(
+      'log_call',
+      'WRITE: Add a new call log entry for a KOL. Requires kol_id and call_date; everything else is optional. Use the dedicated fields (notes / market_intel / recommended_angle / feedback_on_hh) over stuffing everything into notes — the team scans by section. Always confirm with the user before calling — this inserts a row and is attributed to your OAuth user.',
+      logCallSchema,
+      async (args) => {
+        const supabase = getServiceClient();
+        const text = await logCall(supabase, args);
         return { content: [{ type: 'text', text }] };
       },
     );
@@ -384,19 +461,16 @@ const handler = createMcpHandler(
 );
 
 // Auth wrapper: validate the bearer token before delegating to the
-// MCP handler. The handler itself is transport-agnostic — it doesn't
-// care that we did auth, it just executes the tool.
-//
-// (Previously this also wrapped handler(req) in mcpAuthStorage.run()
-// so the log_crm_activity write tool could attribute its insert to
-// the calling user. With the MCP intentionally restricted to read-
-// only tools, that storage plumbing is no longer needed at runtime.
-// lib/mcp/context.ts is kept on disk for when/if write tools come
-// back — re-add the .run() wrapper here at that point.)
+// MCP handler. Wraps the handler in mcpAuthStorage.run() so the
+// Phase 4 write tools (log_deliverable, log_call) can attribute their
+// inserts to the calling user via mcpAuthStorage.getStore() — the
+// MCP SDK doesn't pass Request through to tool callbacks, so this
+// AsyncLocalStorage trick is the cleanest way to plumb user_id without
+// changing every tool signature.
 async function authedHandler(req: Request): Promise<Response> {
   const ctx = await authenticateMcpRequest(req);
   if (!ctx) return unauthorizedResponse();
-  return handler(req);
+  return mcpAuthStorage.run(ctx, () => handler(req));
 }
 
 export { authedHandler as GET, authedHandler as POST, authedHandler as DELETE };

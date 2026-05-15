@@ -1,5 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
+import { computeRosterScores, tierForScore } from '@/lib/kolScoringEngine';
+import { mcpAuthStorage } from '@/lib/mcp/context';
 
 /**
  * Tool definitions for the HoloHive MCP server.
@@ -1621,4 +1623,311 @@ export async function getFormSubmissionDetail(
     out.push('```');
   }
   return out.join('\n');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// KOL Database Overhaul — Phase 4 MCP tools
+// ════════════════════════════════════════════════════════════════════════
+//
+// Per the May 2026 spec. Six new tools that expose the kol_deliverables /
+// kol_channel_snapshots / kol_call_logs surfaces to Claude:
+//
+//   READ:  get_kol_deliverables, get_kol_score, get_kol_channel_snapshot,
+//          get_kol_call_log
+//   WRITE: log_deliverable, log_call
+//
+// The two write tools are a deliberate departure from the previously
+// read-only MCP server. They're scoped narrowly (only insert into the
+// new Phase 2/3 tables; no UPDATE / DELETE) and use AsyncLocalStorage
+// to attribute every insert to the calling user via mcp_oauth_access_tokens.
+// Token revocation already disables both read and write access.
+
+// ─── Tool: get_kol_deliverables ───────────────────────────────────────
+
+export const getKolDeliverablesSchema = {
+  kol_id: z.string().uuid().describe('Master KOL UUID — get from search_kols or list_top_kols.'),
+  campaign_id: z.string().uuid().optional()
+    .describe('Optional campaign UUID — when provided, only deliverables for this campaign are returned.'),
+  limit: z.number().int().min(1).max(100).default(20),
+};
+
+export async function getKolDeliverables(
+  supabase: SupabaseClient,
+  args: { kol_id: string; campaign_id?: string; limit: number },
+): Promise<string> {
+  let q = (supabase as any)
+    .from('kol_deliverables')
+    .select('*, campaign:campaigns(name, slug)')
+    .eq('kol_id', args.kol_id)
+    .order('date_posted', { ascending: false })
+    .limit(args.limit);
+  if (args.campaign_id) q = q.eq('campaign_id', args.campaign_id);
+
+  const { data, error } = await q;
+  if (error) return `Error: ${error.message}`;
+  const rows = (data || []) as any[];
+  if (rows.length === 0) {
+    return args.campaign_id
+      ? `No deliverables logged for this KOL on the specified campaign.`
+      : `No deliverables logged for this KOL.`;
+  }
+
+  const fmtNum = (n: number | null | undefined) => (n != null ? n.toLocaleString() : '—');
+  const lines = rows.map((d) => {
+    const dated = d.date_posted ? new Date(d.date_posted).toISOString().slice(0, 10) : '—';
+    const campaign = d.campaign?.name || '?';
+    return [
+      `• [${d.id}] #${d.brief_number} ${d.brief_topic} — ${campaign} (posted ${dated})`,
+      `    post: ${d.post_link}`,
+      `    24h_views=${fmtNum(d.views_24h)} · 48h_views=${fmtNum(d.views_48h)} · forwards=${fmtNum(d.forwards)} · reactions=${fmtNum(d.reactions)} · activations=${fmtNum(d.activation_participants)}`,
+      d.notes ? `    notes: ${d.notes}` : null,
+    ].filter(Boolean).join('\n');
+  });
+
+  return `${rows.length} deliverable(s):\n\n${lines.join('\n\n')}`;
+}
+
+// ─── Tool: get_kol_score ──────────────────────────────────────────────
+
+export const getKolScoreSchema = {
+  kol_id: z.string().uuid().describe('Master KOL UUID.'),
+};
+
+export async function getKolScore(
+  supabase: SupabaseClient,
+  args: { kol_id: string },
+): Promise<string> {
+  // Score requires roster-wide normalization (each dimension is min-max
+  // scaled across the whole population). So a per-KOL request still
+  // pulls everyone's data. ~200-500ms typical at <500 KOLs — acceptable
+  // for an MCP call.
+  const [kolsRes, delivRes, snapRes] = await Promise.all([
+    (supabase as any).from('master_kols').select('id, name').is('archived_at', null),
+    (supabase as any).from('kol_deliverables').select('*').limit(2000),
+    (supabase as any)
+      .from('kol_channel_snapshots')
+      .select('*')
+      .gte('snapshot_date', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)),
+  ]);
+
+  if (kolsRes.error) return `Error: ${kolsRes.error.message}`;
+  const kols = (kolsRes.data || []) as Array<{ id: string; name: string }>;
+  const target = kols.find((k) => k.id === args.kol_id);
+  if (!target) return `KOL not found: ${args.kol_id}`;
+
+  // Group deliverables + snapshots by kol_id for the scoring engine.
+  const delivByKol = new Map<string, any[]>();
+  for (const d of (delivRes.data || []) as any[]) {
+    if (!delivByKol.has(d.kol_id)) delivByKol.set(d.kol_id, []);
+    delivByKol.get(d.kol_id)!.push(d);
+  }
+  const snapByKol = new Map<string, any[]>();
+  for (const s of (snapRes.data || []) as any[]) {
+    if (!snapByKol.has(s.kol_id)) snapByKol.set(s.kol_id, []);
+    snapByKol.get(s.kol_id)!.push(s);
+  }
+
+  const roster = kols.map((k) => ({
+    kol_id: k.id,
+    deliverables: delivByKol.get(k.id) || [],
+    snapshots: snapByKol.get(k.id) || [],
+  }));
+  const scores = computeRosterScores(roster);
+  const result = scores.get(args.kol_id);
+  if (!result) return `Score not computed for ${target.name} (${args.kol_id}).`;
+
+  const out: string[] = [];
+  out.push(`## Score for ${target.name}`);
+  out.push('');
+  if (result.score == null) {
+    out.push(`**Score:** Insufficient data`);
+    if (result.reason) out.push(`*${result.reason}*`);
+  } else {
+    const tier = tierForScore(result.score);
+    out.push(`**Composite:** ${result.score}/100 · Tier ${tier.label}`);
+    out.push('');
+    out.push('**Per-dimension breakdown (0-100, normalized vs roster):**');
+    out.push(`  · Engagement Quality:  ${result.dimensions.engagement_quality ?? '—'}`);
+    out.push(`  · Reach Efficiency:    ${result.dimensions.reach_efficiency ?? '—'}`);
+    out.push(`  · Channel Health:      ${result.dimensions.channel_health ?? '—'}`);
+    out.push(`  · Growth Trajectory:   ${result.dimensions.growth_trajectory ?? '—'}`);
+    out.push(`  · Activation Impact:   ${result.dimensions.activation_impact ?? '—'}`);
+  }
+  return out.join('\n');
+}
+
+// ─── Tool: get_kol_channel_snapshot ───────────────────────────────────
+
+export const getKolChannelSnapshotSchema = {
+  kol_id: z.string().uuid().describe('Master KOL UUID.'),
+  history: z.number().int().min(1).max(24).default(1)
+    .describe('Number of recent monthly snapshots to return (default 1 = latest only).'),
+};
+
+export async function getKolChannelSnapshot(
+  supabase: SupabaseClient,
+  args: { kol_id: string; history: number },
+): Promise<string> {
+  const { data, error } = await (supabase as any)
+    .from('kol_channel_snapshots')
+    .select('*')
+    .eq('kol_id', args.kol_id)
+    .order('snapshot_date', { ascending: false })
+    .limit(args.history);
+  if (error) return `Error: ${error.message}`;
+  const rows = (data || []) as any[];
+  if (rows.length === 0) return `No channel snapshots logged for this KOL yet.`;
+
+  const fmt = (n: number | null | undefined) => (n != null ? n.toLocaleString() : '—');
+  const lines = rows.map((s) => {
+    const month = new Date(s.snapshot_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    return [
+      `• ${month} — ${fmt(s.follower_count)} followers`,
+      `    avg_views=${fmt(s.avg_views_per_post)} · avg_forwards=${fmt(s.avg_forwards_per_post)} · avg_reactions=${fmt(s.avg_reactions_per_post)} · posts/wk=${s.posting_frequency ?? '—'}`,
+      s.notes ? `    notes: ${s.notes}` : null,
+    ].filter(Boolean).join('\n');
+  });
+
+  return `${rows.length} snapshot(s):\n\n${lines.join('\n\n')}`;
+}
+
+// ─── Tool: get_kol_call_log ───────────────────────────────────────────
+
+export const getKolCallLogSchema = {
+  kol_id: z.string().uuid().describe('Master KOL UUID.'),
+  limit: z.number().int().min(1).max(50).default(20),
+};
+
+export async function getKolCallLog(
+  supabase: SupabaseClient,
+  args: { kol_id: string; limit: number },
+): Promise<string> {
+  const { data, error } = await (supabase as any)
+    .from('kol_call_logs')
+    .select('*')
+    .eq('kol_id', args.kol_id)
+    .order('call_date', { ascending: false })
+    .limit(args.limit);
+  if (error) return `Error: ${error.message}`;
+  const rows = (data || []) as any[];
+  if (rows.length === 0) return `No call logs for this KOL yet.`;
+
+  const lines = rows.map((c) => {
+    const date = new Date(c.call_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const tags = [c.call_type, c.project].filter(Boolean).join(' · ');
+    const sections = [
+      c.notes && `notes: ${c.notes}`,
+      c.market_intel && `market intel: ${c.market_intel}`,
+      c.recommended_angle && `recommended angle: ${c.recommended_angle}`,
+      c.feedback_on_hh && `feedback on HH: ${c.feedback_on_hh}`,
+    ].filter(Boolean);
+    return [
+      `• ${date}${tags ? ` — ${tags}` : ''}`,
+      ...sections.map((s) => `    ${s}`),
+    ].join('\n');
+  });
+
+  return `${rows.length} call log(s):\n\n${lines.join('\n\n')}`;
+}
+
+// ─── Tool: log_deliverable (WRITE) ────────────────────────────────────
+
+export const logDeliverableSchema = {
+  kol_id: z.string().uuid().describe('Master KOL UUID.'),
+  campaign_id: z.string().uuid().describe('Campaign UUID.'),
+  brief_number: z.number().int().min(1)
+    .describe('Sequence number within (kol, campaign). 1 for the first brief, 2 for the second, etc.'),
+  brief_topic: z.string().min(1).max(200).describe('Short label for the brief, e.g. "Valiant Onboarding".'),
+  post_link: z.string().url().describe('URL to the published post. Required.'),
+  date_brief_sent: z.string().describe('ISO timestamp when brief was sent (e.g. "2026-05-15T00:00:00Z").'),
+  date_posted: z.string().describe('ISO timestamp when KOL posted.'),
+  views_24h: z.number().int().min(0).optional().describe('Views at 24 hours.'),
+  views_48h: z.number().int().min(0).optional().describe('Views at 48 hours.'),
+  forwards: z.number().int().min(0).optional().describe('Forwards/shares.'),
+  reactions: z.number().int().min(0).optional().describe('Total emoji reactions.'),
+  activation_participants: z.number().int().min(0).optional().describe('Event participation from KOL\'s channel.'),
+  notes: z.string().max(2000).optional().describe('Free-form notes (anomalies, context).'),
+};
+
+export async function logDeliverable(
+  supabase: SupabaseClient,
+  args: {
+    kol_id: string; campaign_id: string; brief_number: number;
+    brief_topic: string; post_link: string;
+    date_brief_sent: string; date_posted: string;
+    views_24h?: number; views_48h?: number; forwards?: number;
+    reactions?: number; activation_participants?: number; notes?: string;
+  },
+): Promise<string> {
+  // Attribution: the MCP request authenticated as a real user via OAuth.
+  // mcpAuthStorage gives us their user_id so created_by is correctly set
+  // (rather than NULL or service-role).
+  const ctx = mcpAuthStorage.getStore();
+  const { data, error } = await (supabase as any)
+    .from('kol_deliverables')
+    .insert({
+      kol_id: args.kol_id,
+      campaign_id: args.campaign_id,
+      brief_number: args.brief_number,
+      brief_topic: args.brief_topic.trim(),
+      post_link: args.post_link.trim(),
+      date_brief_sent: args.date_brief_sent,
+      date_posted: args.date_posted,
+      views_24h: args.views_24h ?? null,
+      views_48h: args.views_48h ?? null,
+      forwards: args.forwards ?? null,
+      reactions: args.reactions ?? null,
+      activation_participants: args.activation_participants ?? null,
+      notes: args.notes?.trim() || null,
+      created_by: ctx?.user_id ?? null,
+    })
+    .select('id, brief_number, brief_topic')
+    .single();
+
+  if (error) return `Error: ${error.message}`;
+  return `✓ Deliverable logged. ID: ${data.id} (#${data.brief_number} ${data.brief_topic})`;
+}
+
+// ─── Tool: log_call (WRITE) ───────────────────────────────────────────
+
+export const logCallSchema = {
+  kol_id: z.string().uuid().describe('Master KOL UUID.'),
+  call_date: z.string().describe('ISO date when the call happened (e.g. "2026-05-14").'),
+  call_type: z.enum(['First Onboarding', 'Repeat Onboarding', 'Check-in']).optional()
+    .describe('Type of call.'),
+  project: z.string().max(100).optional().describe('Project the call was about.'),
+  notes: z.string().max(5000).optional().describe('General debrief.'),
+  market_intel: z.string().max(5000).optional().describe('Narratives/trends the KOL flagged.'),
+  recommended_angle: z.string().max(5000).optional().describe('Content approach they suggested.'),
+  feedback_on_hh: z.string().max(5000).optional().describe('What they liked/disliked about working with us.'),
+};
+
+export async function logCall(
+  supabase: SupabaseClient,
+  args: {
+    kol_id: string; call_date: string;
+    call_type?: 'First Onboarding' | 'Repeat Onboarding' | 'Check-in';
+    project?: string; notes?: string; market_intel?: string;
+    recommended_angle?: string; feedback_on_hh?: string;
+  },
+): Promise<string> {
+  const ctx = mcpAuthStorage.getStore();
+  const { data, error } = await (supabase as any)
+    .from('kol_call_logs')
+    .insert({
+      kol_id: args.kol_id,
+      call_date: args.call_date,
+      call_type: args.call_type ?? null,
+      project: args.project?.trim() || null,
+      notes: args.notes?.trim() || null,
+      market_intel: args.market_intel?.trim() || null,
+      recommended_angle: args.recommended_angle?.trim() || null,
+      feedback_on_hh: args.feedback_on_hh?.trim() || null,
+      created_by: ctx?.user_id ?? null,
+    })
+    .select('id, call_date')
+    .single();
+
+  if (error) return `Error: ${error.message}`;
+  return `✓ Call log added. ID: ${data.id} (date: ${data.call_date})`;
 }
