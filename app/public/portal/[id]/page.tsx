@@ -1183,7 +1183,14 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
               }}
             >
               <p className="text-xs font-medium uppercase tracking-[0.35em] mb-8" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                Welcome back
+                {/* Default to "Welcome" until we've confirmed an
+                    onboarding submission exists. Greeting a brand-new
+                    client with "Welcome back" reads wrong; defaulting
+                    to "Welcome" during the loading window means
+                    returning clients see ~200-500ms of "Welcome"
+                    before the check resolves to "Welcome back" — small
+                    flash, much better than the inverse mistake. */}
+                {hasOnboardingResponse === true ? 'Welcome back' : 'Welcome'}
               </p>
             </div>
 
@@ -1434,7 +1441,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         {/* Welcome Section */}
         <div className="mb-10">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back, <span className="text-brand">{client?.name}</span>
+            {/* See entrance-screen comment — same gate, same reasoning. */}
+            {hasOnboardingResponse === true ? 'Welcome back' : 'Welcome'}, <span className="text-brand">{client?.name}</span>
           </h1>
           <p className="text-gray-500 text-lg">
             {welcomeSubtitle}
