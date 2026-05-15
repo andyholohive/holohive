@@ -530,7 +530,7 @@ export default function ArchivePage() {
                     onDelete={() => handlePermanentDelete('kol', kol.id, kol.name)}
                     extraBadges={
                       <>
-                        {kol.tier && <Badge variant="outline" className="text-xs">{kol.tier}</Badge>}
+                        {/* Tier badge removed — column dropped in migration 071. */}
                         {kol.region && <Badge variant="outline" className="text-xs">{kol.region}</Badge>}
                       </>
                     }

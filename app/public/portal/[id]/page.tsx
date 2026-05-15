@@ -823,7 +823,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           campaign_id,
           status,
           hidden,
-          master_kols(name, link, platform, tier),
+          master_kols(name, link, platform),
           contents(content_link, impressions, likes, comments, retweets, bookmarks)
         `)
         .in('campaign_id', campaignIds)
@@ -845,7 +845,9 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           name: mk.name || 'Unknown',
           link: mk.link || null,
           platform: mk.platform || null,
-          tier: mk.tier || null,
+          // tier removed — column dropped in migration 071. Public portal
+          // now omits the tier badge; replace with Score in Phase 3.
+          tier: null,
           status: kol.status,
           displayStatus: statusInfo.label,
           statusColor: statusInfo.color,

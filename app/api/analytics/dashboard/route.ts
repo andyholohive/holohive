@@ -63,7 +63,9 @@ export async function GET(request: Request) {
       (supabase as any).from('crm_activities').select('id, opportunity_id, type, title, owner_id, created_at, crm_opportunities(name)').gte('created_at', since).order('created_at', { ascending: false }).limit(50),
       (supabase as any).from('prospects').select('id, status, source, scraped_at, discovery_snapshot, promoted_opportunity_id').eq('source', 'dropstab_discovery').gte('scraped_at', since),
       (supabase as any).from('payments').select('amount, payment_date, campaigns(name, status)'),
-      (supabase as any).from('master_kols').select('id, group_chat, created_at, region, tier').is('archived_at', null),
+      // tier removed from select — column dropped in migration 071, and
+      // it was never read downstream in this handler anyway.
+      (supabase as any).from('master_kols').select('id, group_chat, created_at, region').is('archived_at', null),
       (supabase as any).from('users').select('id, name, email').eq('is_active', true),
       (supabase as any).from('campaigns').select('id, name, total_budget, status').is('archived_at', null).neq('status', 'closed').neq('status', 'Completed'),
       (supabase as any).from('contents').select('id, activation_date').not('activation_date', 'is', null).lt('activation_date', cutoff7d).is('impressions', null).is('likes', null),

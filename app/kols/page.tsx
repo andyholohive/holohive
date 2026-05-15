@@ -49,33 +49,43 @@ export default function KOLsPage() {
     content_type: [] as string[],
     deliverables: [] as string[],
     pricing: [] as string[],
-    rating: '',
-    ratingOperator: '>' as '>' | '<' | '=',
+    // `rating` filter removed alongside the column (migration 071).
     community: '',
     group_chat: '',
     in_house: [] as string[],
-    description: ''
+    description: '',
+    projects: '',
   });
 
-  // Default visible columns
+  // Default visible columns. Updated for the May 2026 KOL overhaul
+  // spec — Score becomes the new anchor (currently placeholder until
+  // Phase 3 ships kol_channel_snapshots + the formula); rating is gone.
+  // Spec list view (in order, all defaults shown):
+  //   Name | Platform | Followers | Region | Score | Projects |
+  //   Creator Type | Content Type | Pricing | Community Founder |
+  //   In-House | Group Chat
+  // Other columns (link, latest_cost, description, wallet, telegram,
+  // deliverables) stay opt-in via the column visibility menu so power
+  // users can still toggle them on without code changes.
   const defaultVisibleColumns = {
     name: true,
-    link: true,
+    link: false,
     platform: true,
     followers: true,
     region: true,
+    score: true,
+    projects: true,
     creator_type: true,
     content_type: true,
-    deliverables: true,
-    pricing: false,
-    latest_cost: true,
-    rating: true,
+    deliverables: false,
+    pricing: true,
+    latest_cost: false,
     community: true,
     group_chat: true,
     in_house: true,
-    description: true,
-    wallet: true,
-    telegram: true
+    description: false,
+    wallet: false,
+    telegram: false
   };
 
   // Initialize visible columns from URL params
@@ -476,18 +486,14 @@ export default function KOLsPage() {
         (!filters.content_type.length || filters.content_type.some(ct => kol.content_type?.includes(ct))) &&
         (!filters.deliverables.length || filters.deliverables.some(d => kol.deliverables?.includes(d))) &&
         (!filters.pricing.length || filters.pricing.some(p => kol.pricing === p)) &&
-        (!filters.rating || (() => {
-          const rating = parseInt(kol.rating?.toString() || '0');
-          const filterVal = parseInt(filters.rating);
-          if (filters.ratingOperator === '>') return rating > filterVal;
-          if (filters.ratingOperator === '<') return rating < filterVal;
-          if (filters.ratingOperator === '=') return rating === filterVal;
-          return true;
-        })()) &&
+        // rating filter removed alongside the column (migration 071).
         (!filters.community || kol.community === (filters.community === 'yes')) &&
         (!filters.group_chat || kol.group_chat === (filters.group_chat === 'yes')) &&
         (!filters.in_house.length || filters.in_house.some(ih => kol.in_house === ih)) &&
-        (!filters.description || kol.description?.toLowerCase().includes(filters.description.toLowerCase()))
+        (!filters.description || kol.description?.toLowerCase().includes(filters.description.toLowerCase())) &&
+        // Substring match across project tags — case-insensitive.
+        (!filters.projects || (kol.projects_worked_together || []).some(p =>
+          p.toLowerCase().includes(filters.projects.toLowerCase())))
       );
 
       return matchesSearch && matchesFilters;
@@ -707,13 +713,14 @@ export default function KOLsPage() {
         followers: undefined, // fix linter error
         region: null,
         community: false,
+        community_link: null,
         content_type: [],
         niche: [],
         pricing: null,
-        tier: null,
         group_chat: false,
         in_house: null,
-        description: ''
+        description: '',
+        projects_worked_together: [],
       };
       const createdKOL = await KOLService.createKOL(emptyKOL);
       setKols(prevKols => [createdKOL, ...prevKols]); // add to top
@@ -885,9 +892,9 @@ export default function KOLsPage() {
   // Add resize line component
 
 
-  const renderEditableCell = (value: any, field: keyof MasterKOL, kolId: string, type: 'text' | 'number' | 'select' | 'multiselect' | 'boolean' | 'rating' = 'text') => {
+  const renderEditableCell = (value: any, field: keyof MasterKOL, kolId: string, type: 'text' | 'number' | 'select' | 'multiselect' | 'boolean' = 'text') => {
     const isEditing = editingCell?.kolId === kolId && editingCell?.field === field;
-    if (type === 'boolean' || type === 'select' || type === 'multiselect' || type === 'rating') {
+    if (type === 'boolean' || type === 'select' || type === 'multiselect') {
       switch (type) {
         case 'boolean':
           if (field === 'community' || field === 'group_chat') {
@@ -929,72 +936,18 @@ export default function KOLsPage() {
             );
           }
           break;
-        case 'rating':
-          return (
-            <div 
-              className="flex items-center space-x-1"
-              onDoubleClick={async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const kolToUpdate = kols.find(k => k.id === kolId);
-                if (kolToUpdate) {
-                  const updatedKOL = { ...kolToUpdate, [field]: 0 };
-                  setKols(prevKols => 
-                    prevKols.map(k => k.id === kolId ? updatedKOL : k)
-                  );
-                  try {
-                    await KOLService.updateKOL(updatedKOL);
-                  } catch (error) {
-                    console.error('Error updating rating:', error);
-                    setKols(prevKols => 
-                      prevKols.map(k => k.id === kolId ? kolToUpdate : k)
-                    );
-                  }
-                }
-              }}
-            >
-              {[1, 2, 3, 4, 5].map(star => (
-                <Star
-                  key={star}
-                  className={`h-3 w-3 cursor-pointer ${
-                    star <= (value || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-                  }`}
-                  onClick={async (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const kolToUpdate = kols.find(k => k.id === kolId);
-                    if (kolToUpdate) {
-                      const updatedKOL = { ...kolToUpdate, [field]: star };
-                      setKols(prevKols => 
-                        prevKols.map(k => k.id === kolId ? updatedKOL : k)
-                      );
-                      try {
-                        await KOLService.updateKOL(updatedKOL);
-                      } catch (error) {
-                        console.error('Error updating rating:', error);
-                        setKols(prevKols => 
-                          prevKols.map(k => k.id === kolId ? kolToUpdate : k)
-                        );
-                      }
-                    }
-                  }}
-                />
-              ))}
-            </div>
-          );
+        // 'rating' case removed — column dropped per migration 071.
         case 'select':
           const options = field === 'region' ? (fieldOptions?.regions || []) :
                          field === 'pricing' ? (fieldOptions?.pricingTiers || []) :
-                         field === 'tier' ? (fieldOptions?.tiers || []) :
+                         // 'tier' option removed alongside the column (migration 071).
                          field === 'creator_type' ? (fieldOptions?.creatorTypes || []) :
                          field === 'in_house' ? (dynamicFieldOptions?.in_house || []) : [];
           const getSelectStyling = () => {
             if (field === 'pricing' && value) {
               return `${getPricingColor(value)} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center`;
             }
-            if (field === 'tier' && value) {
-              return `${getTierColor(value)} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center`;
-            }
+            // 'tier' branch removed — column dropped per migration 071.
             if (field === 'creator_type' && value) {
               return `${getCreatorTypeColor(value)} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center`;
             }
@@ -1751,9 +1704,9 @@ export default function KOLsPage() {
               />
           </div>
           </div>
-          {/* Community */}
+          {/* Community Founder (renamed from "Community" per May 2026 spec). */}
           <div className="min-w-[100px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Community</span>
+            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Community Founder</span>
             <Select value={bulkEdit.community === true ? 'yes' : bulkEdit.community === false ? 'no' : ''} onValueChange={v => setBulkEdit(prev => ({ ...prev, community: v === 'yes' }))}>
               <SelectTrigger
                 className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.community !== undefined ? (bulkEdit.community ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') : ''}`}
@@ -2097,9 +2050,9 @@ export default function KOLsPage() {
                 />
               </div>
             </div>
-            {/* Community Filter */}
+            {/* Community Founder filter (renamed from "Community"). */}
             <div className="min-w-[100px] flex flex-col items-end justify-end">
-              <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Community</span>
+              <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Community Founder</span>
               <Select value={filters.community} onValueChange={v => setFilters(prev => ({ ...prev, community: v }))}>
                 <SelectTrigger
                   className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${filters.community === 'yes' ? 'bg-green-100 text-green-800' : filters.community === 'no' ? 'bg-red-100 text-red-800' : ''}`}
@@ -2183,31 +2136,7 @@ export default function KOLsPage() {
                 />
               </div>
             </div>
-            {/* Rating Filter */}
-            <div className="min-w-[130px] flex flex-col items-end justify-end">
-              <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Rating</span>
-              <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
-                <Select
-                  value={filters.ratingOperator}
-                  onValueChange={(value) => setFilters(prev => ({ ...prev, ratingOperator: value as '>' | '<' | '=' }))}
-                >
-                  <SelectTrigger className="border-none shadow-none bg-transparent w-auto h-auto px-1 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none" style={{ outline: 'none', boxShadow: 'none', minWidth: 40 }}>
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value=">">{'>'}</SelectItem>
-                    <SelectItem value="<">{'<'}</SelectItem>
-                    <SelectItem value="=">=</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="number"
-                  value={filters.rating}
-                  onChange={(e) => setFilters(prev => ({ ...prev, rating: e.target.value }))}
-                  className="focus-brand h-7 text-xs w-16"
-                />
-              </div>
-            </div>
+            {/* Rating filter removed — rating column dropped per migration 071. */}
             {/* Reset Filters Button */}
             <div className="flex flex-col items-end justify-end">
               <span className="text-xs text-transparent mb-1 self-start">Reset</span>
@@ -2228,12 +2157,11 @@ export default function KOLsPage() {
                     content_type: [],
                     deliverables: [],
                     pricing: [],
-                    rating: '',
-                    ratingOperator: '>',
                     community: '',
                     group_chat: '',
                     in_house: [],
-                    description: ''
+                    description: '',
+                    projects: '',
                   });
                 }}
               >
@@ -2264,16 +2192,17 @@ export default function KOLsPage() {
                   platform: 'Platform',
                   followers: 'Followers',
                   region: 'Region',
+                  score: 'Score',
+                  projects: 'Projects',
                   creator_type: 'Creator Type',
                   content_type: 'Content Type',
                   deliverables: 'Deliverables',
                   pricing: 'Pricing Tier',
                   latest_cost: 'Pricing',
-                  rating: 'Rating',
-                  community: 'Community',
+                  community: 'Community Founder',
                   group_chat: 'Group Chat',
                   in_house: 'In-House',
-                  description: 'Description'
+                  description: 'Notes'
                 }).map(([key, label]) => (
                   <label key={key} className="flex items-center justify-between cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors">
                     <span className="text-sm font-medium mr-4">{label}</span>
@@ -2710,10 +2639,18 @@ export default function KOLsPage() {
               {visibleColumns.latest_cost && (
                 <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>
               )}
-              {visibleColumns.rating && (
+              {/* Score: placeholder until Phase 3 (kol_channel_snapshots
+                  + scoring formula) ships. Show a static "Score" header;
+                  no filter yet (will get a numeric range filter in Phase 3). */}
+              {visibleColumns.score && (
+                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Score</TableHead>
+              )}
+              {/* Projects Worked Together: free-text tags per spec v1.
+                  Substring-match filter on the chip list. */}
+              {visibleColumns.projects && (
                 <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
                   <div className="flex items-center gap-1 cursor-pointer group">
-                    <span>Rating</span>
+                    <span>Projects</span>
                     <Popover>
                       <PopoverTrigger asChild>
                         <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -2722,35 +2659,20 @@ export default function KOLsPage() {
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
                         <div className="p-3">
-                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Rating</div>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Select
-                              value={filters.ratingOperator}
-                              onValueChange={(value) => setFilters(prev => ({ ...prev, ratingOperator: value as '>' | '<' | '=' }))}
-                            >
-                              <SelectTrigger className="w-16 h-8 text-xs focus:ring-0 focus:ring-offset-0">
-                                <SelectValue placeholder="=" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value=">">{'>'}</SelectItem>
-                                <SelectItem value="<">{'<'}</SelectItem>
-                                <SelectItem value="=">=</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Input
-                              type="number"
-                              placeholder="Value"
-                              value={filters.rating}
-                              onChange={(e) => setFilters(prev => ({ ...prev, rating: e.target.value }))}
-                              className="h-8 text-xs focus-brand"
-                            />
-                          </div>
-                          {(filters.ratingOperator || filters.rating) && (
+                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Projects</div>
+                          <Input
+                            type="text"
+                            placeholder="Project name…"
+                            value={filters.projects}
+                            onChange={(e) => setFilters(prev => ({ ...prev, projects: e.target.value }))}
+                            className="h-8 text-xs focus-brand"
+                          />
+                          {filters.projects && (
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="w-full text-xs"
-                              onClick={() => setFilters(prev => ({ ...prev, ratingOperator: '>' as '>' | '<' | '=', rating: '' }))}
+                              className="w-full text-xs mt-2"
+                              onClick={() => setFilters(prev => ({ ...prev, projects: '' }))}
                             >
                               Clear
                             </Button>
@@ -2758,7 +2680,7 @@ export default function KOLsPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                    {(filters.ratingOperator && filters.rating) && (
+                    {filters.projects && (
                       <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         1
                       </span>
@@ -2769,7 +2691,7 @@ export default function KOLsPage() {
               {visibleColumns.community && (
                 <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
                   <div className="flex items-center gap-1 cursor-pointer group">
-                    <span>Community</span>
+                    <span>Community Founder</span>
                     <Popover>
                       <PopoverTrigger asChild>
                         <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -2913,7 +2835,7 @@ export default function KOLsPage() {
                   </div>
                 </TableHead>
               )}
-              {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Description</TableHead>}
+              {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Notes</TableHead>}
               {visibleColumns.wallet && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Wallet</TableHead>}
               {visibleColumns.telegram && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Telegram</TableHead>}
               <TableHead className="bg-gray-50 whitespace-nowrap">Actions</TableHead>
@@ -3037,14 +2959,51 @@ export default function KOLsPage() {
                     </div>
                   </TableCell>
                   )}
-                  {visibleColumns.rating && (
+                  {/* Score: placeholder until Phase 3 wires the composite
+                      formula. Show "—" rather than fake numbers; the badge
+                      lands when min 3 deliverables exist per spec. */}
+                  {visibleColumns.score && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                    <div className="truncate">{renderEditableCell(kol.rating, 'rating', kol.id, 'rating')}</div>
+                    <div className="truncate text-xs text-gray-400" title="Score will populate once kol_deliverables data is logged (Phase 3)">—</div>
+                  </TableCell>
+                  )}
+                  {/* Projects: free-text tag chips (v1 per spec). Stored
+                      as a text[] on master_kols. Edit via the existing
+                      multiselect renderer. */}
+                  {visibleColumns.projects && (
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                    <div className="flex flex-wrap gap-1 max-w-[260px]">
+                      {(kol.projects_worked_together || []).length > 0 ? (
+                        (kol.projects_worked_together || []).map((p, i) => (
+                          <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700">
+                            {p}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-gray-400 text-xs">-</span>
+                      )}
+                    </div>
                   </TableCell>
                   )}
                   {visibleColumns.community && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
-                    <div className="truncate">{renderEditableCell(kol.community, 'community', kol.id, 'boolean')}</div>
+                    <div className="flex items-center gap-2">
+                      {renderEditableCell(kol.community, 'community', kol.id, 'boolean')}
+                      {/* Show the community link inline when the toggle is
+                          on. Lets the team paste a URL without opening a
+                          separate dialog. Empty when null. */}
+                      {kol.community && (
+                        <a
+                          href={kol.community_link || undefined}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`text-xs underline truncate max-w-[120px] ${kol.community_link ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 pointer-events-none'}`}
+                          title={kol.community_link || 'No link set'}
+                        >
+                          {kol.community_link ? 'link' : '(no link)'}
+                        </a>
+                      )}
+                    </div>
                   </TableCell>
                   )}
                   {visibleColumns.group_chat && (
@@ -3298,11 +3257,15 @@ const KOLTableSkeleton = React.memo(function KOLTableSkeleton({
             {visibleColumns.deliverables && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Deliverables</TableHead>}
             {visibleColumns.pricing && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>}
             {visibleColumns.latest_cost && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>}
-            {visibleColumns.rating && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Rating</TableHead>}
-            {visibleColumns.community && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Community</TableHead>}
+            {/* Score + Projects added per May 2026 KOL overhaul spec.
+                Rating column removed (migration 071). Loading skeleton
+                mirrors the live table so columns don't reflow on load. */}
+            {visibleColumns.score && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Score</TableHead>}
+            {visibleColumns.projects && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Projects</TableHead>}
+            {visibleColumns.community && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Community Founder</TableHead>}
             {visibleColumns.group_chat && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Group Chat</TableHead>}
             {visibleColumns.in_house && <TableHead className={`bg-gray-50 border-r border-gray-200 select-none ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}>In-House</TableHead>}
-            {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Description</TableHead>}
+            {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Notes</TableHead>}
             {visibleColumns.wallet && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Wallet</TableHead>}
             {visibleColumns.telegram && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Telegram</TableHead>}
             <TableHead className="bg-gray-50 whitespace-nowrap">Actions</TableHead>
@@ -3322,7 +3285,8 @@ const KOLTableSkeleton = React.memo(function KOLTableSkeleton({
               {visibleColumns.deliverables && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-18 rounded-md" /><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-14 rounded-md" /></div></TableCell>}
               {visibleColumns.pricing && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>}
               {visibleColumns.latest_cost && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.rating && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><div className="flex items-center space-x-1 w-full">{[1, 2, 3, 4, 5].map(star => (<Skeleton key={star} className="h-3 w-3 rounded" />))}</div></TableCell>}
+              {visibleColumns.score && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-12" /></TableCell>}
+              {visibleColumns.projects && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-40`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-5 w-16 rounded" /><Skeleton className="h-5 w-12 rounded" /></div></TableCell>}
               {visibleColumns.community && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
               {visibleColumns.group_chat && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
               {visibleColumns.in_house && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}

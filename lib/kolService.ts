@@ -1,7 +1,11 @@
 import { supabase } from './supabase';
 import { VectorStore } from './vectorStore';
 
-// TypeScript types for KOL data
+// TypeScript types for KOL data.
+// `tier` and `rating` were removed in migration 071 — replaced by the
+// composite Score + tier badge per the May 2026 KOL overhaul spec.
+// `community_link` and `projects_worked_together` were added in the
+// same migration.
 export interface MasterKOL {
   id: string;
   name: string;
@@ -10,17 +14,17 @@ export interface MasterKOL {
   followers: number | null;
   region: string | null;
   community: boolean | null;
+  community_link: string | null;
   deliverables: string[] | null;
   creator_type: string[] | null;
   content_type: string[] | null;
   niche: string[] | null;
   pricing: string | null;
-  tier: string | null;
-  rating: number | null;
   group_chat: boolean | null;
   in_house: string | null;
   description: string | null;
   wallet: string | null;
+  projects_worked_together: string[] | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -32,17 +36,17 @@ export interface CreateKOLData {
   followers?: number;
   region?: MasterKOL['region'];
   community?: boolean;
+  community_link?: string | null;
   deliverables?: string[];
   creator_type?: MasterKOL['creator_type'];
   content_type?: MasterKOL['content_type'];
   niche?: string[];
   pricing?: MasterKOL['pricing'];
-  tier?: MasterKOL['tier'];
-  rating?: number;
   group_chat?: boolean;
   in_house?: string | null;
   description?: string;
   wallet?: string;
+  projects_worked_together?: string[];
 }
 
 export interface UpdateKOLData {
@@ -53,17 +57,17 @@ export interface UpdateKOLData {
   followers?: number | null;
   region?: string | null;
   community?: boolean | null;
+  community_link?: string | null;
   deliverables?: string[] | null;
   creator_type?: string[] | null;
   content_type?: string[] | null;
   niche?: string[] | null;
   pricing?: string | null;
-  tier?: string | null;
-  rating?: number | null;
   group_chat?: boolean | null;
   in_house?: string | null;
   description?: string | null;
   wallet?: string | null;
+  projects_worked_together?: string[] | null;
 }
 
 export class KOLService {
@@ -79,7 +83,11 @@ export class KOLService {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return (kols || []) as MasterKOL[];
+      // Cast via unknown — the generated Database types still carry the
+      // dropped `tier`/`rating` columns and lack the new ones until
+      // migration 071 is applied (then `npm run db:types` regenerates).
+      // Once the migration lands, the cast can drop back to `as MasterKOL[]`.
+      return ((kols || []) as unknown) as MasterKOL[];
     } catch (error) {
       console.error('Error fetching KOLs:', error);
       throw error;
@@ -100,16 +108,16 @@ export class KOLService {
           followers: kolData.followers || null,
           region: kolData.region || null,
           community: kolData.community || false,
+          community_link: kolData.community_link || null,
           deliverables: kolData.deliverables || [],
           niche: kolData.niche || [],
           pricing: kolData.pricing || null,
-          tier: kolData.tier || null,
-          rating: kolData.rating || null,
           group_chat: kolData.group_chat || false,
           description: kolData.description || null,
           creator_type: kolData.creator_type || null,
           content_type: kolData.content_type || null,
-          in_house: kolData.in_house || null
+          in_house: kolData.in_house || null,
+          projects_worked_together: kolData.projects_worked_together || []
         }])
         .select()
         .single();
@@ -128,7 +136,7 @@ export class KOLService {
         console.log('⚠️  KOL created but not indexed. Run indexing script later.');
       });
 
-      return kol as MasterKOL;
+      return (kol as unknown) as MasterKOL;
     } catch (error) {
       console.error('Error creating KOL:', error);
       throw error;
@@ -178,7 +186,7 @@ export class KOLService {
         });
       }
 
-      return kol as MasterKOL;
+      return (kol as unknown) as MasterKOL;
     } catch (error) {
       console.error('Error updating KOL:', error);
       throw error;
@@ -253,7 +261,9 @@ export class KOLService {
       deliverables: ['Post', 'Video', 'Article', 'AMA', 'Ambassadorship', 'Alpha', 'QRT', 'Thread', 'Spaces', 'Newsletter'],
       niches: ['General', 'Gaming', 'Crypto', 'Memecoin', 'NFT', 'Trading', 'AI', 'Research', 'Airdrop', 'Art'],
       pricingTiers: ['<$200', '$200-500', '$500-1K', '$1K-2K', '$2K-3K', '>$3K'],
-      tiers: ['Tier S', 'Tier 1', 'Tier 2', 'Tier 3', 'Tier 4'],
+      // `tiers` was removed alongside the `tier` column (migration 071).
+      // The new tier badge is auto-derived from the composite Score in
+      // Phase 3 — no manual tier picker anymore.
       creatorTypes: ['General', 'Gaming', 'Crypto', 'Memecoin', 'NFT', 'Trading', 'AI', 'Research', 'Airdrop', 'Art', 'Native (Meme/Culture)', 'Drama-Forward', 'Skeptic', 'Educator', 'Bridge Builder', 'Visionary', 'Onboarder'],
       contentTypes: ['Meme', 'News', 'Trading', 'Deep Dive', 'Meme/Cultural Narrative', 'Drama Queen', 'Sceptics', 'Technical Educator', 'Bridge Builders', 'Visionaries']
     };

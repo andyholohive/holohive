@@ -2723,8 +2723,7 @@ const CampaignDetailsPage = () => {
       content_type: kol.content_type || [],
       niche: kol.niche || [],
       pricing: kol.pricing,
-      tier: kol.tier,
-      rating: kol.rating,
+      // tier and rating fields removed (migration 071).
       in_house: kol.in_house,
       description: kol.description,
       wallet: kol.wallet,
@@ -11500,22 +11499,8 @@ const CampaignDetailsPage = () => {
                 </Select>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="mk-tier">Tier</Label>
-                <Select
-                  value={masterKolForm.tier || ''}
-                  onValueChange={(v) => setMasterKolForm(f => ({ ...f, tier: v || null }))}
-                >
-                  <SelectTrigger id="mk-tier" className="focus-brand">
-                    <SelectValue placeholder="Select tier" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {((fieldOptions as any)?.tiers || []).map((t: string) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Tier select removed — column dropped in migration 071.
+                  Phase 3 will surface the auto-derived Score badge here. */}
 
               <div className="space-y-1.5 col-span-2">
                 <Label>Platforms</Label>
@@ -11567,19 +11552,7 @@ const CampaignDetailsPage = () => {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="mk-rating">Rating (0-5)</Label>
-                <Input
-                  id="mk-rating"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="5"
-                  value={masterKolForm.rating ?? ''}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, rating: e.target.value ? Number(e.target.value) : null }))}
-                  className="focus-brand"
-                />
-              </div>
+              {/* Rating input removed — column dropped in migration 071. */}
 
               <div className="space-y-1.5">
                 <Label htmlFor="mk-in-house">In-House</Label>

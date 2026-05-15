@@ -220,15 +220,16 @@ export class VectorStore {
       // Services and pricing
       kol.deliverables?.length ? `Services: ${kol.deliverables.join(', ')}. Can deliver ${kol.deliverables.join(', ')}` : '',
       kol.pricing ? `Pricing: ${kol.pricing}. Costs ${kol.pricing}` : '',
-      kol.tier ? `Tier: ${kol.tier}. ${kol.tier} tier creator` : '',
+      // tier text removed — column dropped (migration 071). Score will
+      // populate this slot once Phase 3 ships kol_channel_snapshots +
+      // the composite formula.
 
       // Engagement features
       kol.community ? 'Has active community, community engagement, audience interaction' : '',
       kol.group_chat ? 'Has group chat, direct communication channel, telegram group' : '',
       kol.in_house ? `In-house status: ${kol.in_house}` : '',
 
-      // Quality indicators
-      kol.rating ? `Rating: ${kol.rating}/5 stars, ${kol.rating >= 4 ? 'highly rated' : kol.rating >= 3 ? 'good rating' : 'average rating'}` : '',
+      // Quality indicators — `rating` text removed (migration 071).
 
       // Free-form description (most important for context)
       kol.description ? `Description: ${kol.description}` : '',
@@ -252,8 +253,8 @@ export class VectorStore {
       niche: kol.niche,
       deliverables: kol.deliverables,
       pricing: kol.pricing,
-      tier: kol.tier,
-      rating: kol.rating,
+      // tier and rating removed from metadata — columns dropped in
+      // migration 071. Search-result UI doesn't render these anymore.
       community: kol.community,
       group_chat: kol.group_chat,
       in_house: kol.in_house,

@@ -234,30 +234,30 @@ export const searchKolsSchema = {
     .describe('Search by name (case-insensitive substring match).'),
   region: z.string().optional()
     .describe('Optional region filter (e.g. "Korea", "Global").'),
-  tier: z.string().optional()
-    .describe('Optional exact tier filter. Vocabulary: "Tier S", "Tier 1", "Tier 2", "Tier 3".'),
+  // `tier` filter removed — column dropped in migration 071. Will be
+  // replaced by a Score-based filter once Phase 3 ships scoring.
   limit: z.number().int().min(1).max(50).default(20),
 };
 
 export async function searchKols(
   supabase: SupabaseClient,
-  args: { query: string; region?: string; tier?: string; limit: number },
+  args: { query: string; region?: string; limit: number },
 ): Promise<string> {
   let q = (supabase as any)
     .from('master_kols')
-    .select('id, name, region, tier, followers, niche, platform, link, in_house, archived_at')
+    .select('id, name, region, followers, niche, platform, link, in_house, archived_at')
     .is('archived_at', null)
     .ilike('name', `%${args.query}%`)
     .order('followers', { ascending: false, nullsFirst: false })
     .limit(args.limit);
 
   if (args.region) q = q.ilike('region', args.region);
-  if (args.tier) q = q.eq('tier', args.tier);
+  // tier filter removed (migration 071).
 
   const { data, error } = await q;
   if (error) return `Error: ${error.message}`;
   const rows = (data || []) as any[];
-  if (rows.length === 0) return `No KOLs match "${args.query}"${args.region ? ` (region=${args.region})` : ''}${args.tier ? ` (tier=${args.tier})` : ''}.`;
+  if (rows.length === 0) return `No KOLs match "${args.query}"${args.region ? ` (region=${args.region})` : ''}.`;
 
   const fmtFollowers = (n: number | null) => {
     if (n == null) return '—';
@@ -273,7 +273,7 @@ export async function searchKols(
     // a second search. Without this, the schema description for
     // get_kol_detail ("from list_top_kols or search_kols") is a lie —
     // the UUID isn't anywhere in the response.
-    return `• [${k.id}] ${k.name} — ${k.tier || '?'} tier · ${fmtFollowers(k.followers)} followers · ${k.region || '—'}${niches}${plats}${k.in_house ? ` · in-house: ${k.in_house}` : ''}`;
+    return `• [${k.id}] ${k.name} — ${fmtFollowers(k.followers)} followers · ${k.region || '—'}${niches}${plats}${k.in_house ? ` · in-house: ${k.in_house}` : ''}`;
   });
 
   return `${rows.length} KOL(s) matching "${args.query}":\n\n${lines.join('\n')}\n\nUse the UUID in [brackets] to call get_kol_detail for full info (link, wallet, pricing, etc.).`;
@@ -1184,7 +1184,8 @@ export async function listCampaignKols(
 ): Promise<string> {
   let q = (supabase as any)
     .from('campaign_kols')
-    .select('id, hh_status, client_status, allocated_budget, paid, hidden, master_kols(id, name, tier, region, followers, link, platform)')
+    // tier removed from joined select (migration 071 dropped the column).
+    .select('id, hh_status, client_status, allocated_budget, paid, hidden, master_kols(id, name, region, followers, link, platform)')
     .eq('campaign_id', args.campaign_id)
     .order('allocated_budget', { ascending: false, nullsFirst: false })
     .limit(args.limit);
@@ -1214,7 +1215,7 @@ export async function listCampaignKols(
     // not what callers need.
     const status = `hh=${r.hh_status || 'untriaged'} · client=${r.client_status || 'untriaged'}`;
     const hidden = r.hidden ? ' (hidden)' : '';
-    return `• [${k.id || '—'}] ${k.name || '?'} — ${k.tier || '?'} tier · ${fmtFollowers(k.followers)} followers · ${k.region || '—'} · ${status}${budget}${paid}${hidden}`;
+    return `• [${k.id || '—'}] ${k.name || '?'} — ${fmtFollowers(k.followers)} followers · ${k.region || '—'} · ${status}${budget}${paid}${hidden}`;
   });
   return `${rows.length} KOL(s) in this campaign:\n\n${lines.join('\n')}\n\nUse the UUID in [brackets] to call get_kol_detail for full info on any KOL.`;
 }
@@ -1270,8 +1271,8 @@ export async function getCampaignPayments(
 export const listTopKolsSchema = {
   region: z.string().optional()
     .describe('Region filter (e.g. "Korea", "Global"). Case-insensitive substring.'),
-  tier: z.string().optional()
-    .describe('Exact tier match. Vocabulary in this database: "Tier S", "Tier 1", "Tier 2", "Tier 3" (top → bottom).'),
+  // tier filter removed — column dropped in migration 071. The doc-spec
+  // replacement is a Score-based filter once Phase 3 ships.
   niche: z.string().optional()
     .describe('Niche substring match (e.g. "DeFi", "GameFi", "L1").'),
   platform: z.string().optional()
@@ -1286,19 +1287,20 @@ export const listTopKolsSchema = {
 export async function listTopKols(
   supabase: SupabaseClient,
   args: {
-    region?: string; tier?: string; niche?: string; platform?: string;
+    region?: string; niche?: string; platform?: string;
     min_followers?: number; in_house_only: boolean; limit: number;
   },
 ): Promise<string> {
   let q = (supabase as any)
     .from('master_kols')
-    .select('id, name, region, tier, followers, niche, platform, content_type, in_house, link, pricing, rating')
+    // tier and rating dropped from select (migration 071).
+    .select('id, name, region, followers, niche, platform, content_type, in_house, link, pricing')
     .is('archived_at', null)
     .order('followers', { ascending: false, nullsFirst: false })
     .limit(args.limit * 2); // over-fetch to allow client-side niche/platform filtering on array columns
 
   if (args.region) q = q.ilike('region', `%${args.region}%`);
-  if (args.tier) q = q.eq('tier', args.tier);
+  // tier filter removed (migration 071).
   if (args.min_followers != null) q = q.gte('followers', args.min_followers);
   if (args.in_house_only) q = q.not('in_house', 'is', null);
 
@@ -1322,7 +1324,6 @@ export async function listTopKols(
   if (rows.length === 0) {
     const filters = [
       args.region && `region~"${args.region}"`,
-      args.tier && `tier=${args.tier}`,
       args.niche && `niche~"${args.niche}"`,
       args.platform && `platform~"${args.platform}"`,
       args.min_followers != null && `followers≥${args.min_followers}`,
@@ -1342,10 +1343,11 @@ export async function listTopKols(
     const niches = Array.isArray(k.niche) && k.niche.length ? ` · ${k.niche.slice(0, 3).join('/')}` : '';
     const plats = Array.isArray(k.platform) && k.platform.length ? ` · ${k.platform.join('+')}` : '';
     const inHouse = k.in_house ? ` · in-house: ${k.in_house}` : '';
-    const rating = k.rating != null ? ` · ★${k.rating}` : '';
+    // tier/rating display removed (migration 071). Score will replace it
+    // once Phase 3 ships.
     // UUID up front for the same reason as search_kols — the caller
     // needs it to chain into get_kol_detail.
-    return `• [${k.id}] ${k.name} — ${k.tier || '?'} tier · ${fmtFollowers(k.followers)} followers · ${k.region || '—'}${niches}${plats}${inHouse}${rating}`;
+    return `• [${k.id}] ${k.name} — ${fmtFollowers(k.followers)} followers · ${k.region || '—'}${niches}${plats}${inHouse}`;
   });
   return `${rows.length} KOL(s):\n\n${lines.join('\n')}\n\nUse the UUID in [brackets] to call get_kol_detail for full info (link, wallet, pricing, etc.).`;
 }
@@ -1377,8 +1379,10 @@ export async function getKolDetail(
   const out: string[] = [];
   out.push(`## ${k.name}`);
   out.push('');
-  out.push(`**Tier:** ${k.tier || '?'}  ·  **Region:** ${k.region || '—'}  ·  **Followers:** ${fmtFollowers(k.followers)}`);
-  if (k.rating != null) out.push(`**Rating:** ★${k.rating}/10`);
+  // Tier and Rating lines removed (migration 071 dropped both columns).
+  // Phase 3 will add a Score line here once kol_channel_snapshots +
+  // the composite scoring formula ship.
+  out.push(`**Region:** ${k.region || '—'}  ·  **Followers:** ${fmtFollowers(k.followers)}`);
   if (Array.isArray(k.platform) && k.platform.length) out.push(`**Platforms:** ${k.platform.join(', ')}`);
   if (Array.isArray(k.niche) && k.niche.length) out.push(`**Niche:** ${k.niche.join(', ')}`);
   if (Array.isArray(k.content_type) && k.content_type.length) out.push(`**Content type:** ${k.content_type.join(', ')}`);
