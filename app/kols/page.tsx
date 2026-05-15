@@ -141,6 +141,20 @@ export default function KOLsPage() {
   // Latest cost per KOL (master_kol_id -> { amount, campaignSlug })
   const [latestCostMap, setLatestCostMap] = useState<Map<string, { amount: number; campaignSlug: string }>>(new Map());
 
+  // Auto-derived "Projects Worked Together" per KOL.
+  //
+  // The May 2026 spec says "Free text tags for v1" — i.e. manual entry.
+  // But we already have the truth in campaign_kols, so manual entry would
+  // be redundant data the team has to maintain. Skip straight to v2's
+  // behavior: derive from the join, present as chips, zero maintenance.
+  //
+  // master_kols.projects_worked_together stays in the schema as an
+  // unused safety hatch — useful later if we ever want manual override
+  // tags (e.g. external projects that aren't in campaign_kols).
+  //
+  // Map shape: kol.id → [{ name, slug }] sorted by most-recent campaign.
+  const [projectsMap, setProjectsMap] = useState<Map<string, Array<{ name: string; slug: string | null }>>>(new Map());
+
   const fieldOptions = KOLService.getFieldOptions();
   const { toast } = useToast();
 
@@ -354,11 +368,50 @@ export default function KOLsPage() {
     }
   };
 
+  // Auto-derive Projects from campaign_kols rather than the manual
+  // projects_worked_together column. One query, joined to campaigns
+  // for the display name + slug. Filtered to non-archived campaigns
+  // (we don't want stale projects from campaigns the team has buried).
+  // Dedup per KOL — same campaign can only appear once even if there
+  // are multiple campaign_kols rows (e.g. KOL re-added after dropout).
+  const fetchProjectsPerKol = async () => {
+    try {
+      const { data, error } = await (supabase as any)
+        .from('campaign_kols')
+        .select('master_kol_id, campaign:campaigns!inner(id, name, slug, archived_at, created_at)')
+        .order('created_at', { ascending: false });
+      if (error || !data) return;
+
+      const map = new Map<string, Array<{ name: string; slug: string | null }>>();
+      const seen = new Map<string, Set<string>>(); // kol_id → set of campaign_ids
+
+      for (const row of data as any[]) {
+        const kolId: string | null = row.master_kol_id;
+        const campaign = row.campaign;
+        if (!kolId || !campaign) continue;
+        if (campaign.archived_at) continue; // skip archived campaigns
+
+        const existing = seen.get(kolId) || new Set<string>();
+        if (existing.has(campaign.id)) continue;
+        existing.add(campaign.id);
+        seen.set(kolId, existing);
+
+        const list = map.get(kolId) || [];
+        list.push({ name: campaign.name || '(unnamed)', slug: campaign.slug || null });
+        map.set(kolId, list);
+      }
+      setProjectsMap(map);
+    } catch (err) {
+      console.error('Error fetching projects per KOL:', err);
+    }
+  };
+
   useEffect(() => {
     fetchKOLs();
     loadDynamicFieldOptions();
     fetchTelegramChats();
     fetchLatestCosts();
+    fetchProjectsPerKol();
   }, []);
 
   // Debounce search term for performance (300ms delay)
@@ -491,14 +544,17 @@ export default function KOLsPage() {
         (!filters.group_chat || kol.group_chat === (filters.group_chat === 'yes')) &&
         (!filters.in_house.length || filters.in_house.some(ih => kol.in_house === ih)) &&
         (!filters.description || kol.description?.toLowerCase().includes(filters.description.toLowerCase())) &&
-        // Substring match across project tags — case-insensitive.
-        (!filters.projects || (kol.projects_worked_together || []).some(p =>
-          p.toLowerCase().includes(filters.projects.toLowerCase())))
+        // Substring match across the derived project list (campaign
+        // names from campaign_kols join). Falls through cleanly when
+        // projectsMap hasn't loaded yet — empty list = no match if
+        // user has typed a filter, but page won't crash.
+        (!filters.projects || (projectsMap.get(kol.id) || []).some(p =>
+          p.name.toLowerCase().includes(filters.projects.toLowerCase())))
       );
 
       return matchesSearch && matchesFilters;
     });
-  }, [kols, debouncedSearchTerm, filters]);
+  }, [kols, debouncedSearchTerm, filters, projectsMap]);
 
   const STALE_THRESHOLD_MS = 90 * 24 * 60 * 60 * 1000;
 
@@ -2967,20 +3023,37 @@ export default function KOLsPage() {
                     <div className="truncate text-xs text-gray-400" title="Score will populate once kol_deliverables data is logged (Phase 3)">—</div>
                   </TableCell>
                   )}
-                  {/* Projects: free-text tag chips (v1 per spec). Stored
-                      as a text[] on master_kols. Edit via the existing
-                      multiselect renderer. */}
+                  {/* Projects: auto-derived from campaign_kols (NOT the
+                      manual projects_worked_together column). Each chip
+                      links to the campaign — quick pivot from "who is
+                      this KOL" to "what work has she done with us." */}
                   {visibleColumns.projects && (
                   <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                     <div className="flex flex-wrap gap-1 max-w-[260px]">
-                      {(kol.projects_worked_together || []).length > 0 ? (
-                        (kol.projects_worked_together || []).map((p, i) => (
-                          <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700">
-                            {p}
-                          </span>
+                      {(projectsMap.get(kol.id) || []).length > 0 ? (
+                        (projectsMap.get(kol.id) || []).slice(0, 5).map((p, i) => (
+                          p.slug ? (
+                            <a
+                              key={i}
+                              href={`/campaigns/${p.slug}`}
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                              title={p.name}
+                            >
+                              {p.name}
+                            </a>
+                          ) : (
+                            <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700" title={p.name}>
+                              {p.name}
+                            </span>
+                          )
                         ))
                       ) : (
                         <span className="text-gray-400 text-xs">-</span>
+                      )}
+                      {(projectsMap.get(kol.id) || []).length > 5 && (
+                        <span className="text-gray-500 text-[10px]" title={(projectsMap.get(kol.id) || []).slice(5).map(p => p.name).join(', ')}>
+                          +{(projectsMap.get(kol.id) || []).length - 5}
+                        </span>
                       )}
                     </div>
                   </TableCell>
