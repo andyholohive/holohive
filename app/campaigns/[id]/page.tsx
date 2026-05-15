@@ -5029,7 +5029,17 @@ const CampaignDetailsPage = () => {
                   </div>
                 </div>
                 {/* Overview View */}
-                {kolViewMode === 'overview' && (
+                {kolViewMode === 'overview' && (() => {
+                  // Hidden KOLs are excluded from every dashboard count +
+                  // chart. They're intentionally archived from the
+                  // active roster (still queryable in the Hidden tab),
+                  // so including them in totals/averages/platform-mix
+                  // misrepresents the campaign's actual footprint.
+                  // Active/Hidden tab counts in the table view (further
+                  // down) keep the unfiltered campaignKOLs because
+                  // those literally show "what's in each bucket".
+                  const dashboardKOLs = campaignKOLs.filter(k => !k.hidden);
+                  return (
                   <div className="space-y-6">
                     {/* Overview Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -5045,7 +5055,7 @@ const CampaignDetailsPage = () => {
                         </CardHeader>
                         <CardContent>
                           <div className="text-2xl font-bold text-gray-900">
-                            {campaignKOLs.length}
+                            {dashboardKOLs.length}
                           </div>
                         </CardContent>
                       </Card>
@@ -5063,19 +5073,9 @@ const CampaignDetailsPage = () => {
                         <CardContent>
                           <div className="text-2xl font-bold text-gray-900">
                             {(() => {
-                              if (campaignKOLs.length > 0) {
-                                const totalFollowers = campaignKOLs.reduce((sum, kol) => sum + (kol.master_kol.followers || 0), 0);
-                                const average = Math.round(totalFollowers / campaignKOLs.length);
-                                console.log('Average followers calculation:', {
-                                  totalKOLs: campaignKOLs.length,
-                                  totalFollowers,
-                                  average,
-                                  formatted: KOLService.formatFollowers(average),
-                                  sampleData: campaignKOLs.slice(0, 3).map(kol => ({
-                                    name: kol.master_kol.name,
-                                    followers: kol.master_kol.followers
-                                  }))
-                                });
+                              if (dashboardKOLs.length > 0) {
+                                const totalFollowers = dashboardKOLs.reduce((sum, kol) => sum + (kol.master_kol.followers || 0), 0);
+                                const average = Math.round(totalFollowers / dashboardKOLs.length);
                                 return KOLService.formatFollowers(average);
                               }
                               return '0';
@@ -5094,7 +5094,7 @@ const CampaignDetailsPage = () => {
                             <p className="text-sm text-gray-600">
                               {(() => {
                                 const platforms = new Set();
-                                campaignKOLs.forEach(kol => {
+                                dashboardKOLs.forEach(kol => {
                                   if (kol.master_kol.platform) {
                                     kol.master_kol.platform.forEach((p: string) => platforms.add(p));
                                   }
@@ -5108,7 +5108,7 @@ const CampaignDetailsPage = () => {
                           <div className="text-2xl font-bold text-gray-900">
                             {(() => {
                               const platforms = new Set();
-                              campaignKOLs.forEach(kol => {
+                              dashboardKOLs.forEach(kol => {
                                 if (kol.master_kol.platform) {
                                   kol.master_kol.platform.forEach((p: string) => platforms.add(p));
                                 }
@@ -5129,7 +5129,7 @@ const CampaignDetailsPage = () => {
                             <p className="text-sm text-gray-600">
                               {(() => {
                                 const regions = new Set();
-                                campaignKOLs.forEach(kol => {
+                                dashboardKOLs.forEach(kol => {
                                   if (kol.master_kol.region) {
                                     regions.add(kol.master_kol.region);
                                   }
@@ -5143,7 +5143,7 @@ const CampaignDetailsPage = () => {
                           <div className="text-2xl font-bold text-gray-900">
                             {(() => {
                               const regions = new Set();
-                              campaignKOLs.forEach(kol => {
+                              dashboardKOLs.forEach(kol => {
                                 if (kol.master_kol.region) {
                                   regions.add(kol.master_kol.region);
                                 }
@@ -5170,7 +5170,7 @@ const CampaignDetailsPage = () => {
                             <BarChart 
                               data={(() => {
                                 const platformCounts: { [key: string]: number } = {};
-                                campaignKOLs.forEach(kol => {
+                                dashboardKOLs.forEach(kol => {
                                   if (kol.master_kol.platform) {
                                     kol.master_kol.platform.forEach((platform: string) => {
                                       platformCounts[platform] = (platformCounts[platform] || 0) + 1;
@@ -5268,7 +5268,7 @@ const CampaignDetailsPage = () => {
                             <BarChart 
                               data={(() => {
                                 const regionCounts: { [key: string]: number } = {};
-                                campaignKOLs.forEach(kol => {
+                                dashboardKOLs.forEach(kol => {
                                   if (kol.master_kol.region) {
                                     regionCounts[kol.master_kol.region] = (regionCounts[kol.master_kol.region] || 0) + 1;
                                   }
@@ -5338,7 +5338,8 @@ const CampaignDetailsPage = () => {
                       </div>
                     </div>
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* Table View */}
                 {kolViewMode === 'table' && (
