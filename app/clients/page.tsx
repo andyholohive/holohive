@@ -3321,10 +3321,11 @@ export default function ClientsPage() {
                       </Popover>
                     )}
                   </div>
-                  <div className="grid gap-2">
-                    <Label>Milestones</Label>
-                    <Textarea value={contextForm.milestones} onChange={(e) => setContextForm({ ...contextForm, milestones: e.target.value })} placeholder="Expected milestones..." className="focus-brand" rows={3} />
-                  </div>
+                  {/* Free-text "Milestones" field removed per May 2026
+                      feedback — redundant with the structured milestones
+                      managed under the Action Board tab. The contextForm
+                      still carries the field so the saved value isn't
+                      destroyed; it's just no longer editable here. */}
                   <div className="grid gap-2">
                     <Label>Client Contacts</Label>
                     <Input value={contextForm.client_contacts} onChange={(e) => setContextForm({ ...contextForm, client_contacts: e.target.value })} placeholder="Primary contacts on client side" className="focus-brand" />
@@ -3341,11 +3342,11 @@ export default function ClientsPage() {
                         <Input value={contextForm.telegram_url} onChange={(e) => setContextForm({ ...contextForm, telegram_url: e.target.value })} placeholder="https://t.me/..." className="focus-brand" />
                       </div>
                       <div className="grid gap-1">
-                        <Label className="text-xs">Shared Drive URL</Label>
+                        <Label className="text-xs">Brand Assets URL</Label>
                         <Input value={contextForm.shared_drive_url} onChange={(e) => setContextForm({ ...contextForm, shared_drive_url: e.target.value })} placeholder="https://drive.google.com/..." className="focus-brand" />
                       </div>
                       <div className="grid gap-1">
-                        <Label className="text-xs">GTM Sync / Tracker URL</Label>
+                        <Label className="text-xs">GTM Plan URL</Label>
                         <Input value={contextForm.gtm_sync_url} onChange={(e) => setContextForm({ ...contextForm, gtm_sync_url: e.target.value })} placeholder="https://..." className="focus-brand" />
                       </div>
                     </div>

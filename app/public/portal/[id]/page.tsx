@@ -1830,20 +1830,11 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 ) : null;
               })()}
 
-              {/* Milestones as a timeline */}
-              {clientContext?.milestones && (
-                <div className="mb-5 bg-gray-50 rounded-lg p-4">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Milestones</p>
-                  <div className="space-y-2">
-                    {clientContext.milestones.split('\n').filter(Boolean).map((milestone, i) => (
-                      <div key={i} className="flex items-start gap-3">
-                        <div className="mt-1.5 h-2 w-2 rounded-full bg-brand flex-shrink-0" />
-                        <p className="text-sm text-gray-700">{milestone}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Free-text Milestones timeline removed per May 2026
+                  feedback — duplicated the structured action-board
+                  milestones rendered above. The DB field stays
+                  populated for any client that still has data; just
+                  not rendered here. */}
 
               {/* Contacts side by side */}
               {(clientContext?.client_contacts || clientContext?.holohive_contacts) && (
@@ -2134,7 +2125,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             <FolderOpen className="h-5 w-5 text-green-600" />
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">Shared Drive</p>
+                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">Brand Assets</p>
                             <p className="text-xs text-gray-500">View files</p>
                           </div>
                           <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
@@ -2151,7 +2142,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             <Globe className="h-5 w-5 text-purple-600" />
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">GTM Sync / Tracker</p>
+                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">GTM Plan</p>
                             <p className="text-xs text-gray-500">Open tracker</p>
                           </div>
                           <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
