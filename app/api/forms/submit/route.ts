@@ -58,12 +58,55 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch form details for Telegram notification
+    // Fetch form details for Telegram notification + slug check below.
     const { data: form } = await supabaseAdmin
       .from('forms')
-      .select('name')
+      .select('name, slug')
       .eq('id', form_id)
       .single();
+
+    // Auto-complete Milestone 1 ("Kickoff & Setup") when the holo-hive
+    // onboarding form is submitted. Per May 2026 spec: M1 is the only
+    // milestone that auto-completes (the others stay manual). When M1
+    // flips to complete we also bump M2 to 'active' so the Action Board
+    // / progress bar advances visibly.
+    //
+    // Gated on form.slug === 'holo-hive-onboarding' so other forms
+    // submitted against a client (e.g. brand-asset upload form) don't
+    // accidentally trigger this. Best-effort — failures here are
+    // logged but never block the form submission response.
+    if (client_id && form?.slug === 'holo-hive-onboarding') {
+      try {
+        // Find this client's milestones in display_order. Filter to
+        // status != 'complete' so re-submission of the form (rare but
+        // possible if Quazo asks the client to redo it) doesn't bounce
+        // M2 back to active when it's already mid-flight.
+        const { data: milestones } = await (supabaseAdmin as any)
+          .from('client_milestones')
+          .select('id, display_order, status')
+          .eq('client_id', client_id)
+          .order('display_order', { ascending: true });
+
+        const ms1 = (milestones || []).find((m: any) => m.display_order === 0);
+        const ms2 = (milestones || []).find((m: any) => m.display_order === 1);
+
+        if (ms1 && ms1.status !== 'complete') {
+          await (supabaseAdmin as any)
+            .from('client_milestones')
+            .update({ status: 'complete', updated_at: new Date().toISOString() })
+            .eq('id', ms1.id);
+          console.log('[Form Submit] Auto-completed Milestone 1 for client', client_id);
+        }
+        if (ms2 && ms2.status === 'upcoming') {
+          await (supabaseAdmin as any)
+            .from('client_milestones')
+            .update({ status: 'active', updated_at: new Date().toISOString() })
+            .eq('id', ms2.id);
+        }
+      } catch (autoErr) {
+        console.error('[Form Submit] Auto-complete M1 failed:', autoErr);
+      }
+    }
 
     console.log('[Form Submit] Sending Telegram notification for form:', {
       formId: form_id,

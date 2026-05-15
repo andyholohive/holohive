@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -44,6 +45,7 @@ import {
   Clock,
   RefreshCw,
   ListChecks,
+  X,
 } from 'lucide-react';
 
 const STALE_DAYS = 7;
@@ -212,6 +214,14 @@ const COLUMN_ORDER_KEY = 'tasks-column-order';
 export default function TasksPage() {
   const { user, userProfile } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Optional URL filter — `/tasks?client=<uuid>` scopes the list to a
+  // single client. Used by the /clients page's "HQ tasks" badge to
+  // bridge into this view. When unset, the list is unfiltered (all
+  // clients + unassigned tasks).
+  const clientFilterId = searchParams.get('client');
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -404,6 +414,13 @@ export default function TasksPage() {
       tabFiltered = tasks.filter(t => deliverableTaskIds.has(t.id));
     }
 
+    // ?client=<uuid> URL filter — bridge from the /clients page's
+    // "HQ tasks" badge. Applied BEFORE the completed/search filters
+    // so counts at the bottom of the page reflect the scoped roster.
+    if (clientFilterId) {
+      tabFiltered = tabFiltered.filter(t => t.client_id === clientFilterId);
+    }
+
     // Hide completed unless the user has toggled them on.
     if (!showCompleted) {
       tabFiltered = tabFiltered.filter(t => t.status !== 'complete');
@@ -419,7 +436,7 @@ export default function TasksPage() {
       t.task_type.toLowerCase().includes(term) ||
       (t.created_by_name && t.created_by_name.toLowerCase().includes(term))
     ).sort((a, b) => a.sort_order - b.sort_order);
-  }, [tasks, activeTab, searchTerm, showCompleted]);
+  }, [tasks, activeTab, searchTerm, showCompleted, clientFilterId]);
 
   // Group filtered tasks by assigned_to
   const groupedByUser = useMemo(() => {
@@ -1301,6 +1318,22 @@ export default function TasksPage() {
                 </div>
               ) : (
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  {/* Client-filter pill — visible only when /tasks?client=
+                      is set (e.g. arrived from /clients HQ tasks badge).
+                      Click X to clear the filter back to "all clients". */}
+                  {clientFilterId && (
+                    <div className="mb-2 inline-flex items-center gap-2 px-3 py-1 bg-brand/10 text-brand rounded-full text-xs font-medium">
+                      <span>Client: {clientMap[clientFilterId] || 'unknown'}</span>
+                      <button
+                        type="button"
+                        onClick={() => router.replace('/tasks')}
+                        className="hover:bg-brand/20 rounded-full p-0.5"
+                        aria-label="Clear client filter"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
                   <TabsList className="bg-gray-100 p-1 h-auto flex-wrap">
                     <TabsTrigger
                       value="one-time"

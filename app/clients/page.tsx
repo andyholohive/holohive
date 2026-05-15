@@ -21,7 +21,7 @@ import { FormService, FormWithStats } from '@/lib/formService';
 import { UserService } from '@/lib/userService';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff, ChevronDown, ChevronUp, Lock, Circle } from 'lucide-react';
+import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff, ChevronDown, ChevronUp, Lock, Circle, ListTodo, MoreHorizontal } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
@@ -117,6 +117,29 @@ type ClientWithStatus = ClientWithAccess & {
   campaignsByStatus?: Record<CampaignStatus, number>;
 };
 
+/**
+ * Compact relative time label for the "Last visit" line on each
+ * client card. ISO timestamp in → "3 days ago" / "Today" / "5 mins
+ * ago" / "Sep 12" out. Caps at "Today" for sub-day diffs because the
+ * card has a hover tooltip showing the exact timestamp anyway —
+ * minute/hour precision in the card itself is just noise.
+ */
+function relativeTimeFromNow(iso: string): string {
+  const ts = new Date(iso).getTime();
+  if (isNaN(ts)) return '—';
+  const diffMs = Date.now() - ts;
+  if (diffMs < 0) return 'just now';
+  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  if (days === 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return '1 week ago';
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  if (days < 60) return '1 month ago';
+  if (days < 365) return `${Math.floor(days / 30)} months ago`;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 export default function ClientsPage() {
   const { user, userProfile } = useAuth();
   const router = useRouter();
@@ -199,6 +222,11 @@ export default function ClientsPage() {
   const [portalAccessSummary, setPortalAccessSummary] = useState<
     Record<string, { count_30d: number; last_at: string | null }>
   >({});
+  // HQ task counts per client — open (non-complete) tasks where
+  // tasks.client_id matches. Drives the "📋 N HQ tasks" badge on each
+  // card and links into /tasks?client=<id>. Loaded alongside the rest
+  // in fetchClients() to avoid a second round-trip per render.
+  const [hqTaskCounts, setHqTaskCounts] = useState<Record<string, number>>({});
   const [accessLogModalClient, setAccessLogModalClient] = useState<ClientWithAccess | null>(null);
   const [accessLogRows, setAccessLogRows] = useState<
     Array<{ id: string; email: string; authorized_via: string; accessed_at: string; user_agent: string | null; ip_address: string | null }>
@@ -432,6 +460,7 @@ export default function ClientsPage() {
         templateRes,
         mindshareRes,
         portalAccessRes,
+        hqTasksRes,
       ] = await Promise.all([
         CampaignService.getCampaignsByClientIds(clientIds) as Promise<any[]>,
         CRMService.getAllOpportunities(),
@@ -447,6 +476,16 @@ export default function ClientsPage() {
           .select('client_id, accessed_at')
           .gte('accessed_at', thirtyDaysAgo)
           .order('accessed_at', { ascending: false }),
+        // Open HQ tasks per client. We pull just client_id + status
+        // because we only need the count — no display fields. The
+        // !=complete filter mirrors how /tasks page hides done items
+        // by default. parent_task_id check excludes deliverable
+        // subtasks (they roll up under their parent in /tasks).
+        supabase.from('tasks')
+          .select('client_id')
+          .neq('status', 'complete')
+          .is('parent_task_id', null)
+          .not('client_id', 'is', null),
       ]);
 
       // Build the campaigns-by-status map per client
@@ -544,6 +583,16 @@ export default function ClientsPage() {
         if (!bucket.last_at) bucket.last_at = row.accessed_at;
       }
       setPortalAccessSummary(accessSummary);
+
+      // HQ task counts per client. One pass over the rows we just
+      // fetched — no further round-trips. Clients with zero open
+      // tasks just don't appear in the map (badge falls back to 0).
+      const taskCounts: Record<string, number> = {};
+      for (const t of ((hqTasksRes.data || []) as Array<{ client_id: string | null }>)) {
+        if (!t.client_id) continue;
+        taskCounts[t.client_id] = (taskCounts[t.client_id] || 0) + 1;
+      }
+      setHqTaskCounts(taskCounts);
     } catch (err) {
       setError('Failed to load clients');
     } finally {
@@ -2656,46 +2705,100 @@ export default function ClientsPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="pt-4 border-t border-gray-100">
-                    <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
-                      <span className="font-bold text-base">Campaigns by Status</span>
-                    </div>
-                    <div className="flex flex-col gap-1 mb-3">
-                      {['Active', 'Planning', 'Paused', 'Completed'].map((status) => {
-                        const statusIcon = {
-                          Active: (
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500">
-                              <CheckCircle className="h-3 w-3 text-white" strokeWidth={2} />
-                            </span>
-                          ),
-                          Planning: (
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-500">
-                              <FileText className="h-3 w-3 text-white" strokeWidth={2} />
-                            </span>
-                          ),
-                          Paused: (
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-yellow-500">
-                              <PauseCircle className="h-3 w-3 text-white" strokeWidth={2} />
-                            </span>
-                          ),
-                          Completed: (
-                            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-teal-600">
-                              <BadgeCheck className="h-3 w-3 text-white" strokeWidth={2} />
-                            </span>
-                          ),
-                        }[status];
-                        return (
-                          <div key={status} className="flex items-center justify-between text-sm text-gray-600">
-                            <span className="flex items-center gap-2">
-                              {statusIcon}
-                              <span>{status}</span>
-                            </span>
-                            <span className="bg-gray-100 rounded-md text-gray-600 font-medium w-7 h-7 flex items-center justify-center">
-                              {clientWithStatus.campaignsByStatus?.[status as CampaignStatus] || 0}
+                    {/* Per May 2026 user feedback: replace the campaign-
+                        status breakdown with onboarding progress + signals
+                        the team actually scans for at a glance.
+                          • Pre-onboarding: progress bar + active milestone
+                          • Post-onboarding (M1 complete): "Week X"
+                          • Pending client tasks badge (court='yours' && !done)
+                          • HQ tasks count → links into /tasks?client=<id>
+                          • Last portal visit relative time */}
+                    {(() => {
+                      const milestones = (clientMilestones[client.id] || []).slice().sort((a, b) => a.display_order - b.display_order);
+                      const m1Complete = milestones.length > 0 && milestones[0].status === 'complete';
+                      const ctx = clientContexts[client.id];
+                      const total = milestones.length;
+                      const completed = milestones.filter(m => m.status === 'complete').length;
+                      const active = milestones.find(m => m.status === 'active');
+                      const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+                      // Week-N derivation. ISO week starts on Monday but for
+                      // an engagement timeline, "Week 1" is the calendar
+                      // week of the start date, regardless of weekday — so
+                      // ceil(days/7), min 1.
+                      const weekN = (() => {
+                        if (!ctx?.start_date) return null;
+                        const start = new Date(ctx.start_date + 'T00:00:00');
+                        const days = Math.floor((Date.now() - start.getTime()) / (24 * 60 * 60 * 1000));
+                        return Math.max(1, Math.ceil((days + 1) / 7));
+                      })();
+
+                      const pendingClientTasks = (clientActionItems[client.id] || []).filter(
+                        i => i.court === 'yours' && !i.is_done && !i.is_hidden,
+                      ).length;
+                      const openHqTasks = hqTaskCounts[client.id] || 0;
+                      const lastVisit = portalAccessSummary[client.id]?.last_at;
+                      const lastVisitLabel = lastVisit ? relativeTimeFromNow(lastVisit) : 'Never visited';
+
+                      return (
+                        <div className="space-y-3 mb-3">
+                          {/* Onboarding progress OR Week-N */}
+                          {!m1Complete ? (
+                            total > 0 ? (
+                              <div>
+                                <div className="flex items-baseline justify-between text-sm mb-1.5">
+                                  <span className="font-semibold text-gray-700">
+                                    Milestone {Math.min(completed + 1, total)} of {total}
+                                    {active && <span className="text-gray-500 font-normal"> — {active.name}</span>}
+                                  </span>
+                                  <span className="text-xs text-gray-500">{pct}%</span>
+                                </div>
+                                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-brand transition-all duration-300"
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-gray-400 italic">No milestones seeded yet.</div>
+                            )
+                          ) : (
+                            <div className="flex items-baseline justify-between text-sm">
+                              <span className="font-semibold text-gray-700">
+                                {weekN != null ? `Week ${weekN}` : 'Engagement live'}
+                              </span>
+                              {ctx?.start_date && (
+                                <span className="text-xs text-gray-500">
+                                  Started {new Date(ctx.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Activity row: pending client tasks + HQ tasks + last visit */}
+                          <div className="flex items-center gap-3 flex-wrap text-xs">
+                            {pendingClientTasks > 0 && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 text-amber-700 font-medium" title={`${pendingClientTasks} task${pendingClientTasks === 1 ? '' : 's'} waiting on the client`}>
+                                🔔 {pendingClientTasks} waiting on client
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); router.push(`/tasks?client=${client.id}`); }}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors font-medium"
+                              title={openHqTasks > 0 ? `${openHqTasks} open HQ task${openHqTasks === 1 ? '' : 's'} — click to view` : 'No open HQ tasks — click to view all'}
+                            >
+                              <ListTodo className="h-3 w-3" />
+                              {openHqTasks} HQ task{openHqTasks === 1 ? '' : 's'}
+                            </button>
+                            <span className="text-gray-500" title={lastVisit ? new Date(lastVisit).toLocaleString() : 'Client has never opened the portal'}>
+                              · Last visit: {lastVisitLabel}
                             </span>
                           </div>
-                        );
-                      })}
-                    </div>
+                        </div>
+                      );
+                    })()}
                     {(client.campaign_count || 0) > 0 ? (
                       <div className="flex gap-2">
                         <Button variant="outline" size="sm" className="w-full" onClick={() => router.push(`/campaigns?clientId=${client.id}`)}>
@@ -2710,70 +2813,64 @@ export default function ClientsPage() {
                         Add Campaign
                       </Button>
                     )}
-                    {/* Client Portal — compact row */}
+                    {/* Client Portal — folded into one dropdown per
+                        May 2026 user feedback. The 4 separate icon
+                        tiles (Context / Updates / Notes / Visits)
+                        ate too much vertical space and added click
+                        ambiguity ("which one is the right one?").
+                        Single button → menu = consistent with how
+                        other CRUD-heavy rows handle this throughout
+                        the app. The "Open Portal" link sits next to
+                        it as the primary action since it's what the
+                        team most often wants. */}
                     <div className="mt-3 pt-3 border-t border-gray-100">
-                      <p className="font-bold text-sm text-gray-700 mb-2">Client Portal</p>
-                      <div className="grid grid-cols-4 gap-2">
-                        {/* Context */}
-                        <button
-                          onClick={() => openContextModal(client)}
-                          className="flex flex-col items-center gap-1.5 p-2.5 rounded-lg border border-gray-200 hover:border-brand hover:bg-brand-light/30 transition-colors group relative"
+                      <div className="flex items-center justify-between gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => router.push(`/public/portal/${client.id}`)}
                         >
-                          <Briefcase className="h-4 w-4 text-gray-400 group-hover:text-brand" />
-                          <span className="text-[11px] font-medium text-gray-600 group-hover:text-brand">Context</span>
-                          {clientContexts[client.id] ? (
-                            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-green-500" title="Set up" />
-                          ) : (
-                            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-gray-300" title="Not set up" />
-                          )}
-                        </button>
-                        {/* Weekly Update */}
-                        <button
-                          onClick={() => { if (clientWeeklyUpdates[client.id]?.length) { openWeeklyModal(client); } else { openWeeklyModal(client); openWeeklyForm(); } }}
-                          className="flex flex-col items-center gap-1.5 p-2.5 rounded-lg border border-gray-200 hover:border-brand hover:bg-brand-light/30 transition-colors group relative"
-                        >
-                          <Activity className="h-4 w-4 text-gray-400 group-hover:text-brand" />
-                          <span className="text-[11px] font-medium text-gray-600 group-hover:text-brand">Updates</span>
-                          {(clientWeeklyUpdates[client.id]?.length || 0) > 0 ? (
-                            <span className="absolute top-1.5 right-1.5 bg-brand text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center">{clientWeeklyUpdates[client.id].length}</span>
-                          ) : (
-                            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-gray-300" />
-                          )}
-                        </button>
-                        {/* Meeting Notes */}
-                        <button
-                          onClick={() => { setMeetingNotesModalClient(client); setMeetingNotesTab('notes'); if (!(clientMeetingNotes[client.id]?.length)) openNoteForm(); }}
-                          className="flex flex-col items-center gap-1.5 p-2.5 rounded-lg border border-gray-200 hover:border-brand hover:bg-brand-light/30 transition-colors group relative"
-                        >
-                          <StickyNote className="h-4 w-4 text-gray-400 group-hover:text-brand" />
-                          <span className="text-[11px] font-medium text-gray-600 group-hover:text-brand">Notes</span>
-                          {(clientMeetingNotes[client.id]?.length || 0) > 0 ? (
-                            <span className="absolute top-1.5 right-1.5 bg-brand text-white text-[9px] font-bold rounded-full h-4 w-4 flex items-center justify-center">{clientMeetingNotes[client.id].length}</span>
-                          ) : (
-                            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-gray-300" />
-                          )}
-                        </button>
-                        {/* Visits — portal_access_log readout. Badge
-                            shows the last-30-day count; click opens the
-                            full log modal. Empty state is a gray dot
-                            so the tile still looks set up. */}
-                        <button
-                          onClick={() => openAccessLogModal(client)}
-                          className="flex flex-col items-center gap-1.5 p-2.5 rounded-lg border border-gray-200 hover:border-brand hover:bg-brand-light/30 transition-colors group relative"
-                          title={portalAccessSummary[client.id]?.last_at
-                            ? `Last visit: ${new Date(portalAccessSummary[client.id]!.last_at!).toLocaleString()}`
-                            : 'No visits yet'}
-                        >
-                          <Eye className="h-4 w-4 text-gray-400 group-hover:text-brand" />
-                          <span className="text-[11px] font-medium text-gray-600 group-hover:text-brand">Visits</span>
-                          {(portalAccessSummary[client.id]?.count_30d || 0) > 0 ? (
-                            <span className="absolute top-1.5 right-1.5 bg-brand text-white text-[9px] font-bold rounded-full h-4 px-1 min-w-[16px] flex items-center justify-center">
-                              {portalAccessSummary[client.id]!.count_30d}
-                            </span>
-                          ) : (
-                            <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-gray-300" />
-                          )}
-                        </button>
+                          <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                          Open Portal
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" title="Client portal management">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuItem onClick={() => openContextModal(client)}>
+                              <Briefcase className="h-4 w-4 mr-2 text-gray-500" />
+                              <span className="flex-1">Context</span>
+                              {clientContexts[client.id] && (
+                                <span className="h-2 w-2 rounded-full bg-green-500" title="Set up" />
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { if (clientWeeklyUpdates[client.id]?.length) { openWeeklyModal(client); } else { openWeeklyModal(client); openWeeklyForm(); } }}>
+                              <Activity className="h-4 w-4 mr-2 text-gray-500" />
+                              <span className="flex-1">Updates</span>
+                              {(clientWeeklyUpdates[client.id]?.length || 0) > 0 && (
+                                <span className="text-[10px] font-semibold text-brand bg-brand/10 px-1.5 rounded">{clientWeeklyUpdates[client.id].length}</span>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setMeetingNotesModalClient(client); setMeetingNotesTab('notes'); if (!(clientMeetingNotes[client.id]?.length)) openNoteForm(); }}>
+                              <StickyNote className="h-4 w-4 mr-2 text-gray-500" />
+                              <span className="flex-1">Notes</span>
+                              {(clientMeetingNotes[client.id]?.length || 0) > 0 && (
+                                <span className="text-[10px] font-semibold text-brand bg-brand/10 px-1.5 rounded">{clientMeetingNotes[client.id].length}</span>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openAccessLogModal(client)}>
+                              <Eye className="h-4 w-4 mr-2 text-gray-500" />
+                              <span className="flex-1">Visits</span>
+                              {(portalAccessSummary[client.id]?.count_30d || 0) > 0 && (
+                                <span className="text-[10px] font-semibold text-brand bg-brand/10 px-1.5 rounded">{portalAccessSummary[client.id]!.count_30d}</span>
+                              )}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </CardContent>
