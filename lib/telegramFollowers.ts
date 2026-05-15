@@ -82,6 +82,15 @@ export interface TelegramFollowerResult {
   channel_title: string | null;
 }
 
+/**
+ * Cap on retry-after waits — anything longer than this and we just
+ * give up rather than burn the function-execution budget on one KOL.
+ * 30s comfortably covers Telegram's typical "retry after 9-19" range
+ * we saw on the first prod run; longer waits indicate a deeper limit
+ * we won't escape inside the same function invocation anyway.
+ */
+const MAX_RETRY_AFTER_SECONDS = 30;
+
 export async function fetchTelegramFollowerCount(
   username: string,
   botToken: string,
@@ -91,30 +100,57 @@ export async function fetchTelegramFollowerCount(
 
   // Single API call — getChatMemberCount alone is enough. Earlier
   // version called getChat first for a "sanity check + title" but
-  // that doubled the per-KOL latency (~900ms vs ~450ms) and pushed
-  // the cron over Vercel's 60s function limit on the full 85-KOL
-  // run. The error message from getChatMemberCount is identical to
-  // getChat's when a channel doesn't exist ("Bad Request: chat not
-  // found"), so we lose nothing by dropping the second call. Title
-  // is no longer captured — the notes field on the snapshot just
-  // omits it.
+  // that doubled the per-KOL latency. The error message from
+  // getChatMemberCount is identical to getChat's when a channel
+  // doesn't exist ("Bad Request: chat not found"), so we lose
+  // nothing by dropping the second call.
+  //
+  // Retry-after handling: when Telegram returns a 429, the response
+  // includes parameters.retry_after with the suggested wait. We
+  // honor it once, capped at MAX_RETRY_AFTER_SECONDS, then bail.
+  // First-run on 85 KOLs (2026-05-15) hit retry-after values of
+  // 9-19s; the 30s cap leaves headroom for slightly punitive
+  // limiter responses without blowing the cron's function budget.
+  return await fetchWithRetry(apiBase, chatId, username, /* alreadyRetried */ false);
+}
+
+async function fetchWithRetry(
+  apiBase: string,
+  chatId: string,
+  username: string,
+  alreadyRetried: boolean,
+): Promise<TelegramFollowerResult> {
   try {
-    const countRes = await fetch(`${apiBase}/getChatMemberCount?chat_id=${encodeURIComponent(chatId)}`);
-    const countData = await countRes.json();
-    if (!countData.ok) {
+    const res = await fetch(`${apiBase}/getChatMemberCount?chat_id=${encodeURIComponent(chatId)}`);
+    const data = await res.json();
+
+    if (!data.ok) {
+      // Telegram tells us exactly how long to wait on a 429. Honor
+      // it once. The single-retry cap prevents an unbounded loop if
+      // their limiter is genuinely over.
+      const retryAfter: unknown = data.parameters?.retry_after;
+      const isRateLimit = res.status === 429 || (typeof retryAfter === 'number');
+      if (isRateLimit && !alreadyRetried && typeof retryAfter === 'number' && retryAfter <= MAX_RETRY_AFTER_SECONDS) {
+        // +1 second buffer — Telegram's clock isn't ours and being
+        // off by even a millisecond at the boundary triggers another
+        // 429. The buffer is cheaper than a wasted retry.
+        await new Promise((r) => setTimeout(r, (retryAfter + 1) * 1000));
+        return fetchWithRetry(apiBase, chatId, username, /* alreadyRetried */ true);
+      }
       return {
         username,
         follower_count: null,
-        error: countData.description || `getChatMemberCount failed (${countRes.status})`,
+        error: data.description || `getChatMemberCount failed (${res.status})`,
         channel_title: null,
       };
     }
-    const count = Number(countData.result);
+
+    const count = Number(data.result);
     if (!Number.isFinite(count) || count < 0) {
       return {
         username,
         follower_count: null,
-        error: `Unparseable count: ${countData.result}`,
+        error: `Unparseable count: ${data.result}`,
         channel_title: null,
       };
     }

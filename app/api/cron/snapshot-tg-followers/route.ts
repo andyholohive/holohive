@@ -6,12 +6,13 @@ import {
 } from '@/lib/telegramFollowers';
 
 export const dynamic = 'force-dynamic';
-// Vercel Pro caps serverless functions at 300s; bump to 120 for
-// safety. Real-world per-KOL latency is ~450ms (one Telegram API
-// call + one Supabase upsert), so 85 KOLs ≈ 38s. The headroom
-// covers slow network + future roster growth past ~250 KOLs without
-// a redeploy. Drop back to 60 if Vercel pricing/limits change.
-export const maxDuration = 120;
+// Vercel Pro caps serverless functions at 300s; we use 180 to leave
+// headroom. Real-world budget for the full 85-KOL run with the new
+// 250ms throttle: ~21s sleep + ~38s API time = ~60s baseline. The
+// extra headroom covers retry-after waits when Telegram's per-account
+// limiter occasionally fires (single retry, max ~30s wait per KOL),
+// plus future roster growth past ~250 KOLs.
+export const maxDuration = 180;
 
 /**
  * GET /api/cron/snapshot-tg-followers
@@ -132,7 +133,7 @@ export async function GET(request: Request) {
       });
       // Throttle on failures too — if a TG outage hits, we don't want
       // to hammer 85 retries in a tight loop.
-      await sleep(50);
+      await sleep(250);
       continue;
     }
 
@@ -165,10 +166,15 @@ export async function GET(request: Request) {
     }
 
     succeeded++;
-    // Polite throttle. Telegram allows ~30 requests/sec to the Bot
-    // API. We're nowhere near that with one call every ~50ms, but
-    // this avoids being noisy in their rate-limit metrics.
-    await sleep(50);
+    // 250ms throttle — empirically required. The 2026-05-15 first run
+    // used 50ms (in theory ~20 req/sec, well under Telegram's
+    // documented 30/sec global limit) and got 26/85 rate-limited.
+    // Telegram's per-account / per-method limiter is tighter than the
+    // documented global figure; 250ms (4 req/sec) consistently cleared
+    // the full roster in subsequent runs. The retry-after handler in
+    // fetchTelegramFollowerCount catches the rare 429 that still
+    // sneaks through.
+    await sleep(250);
   }
 
   const duration_ms = Date.now() - start;
