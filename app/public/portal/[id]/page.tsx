@@ -1796,9 +1796,11 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                   <Briefcase className="h-5 w-5 text-white" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900">Engagement Overview</h3>
-                {clientContext?.engagement_type && (
-                  <span className="px-3 py-1 bg-brand-light text-brand text-sm font-medium rounded-full">{clientContext.engagement_type}</span>
-                )}
+                {/* engagement_type pill hidden per May 2026 audit — was
+                    its only render site and the field added no real
+                    workflow value beyond the cosmetic label. Restore
+                    by un-hiding the Select on the team-side modal AND
+                    re-adding this <span> render. */}
                 {(() => {
                   const startDate = linkedCRMAccount?.closed_at || linkedCRMAccount?.qualified_at || linkedCRMAccount?.created_at || clientContext?.start_date;
                   return startDate ? (

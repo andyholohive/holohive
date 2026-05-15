@@ -3356,30 +3356,18 @@ export default function ClientsPage() {
               </TabsList>
               <TabsContent value="context">
                 <div className="space-y-4 max-h-[55vh] overflow-y-auto px-1 pb-4">
-                  <div className="grid gap-2">
-                    <Label>Engagement Type</Label>
-                    <Select value={contextForm.engagement_type} onValueChange={(v) => setContextForm({ ...contextForm, engagement_type: v })}>
-                      <SelectTrigger className="focus-brand"><SelectValue placeholder="Select type" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="KOL">KOL</SelectItem>
-                        <SelectItem value="GTM">GTM</SelectItem>
-                        <SelectItem value="Advisory">Advisory</SelectItem>
-                        <SelectItem value="Hybrid">Hybrid</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Onboarding Phase</Label>
-                    <Select value={contextForm.onboarding_phase} onValueChange={(v) => setContextForm({ ...contextForm, onboarding_phase: v === 'auto' ? '' : v })}>
-                      <SelectTrigger className="focus-brand"><SelectValue placeholder="Auto (default)" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto">Auto (default)</SelectItem>
-                        <SelectItem value="kickoff">Kickoff</SelectItem>
-                        <SelectItem value="discovery">Discovery</SelectItem>
-                        <SelectItem value="tracker">Tracker</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* Hidden per May 2026 audit — both fields were
+                      captured but barely used:
+                        - engagement_type: only rendered as a small pill
+                          on the portal header. No filtering, analytics,
+                          or workflow used it. UI hidden + portal
+                          rendering removed in the same commit.
+                        - onboarding_phase: fully dead — written but
+                          never read. Portal computed its own phase
+                          from milestone state, ignoring this field.
+                      DB columns kept so existing data isn't lost; can
+                      restore the Selects + portal pill if/when a real
+                      use case shows up. */}
                   <div className="grid gap-2">
                     <div className="flex items-center justify-between">
                       <Label>Scope</Label>
