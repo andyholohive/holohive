@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/mindshare-scan",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/snapshot-tg-followers",
+      "schedule": "0 2 1 * *"
     }
   ]
 }

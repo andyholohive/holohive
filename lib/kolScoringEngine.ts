@@ -263,6 +263,39 @@ export function computeRosterScores(roster: KolScoreInput[]): Map<string, KolSco
     activation_impact: rangeOf(allAi),
   };
 
+  // Detect dimensions that have ZERO non-null values across the whole
+  // roster. Common case: with follower-count-only auto-pull (current
+  // setup), Channel Health has no source data anywhere and would
+  // otherwise normalize to 0 for everyone, dragging every composite
+  // down by 20% for no reason. Redistribute its 20% weight evenly
+  // across the surviving dimensions instead.
+  //
+  // Done as a "live dimensions" set + dynamic per-dimension weight so
+  // the composite calc below stays one expression. If all 5 dimensions
+  // survive (the doc's intended state once full snapshots flow), this
+  // collapses to the original equal-weight 20% formula.
+  const dimensionHasData: Record<keyof typeof ranges, boolean> = {
+    engagement_quality: allEq.some((v) => v != null),
+    reach_efficiency: allRe.some((v) => v != null),
+    channel_health: allCh.some((v) => v != null),
+    growth_trajectory: allGt.some((v) => v != null),
+    activation_impact: allAi.some((v) => v != null),
+  };
+  const liveDimensionCount = Object.values(dimensionHasData).filter(Boolean).length;
+  // Per-dimension weight. Live dimensions split the 100% evenly; dead
+  // ones get 0 (their normalized value still computes to 0 but is
+  // weighted out of the composite). If literally nothing has data the
+  // composite will be 0 — but the deliverables threshold below will
+  // gate it to "Insufficient data" anyway so the user never sees that.
+  const perDimensionWeight = liveDimensionCount > 0 ? 1 / liveDimensionCount : 0;
+  const weight = {
+    engagement_quality: dimensionHasData.engagement_quality ? perDimensionWeight : 0,
+    reach_efficiency: dimensionHasData.reach_efficiency ? perDimensionWeight : 0,
+    channel_health: dimensionHasData.channel_health ? perDimensionWeight : 0,
+    growth_trajectory: dimensionHasData.growth_trajectory ? perDimensionWeight : 0,
+    activation_impact: dimensionHasData.activation_impact ? perDimensionWeight : 0,
+  };
+
   // Step 3: per-KOL normalized + composite + threshold gate.
   const out = new Map<string, KolScoreResult>();
   for (const k of roster) {
@@ -277,11 +310,11 @@ export function computeRosterScores(roster: KolScoreInput[]): Map<string, KolSco
     };
 
     const composite =
-      normalized.engagement_quality * 0.2 +
-      normalized.reach_efficiency * 0.2 +
-      normalized.channel_health * 0.2 +
-      normalized.growth_trajectory * 0.2 +
-      normalized.activation_impact * 0.2;
+      normalized.engagement_quality * weight.engagement_quality +
+      normalized.reach_efficiency * weight.reach_efficiency +
+      normalized.channel_health * weight.channel_health +
+      normalized.growth_trajectory * weight.growth_trajectory +
+      normalized.activation_impact * weight.activation_impact;
 
     // Threshold gate per spec: minimum 3 deliverables.
     const deliverableCount = k.deliverables.length;
@@ -295,12 +328,16 @@ export function computeRosterScores(roster: KolScoreInput[]): Map<string, KolSco
             MIN_DELIVERABLES_FOR_SCORE - deliverableCount === 1 ? '' : 's'
           }.`
         : null,
+      // For each dimension: null when KOL is below the deliverables
+      // threshold (whole-score gate) OR when the dimension itself has
+      // zero data across the roster (so the UI bar reads "—" instead
+      // of misleading "0", and the bar itself is hidden).
       dimensions: {
-        engagement_quality: belowThreshold ? null : Math.round(normalized.engagement_quality),
-        reach_efficiency: belowThreshold ? null : Math.round(normalized.reach_efficiency),
-        channel_health: belowThreshold ? null : Math.round(normalized.channel_health),
-        growth_trajectory: belowThreshold ? null : Math.round(normalized.growth_trajectory),
-        activation_impact: belowThreshold ? null : Math.round(normalized.activation_impact),
+        engagement_quality: belowThreshold || !dimensionHasData.engagement_quality ? null : Math.round(normalized.engagement_quality),
+        reach_efficiency:   belowThreshold || !dimensionHasData.reach_efficiency   ? null : Math.round(normalized.reach_efficiency),
+        channel_health:     belowThreshold || !dimensionHasData.channel_health     ? null : Math.round(normalized.channel_health),
+        growth_trajectory:  belowThreshold || !dimensionHasData.growth_trajectory  ? null : Math.round(normalized.growth_trajectory),
+        activation_impact:  belowThreshold || !dimensionHasData.activation_impact  ? null : Math.round(normalized.activation_impact),
       },
     });
   }
