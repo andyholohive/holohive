@@ -462,7 +462,51 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                       <th className="text-left p-2 font-medium text-gray-600 text-xs">Step</th>
                       <th className="text-left p-2 font-medium text-gray-600 text-xs">Role</th>
                       <th className="text-left p-2 font-medium text-gray-600 text-xs">Assignee</th>
-                      <th className="text-left p-2 font-medium text-gray-600 text-xs w-[130px]">Due Date</th>
+                      <th className="text-left p-2 font-medium text-gray-600 text-xs w-[150px]">
+                        <div className="flex items-center justify-between gap-1">
+                          <span>Due Date</span>
+                          {/* Bulk-apply trigger. Two actions in one popover:
+                              - Set all steps to a single date (flatten)
+                              - Shift dates so the LAST step lands on the
+                                picked date (preserves spacing — useful when
+                                the deadline moves but the relative cadence
+                                between steps should stay intact). */}
+                          <BulkDueDatePopover
+                            templateSteps={templateSteps}
+                            currentDates={dueDates}
+                            onApplyAll={(dateStr) => {
+                              const overrides: Record<number, string> = {};
+                              for (const s of templateSteps) overrides[s.step_order] = dateStr;
+                              setDueDateOverrides(overrides);
+                            }}
+                            onShiftToEndOn={(targetEndDateStr) => {
+                              // Shift everything by the delta between the
+                              // current LAST step's date and the target.
+                              // Walks every step's existing computed date
+                              // forward/backward by the same number of days,
+                              // preserving the relative spacing the template
+                              // designed in.
+                              if (templateSteps.length === 0) return;
+                              const lastStep = [...templateSteps].sort(
+                                (a, b) => b.step_order - a.step_order,
+                              )[0];
+                              const currentLast = dueDates[lastStep.step_order];
+                              if (!currentLast) return;
+                              const fromDate = new Date(currentLast + 'T00:00:00');
+                              const toDate = new Date(targetEndDateStr + 'T00:00:00');
+                              const deltaMs = toDate.getTime() - fromDate.getTime();
+                              const overrides: Record<number, string> = {};
+                              for (const s of templateSteps) {
+                                const orig = dueDates[s.step_order];
+                                if (!orig) continue;
+                                const shifted = new Date(new Date(orig + 'T00:00:00').getTime() + deltaMs);
+                                overrides[s.step_order] = toLocalDateString(shifted);
+                              }
+                              setDueDateOverrides(overrides);
+                            }}
+                          />
+                        </div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -663,5 +707,111 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/* ────────────────────────── Bulk due-date popover ─────────────────────── */
+
+/**
+ * Bulk-apply trigger for the per-step Due Date column. Two real
+ * actions because they answer different questions:
+ *
+ *   "All steps share the same hard deadline" → Apply to all
+ *     (e.g. campaign launches Friday, every step needs to be done
+ *     before then; spacing doesn't matter)
+ *
+ *   "Project moved but cadence stays" → Shift to end on
+ *     (e.g. template scheduled X over 30 days, the launch slipped
+ *     by a week; just push everything back proportionally)
+ *
+ * Renders as a small icon button next to the column header. Compact
+ * popover: calendar + two buttons. No third "shift by N days" option
+ * — the end-date framing is more concrete and covers the same use
+ * case ("set end-on to a week from today" = "shift forward by 7d").
+ */
+function BulkDueDatePopover({
+  templateSteps,
+  currentDates,
+  onApplyAll,
+  onShiftToEndOn,
+}: {
+  templateSteps: Array<{ step_order: number }>;
+  currentDates: Record<number, string>;
+  onApplyAll: (dateStr: string) => void;
+  onShiftToEndOn: (dateStr: string) => void;
+}) {
+  const [picked, setPicked] = useState<Date | undefined>(undefined);
+  const [open, setOpen] = useState(false);
+
+  // Disable shift if no current dates exist to shift FROM (caller
+  // can't compute a delta without them). The first time the wizard
+  // opens, the auto-computed dates are present, so this is rarely
+  // hit — but defensive in case the template has no estimated
+  // durations.
+  const lastStepOrder = templateSteps.length > 0
+    ? Math.max(...templateSteps.map(s => s.step_order))
+    : 0;
+  const canShift = !!currentDates[lastStepOrder];
+
+  // Shared close-after-action handler. Both buttons call onApply,
+  // close the popover, and reset the picked date so the next open
+  // starts fresh (less surprising than retaining stale state).
+  const apply = (mode: 'all' | 'shift') => {
+    if (!picked) return;
+    const dateStr = `${picked.getFullYear()}-${String(picked.getMonth() + 1).padStart(2, '0')}-${String(picked.getDate()).padStart(2, '0')}`;
+    if (mode === 'all') onApplyAll(dateStr);
+    else onShiftToEndOn(dateStr);
+    setOpen(false);
+    setPicked(undefined);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="text-[10px] text-brand hover:underline flex items-center gap-0.5 font-medium"
+          title="Bulk apply a date to all steps"
+        >
+          <CalendarIcon className="h-3 w-3" />
+          Bulk
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="end">
+        <div className="p-2 border-b text-[11px] text-gray-600 font-medium">
+          Bulk apply due date
+        </div>
+        <Calendar
+          mode="single"
+          selected={picked}
+          onSelect={setPicked}
+          initialFocus
+          classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+          modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+        />
+        <div className="p-2 border-t flex flex-col gap-1.5">
+          <Button
+            type="button"
+            size="sm"
+            disabled={!picked}
+            onClick={() => apply('all')}
+            className="text-xs h-8"
+          >
+            Apply to all steps
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={!picked || !canShift}
+            onClick={() => apply('shift')}
+            className="text-xs h-8"
+            title={canShift ? 'Shift every step by the same delta so the last step lands on this date' : 'Needs existing dates to shift from'}
+          >
+            Shift so last step ends on this date
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
