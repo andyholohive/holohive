@@ -341,6 +341,16 @@ async function handleCommand(chatId: string, command: string, args: string[], me
     return;
   }
 
+  // Built-in /tasks command — lists open tasks with one-tap done
+  // buttons so users don't have to remember T-NNN IDs. Subcommands:
+  //   /tasks          — your assigned, open tasks (default)
+  //   /tasks all      — every team member's open tasks
+  //   /tasks overdue  — your overdue (or all if combined with all)
+  if (cmd === 'tasks') {
+    await handleTasksCommand(chatId, args, message);
+    return;
+  }
+
   try {
     // Look up command in database
     const { data: commandData, error } = await supabaseAdmin
@@ -411,101 +421,168 @@ async function handleCommand(chatId: string, command: string, args: string[], me
  * is "always 200 to Telegram so it doesn't retry".
  */
 async function handleDoneCommand(chatId: string, args: string[], message: any) {
-  const fromUserId = message.from?.id?.toString();
-
-  // Auth check first — match users.telegram_id to make sure this is a
-  // team member. /done mutates state, so we can't be permissive like
-  // the static-text commands.
-  if (!fromUserId) {
-    await sendTelegramMessage(chatId, '⚠️ Could not identify you. /done is team-only.');
-    return;
-  }
-  const { data: teamMember } = await supabaseAdmin
-    .from('users')
-    .select('id, name')
-    .eq('telegram_id', fromUserId)
-    .single();
+  const teamMember = await resolveTeamMember(message);
   if (!teamMember) {
     await sendTelegramMessage(chatId, '⚠️ /done is only available to team members.');
     return;
   }
 
-  // Parse the ID arg. Tolerant of casing + the "T-" prefix being missing,
-  // since on a phone keyboard it's faster to type "/done 42" than to
-  // hunt for the dash. Numeric-only is padded to 3 digits to match the
-  // T-001 zero-padded format the trigger inserts.
-  const raw = (args[0] || '').trim();
+  const raw = args.join(' ').trim();
   if (!raw) {
-    await sendTelegramMessage(chatId, 'Usage: <code>/done T-042</code>');
+    await sendTelegramMessage(chatId, 'Usage: <code>/done T-042</code> or <code>/done bump daniel</code>');
     return;
   }
-  let shortId: string;
+
+  // Two parse paths:
+  //   1. T-NNN style (or bare numeric) — exact lookup by short_id.
+  //      Same as the original behavior; no AI, no fuzz.
+  //   2. Anything else — fuzzy substring search against open task
+  //      names. 0 matches → "not found", 1 match → close it,
+  //      >1 → render picker buttons. Lets people type "bump daniel"
+  //      when they remember the topic but not the ID.
   const numericOnly = raw.replace(/[^0-9]/g, '');
-  if (/^t-?\d+$/i.test(raw)) {
-    shortId = `T-${numericOnly.padStart(3, '0')}`;
-  } else if (/^\d+$/.test(numericOnly)) {
-    shortId = `T-${numericOnly.padStart(3, '0')}`;
-  } else {
-    await sendTelegramMessage(chatId, `❓ Couldn't parse <code>${escapeHtml(raw)}</code>. Try <code>/done T-042</code>.`);
+  const looksLikeId = /^t-?\d+$/i.test(raw) || /^\d+$/.test(raw);
+  if (looksLikeId) {
+    const shortId = `T-${numericOnly.padStart(3, '0')}`;
+    await closeByShortIdAndReply(chatId, shortId, teamMember);
     return;
   }
 
-  try {
-    // Look up by short_id. Could be ambiguous in theory (the unique
-    // index is partial WHERE NOT NULL) but in practice every row has a
-    // generated short_id post-migration 066.
-    const { data: task, error: taskErr } = await supabaseAdmin
-      .from('tasks')
-      .select('id, short_id, task_name, status, parent_task_id')
-      .eq('short_id', shortId)
-      .maybeSingle();
+  // Fuzzy path. Search OPEN tasks only — closing an already-complete
+  // task isn't useful and the picker for an arbitrary substring
+  // could otherwise return dozens of historical matches.
+  const { data: matches } = await (supabaseAdmin as any)
+    .from('tasks')
+    .select('id, short_id, task_name, due_date, assigned_to_name')
+    .ilike('task_name', `%${raw}%`)
+    .neq('status', 'complete')
+    .limit(6) // cap at 6 so the picker stays scannable
+    .order('due_date', { ascending: true, nullsFirst: false });
 
-    if (taskErr) {
-      console.error('[Telegram /done] task lookup failed:', taskErr);
-      await sendTelegramMessage(chatId, '⚠️ Lookup failed. Try again or close it from /tasks.');
-      return;
-    }
-    if (!task) {
-      await sendTelegramMessage(chatId, `🤷 No task with ID <code>${escapeHtml(shortId)}</code>.`);
-      return;
-    }
-    if (task.status === 'complete') {
-      await sendTelegramMessage(chatId, `✅ <code>${escapeHtml(shortId)}</code> was already complete.`);
-      return;
-    }
+  const rows = (matches || []) as Array<{
+    id: string; short_id: string | null; task_name: string;
+    due_date: string | null; assigned_to_name: string | null;
+  }>;
 
-    // Mirror the side-effects of taskService.updateField('status', 'complete')
-    // since we're going through the service-role client directly:
-    //  - set completed_at = now()
-    //  - set updated_at  = now()
-    // (The recurring-clone + parent-deliverable-rollup logic lives in
-    // taskService and isn't worth re-implementing here for the /done
-    // path; if a recurring task is closed from chat, the next instance
-    // will get cloned the next time someone closes it from the UI. Good
-    // enough for v1; revisit if it becomes an issue.)
-    const nowIso = new Date().toISOString();
-    const { error: updErr } = await supabaseAdmin
-      .from('tasks')
-      .update({ status: 'complete', completed_at: nowIso, updated_at: nowIso })
-      .eq('id', task.id);
+  if (rows.length === 0) {
+    await sendTelegramMessage(chatId, `🤷 No open task matching <code>${escapeHtml(raw)}</code>.`);
+    return;
+  }
 
-    if (updErr) {
-      console.error('[Telegram /done] update failed:', updErr);
-      await sendTelegramMessage(chatId, '⚠️ Update failed. Try again or close it from /tasks.');
-      return;
-    }
+  if (rows.length === 1) {
+    const t = rows[0];
+    await closeByDbIdAndReply(chatId, t.id, teamMember);
+    return;
+  }
 
-    const safeName = escapeHtml(task.task_name || '(untitled task)');
-    const closer = escapeHtml(teamMember.name || 'team');
+  // Multiple matches — render picker buttons. Same `done:<id>`
+  // callback prefix as the /tasks list buttons; one handler closes
+  // both flows.
+  const pickerLines = ['Multiple open tasks match — which one?'];
+  const buttons = rows.map((t) => [{
+    text: truncateButton(`${t.short_id || ''} ${t.task_name}${t.due_date ? ` · ${shortDueLabel(t.due_date)}` : ''}`.trim()),
+    callback_data: `done:${t.id}`,
+  }]);
+  await sendTelegramMessageWithButtons(chatId, pickerLines.join('\n'), buttons);
+}
+
+/**
+ * Close a task by its short_id + send the response message. Used by
+ * the exact-ID path of /done. Wraps closeByDbId for the lookup.
+ */
+async function closeByShortIdAndReply(
+  chatId: string,
+  shortId: string,
+  teamMember: { id: string; name: string },
+) {
+  const { data: task, error: taskErr } = await (supabaseAdmin as any)
+    .from('tasks')
+    .select('id, short_id, task_name, status')
+    .eq('short_id', shortId)
+    .maybeSingle();
+  if (taskErr) {
+    console.error('[Telegram /done] task lookup failed:', taskErr);
+    await sendTelegramMessage(chatId, '⚠️ Lookup failed. Try again or close it from /tasks.');
+    return;
+  }
+  if (!task) {
+    await sendTelegramMessage(chatId, `🤷 No task with ID <code>${escapeHtml(shortId)}</code>.`);
+    return;
+  }
+  if (task.status === 'complete') {
+    await sendTelegramMessage(chatId, `✅ <code>${escapeHtml(shortId)}</code> was already complete.`);
+    return;
+  }
+  await closeByDbIdAndReply(chatId, task.id, teamMember);
+}
+
+/**
+ * Close a task by its DB UUID + send the success message. Pure
+ * worker — caller has already validated the task should be closed.
+ *
+ * Mirrors the side-effects of taskService.updateField('status',
+ * 'complete') since we're using the service-role client directly:
+ * sets completed_at + updated_at. The recurring-clone and parent-
+ * deliverable rollup logic stays in taskService — not worth
+ * re-implementing here. If a recurring task is closed from chat the
+ * next instance gets cloned the next time someone closes it from
+ * the web UI; acceptable for v1.
+ */
+async function closeByDbIdAndReply(
+  chatId: string,
+  taskDbId: string,
+  teamMember: { id: string; name: string },
+) {
+  const { data: task, error: fetchErr } = await (supabaseAdmin as any)
+    .from('tasks')
+    .select('id, short_id, task_name, status')
+    .eq('id', taskDbId)
+    .maybeSingle();
+  if (fetchErr || !task) {
+    await sendTelegramMessage(chatId, '⚠️ Task not found.');
+    return;
+  }
+  if (task.status === 'complete') {
     await sendTelegramMessage(
       chatId,
-      `✅ <b>${escapeHtml(shortId)}</b> ${safeName}\n<i>closed by ${closer}</i>`,
+      `✅ <code>${escapeHtml(task.short_id || taskDbId)}</code> was already complete.`,
     );
-    console.log('[Telegram Webhook] /done closed task:', { shortId, by: teamMember.name });
-  } catch (err) {
-    console.error('[Telegram /done] unexpected error:', err);
-    await sendTelegramMessage(chatId, '⚠️ Something went wrong. Try again or close it from /tasks.');
+    return;
   }
+  const nowIso = new Date().toISOString();
+  const { error: updErr } = await (supabaseAdmin as any)
+    .from('tasks')
+    .update({ status: 'complete', completed_at: nowIso, updated_at: nowIso })
+    .eq('id', taskDbId);
+  if (updErr) {
+    console.error('[Telegram /done] update failed:', updErr);
+    await sendTelegramMessage(chatId, '⚠️ Update failed. Try again or close it from /tasks.');
+    return;
+  }
+  const safeName = escapeHtml(task.task_name || '(untitled task)');
+  const closer = escapeHtml(teamMember.name || 'team');
+  await sendTelegramMessage(
+    chatId,
+    `✅ <b>${escapeHtml(task.short_id || '')}</b> ${safeName}\n<i>closed by ${closer}</i>`,
+  );
+  console.log('[Telegram Webhook] /done closed task:', { taskDbId, shortId: task.short_id, by: teamMember.name });
+}
+
+/**
+ * Resolve the calling user to a team-member row via users.telegram_id.
+ * Returns null when the sender isn't on the team. Used by every
+ * write-capable command (/done, /task, /tasks).
+ */
+async function resolveTeamMember(message: any): Promise<{ id: string; name: string } | null> {
+  const fromUserId = message.from?.id?.toString();
+  if (!fromUserId) return null;
+  const { data } = await supabaseAdmin
+    .from('users')
+    .select('id, name')
+    .eq('telegram_id', fromUserId)
+    .single();
+  if (!data) return null;
+  return { id: (data as any).id, name: (data as any).name };
 }
 
 function escapeHtml(s: string): string {
@@ -513,6 +590,182 @@ function escapeHtml(s: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+/**
+ * Handle the /tasks slash command — list open tasks with one-tap
+ * done buttons. The whole point is "users don't have to remember
+ * T-NNN IDs"; the inline keyboard lets them tap the row instead.
+ *
+ * Subcommands:
+ *   /tasks         → caller's open tasks (default — most common case)
+ *   /tasks all     → every team member's open tasks (visibility)
+ *   /tasks overdue → caller's overdue (combine with `all` for team-wide)
+ *
+ * Sort within the list: overdue first (most urgent), then today,
+ * then upcoming, then no-due-date (no signal to sort by).
+ *
+ * Pagination intentionally omitted for v1 — caps the list at 20
+ * tasks (Telegram's inline keyboard handles 100+ buttons fine but
+ * the message becomes unreadable). If anyone regularly has >20
+ * open tasks, that's a triage problem, not a UI problem.
+ */
+async function handleTasksCommand(chatId: string, args: string[], message: any) {
+  const teamMember = await resolveTeamMember(message);
+  if (!teamMember) {
+    await sendTelegramMessage(chatId, '⚠️ /tasks is only available to team members.');
+    return;
+  }
+
+  // Parse the subcommand. Order doesn't matter — `/tasks all overdue`
+  // and `/tasks overdue all` both work.
+  const flags = new Set(args.map((a) => a.trim().toLowerCase()).filter(Boolean));
+  const teamWide = flags.has('all');
+  const overdueOnly = flags.has('overdue');
+
+  await renderTasksList(chatId, teamMember, { teamWide, overdueOnly });
+}
+
+/**
+ * Build + send (or edit) the task list message. Used by both the
+ * initial /tasks command and by the done-button callback to refresh
+ * the message after a task is closed.
+ *
+ * `editMessageId` switches between sendMessage (initial) and
+ * editMessageText (refresh). Both routes share the same renderer so
+ * the list stays consistent across initial display and refreshes.
+ */
+async function renderTasksList(
+  chatId: string,
+  teamMember: { id: string; name: string },
+  opts: { teamWide: boolean; overdueOnly: boolean; editMessageId?: number },
+) {
+  const todayIso = new Date().toISOString().slice(0, 10);
+
+  let q = (supabaseAdmin as any)
+    .from('tasks')
+    .select('id, short_id, task_name, due_date, assigned_to, assigned_to_name, status')
+    .neq('status', 'complete')
+    .order('due_date', { ascending: true, nullsFirst: false })
+    .limit(50); // over-fetch so the 20-cap below picks the most urgent
+
+  if (!opts.teamWide) q = q.eq('assigned_to', teamMember.id);
+  if (opts.overdueOnly) q = q.lt('due_date', todayIso);
+
+  const { data: tasks, error } = await q;
+  if (error) {
+    const msg = `⚠️ Couldn't load tasks: ${error.message}`;
+    if (opts.editMessageId) {
+      await editMessageText(chatId, opts.editMessageId, msg);
+    } else {
+      await sendTelegramMessage(chatId, msg);
+    }
+    return;
+  }
+  const rows = (tasks || []) as Array<{
+    id: string; short_id: string | null; task_name: string;
+    due_date: string | null; assigned_to: string | null;
+    assigned_to_name: string | null; status: string;
+  }>;
+
+  // Sort: overdue first, then today, then upcoming, then no-date.
+  // Within each bucket keep the date-asc order from the SQL.
+  const today = todayIso;
+  const sorted = [...rows].sort((a, b) => bucket(a.due_date, today) - bucket(b.due_date, today));
+
+  const total = sorted.length;
+  const visible = sorted.slice(0, 20);
+
+  const titleParts = [
+    opts.teamWide ? '📋 <b>Team open tasks</b>' : '📋 <b>Your open tasks</b>',
+    opts.overdueOnly ? '(overdue)' : '',
+    total === 0 ? '' : visible.length === total ? `(${total})` : `(showing ${visible.length} of ${total})`,
+  ].filter(Boolean);
+  const header = titleParts.join(' ');
+
+  if (total === 0) {
+    const empty = opts.overdueOnly
+      ? '🎉 No overdue tasks!'
+      : opts.teamWide
+        ? '🎉 No open tasks across the team.'
+        : '🎉 No open tasks. Take a break.';
+    const msg = `${header}\n\n${empty}`;
+    if (opts.editMessageId) {
+      await editMessageText(chatId, opts.editMessageId, msg);
+    } else {
+      await sendTelegramMessage(chatId, msg);
+    }
+    return;
+  }
+
+  // Build a body line + a button row per task. Body text gives the
+  // full picture (assignee, due date) since button text is capped.
+  const lines = [header, ''];
+  const buttons: Array<Array<{ text: string; callback_data: string }>> = [];
+  for (const t of visible) {
+    const sid = t.short_id || '?';
+    const due = shortDueLabel(t.due_date);
+    const who = opts.teamWide && t.assigned_to_name ? ` · ${t.assigned_to_name}` : '';
+    lines.push(`<b>${escapeHtml(sid)}</b> ${escapeHtml(t.task_name)}${due ? ` <i>(${escapeHtml(due)})</i>` : ''}${escapeHtml(who)}`);
+    buttons.push([{
+      text: truncateButton(`✅ ${sid} — ${t.task_name}${due ? ` (${due})` : ''}`),
+      callback_data: `done:${t.id}`,
+    }]);
+  }
+  if (visible.length < total) {
+    lines.push('');
+    lines.push(`<i>+${total - visible.length} more not shown — open /tasks page on web to see all.</i>`);
+  }
+
+  const text = lines.join('\n');
+  if (opts.editMessageId) {
+    await editMessageTextWithButtons(chatId, opts.editMessageId, text, buttons);
+  } else {
+    await sendTelegramMessageWithButtons(chatId, text, buttons);
+  }
+}
+
+/**
+ * Sort bucket helper for the task list.
+ *   0 = overdue (past due_date)
+ *   1 = today
+ *   2 = upcoming (future date)
+ *   3 = no due date (least urgent — user hasn't committed to a deadline)
+ */
+function bucket(due: string | null, today: string): number {
+  if (!due) return 3;
+  const dueDay = due.length >= 10 ? due.slice(0, 10) : due;
+  if (dueDay < today) return 0;
+  if (dueDay === today) return 1;
+  return 2;
+}
+
+/**
+ * Compact relative-date label for task buttons / lines.
+ * "OVERDUE 3d", "Today", "Tomorrow", "Mon May 19", etc.
+ */
+function shortDueLabel(due: string | null): string {
+  if (!due) return '';
+  const dueDay = due.length >= 10 ? due.slice(0, 10) : due;
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const dueDate = new Date(`${dueDay}T00:00:00Z`);
+  if (isNaN(dueDate.getTime())) return dueDay;
+  const diffDays = Math.round((dueDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+  if (diffDays < 0) return `OVERDUE ${Math.abs(diffDays)}d`;
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Tomorrow';
+  if (diffDays < 7) return dueDate.toLocaleDateString('en-US', { weekday: 'short' });
+  return dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/**
+ * Telegram inline-keyboard buttons render as wrapped text but get
+ * truncated visually if too long. Cap at ~50 chars to keep the row
+ * looking clean on phone screens.
+ */
+function truncateButton(s: string): string {
+  return s.length <= 55 ? s : s.slice(0, 52) + '…';
 }
 
 /**
@@ -668,8 +921,104 @@ async function handleCallbackQuery(cq: any) {
     return;
   }
 
+  // `done:<task_id>` — fired by the buttons in /tasks lists AND the
+  // picker buttons rendered when /done <fuzzy> matches multiple
+  // tasks. Both flows route through the same close-and-refresh path.
+  if (data.startsWith('done:')) {
+    await handleDoneCallback(cq);
+    return;
+  }
+
   // Unknown callback — dismiss the spinner so the button doesn't hang.
   await answerCallbackQuery(callbackId);
+}
+
+/**
+ * Handle a `done:<task_id>` button click. Closes the task and either:
+ *   - Refreshes the /tasks list (when the original message had a list
+ *     of buttons) — re-renders so the closed task drops out and the
+ *     count updates.
+ *   - Edits the picker message to a confirmation (when the original
+ *     was a /done <fuzzy> picker — there's no list to refresh).
+ *
+ * Permissive auth like /done — any team member can close any task by
+ * tapping a button, same as the existing T-NNN command. Anti-grief
+ * isn't worth the friction here; the team is small and trust-based.
+ */
+async function handleDoneCallback(cq: any) {
+  const callbackId: string = cq.id;
+  const data: string = cq.data || '';
+  const taskDbId = data.split(':')[1];
+  const messageChatId = cq.message?.chat?.id?.toString();
+  const messageId = cq.message?.message_id;
+
+  if (!taskDbId || !messageChatId || !messageId) {
+    await answerCallbackQuery(callbackId, 'Invalid button.');
+    return;
+  }
+
+  const teamMember = await resolveTeamMember(cq);
+  if (!teamMember) {
+    await answerCallbackQuery(callbackId, 'Team-only.');
+    return;
+  }
+
+  // Look up + close. We don't reuse closeByDbIdAndReply because
+  // that sends a NEW message; for the callback we want to EDIT the
+  // existing list message instead of cluttering the chat with a
+  // confirmation per click.
+  const { data: task } = await (supabaseAdmin as any)
+    .from('tasks')
+    .select('id, short_id, task_name, status')
+    .eq('id', taskDbId)
+    .maybeSingle();
+
+  if (!task) {
+    await answerCallbackQuery(callbackId, 'Task not found.');
+    return;
+  }
+  if (task.status !== 'complete') {
+    const nowIso = new Date().toISOString();
+    const { error: updErr } = await (supabaseAdmin as any)
+      .from('tasks')
+      .update({ status: 'complete', completed_at: nowIso, updated_at: nowIso })
+      .eq('id', taskDbId);
+    if (updErr) {
+      console.error('[Telegram done-callback] update failed:', updErr);
+      await answerCallbackQuery(callbackId, 'Update failed.');
+      return;
+    }
+  }
+
+  // Decide whether this came from a /tasks list (re-render the list)
+  // or from a /done <fuzzy> picker (edit to confirmation). Heuristic:
+  // the message text starts with the list header "📋" — that's only
+  // present in renderTasksList output. Cheap, no extra state needed.
+  const messageText: string = cq.message?.text || cq.message?.caption || '';
+  const isListMessage = messageText.startsWith('📋');
+
+  if (isListMessage) {
+    // Refresh the list. Need to detect which filter the original used
+    // — we don't store it anywhere, so re-derive from the header text.
+    const teamWide = messageText.includes('Team open tasks');
+    const overdueOnly = messageText.includes('(overdue)');
+    await renderTasksList(messageChatId, teamMember, {
+      teamWide,
+      overdueOnly,
+      editMessageId: messageId,
+    });
+  } else {
+    // Picker flow — edit to a single-line confirmation.
+    const sid = task.short_id || '?';
+    const safeName = escapeHtml(task.task_name || '(untitled task)');
+    await editMessageText(
+      messageChatId,
+      messageId,
+      `✅ <b>${escapeHtml(sid)}</b> ${safeName}\n<i>closed by ${escapeHtml(teamMember.name)}</i>`,
+    );
+  }
+
+  await answerCallbackQuery(callbackId, `Closed ${task.short_id || ''}`.trim());
 }
 
 /**
@@ -897,6 +1246,46 @@ async function editMessageText(chatId: string, messageId: number, text: string) 
     return true;
   } catch (err) {
     console.error('[Telegram Webhook] editMessageText threw:', err);
+    return false;
+  }
+}
+
+/**
+ * Edit a message AND replace its inline keyboard. Used by the /tasks
+ * list refresh — when a user clicks a done button, we re-render the
+ * whole message (text + remaining task buttons) in place. Cleaner UX
+ * than leaving stale buttons or sending a new list message.
+ */
+async function editMessageTextWithButtons(
+  chatId: string,
+  messageId: number,
+  text: string,
+  buttons: Array<Array<{ text: string; callback_data: string }>>,
+) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  if (!botToken) return false;
+  try {
+    const res = await fetch(
+      `https://api.telegram.org/bot${botToken}/editMessageText`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          message_id: messageId,
+          text,
+          parse_mode: 'HTML',
+          reply_markup: { inline_keyboard: buttons },
+        }),
+      },
+    );
+    if (!res.ok) {
+      console.error('[Telegram Webhook] editMessageTextWithButtons error:', await res.json().catch(() => ({})));
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[Telegram Webhook] editMessageTextWithButtons threw:', err);
     return false;
   }
 }
