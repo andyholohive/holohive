@@ -455,12 +455,22 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                   </Button>
                 )}
               </div>
+              {/* HIDDEN ROLE COLUMN (May 2026): the per-step "Role"
+                  column was hidden after a team review found it gave
+                  marginal value beyond the visual noise. The data is
+                  still preserved on deliverable_template_steps
+                  (default_role / role_label) AND on the created
+                  parent task (role_assignments JSONB), so nothing was
+                  lost — only the UI surface. To bring it back: add the
+                  <th>Role</th> + <td>{role badge}</td> below, and
+                  restore the "auto-fill peers with same role" branch
+                  in the Assignee onValueChange handler (look for the
+                  sameRolePeers comment in the same file). */}
               <div className="border rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b">
                       <th className="text-left p-2 font-medium text-gray-600 text-xs">Step</th>
-                      <th className="text-left p-2 font-medium text-gray-600 text-xs">Role</th>
                       <th className="text-left p-2 font-medium text-gray-600 text-xs">Assignee</th>
                       <th className="text-left p-2 font-medium text-gray-600 text-xs w-[150px]">
                         <div className="flex items-center justify-between gap-1">
@@ -516,9 +526,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                           <div className="text-xs font-medium">{s.step_order}. {s.step_name}</div>
                           <div className="text-[10px] text-gray-400">{s.estimated_duration_days}d</div>
                         </td>
-                        <td className="p-2">
-                          <Badge variant="outline" className="text-[10px]">{s.role_label}</Badge>
-                        </td>
+                        {/* Role <td> hidden — see top-of-table comment. */}
                         <td className="p-2">
                           <Select
                             value={stepAssignments[s.id]?.userId || 'unassigned'}
@@ -530,25 +538,16 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                                   delete next[s.id];
                                   return next;
                                 }
-                                // Convenience: when picking an assignee for
-                                // the FIRST step of a given role, auto-fill
-                                // peers that share the same role and are
-                                // still unassigned. Subsequent picks for
-                                // OTHER steps don't propagate — preserves
-                                // independent per-step control.
-                                const next: typeof prev = { ...prev, [s.id]: { userId: val, userName: member?.name || '' } };
-                                const sameRolePeers = templateSteps.filter(
-                                  p => p.id !== s.id && p.default_role === s.default_role && !prev[p.id]
-                                );
-                                const isFirstPickForRole = !templateSteps.some(
-                                  p => p.id !== s.id && p.default_role === s.default_role && prev[p.id]
-                                );
-                                if (isFirstPickForRole) {
-                                  for (const peer of sameRolePeers) {
-                                    next[peer.id] = { userId: val, userName: member?.name || '' };
-                                  }
-                                }
-                                return next;
+                                // Per-step assignment only. The auto-fill-
+                                // peers-with-same-role branch was removed
+                                // when the Role column got hidden — without
+                                // the Role visible, propagating to "peers
+                                // with same role" would be a magic side
+                                // effect users couldn't see. To restore:
+                                // un-hide the Role column AND re-add the
+                                // sameRolePeers loop here (git history has
+                                // the original).
+                                return { ...prev, [s.id]: { userId: val, userName: member?.name || '' } };
                               });
                             }}
                           >
