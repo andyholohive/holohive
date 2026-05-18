@@ -1781,9 +1781,18 @@ export async function getKolChannelSnapshot(
   const fmt = (n: number | null | undefined) => (n != null ? n.toLocaleString() : '—');
   const lines = rows.map((s) => {
     const month = new Date(s.snapshot_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    // Computed columns (mig 075). engagement_rate is a ratio (0.0234
+    // = 2.34%) so display as a pct; follower_growth_pct is already a
+    // pct. Both NULL when source data is missing.
+    const er = s.engagement_rate != null
+      ? `${(Number(s.engagement_rate) * 100).toFixed(2)}%`
+      : '—';
+    const growth = s.follower_growth_pct != null
+      ? `${Number(s.follower_growth_pct) >= 0 ? '+' : ''}${Number(s.follower_growth_pct).toFixed(2)}%`
+      : '—';
     return [
-      `• ${month} — ${fmt(s.follower_count)} followers`,
-      `    avg_views=${fmt(s.avg_views_per_post)} · avg_forwards=${fmt(s.avg_forwards_per_post)} · avg_reactions=${fmt(s.avg_reactions_per_post)} · posts/wk=${s.posting_frequency ?? '—'}`,
+      `• ${month} — ${fmt(s.follower_count)} followers (MoM growth: ${growth})`,
+      `    avg_views=${fmt(s.avg_views_per_post)} · avg_forwards=${fmt(s.avg_forwards_per_post)} · avg_reactions=${fmt(s.avg_reactions_per_post)} · posts/wk=${s.posting_frequency ?? '—'} · engagement_rate=${er}`,
       s.notes ? `    notes: ${s.notes}` : null,
     ].filter(Boolean).join('\n');
   });

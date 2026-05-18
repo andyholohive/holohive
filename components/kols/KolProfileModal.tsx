@@ -652,6 +652,14 @@ function SnapshotRow({ s, onDelete }: { s: KolChannelSnapshot; onDelete: () => v
     const d = new Date(s.snapshot_date + "T00:00:00");
     return isNaN(d.getTime()) ? s.snapshot_date : d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
   })();
+
+  // Computed columns from mig 075. Show alongside the raw stats so
+  // the team can see the derived metrics that feed Score without
+  // dropping to SQL. NULL on first snapshots (growth needs a prior)
+  // and on follower-count-only auto-pulls (ER needs avg_views).
+  const growthPct = s.follower_growth_pct != null ? Number(s.follower_growth_pct) : null;
+  const engagementRate = s.engagement_rate != null ? Number(s.engagement_rate) : null;
+
   return (
     <div className="border border-gray-200 rounded-md p-3 bg-white">
       <div className="flex items-start justify-between gap-2">
@@ -661,12 +669,34 @@ function SnapshotRow({ s, onDelete }: { s: KolChannelSnapshot; onDelete: () => v
             <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">
               {s.follower_count.toLocaleString()} followers
             </span>
+            {/* MoM growth as a colored pill next to the follower count
+                — positive=green, negative=red, zero=gray. Reads as a
+                trend at a glance without the user parsing the number. */}
+            {growthPct != null && (
+              <span
+                className={`text-xs px-1.5 py-0.5 rounded font-semibold ${
+                  growthPct > 0 ? 'bg-emerald-50 text-emerald-700'
+                  : growthPct < 0 ? 'bg-red-50 text-red-700'
+                  : 'bg-gray-100 text-gray-600'
+                }`}
+                title="Month-over-month follower growth"
+              >
+                {growthPct > 0 ? '↑' : growthPct < 0 ? '↓' : '·'} {Math.abs(growthPct).toFixed(1)}%
+              </span>
+            )}
           </div>
-          <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
+          <div className="mt-2 grid grid-cols-5 gap-2 text-xs">
             <Stat label="Avg Views" value={s.avg_views_per_post} />
             <Stat label="Avg Forwards" value={s.avg_forwards_per_post} />
             <Stat label="Avg Reactions" value={s.avg_reactions_per_post} />
             <Stat label="Posts/Wk" value={s.posting_frequency != null ? Number(s.posting_frequency) : null} />
+            {/* Engagement rate (avg_views / followers) — formatted as
+                a percentage with 2 decimals for sub-1% precision
+                (typical TG channel ER is 0.05-3%). */}
+            <Stat
+              label="ER %"
+              value={engagementRate != null ? Number((engagementRate * 100).toFixed(2)) : null}
+            />
           </div>
           {s.notes && <p className="mt-2 text-xs text-gray-600 italic">"{s.notes}"</p>}
         </div>

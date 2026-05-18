@@ -30,6 +30,14 @@ export interface KolChannelSnapshot {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  /** Computed: avg_views_per_post / follower_count. Stored column
+   *  auto-derived by Postgres (mig 075). NULL when source fields
+   *  are missing. */
+  engagement_rate: number | null;
+  /** Computed: month-over-month follower growth as a percentage.
+   *  Trigger-derived from the previous snapshot for the same KOL
+   *  (mig 075). NULL on the first snapshot per KOL. */
+  follower_growth_pct: number | null;
 }
 
 export interface CreateKolChannelSnapshotInput {
