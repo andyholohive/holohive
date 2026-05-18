@@ -5160,9 +5160,19 @@ export default function SalesPipelinePage() {
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                 <div>
                   <Label className="text-xs text-gray-500">Deal value</Label>
+                  {/* Uncontrolled input — `value={opp.deal_value}` with
+                      only an onBlur handler made the input unwritable:
+                      every parent re-render (and applyOppPatch triggers
+                      one) reset the DOM value back to the prop, so
+                      typing never stuck. `defaultValue` + `key={opp.id}`
+                      lets the user type freely, and the key remounts the
+                      input when switching to a different opp so it
+                      picks up the new starting value. Same fix applied
+                      to every inline-edit Input/Textarea in this panel. */}
                   <Input
+                    key={`deal-value-${opp.id}`}
                     type="number"
-                    value={opp.deal_value ?? ''}
+                    defaultValue={opp.deal_value ?? ''}
                     placeholder="0"
                     onBlur={async (e) => {
                       const raw = e.target.value.trim();
@@ -5437,7 +5447,8 @@ export default function SalesPipelinePage() {
                           drop signals like "Korea announcement", "Series
                           A", "exchange listing", or full context paragraphs. */}
                       <Textarea
-                        value={opp.next_action_notes || ''}
+                        key={`orbit-watch-${opp.id}`}
+                        defaultValue={opp.next_action_notes || ''}
                         placeholder="e.g. Watching for Korea expansion announcement, Series A raise, or exchange listing — message them when any of these hit."
                         onBlur={async (e) => {
                           const v = e.target.value.trim() || null;
@@ -5520,7 +5531,8 @@ export default function SalesPipelinePage() {
                   <div>
                     <Label className="text-xs text-gray-500">Decision maker</Label>
                     <Input
-                      value={opp.decision_maker_name || ''}
+                      key={`dm-name-${opp.id}`}
+                      defaultValue={opp.decision_maker_name || ''}
                       placeholder="Name"
                       onBlur={async (e) => {
                         const v = e.target.value.trim() || null;
@@ -5535,7 +5547,8 @@ export default function SalesPipelinePage() {
                   <div>
                     <Label className="text-xs text-gray-500">DM role</Label>
                     <Input
-                      value={opp.decision_maker_role || ''}
+                      key={`dm-role-${opp.id}`}
+                      defaultValue={opp.decision_maker_role || ''}
                       placeholder="e.g. Head of Marketing"
                       onBlur={async (e) => {
                         const v = e.target.value.trim() || null;
@@ -5584,7 +5597,8 @@ export default function SalesPipelinePage() {
                   <div>
                     <Label className="text-xs text-gray-500">Proposal doc URL</Label>
                     <Input
-                      value={opp.proposal_doc_url || ''}
+                      key={`proposal-url-${opp.id}`}
+                      defaultValue={opp.proposal_doc_url || ''}
                       placeholder="https://..."
                       onBlur={async (e) => {
                         const v = e.target.value.trim() || null;
@@ -5599,7 +5613,8 @@ export default function SalesPipelinePage() {
                   <div className="col-span-2">
                     <Label className="text-xs text-gray-500">Next action / notes</Label>
                     <Textarea
-                      value={opp.next_action_notes || ''}
+                      key={`pp-notes-${opp.id}`}
+                      defaultValue={opp.next_action_notes || ''}
                       placeholder="What are we waiting on? What's the next step?"
                       onBlur={async (e) => {
                         const v = e.target.value.trim() || null;
