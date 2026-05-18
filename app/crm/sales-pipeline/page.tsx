@@ -154,7 +154,17 @@ export default function SalesPipelinePage() {
   const [loading, setLoading] = useState(true);
   const [opportunities, setOpportunities] = useState<SalesPipelineOpportunity[]>([]);
   const [affiliates, setAffiliates] = useState<CRMAffiliate[]>([]);
-  const [users, setUsers] = useState<{ id: string; name: string | null; email: string }[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string | null; email: string; is_active?: boolean | null }[]>([]);
+
+  // Filtered roster — excludes inactive (`is_active=false`) users so
+  // pending/deactivated test accounts (e.g. "Andy Test", "bolt test")
+  // don't clutter the per-owner tab bar, owner dropdowns, or
+  // per-user metrics tables. `is_active === false` (not !==true) so
+  // legacy users with null/undefined still appear by default.
+  const activeUsers = useMemo(
+    () => users.filter(u => u.is_active !== false),
+    [users],
+  );
   const [metrics, setMetrics] = useState({ totalCount: 0, bucketA: 0, bucketB: 0, bucketC: 0, activeValue: 0, bamfamViolations: 0 });
 
   // Weekly Activity Funnel (header) — canonical 5-stage outbound funnel.
@@ -3107,7 +3117,7 @@ export default function SalesPipelinePage() {
           All Owners
           <span className="ml-1.5 text-[10px] font-semibold opacity-70">{outreachAllTotal}</span>
         </button>
-        {users.filter(u => u.id !== user?.id).map(u => (
+        {activeUsers.filter(u => u.id !== user?.id).map(u => (
           <button
             key={u.id}
             onClick={() => { setOutreachFilters(prev => ({ ...prev, owner_id: u.id })); setOutreachPage(1); setSelectedOutreach([]); }}
@@ -3238,7 +3248,7 @@ export default function SalesPipelinePage() {
                     >
                       <span className="text-gray-500 italic">Unassigned</span>
                     </CommandItem>
-                    {users.map(u => (
+                    {activeUsers.map(u => (
                       <CommandItem
                         key={u.id}
                         value={`${u.name || ''} ${u.email}`}
@@ -4521,7 +4531,7 @@ export default function SalesPipelinePage() {
               <SelectValue placeholder="Select user" />
             </SelectTrigger>
             <SelectContent>
-              {users.map(u => (
+              {activeUsers.map(u => (
                 <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
               ))}
             </SelectContent>
@@ -4797,7 +4807,7 @@ export default function SalesPipelinePage() {
                     <Select value={form.owner_id || ''} onValueChange={v => setForm(f => ({ ...f, owner_id: v }))}>
                       <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
                       <SelectContent>
-                        {users.map(u => (
+                        {activeUsers.map(u => (
                           <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
                         ))}
                       </SelectContent>
@@ -4823,7 +4833,7 @@ export default function SalesPipelinePage() {
                     <Select value="" onValueChange={v => { if (v && !(form.co_owner_ids || []).includes(v) && v !== form.owner_id) setForm(f => ({ ...f, co_owner_ids: [...(f.co_owner_ids || []), v] })); }}>
                       <SelectTrigger className="border-none shadow-none bg-transparent h-6 w-auto px-1 text-xs text-gray-400 focus:ring-0"><SelectValue placeholder="+ Add" /></SelectTrigger>
                       <SelectContent>
-                        {users.filter(u => u.id !== form.owner_id && !(form.co_owner_ids || []).includes(u.id)).map(u => (
+                        {activeUsers.filter(u => u.id !== form.owner_id && !(form.co_owner_ids || []).includes(u.id)).map(u => (
                           <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
                         ))}
                       </SelectContent>
@@ -5038,7 +5048,7 @@ export default function SalesPipelinePage() {
                     <SelectValue placeholder="Team member" />
                   </SelectTrigger>
                   <SelectContent>
-                    {users.map(u => (
+                    {activeUsers.map(u => (
                       <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
                     ))}
                   </SelectContent>
@@ -6079,7 +6089,7 @@ export default function SalesPipelinePage() {
                 >
                   <SelectTrigger className="focus-brand"><SelectValue placeholder="Select..." /></SelectTrigger>
                   <SelectContent>
-                    {users.map(u => (
+                    {activeUsers.map(u => (
                       <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
                     ))}
                   </SelectContent>
@@ -6101,7 +6111,7 @@ export default function SalesPipelinePage() {
                   <Select value="" onValueChange={v => { if (v && !(form.co_owner_ids || []).includes(v) && v !== form.owner_id) setForm(f => ({ ...f, co_owner_ids: [...(f.co_owner_ids || []), v] })); }}>
                     <SelectTrigger className="border-none shadow-none bg-transparent h-6 w-auto px-1 text-xs text-gray-400 focus:ring-0"><SelectValue placeholder="+ Add" /></SelectTrigger>
                     <SelectContent>
-                      {users.filter(u => u.id !== form.owner_id && !(form.co_owner_ids || []).includes(u.id)).map(u => (
+                      {activeUsers.filter(u => u.id !== form.owner_id && !(form.co_owner_ids || []).includes(u.id)).map(u => (
                         <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
                       ))}
                     </SelectContent>
@@ -6340,7 +6350,7 @@ export default function SalesPipelinePage() {
                       <SelectValue placeholder="Team member" />
                     </SelectTrigger>
                     <SelectContent>
-                      {users.map(u => (
+                      {activeUsers.map(u => (
                         <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
                       ))}
                     </SelectContent>
@@ -6524,7 +6534,7 @@ export default function SalesPipelinePage() {
                       <SelectValue placeholder="Team member" />
                     </SelectTrigger>
                     <SelectContent>
-                      {users.map(u => (
+                      {activeUsers.map(u => (
                         <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
                       ))}
                     </SelectContent>
@@ -6661,7 +6671,7 @@ export default function SalesPipelinePage() {
                   }}>
                     <SelectTrigger className="border-none shadow-none bg-transparent h-6 w-auto px-1 text-xs text-gray-400 focus:ring-0"><SelectValue placeholder="+ Add" /></SelectTrigger>
                     <SelectContent>
-                      {users.filter(u => !(activityLogForm.co_owner_ids || []).includes(u.id)).map(u => (
+                      {activeUsers.filter(u => !(activityLogForm.co_owner_ids || []).includes(u.id)).map(u => (
                         <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
                       ))}
                     </SelectContent>
