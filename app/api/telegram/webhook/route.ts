@@ -382,6 +382,15 @@ async function handleCommand(chatId: string, command: string, args: string[], me
     return;
   }
 
+  // Built-in /bulk command — multi-task, multi-client batch creator.
+  // Paste a structured weekly-rollout-style message and the bot
+  // parses it into N tasks across the right clients with one confirm
+  // step. See lib/bulkTaskParser.ts for the parse contract.
+  if (cmd === 'bulk') {
+    await handleBulkCommand(chatId, message);
+    return;
+  }
+
   try {
     // Look up command in database
     const { data: commandData, error } = await supabaseAdmin
@@ -977,6 +986,15 @@ async function handleCallbackQuery(cq: any) {
     return;
   }
 
+  // `bulk:create:<id>` / `bulk:cancel:<id>` — confirm flow for the
+  // /bulk multi-task batch. Single handler for both because the
+  // post-action work (edit preview message, dismiss spinner) is the
+  // same regardless of which button was pressed.
+  if (data.startsWith('bulk:')) {
+    await handleBulkCallback(cq);
+    return;
+  }
+
   // Unknown callback — dismiss the spinner so the button doesn't hang.
   await answerCallbackQuery(callbackId);
 }
@@ -1189,6 +1207,316 @@ async function handleTaskCallback(cq: any) {
   }
 
   await answerCallbackQuery(callbackId, 'Unknown action.');
+}
+
+/* ─────────────────────────── /bulk command ─────────────────────────── */
+
+/**
+ * Handle the /bulk multi-task batch command.
+ *
+ * Flow mirrors /task but for many tasks across multiple clients:
+ *   1. Auth (team-only via users.telegram_id)
+ *   2. Extract body (everything after "/bulk ")
+ *   3. Pull team roster + active client list (preloads Claude's resolution maps)
+ *   4. Call bulkTaskParser → ParsedBulk with sections + issues
+ *   5. INSERT pending_bulk_tasks row
+ *   6. Render preview message with [✅ Create all N] / [❌ Cancel]
+ *      buttons. callback_data carries the pending_bulk_tasks.id.
+ *
+ * Confirm logic lives in handleBulkCallback.
+ */
+async function handleBulkCommand(chatId: string, message: any) {
+  const threadId: number | undefined = message.message_thread_id || undefined;
+  const fromUserId = message.from?.id?.toString();
+
+  if (!fromUserId) {
+    await sendTelegramMessage(chatId, '⚠️ Could not identify you. /bulk is team-only.', 'HTML', threadId);
+    return;
+  }
+  const { data: teamMember } = await supabaseAdmin
+    .from('users')
+    .select('id, name')
+    .eq('telegram_id', fromUserId)
+    .single();
+  if (!teamMember) {
+    await sendTelegramMessage(chatId, '⚠️ /bulk is only available to team members.', 'HTML', threadId);
+    return;
+  }
+
+  const fullText = (message.text || '').trim();
+  const firstSpace = fullText.indexOf(' ');
+  const body = firstSpace === -1 ? '' : fullText.slice(firstSpace + 1).trim();
+
+  if (!body) {
+    await sendTelegramMessage(
+      chatId,
+      'Usage: <code>/bulk</code> followed by a weekly-rollout-style block.\n\n' +
+      'Each client section starts with the client name on its own line, then bullet lines like:\n' +
+      '<code>• May 19 - @yano write the OST recap brief</code>',
+      'HTML',
+      threadId,
+    );
+    return;
+  }
+
+  await sendTelegramMessage(chatId, '🤔 Parsing batch...', 'HTML', threadId);
+
+  // Pre-load resolution sources. Both lists are bounded (team is
+  // ~10, clients ~30) so no pagination concerns.
+  const [{ data: roster }, { data: clientList }] = await Promise.all([
+    supabaseAdmin
+      .from('users')
+      .select('id, name, telegram_username')
+      .not('telegram_id', 'is', null),
+    (supabaseAdmin as any)
+      .from('clients')
+      .select('id, name')
+      .is('archived_at', null)
+      .order('name'),
+  ]);
+
+  let parsed;
+  try {
+    const { parseBulkTasks } = await import('@/lib/bulkTaskParser');
+    parsed = await parseBulkTasks({
+      body,
+      teamMembers: (roster || []) as any,
+      clients: (clientList || []) as any,
+    });
+  } catch (err: any) {
+    console.error('[Telegram /bulk] parse failed:', err);
+    await sendTelegramMessage(chatId, '⚠️ Couldn\'t parse that. Try checking the format.', 'HTML', threadId);
+    return;
+  }
+
+  const totalParsed = parsed.sections.reduce((sum, s) => sum + s.tasks.length, 0);
+  const totalToCreate = parsed.sections.reduce(
+    (sum, s) => sum + s.tasks.filter(t => !t.is_complete).length,
+    0,
+  );
+  const totalDoneMarked = totalParsed - totalToCreate;
+
+  if (totalParsed === 0) {
+    await sendTelegramMessage(chatId, '🤷 No tasks parsed from that input.', 'HTML', threadId);
+    return;
+  }
+
+  // Stage the parse result. The pending row carries everything the
+  // callback needs to do the inserts — no need to re-call Claude on
+  // confirm. Auto-expires implicitly (no consumer beyond the
+  // callback) so we don't need a sweeper.
+  const { data: pending, error: pendingErr } = await (supabaseAdmin as any)
+    .from('pending_bulk_tasks')
+    .insert({
+      created_by_user_id: (teamMember as any).id,
+      origin_chat_id: chatId,
+      origin_message_id: message.message_id ?? null,
+      origin_thread_id: message.message_thread_id ?? null,
+      parsed,
+      raw_text: body,
+    })
+    .select('id')
+    .single();
+  if (pendingErr || !pending) {
+    console.error('[Telegram /bulk] pending insert failed:', pendingErr);
+    await sendTelegramMessage(chatId, '⚠️ Couldn\'t stage the batch. Try again.', 'HTML', threadId);
+    return;
+  }
+
+  // ── Build the preview message ──────────────────────────────────
+  // Group output by client. Each task line: short status icon + due
+  // date + task name + assignee. Telegram caps messages at 4096
+  // chars; if the preview overflows we truncate per-client with a
+  // "+N more" indicator.
+  const previewLines: string[] = [];
+  previewLines.push(`📋 <b>Bulk preview — ${totalToCreate} task${totalToCreate === 1 ? '' : 's'} to create</b>`);
+  if (totalDoneMarked > 0) {
+    previewLines.push(`<i>(plus ${totalDoneMarked} marked done, skipping)</i>`);
+  }
+  previewLines.push('');
+
+  for (const section of parsed.sections) {
+    const clientLabel = section.client_id
+      ? section.client_name
+      : `${section.client_name} ⚠️ <i>(no match)</i>`;
+    previewLines.push(`<b>${escapeHtml(clientLabel)}</b>`);
+    for (const t of section.tasks) {
+      const tick = t.is_complete ? '✅' : '○';
+      const date = t.due_date ? escapeHtml(t.due_date) : '—';
+      const assignee = t.primary_assignee_name
+        ? ` · ${escapeHtml(t.primary_assignee_name)}${t.co_owner_handles.length ? ` (+${t.co_owner_handles.length})` : ''}`
+        : '';
+      previewLines.push(`  ${tick} <code>${date}</code> ${escapeHtml(t.task_name)}${assignee}`);
+    }
+    previewLines.push('');
+  }
+
+  if (parsed.issues.length > 0) {
+    previewLines.push(`⚠️ <b>Issues (${parsed.issues.length}):</b>`);
+    for (const issue of parsed.issues.slice(0, 8)) {
+      previewLines.push(`  • ${escapeHtml(issue.message)}`);
+    }
+    if (parsed.issues.length > 8) {
+      previewLines.push(`  • +${parsed.issues.length - 8} more`);
+    }
+  }
+
+  // Truncate hard to stay under Telegram's 4096-char limit. The
+  // pending row has the full data; the preview is just for human
+  // verification.
+  const MAX_PREVIEW_CHARS = 3800;
+  let previewText = previewLines.join('\n');
+  if (previewText.length > MAX_PREVIEW_CHARS) {
+    previewText = previewText.slice(0, MAX_PREVIEW_CHARS) + '\n\n<i>(preview truncated; full data will still be inserted on confirm)</i>';
+  }
+
+  await sendTelegramMessageWithButtons(
+    chatId,
+    previewText,
+    [[
+      { text: `✅ Create ${totalToCreate}`, callback_data: `bulk:create:${pending.id}` },
+      { text: '❌ Cancel', callback_data: `bulk:cancel:${pending.id}` },
+    ]],
+    message.message_thread_id,
+  );
+}
+
+/**
+ * Handle ✅/❌ on the /bulk preview message.
+ *
+ * Same anti-grief check as /task — only the user who typed /bulk can
+ * confirm or cancel. Cancel just deletes the pending row + edits the
+ * preview. Create iterates the parsed sections, inserts non-complete
+ * tasks (✅-marked ones are skipped), fires assignee DMs in
+ * parallel, and rolls up co-owner handles into the description
+ * footer per the multi-assignee design note in mig 077.
+ *
+ * Insert mode: best-effort per-row rather than a SQL transaction
+ * (PostgREST doesn't expose multi-row transactions cleanly). Per-row
+ * failures are collected and reported in the outcome message rather
+ * than rolling back successful inserts — partial creation is more
+ * useful than nothing when most rows are valid.
+ */
+async function handleBulkCallback(cq: any) {
+  const callbackId: string = cq.id;
+  const data: string = cq.data || '';
+  const [, action, pendingId] = data.split(':');
+  const clickerTgId = cq.from?.id?.toString();
+  const messageChatId = cq.message?.chat?.id?.toString();
+  const messageId = cq.message?.message_id;
+
+  if (!pendingId || !clickerTgId || !messageChatId || !messageId) {
+    await answerCallbackQuery(callbackId, 'Invalid button.');
+    return;
+  }
+
+  const { data: pending } = await (supabaseAdmin as any)
+    .from('pending_bulk_tasks')
+    .select('*')
+    .eq('id', pendingId)
+    .maybeSingle();
+  if (!pending) {
+    await answerCallbackQuery(callbackId, 'This batch already expired.');
+    await editMessageText(messageChatId, messageId, '⏳ <i>Pending batch no longer available.</i>');
+    return;
+  }
+
+  const { data: clicker } = await supabaseAdmin
+    .from('users')
+    .select('id, name')
+    .eq('telegram_id', clickerTgId)
+    .single();
+  if (!clicker || (clicker as any).id !== pending.created_by_user_id) {
+    await answerCallbackQuery(callbackId, 'Only the batch creator can confirm.');
+    return;
+  }
+
+  if (action === 'cancel') {
+    await (supabaseAdmin as any).from('pending_bulk_tasks').delete().eq('id', pendingId);
+    await editMessageText(messageChatId, messageId, '❌ <i>Bulk cancelled.</i>');
+    await answerCallbackQuery(callbackId, 'Cancelled');
+    return;
+  }
+
+  if (action !== 'create') {
+    await answerCallbackQuery(callbackId, 'Unknown action.');
+    return;
+  }
+
+  // ── Create path ────────────────────────────────────────────────
+  const parsed = pending.parsed as any;
+  const sections: any[] = parsed?.sections || [];
+
+  const createdIds: string[] = [];
+  const failures: Array<{ task_name: string; error: string }> = [];
+
+  for (const section of sections) {
+    const clientId: string | null = section.client_id || null;
+    for (const t of section.tasks || []) {
+      if (t.is_complete) continue; // ✅-marked rows skip insert
+
+      // Compose description with the co-owner footer when present.
+      // Plain text — task description is rendered as HTML elsewhere
+      // but the description column is whatever we put in.
+      const baseDesc = t.notes ? String(t.notes).trim() : '';
+      const coOwnerFooter = (t.co_owner_handles || []).length > 0
+        ? `\n\nCo-owners: ${(t.co_owner_handles as string[]).map(h => `@${h}`).join(', ')}`
+        : '';
+      const description = (baseDesc + coOwnerFooter) || null;
+
+      const insertPayload: Record<string, any> = {
+        task_name: t.task_name,
+        assigned_to: t.primary_assignee_id || null,
+        assigned_to_name: t.primary_assignee_name || null,
+        due_date: t.due_date || null,
+        description,
+        client_id: clientId,
+        status: 'to_do',
+        priority: 'medium',
+        frequency: 'one-time',
+        task_type: 'General',
+        created_by: (clicker as any).id,
+        created_by_name: (clicker as any).name,
+      };
+
+      const { data: created, error: insErr } = await (supabaseAdmin as any)
+        .from('tasks')
+        .insert(insertPayload)
+        .select('id, short_id, assigned_to')
+        .single();
+
+      if (insErr || !created) {
+        failures.push({ task_name: t.task_name, error: insErr?.message || 'insert failed' });
+        continue;
+      }
+      createdIds.push(created.id);
+
+      // Fire the assignment DM if this task has an assignee. Same
+      // inline path /task uses — service-role write, dedupe via
+      // last_assignee_notified_to.
+      if (created.assigned_to) {
+        sendAssignmentDmInline(created.id, (clicker as any).name).catch(() => {});
+      }
+    }
+  }
+
+  await (supabaseAdmin as any).from('pending_bulk_tasks').delete().eq('id', pendingId);
+
+  // Compose outcome message. Successes are the headline; failures
+  // get itemized so the user can re-submit just the broken rows.
+  const lines: string[] = [];
+  lines.push(`✅ <b>Created ${createdIds.length} task${createdIds.length === 1 ? '' : 's'}</b>`);
+  lines.push(`<i>by ${escapeHtml((clicker as any).name)}</i>`);
+  if (failures.length > 0) {
+    lines.push('');
+    lines.push(`⚠️ <b>${failures.length} failed:</b>`);
+    for (const f of failures.slice(0, 8)) {
+      lines.push(`  • ${escapeHtml(f.task_name)} — ${escapeHtml(f.error)}`);
+    }
+    if (failures.length > 8) lines.push(`  • +${failures.length - 8} more`);
+  }
+  await editMessageText(messageChatId, messageId, lines.join('\n'));
+  await answerCallbackQuery(callbackId, `Created ${createdIds.length}`);
 }
 
 /**
