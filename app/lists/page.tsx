@@ -715,13 +715,37 @@ export default function ListsPage() {
         if (updateError) throw updateError;
         listId = editingList.id;
 
-        // Remove existing KOL associations
-        const { error: deleteError } = await supabase
-          .from('list_kols')
-          .delete()
-          .eq('list_id', editingList.id);
+        // Diff KOL associations instead of delete-all + re-insert.
+        // The old approach nuked every per-KOL `notes` and reset every
+        // `status` back to 'curated' on save — meaning any annotations
+        // the team had added (or a "shortlisted" / "rejected" status
+        // they'd set) silently disappeared. Now we only delete the
+        // KOLs being REMOVED and only insert the KOLs being ADDED;
+        // existing KOLs in the list are left alone, preserving their
+        // notes + status untouched.
+        const previousKolIds = new Set((editingList.kols || []).map(k => k.id));
+        const nextKolIds = new Set(newList.selectedKOLs);
+        const toRemove = Array.from(previousKolIds).filter(id => !nextKolIds.has(id));
+        const toAdd = Array.from(nextKolIds).filter(id => !previousKolIds.has(id));
 
-        if (deleteError) throw deleteError;
+        if (toRemove.length > 0) {
+          const { error: removeError } = await supabase
+            .from('list_kols')
+            .delete()
+            .eq('list_id', editingList.id)
+            .in('master_kol_id', toRemove);
+          if (removeError) throw removeError;
+        }
+        if (toAdd.length > 0) {
+          const { error: addError } = await supabase
+            .from('list_kols')
+            .insert(toAdd.map(kolId => ({
+              list_id: editingList.id,
+              master_kol_id: kolId,
+              status: 'curated',
+            })));
+          if (addError) throw addError;
+        }
       } else {
         // Create new list with auto-generated slug
         const { data: newListData, error: insertError } = await supabase
@@ -737,21 +761,23 @@ export default function ListsPage() {
 
         if (insertError) throw insertError;
         listId = newListData.id;
-      }
 
-      // Add KOL associations
-      if (newList.selectedKOLs.length > 0) {
-        const kolAssociations = newList.selectedKOLs.map(kolId => ({
-          list_id: listId,
-          master_kol_id: kolId,
-          status: 'curated', // Default status for new KOLs in list
-        }));
+        // New-list path keeps the original bulk-insert. No prior rows
+        // exist so there's nothing to preserve; every KOL starts at
+        // status='curated' with no notes.
+        if (newList.selectedKOLs.length > 0) {
+          const kolAssociations = newList.selectedKOLs.map(kolId => ({
+            list_id: listId,
+            master_kol_id: kolId,
+            status: 'curated',
+          }));
 
-        const { error: kolsError } = await supabase
-          .from('list_kols')
-          .insert(kolAssociations);
+          const { error: kolsError } = await supabase
+            .from('list_kols')
+            .insert(kolAssociations);
 
-        if (kolsError) throw kolsError;
+          if (kolsError) throw kolsError;
+        }
       }
     
       handleCloseListModal();
