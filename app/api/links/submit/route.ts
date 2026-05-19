@@ -78,15 +78,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send Telegram notification (must await in serverless environment)
+    // Send Telegram notification (must await in serverless environment).
+    // Deep-link to the new row via ?id=<link.id> so the recipient lands
+    // directly on the submitted link instead of the unfiltered /links
+    // index. The page reads this param on mount, auto-switches to the
+    // tab the link belongs to (Holo Hive / Guide / Clients), and pins
+    // the filter to just that row.
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://portal.holohive.agency';
-    const linkUrl = `${baseUrl}/links`;
+    const linkUrl = `${baseUrl}/links?id=${encodeURIComponent(link.id)}`;
     const message = `<b>New Link Submitted</b>\n\n` +
       `<b>Name:</b> ${name.trim()}\n` +
       `<b>URL:</b> ${url.trim()}\n` +
       `<b>Client:</b> ${client?.trim() || 'N/A'}\n` +
       `<b>Type:</b> ${link_types?.map((t: string) => t.charAt(0).toUpperCase() + t.slice(1)).join(', ') || 'N/A'}\n\n` +
-      `<a href="${linkUrl}">View Links</a>`;
+      `<a href="${linkUrl}">View Link</a>`;
 
     try {
       await TelegramService.sendMessage(message);

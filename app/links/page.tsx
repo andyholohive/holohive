@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -85,6 +86,17 @@ const ACCESS_OPTIONS = [
 export default function LinksPage() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Deep-link target. /api/links/submit's Telegram message includes
+  // ?id=<link-id> so the recipient lands on the newly-submitted row
+  // instead of the unfiltered index. The effect below picks this up
+  // once `links` has loaded, switches to the right tab, and pins the
+  // search filter to the link's exact name (so the page shows just
+  // that row). Clearing the search field clears the deep-link state.
+  const focusLinkId = searchParams.get('id');
+
   const [loading, setLoading] = useState(true);
   const [links, setLinks] = useState<Link[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
@@ -135,6 +147,34 @@ export default function LinksPage() {
   useEffect(() => {
     fetchLinks();
   }, []);
+
+  // Deep-link handler: once links + clients are loaded AND we have
+  // a ?id= in the URL, find the target row, switch to its tab, and
+  // set the search term to its name so the table filters to just it.
+  // Runs after every links update so a fresh insert (e.g. user added
+  // a link in another tab and came back) still resolves correctly.
+  useEffect(() => {
+    if (!focusLinkId || loading || links.length === 0) return;
+    const target = links.find(l => l.id === focusLinkId);
+    if (!target) return;
+
+    // Tab routing mirrors getTabLinks() — Guide takes priority since
+    // a "Guide"-typed link could also belong to a client; the tabs
+    // visually filter by type first, then by client.
+    if (target.link_types?.includes('guide')) {
+      setActiveTab('guide');
+    } else if (target.client === 'Holo Hive') {
+      setActiveTab('holohive');
+    } else {
+      setActiveTab('clients');
+    }
+
+    // Use the link's name as the search term — the search field
+    // already matches name/url/client, and an exact-name search
+    // reliably narrows to the target. The user can clear the field
+    // to see everything else again.
+    setSearchTerm(target.name);
+  }, [focusLinkId, loading, links]);
 
   const fetchLinks = async () => {
     setLoading(true);
