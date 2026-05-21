@@ -224,6 +224,18 @@ export default function TasksPage() {
   const clientFilterId = searchParams.get('client');
 
   const [tasks, setTasks] = useState<Task[]>([]);
+  // [Subtasks v1] Tracks which parent tasks are expanded to show their
+  // subtasks inline. Default: all collapsed. State lives in-memory only
+  // (resets on page reload) — matches the deliverables page pattern.
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
+  const toggleTaskExpand = (id: string) => {
+    setExpandedTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
   const [loading, setLoading] = useState(true);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
@@ -336,7 +348,15 @@ export default function TasksPage() {
       );
     });
     ClientService.getAllClients().then((c) => {
-      setClients(c.map(cl => ({ id: cl.id, name: cl.name })));
+      // [Client filter] Only ACTIVE clients in the Client dropdown.
+      // getAllClients already drops archived rows; this layer drops
+      // is_active=false (deactivated but not archived). 5 inactive
+      // clients were leaking into the picker before this change.
+      // is_active !== false admits NULL too so legacy rows still appear.
+      setClients(
+        c.filter(cl => (cl as any).is_active !== false)
+          .map(cl => ({ id: cl.id, name: cl.name }))
+      );
     }).catch(() => {});
   }, []);
 
@@ -377,6 +397,23 @@ export default function TasksPage() {
     return map;
   }, [teamMembers]);
 
+  // [Subtasks v1] Group every subtask by its parent_task_id. Used to
+  // (a) decide whether a parent row gets an expand chevron, and
+  // (b) render the subtask rows inline when expanded.
+  // We iterate the full tasks state (not the tab-filtered view) so a
+  // parent's subtasks are always available regardless of which tab the
+  // user is on.
+  const subtasksByParent = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    for (const t of tasks) {
+      if (t.parent_task_id) {
+        if (!map.has(t.parent_task_id)) map.set(t.parent_task_id, []);
+        map.get(t.parent_task_id)!.push(t);
+      }
+    }
+    return map;
+  }, [tasks]);
+
   // Tab counts. Counts reflect what the user actually SEES on each tab,
   // so completed tasks are excluded from the totals when the toggle is
   // off (matches the filtered list rendered below). Otherwise the
@@ -384,13 +421,19 @@ export default function TasksPage() {
   const deliverableTaskIds = useMemo(() => new Set(Object.keys(deliverableProgress)), [deliverableProgress]);
   const visibilityFilter = (t: Task) => showCompleted || t.status !== 'complete';
 
+  // [Subtask visibility v3] Subtasks are now first-class rows in the
+  // three tabs (one-time / recurring / deliverables) — they appear
+  // in whichever tab matches their own frequency / deliverable status.
+  // Visual grouping in renderTaskTable keeps them right under their
+  // parent in the list, with an indent + parent-name subtitle on the
+  // row itself so users can see context at a glance.
   const oneTimeCount = useMemo(() =>
-    tasks.filter(t => t.frequency === 'one-time' && !deliverableTaskIds.has(t.id) && !t.parent_task_id && visibilityFilter(t)).length,
-    [tasks, deliverableTaskIds, showCompleted]
+    tasks.filter(t => t.frequency === 'one-time' && visibilityFilter(t)).length,
+    [tasks, showCompleted]
   );
   const recurringCount = useMemo(() =>
-    tasks.filter(t => t.frequency !== 'one-time' && !deliverableTaskIds.has(t.id) && !t.parent_task_id && visibilityFilter(t)).length,
-    [tasks, deliverableTaskIds, showCompleted]
+    tasks.filter(t => t.frequency !== 'one-time' && visibilityFilter(t)).length,
+    [tasks, showCompleted]
   );
   const deliverableCount = useMemo(() =>
     tasks.filter(t => deliverableTaskIds.has(t.id) && visibilityFilter(t)).length,
@@ -403,15 +446,24 @@ export default function TasksPage() {
     [tasks, showCompleted]
   );
 
-  // Filter tasks by tab + search (exclude subtasks from one-time/recurring — they belong in Deliverables)
+  // Filter tasks by tab + search. Subtasks ARE included now — they
+  // fall into whichever tab matches their own frequency, and the
+  // deliverables tab also pulls in subtasks of deliverable parents
+  // (since they're deliverable-related work). renderTaskTable orders
+  // them right under their parent so the visual grouping is preserved.
   const filtered = useMemo(() => {
     let tabFiltered: Task[];
     if (activeTab === 'one-time') {
-      tabFiltered = tasks.filter(t => t.frequency === 'one-time' && !deliverableTaskIds.has(t.id) && !t.parent_task_id);
+      tabFiltered = tasks.filter(t => t.frequency === 'one-time');
     } else if (activeTab === 'recurring') {
-      tabFiltered = tasks.filter(t => t.frequency !== 'one-time' && !deliverableTaskIds.has(t.id) && !t.parent_task_id);
+      tabFiltered = tasks.filter(t => t.frequency !== 'one-time');
     } else {
-      tabFiltered = tasks.filter(t => deliverableTaskIds.has(t.id));
+      // Deliverables tab: parents + their subtasks (so users see the
+      // full deliverable picture in one view).
+      tabFiltered = tasks.filter(t =>
+        deliverableTaskIds.has(t.id) ||
+        (t.parent_task_id !== null && t.parent_task_id !== undefined && deliverableTaskIds.has(t.parent_task_id))
+      );
     }
 
     // ?client=<uuid> URL filter — bridge from the /clients page's
@@ -743,13 +795,50 @@ export default function TasksPage() {
     </thead>
   );
 
-  const renderCell = (task: Task, col: ColumnKey) => {
+  const renderCell = (task: Task, col: ColumnKey, isSubtask: boolean = false, showParentLink: boolean = false) => {
     const isEditingField = (field: string) => editingCell?.taskId === task.id && editingCell?.field === field;
+    // [Subtask visibility v4]
+    //   - Top-level parent: render the chevron when the task has any
+    //     subtasks (data comes from the global subtasksByParent map).
+    //     Lets the parent assignee expand for full visibility.
+    //   - Nested subtask (under expanded parent): indent + left-border,
+    //     no subtitle (parent is right above).
+    //   - Standalone subtask (in subtask assignee's group, parent in
+    //     another group): indent + left-border AND a "↳ Part of..."
+    //     subtitle linking back to the parent.
+    const childCount = isSubtask ? 0 : (subtasksByParent.get(task.id)?.length || 0);
+    const isExpanded = expandedTaskIds.has(task.id);
+    const parentTask = showParentLink && task.parent_task_id
+      ? tasks.find(t => t.id === task.parent_task_id)
+      : null;
 
     switch (col) {
       case 'taskName':
         return (
           <td key={col} className={`py-3 px-3 ${COL.taskName}`}>
+            <div className={`flex items-center gap-2 ${isSubtask ? 'pl-6 border-l-2 border-gray-100' : ''}`}>
+              {/* Chevron — only on top-level parents that have at least
+                  one subtask anywhere. */}
+              {!isSubtask && childCount > 0 && (
+                <button
+                  type="button"
+                  className="p-0.5 rounded hover:bg-gray-200 transition-colors flex-shrink-0"
+                  onClick={(e) => { e.stopPropagation(); toggleTaskExpand(task.id); }}
+                  title={isExpanded ? 'Collapse subtasks' : `Expand ${childCount} subtask${childCount === 1 ? '' : 's'}`}
+                >
+                  {isExpanded ? (
+                    <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                  ) : (
+                    <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+                  )}
+                </button>
+              )}
+              {/* Spacer for top-level rows that have no subtasks — keeps
+                  task names vertically aligned across all rows. */}
+              {!isSubtask && childCount === 0 && (
+                <span className="w-4 flex-shrink-0" aria-hidden />
+              )}
+              <div className="flex-1 min-w-0">
             {isEditingField('task_name') ? (
               <Input
                 value={editingValue}
@@ -847,6 +936,20 @@ export default function TasksPage() {
                 )}
               </span>
             )}
+            {/* [Subtask visibility v4] Parent-link subtitle — only on
+                STANDALONE subtask rows (subtask assignee's group, where
+                the parent isn't visible above). Nested rows under an
+                expanded parent skip this because context is obvious. */}
+            {showParentLink && parentTask && (
+              <p
+                className="text-[10px] text-gray-400 mt-0.5 truncate"
+                title={`Part of: ${parentTask.task_name}`}
+              >
+                ↳ Part of: {parentTask.task_name}
+              </p>
+            )}
+              </div>
+            </div>
           </td>
         );
       case 'priority': {
@@ -1156,33 +1259,45 @@ export default function TasksPage() {
     }
   };
 
-  const renderTaskRow = (task: Task) => {
+  const renderTaskRow = (task: Task, isSubtask: boolean = false, showParentLink: boolean = false) => {
     const globalIdx = globalSorted.findIndex(t => t.id === task.id);
 
     return (
-      <tr key={task.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors group">
-        {/* Reorder arrows - always first */}
+      <tr
+        key={task.id}
+        className={`border-b border-gray-100 hover:bg-gray-50/50 transition-colors group ${
+          // [Subtasks v1] Subtle background tint + lighter border so subtask
+          // rows visually nest under their parent. Combined with the
+          // task-name-cell indent (renderCell), it creates the tree look.
+          isSubtask ? 'bg-gray-50/40' : ''
+        }`}
+      >
+        {/* Reorder arrows — hidden for subtasks (they're ordered within
+            their parent, not across the global flat list). The cell still
+            exists to preserve the table grid alignment. */}
         <td className={`py-3 px-3 ${COL.reorder}`}>
-          <div className="flex flex-col items-center gap-0.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-auto h-auto px-1 py-0 hover:bg-gray-100 disabled:opacity-20"
-              onClick={() => handleReorder(task.id, 'up')}
-              disabled={globalIdx === 0}
-            >
-              <ChevronUp className="h-3.5 w-3.5 text-gray-400" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-auto h-auto px-1 py-0 hover:bg-gray-100 disabled:opacity-20"
-              onClick={() => handleReorder(task.id, 'down')}
-              disabled={globalIdx === globalSorted.length - 1}
-            >
-              <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
-            </Button>
-          </div>
+          {!isSubtask && (
+            <div className="flex flex-col items-center gap-0.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-auto h-auto px-1 py-0 hover:bg-gray-100 disabled:opacity-20"
+                onClick={() => handleReorder(task.id, 'up')}
+                disabled={globalIdx === 0}
+              >
+                <ChevronUp className="h-3.5 w-3.5 text-gray-400" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-auto h-auto px-1 py-0 hover:bg-gray-100 disabled:opacity-20"
+                onClick={() => handleReorder(task.id, 'down')}
+                disabled={globalIdx === globalSorted.length - 1}
+              >
+                <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+              </Button>
+            </div>
+          )}
         </td>
 
         {/* Status dropdown */}
@@ -1221,7 +1336,7 @@ export default function TasksPage() {
         </td>
 
         {/* Dynamic columns based on columnOrder */}
-        {visibleColumnOrder.map((col) => renderCell(task, col))}
+        {visibleColumnOrder.map((col) => renderCell(task, col, isSubtask, showParentLink))}
 
         {/* Actions - always last */}
         <td className={`py-3 px-3 text-right ${COL.actions}`}>
@@ -1239,12 +1354,62 @@ export default function TasksPage() {
   };
 
   const renderTaskTable = (groupTasks: Task[], groupKey: string) => {
-    const sorted = [...groupTasks].sort((a, b) => a.sort_order - b.sort_order);
+    // [Subtask visibility v4] Two kinds of subtask rows:
+    //
+    //   1. NESTED: appears under an expanded parent (chevron toggles).
+    //      Used when the subtask's parent is in this SAME assignee
+    //      group. The parent owns the visual relationship via the
+    //      chevron — no subtitle needed since context is right above.
+    //
+    //   2. STANDALONE: appears as its own row in the subtask
+    //      assignee's group, WITH a "↳ Part of: [parent name]"
+    //      subtitle. Used when the parent is in a DIFFERENT group
+    //      (or no group at all — e.g., orphan).
+    //
+    // Net effect: parent assignee sees parent + chevron (collapse to
+    // keep the list clean, expand for full sub-visibility). Subtask
+    // assignee sees their work with a link back to the main deliverable.
+    // No duplication when both assignees are the same person.
+    const topLevel = groupTasks.filter(t => !t.parent_task_id);
+    const topLevelIdSet = new Set(topLevel.map(t => t.id));
+    const standaloneSubtasks: Task[] = [];
+    for (const t of groupTasks) {
+      if (!t.parent_task_id) continue;
+      // If parent is in this group, the subtask is NESTED only —
+      // rendered under the parent when expanded. Don't push standalone.
+      if (topLevelIdSet.has(t.parent_task_id)) continue;
+      standaloneSubtasks.push(t);
+    }
+    const sortStep = (a: Task, b: Task) => {
+      const numA = parseInt(a.task_name.match(/^(\d+)\./)?.[1] || '999');
+      const numB = parseInt(b.task_name.match(/^(\d+)\./)?.[1] || '999');
+      if (numA !== numB) return numA - numB;
+      return a.sort_order - b.sort_order;
+    };
+    const sortedTopLevel = [...topLevel].sort((a, b) => a.sort_order - b.sort_order);
+    const rows: Array<{ task: Task; isSubtask: boolean; showParentLink: boolean }> = [];
+    for (const t of sortedTopLevel) {
+      rows.push({ task: t, isSubtask: false, showParentLink: false });
+      // If expanded, show ALL the parent's subtasks (across all
+      // assignees) — gives the parent assignee full visibility into
+      // every step under their deliverable.
+      if (expandedTaskIds.has(t.id)) {
+        const allKids = subtasksByParent.get(t.id) || [];
+        for (const k of [...allKids].sort(sortStep)) {
+          rows.push({ task: k, isSubtask: true, showParentLink: false });
+        }
+      }
+    }
+    // Standalone subtasks appended after the top-level rows — these
+    // are this assignee's subtasks whose parent lives elsewhere.
+    for (const s of [...standaloneSubtasks].sort(sortStep)) {
+      rows.push({ task: s, isSubtask: true, showParentLink: true });
+    }
     return (
       <table className="w-full text-sm">
         {tableHeader}
         <tbody>
-          {sorted.map((task) => renderTaskRow(task))}
+          {rows.map(({ task, isSubtask, showParentLink }) => renderTaskRow(task, isSubtask, showParentLink))}
           {addingToGroup === groupKey && (
             <tr className="border-b border-gray-100 bg-gray-50/30">
               <td className={`py-3 px-3 ${COL.reorder}`}></td>

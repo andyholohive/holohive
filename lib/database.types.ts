@@ -876,6 +876,7 @@ export type Database = {
           client_id: string
           created_at: string
           created_by: string | null
+          current_phase: string | null
           description: string | null
           end_date: string | null
           id: string
@@ -908,6 +909,7 @@ export type Database = {
           client_id: string
           created_at?: string
           created_by?: string | null
+          current_phase?: string | null
           description?: string | null
           end_date?: string | null
           id?: string
@@ -940,6 +942,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           created_by?: string | null
+          current_phase?: string | null
           description?: string | null
           end_date?: string | null
           id?: string
@@ -3064,8 +3067,10 @@ export type Database = {
       }
       list_email_views: {
         Row: {
+          click_target: string | null
           created_at: string | null
           email: string
+          event_type: string | null
           id: string
           ip_address: string | null
           list_id: string
@@ -3073,8 +3078,10 @@ export type Database = {
           viewed_at: string | null
         }
         Insert: {
+          click_target?: string | null
           created_at?: string | null
           email: string
+          event_type?: string | null
           id?: string
           ip_address?: string | null
           list_id: string
@@ -3082,8 +3089,10 @@ export type Database = {
           viewed_at?: string | null
         }
         Update: {
+          click_target?: string | null
           created_at?: string | null
           email?: string
+          event_type?: string | null
           id?: string
           ip_address?: string | null
           list_id?: string

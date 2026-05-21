@@ -21,7 +21,9 @@ import { FormService, FormWithStats } from '@/lib/formService';
 import { UserService } from '@/lib/userService';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff, ChevronDown, ChevronUp, Lock, Circle, ListTodo, MoreHorizontal, Bell } from 'lucide-react';
+import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff, ChevronDown, ChevronUp, Lock, Circle, ListTodo, MoreHorizontal, Bell, Settings, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import Link from 'next/link';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import Image from 'next/image';
@@ -1683,6 +1685,13 @@ export default function ClientsPage() {
                   <Plus className="h-4 w-4 mr-2" />
                   Start Client
                 </Button>
+                {/* [Templates admin v1] Templates button mirrors the
+                    loaded-state header so the action bar doesn't
+                    visually shift when data finishes loading. */}
+                <Button variant="outline" className="hover:bg-gray-50" disabled>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Templates
+                </Button>
                 <Button variant="outline" className="hover:bg-gray-50" disabled>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Client
@@ -1858,33 +1867,14 @@ export default function ClientsPage() {
                               <span className="text-xs text-red-600">Please enter a valid email address.</span>
                             )}
                           </div>
-                          <div className="grid gap-2">
-                            <Label htmlFor="location">Location</Label>
-                            <Input
-                              id="location"
-                              value={startClientForm.location}
-                              onChange={(e) => setStartClientForm({ ...startClientForm, location: e.target.value })}
-                              placeholder="Enter location"
-                              className="focus-brand"
-                              disabled={startClientForm.isRenewingClient}
-                            />
-                          </div>
-                          <div className="grid gap-2">
-                            <Label htmlFor="source">
-                              Source {!startClientForm.isRenewingClient && <span className="text-red-500">*</span>}
-                            </Label>
-                            <Select value={startClientForm.source} onValueChange={(value) => setStartClientForm({ ...startClientForm, source: value })} disabled={startClientForm.isRenewingClient}>
-                              <SelectTrigger className="focus-brand" disabled={startClientForm.isRenewingClient}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Inbound">Inbound</SelectItem>
-                                <SelectItem value="Outbound">Outbound</SelectItem>
-                                <SelectItem value="Referral">Referral</SelectItem>
-                                <SelectItem value="Renewal">Renewal</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          {/* Location field hidden per May 2026 audit —
+                              see the matching hide in the Add/Edit
+                              Client dialog. State plumbing kept intact. */}
+                          {/* Source field hidden per May 2026 audit —
+                              wizard's isStepValid still passes because
+                              startClientForm.source defaults to
+                              'Inbound'. Renewal flow still flips the
+                              value to 'Renewal' via the checkbox above. */}
                         </div>
                       </div>
                     )}
@@ -2373,6 +2363,16 @@ export default function ClientsPage() {
                   )}
                 </DialogContent>
               </Dialog>
+              {/* [Templates admin v1] Quick link to the milestone templates
+                  management page. Placed inline with the other top-bar
+                  actions so admins can hop straight to template CRUD
+                  without going through a client's Action Board. */}
+              <Link href="/clients/templates">
+                <Button variant="outline" className="hover:bg-gray-50">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Templates
+                </Button>
+              </Link>
               <Dialog open={isNewClientOpen} onOpenChange={(open) => {
                 if (!open) {
                   handleCloseClientModal();
@@ -2445,24 +2445,16 @@ export default function ClientsPage() {
                         <Label htmlFor="email">Email</Label>
                         <Input id="email" type="email" value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} placeholder="Enter email address" className="focus-brand" required />
                       </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="location">Location</Label>
-                        <Input id="location" value={newClient.location} onChange={(e) => setNewClient({ ...newClient, location: e.target.value })} placeholder="Enter location (optional)" className="focus-brand" />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="source">Source</Label>
-                        <Select value={newClient.source} onValueChange={(value) => setNewClient({ ...newClient, source: value })}>
-                          <SelectTrigger className="focus-brand">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Inbound">Inbound</SelectItem>
-                            <SelectItem value="Outbound">Outbound</SelectItem>
-                            <SelectItem value="Referral">Referral</SelectItem>
-                            <SelectItem value="Renewal">Renewal</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      {/* Location field hidden per May 2026 audit — was
+                          inconsistently filled across the team and the
+                          on-card display was already removed in the
+                          earlier card cleanup. Data + state plumbing
+                          remains so existing values aren't destroyed
+                          and the input can be restored if needed. */}
+                      {/* Source field hidden per May 2026 audit — same
+                          reasoning as Location. State defaults to
+                          'Inbound' so saves don't break. Restore by
+                          uncommenting this block. */}
                       <div className="grid gap-2">
                         <Label htmlFor="client-status">Status</Label>
                         <Select value={newClient.is_active ? 'active' : 'inactive'} onValueChange={(value) => setNewClient({ ...newClient, is_active: value === 'active' })}>
@@ -2630,7 +2622,7 @@ export default function ClientsPage() {
             filteredClients.map((client) => {
               const clientWithStatus = client as ClientWithStatus;
               return (
-                <Card key={client.id} className="transition-shadow group">
+                <Card key={client.id} className="transition-shadow group flex flex-col h-full">
                   <CardHeader className="pb-4">
                     <div className="mb-3">
                       <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
@@ -2688,10 +2680,11 @@ export default function ClientsPage() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <div className="flex items-center text-sm text-gray-600">
-                        <Mail className="h-4 w-4 mr-2 text-gray-600" />
-                        <span className="text-gray-600">{client.email}</span>
-                      </div>
+                      {/* Email row hidden per May 2026 client-card cleanup —
+                          it added vertical noise without ever being
+                          actionable on the card. Email is still
+                          accessible inside the Edit Portal modal / via
+                          search. */}
                       <div className="flex items-center text-sm text-gray-600 min-h-[20px]">
                         {client.location ? (
                           <>
@@ -2704,7 +2697,7 @@ export default function ClientsPage() {
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-4 border-t border-gray-100">
+                  <CardContent className="pt-4 border-t border-gray-100 flex flex-col flex-1">
                     {/* Per May 2026 user feedback: replace the campaign-
                         status breakdown with onboarding progress + signals
                         the team actually scans for at a glance.
@@ -2779,9 +2772,34 @@ export default function ClientsPage() {
                           {/* Activity row: pending client tasks + HQ tasks + last visit */}
                           <div className="flex items-center gap-3 flex-wrap text-xs">
                             {pendingClientTasks > 0 && (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 text-amber-700 font-medium" title={`${pendingClientTasks} task${pendingClientTasks === 1 ? '' : 's'} waiting on the client`}>
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 text-amber-700 font-medium">
                                 <Bell className="h-3 w-3" />
                                 {pendingClientTasks} waiting on client
+                                {/* Hover-info button explaining what counts
+                                    as "waiting on client". Placed inside
+                                    the badge so it travels with it visually. */}
+                                <TooltipProvider delayDuration={150}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="ml-0.5 inline-flex items-center justify-center rounded-full hover:bg-amber-100 transition-colors"
+                                        onClick={(e) => e.stopPropagation()}
+                                        aria-label="What does this count?"
+                                      >
+                                        <Info className="h-3 w-3 text-amber-600/80" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom" align="start" className="max-w-[260px] text-xs leading-relaxed">
+                                      Count of action-board items on the
+                                      <strong> client's side</strong> (the
+                                      "Yours" column) that are still open
+                                      across all milestones. Quick signal
+                                      to nudge the client when they're
+                                      blocking next steps.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               </span>
                             )}
                             <button
@@ -2814,17 +2832,21 @@ export default function ClientsPage() {
                         Add Campaign
                       </Button>
                     )}
-                    {/* Client Portal — folded into one dropdown per
-                        May 2026 user feedback. The 4 separate icon
-                        tiles (Context / Updates / Notes / Visits)
-                        ate too much vertical space and added click
-                        ambiguity ("which one is the right one?").
-                        Single button → menu = consistent with how
-                        other CRUD-heavy rows handle this throughout
-                        the app. The "Open Portal" link sits next to
-                        it as the primary action since it's what the
-                        team most often wants. */}
-                    <div className="mt-3 pt-3 border-t border-gray-100">
+                    {/* Client Portal row — three flat buttons (no kebab).
+                        Updates + Notes were hidden per the May 22, 2026
+                        audit because the features had ~zero usage
+                        (5 update rows total across 2 clients, 1 note
+                        row total, both untouched for 3-4 months). Data
+                        + handlers + modals remain intact so the
+                        features can be restored by adding the buttons
+                        back if the team adopts the workflow.
+
+                        mt-auto pushes this entire row to the bottom of
+                        the card so the divider + buttons align across
+                        the row regardless of how much content sits
+                        above (campaign count, badges, milestone bar
+                        all vary per client). */}
+                    <div className="mt-auto pt-3 border-t border-gray-100">
                       <div className="flex items-center justify-between gap-2">
                         <Button
                           variant="outline"
@@ -2835,43 +2857,34 @@ export default function ClientsPage() {
                           <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
                           Open Portal
                         </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" title="Client portal management">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuItem onClick={() => openContextModal(client)}>
-                              <Briefcase className="h-4 w-4 mr-2 text-gray-500" />
-                              <span className="flex-1">Context</span>
-                              {clientContexts[client.id] && (
-                                <span className="h-2 w-2 rounded-full bg-green-500" title="Set up" />
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { if (clientWeeklyUpdates[client.id]?.length) { openWeeklyModal(client); } else { openWeeklyModal(client); openWeeklyForm(); } }}>
-                              <Activity className="h-4 w-4 mr-2 text-gray-500" />
-                              <span className="flex-1">Updates</span>
-                              {(clientWeeklyUpdates[client.id]?.length || 0) > 0 && (
-                                <span className="text-[10px] font-semibold text-brand bg-brand/10 px-1.5 rounded">{clientWeeklyUpdates[client.id].length}</span>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setMeetingNotesModalClient(client); setMeetingNotesTab('notes'); if (!(clientMeetingNotes[client.id]?.length)) openNoteForm(); }}>
-                              <StickyNote className="h-4 w-4 mr-2 text-gray-500" />
-                              <span className="flex-1">Notes</span>
-                              {(clientMeetingNotes[client.id]?.length || 0) > 0 && (
-                                <span className="text-[10px] font-semibold text-brand bg-brand/10 px-1.5 rounded">{clientMeetingNotes[client.id].length}</span>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openAccessLogModal(client)}>
-                              <Eye className="h-4 w-4 mr-2 text-gray-500" />
-                              <span className="flex-1">Visits</span>
-                              {(portalAccessSummary[client.id]?.count_30d || 0) > 0 && (
-                                <span className="text-[10px] font-semibold text-brand bg-brand/10 px-1.5 rounded">{portalAccessSummary[client.id]!.count_30d}</span>
-                              )}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => openContextModal(client)}
+                          title="Edit client portal context + action board"
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                          Edit Portal
+                          {clientContexts[client.id] && (
+                            <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0" title="Set up" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => openAccessLogModal(client)}
+                          title="Portal visit history"
+                        >
+                          <Eye className="h-3.5 w-3.5 mr-1.5" />
+                          Visits
+                          {(portalAccessSummary[client.id]?.count_30d || 0) > 0 && (
+                            <span className="ml-1.5 text-[10px] font-semibold text-brand bg-brand/10 px-1.5 rounded flex-shrink-0">
+                              {portalAccessSummary[client.id]!.count_30d}
+                            </span>
+                          )}
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -3412,13 +3425,100 @@ export default function ClientsPage() {
                       managed under the Action Board tab. The contextForm
                       still carries the field so the saved value isn't
                       destroyed; it's just no longer editable here. */}
-                  <div className="grid gap-2">
-                    <Label>Client Contacts</Label>
-                    <Input value={contextForm.client_contacts} onChange={(e) => setContextForm({ ...contextForm, client_contacts: e.target.value })} placeholder="Primary contacts on client side" className="focus-brand" />
-                  </div>
+                  {/* Client Contacts field hidden per May 2026 audit —
+                      field is also hidden in the portal. DB column kept
+                      so existing data isn't destroyed; can restore the
+                      input + portal rendering trivially if it's wanted
+                      back later. */}
                   <div className="grid gap-2">
                     <Label>Holo Hive Contacts</Label>
-                    <Input value={contextForm.holohive_contacts} onChange={(e) => setContextForm({ ...contextForm, holohive_contacts: e.target.value })} placeholder="Primary contacts on Holo Hive side" className="focus-brand" />
+                    {/* Picker of team members instead of free text.
+                        Storage stays as comma-separated names (no schema
+                        change). Unmatched manual entries get dropped
+                        on save — acceptable migration cost since the
+                        user explicitly wants the picker model. */}
+                    {(() => {
+                      // Approved team members only — filter out:
+                      //   - clients (handled via the per-client portal),
+                      //   - inactive users (guests, invited-but-never-joined,
+                      //     deactivated members).
+                      // The is_active flag is the canonical "approved" gate.
+                      const teamMembers = allUsers.filter((u: any) =>
+                        u.role !== 'client' && u.is_active !== false
+                      );
+                      const currentNames = (contextForm.holohive_contacts || '')
+                        .split(',').map(s => s.trim()).filter(Boolean);
+                      const currentNamesLower = new Set(currentNames.map(n => n.toLowerCase()));
+                      const selectedUsers = teamMembers.filter((u: any) =>
+                        currentNamesLower.has((u.name || u.email || '').toLowerCase())
+                      );
+                      const triggerLabel = selectedUsers.length > 0
+                        ? selectedUsers.map((u: any) => u.name || u.email).join(', ')
+                        : 'Select team members…';
+                      return (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="focus-brand justify-between font-normal h-auto min-h-9 py-2 text-left"
+                              style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: selectedUsers.length > 0 ? '#111827' : '#9ca3af' }}
+                            >
+                              <span className="truncate">{triggerLabel}</span>
+                              <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0 ml-2" />
+                            </Button>
+                          </PopoverTrigger>
+                          {/* Scroll on the PopoverContent itself — putting
+                              max-h + overflow on an inner div can fail
+                              when Radix's wrapper sizing collapses
+                              parent constraints. */}
+                          <PopoverContent className="w-72 p-2 max-h-72 overflow-y-auto" align="start">
+                            <div className="space-y-0.5">
+                              {teamMembers.length === 0 && (
+                                <p className="text-xs text-gray-400 italic px-2 py-2">No active team members found.</p>
+                              )}
+                              {teamMembers.map((u: any) => {
+                                const name = u.name || u.email;
+                                const checked = currentNamesLower.has(name.toLowerCase());
+                                return (
+                                  <label
+                                    key={u.id}
+                                    className="flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-gray-100 cursor-pointer"
+                                  >
+                                    <Checkbox
+                                      checked={checked}
+                                      onCheckedChange={(c) => {
+                                        // Rebuild the comma-separated string from
+                                        // the picker's selection. We DON'T preserve
+                                        // unmatched manual entries — the user is
+                                        // explicitly opting into the structured
+                                        // picker model.
+                                        const nextSet = new Set(
+                                          teamMembers
+                                            .filter((m: any) => {
+                                              const mName = m.name || m.email;
+                                              const isThis = m.id === u.id;
+                                              return isThis ? !!c : currentNamesLower.has(mName.toLowerCase());
+                                            })
+                                            .map((m: any) => m.name || m.email)
+                                        );
+                                        setContextForm({
+                                          ...contextForm,
+                                          holohive_contacts: Array.from(nextSet).join(', '),
+                                        });
+                                      }}
+                                    />
+                                    <span className="flex-1 min-w-0 truncate">{name}</span>
+                                    {u.email && u.name && (
+                                      <span className="text-[10px] text-gray-400 truncate">{u.email}</span>
+                                    )}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      );
+                    })()}
                   </div>
                   <div className="border-t pt-4 mt-2">
                     <p className="text-sm font-semibold text-gray-700 mb-3">Resource Links (shown in client portal)</p>
@@ -3574,6 +3674,16 @@ export default function ClientsPage() {
                               {milestoneTemplates.length > 0 && <DropdownMenuSeparator />}
                               <DropdownMenuItem onClick={() => setSaveTemplateOpen(true)}>
                                 <Plus className="h-3.5 w-3.5 mr-2" /> Save current as template
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              {/* [Templates admin v1] Link to the dedicated
+                                  management page for full CRUD. Opens in
+                                  a new tab so the Context popup stays open. */}
+                              <DropdownMenuItem
+                                onClick={() => window.open('/clients/templates', '_blank')}
+                                className="text-gray-500"
+                              >
+                                <Settings className="h-3.5 w-3.5 mr-2" /> Manage templates…
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>

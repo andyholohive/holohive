@@ -24,6 +24,18 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabase";
 import { CampaignKOLService } from "@/lib/campaignKolService";
+
+// [Campaign Live v1] Preset phases for the inline Phase dropdown on the
+// campaigns list. Mirrors the const in app/campaigns/[id]/page.tsx — kept
+// duplicated for now to avoid a third file just for one tiny constant.
+// If you change one, change both.
+const CURRENT_PHASE_OPTIONS = [
+  'Setup',
+  'Seeding Phase',
+  'Amplification Phase',
+  'Activation Phase',
+  'Reporting Phase',
+] as const;
 import { UserService } from '@/lib/userService';
 
 export default function CampaignsPage() {
@@ -266,13 +278,16 @@ export default function CampaignsPage() {
               ).length;
               counts[campaign.id] = { total, posted };
 
-              // Content is paid only if it is directly linked to a payment
-              // that has both amount > 0 and payment_date set
+              // Content is paid if it is linked to a payment with a
+              // payment_date set. Amount is intentionally NOT checked:
+              // $0 USD payments are legitimate (token deals, WL access,
+              // comped posts) — they represent a completed transaction,
+              // just with no fiat changing hands.
               const payments = paymentsRes.data || [];
               const paidContentIds = new Set<string>();
 
               payments.forEach(p => {
-                if (Number(p.amount) > 0 && p.payment_date && p.content_id) {
+                if (p.payment_date && p.content_id) {
                   // content_id can be a single id or JSON array
                   const ids = Array.isArray(p.content_id) ? p.content_id : [p.content_id];
                   ids.forEach((id: string) => { if (id && id !== 'none') paidContentIds.add(id); });
@@ -387,6 +402,24 @@ export default function CampaignsPage() {
   const handleShareCampaign = (campaign: CampaignWithDetails) => {
     setSharingCampaign(campaign);
     setIsShareCampaignOpen(true);
+  };
+
+  // [Campaign Live v1] Inline phase update from the list view. Optimistic:
+  // patch local state immediately, roll back on error. Used by the Phase
+  // dropdown in the Table view's row. Same column the campaign detail
+  // form writes to.
+  const handleUpdateCurrentPhase = async (campaignId: string, nextPhase: string | null) => {
+    const previous = campaigns;
+    setCampaigns(prev => prev.map(c =>
+      c.id === campaignId ? { ...c, current_phase: nextPhase } as CampaignWithDetails : c
+    ));
+    try {
+      await CampaignService.updateCampaign(campaignId, { current_phase: nextPhase });
+    } catch (err) {
+      console.error('Failed to update phase:', err);
+      setCampaigns(previous);
+      alert('Failed to update phase. Try again or use the campaign detail page.');
+    }
   };
 
   const handleArchiveCampaign = (campaign: CampaignWithDetails) => {
@@ -1240,6 +1273,10 @@ export default function CampaignsPage() {
                 <TableHead className="font-semibold">Status</TableHead>
                 <TableHead className="font-semibold">Budget</TableHead>
                 <TableHead className="font-semibold">Dates</TableHead>
+                {/* [Campaign Live v1] Inline phase setter — same data the
+                    campaign detail form writes to (campaigns.current_phase).
+                    See app/public/portal/[id]/page.tsx for where it surfaces. */}
+                <TableHead className="font-semibold">Phase</TableHead>
                 <TableHead className="font-semibold">Progress</TableHead>
                 <TableHead className="font-semibold text-right">Actions</TableHead>
               </TableRow>
@@ -1284,6 +1321,27 @@ export default function CampaignsPage() {
                     <TableCell className="text-gray-600 text-sm">
                       {formatDate(campaign.start_date)}
                       {campaign.end_date ? ` - ${formatDate(campaign.end_date)}` : ''}
+                    </TableCell>
+                    {/* [Campaign Live v1] Inline Phase cell. stopPropagation
+                        prevents the row's onClick (navigates to detail) from
+                        firing when the user opens the dropdown. */}
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Select
+                        value={campaign.current_phase ?? '__none__'}
+                        onValueChange={(v) =>
+                          handleUpdateCurrentPhase(campaign.id, v === '__none__' ? null : v)
+                        }
+                      >
+                        <SelectTrigger className="h-8 w-[170px] text-xs focus-brand">
+                          <SelectValue placeholder="— Not set" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">— Not set</SelectItem>
+                          {CURRENT_PHASE_OPTIONS.map(phase => (
+                            <SelectItem key={phase} value={phase}>{phase}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

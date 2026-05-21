@@ -12,7 +12,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 // import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,6 +42,21 @@ type KolSortKey =
   | 'budget' | 'paid' | 'date_added';
 
 /**
+ * KOL workflow stages, in journey order. The default sort on the KOL
+ * Dashboard uses this so rows appear Curated → Contacted → Interested →
+ * Onboarded → Concluded (natural pipeline order), not alphabetical
+ * (which would surface Concluded ahead of Onboarded — nonsense).
+ *
+ * Mirrored in app/public/campaigns/[id]/page.tsx — keep both in sync.
+ */
+const KOL_STATUS_ORDER = ['Curated', 'Contacted', 'Interested', 'Onboarded', 'Concluded'] as const;
+const statusOrderIndex = (s: string | null | undefined): number => {
+  if (!s) return KOL_STATUS_ORDER.length; // unknown → end
+  const idx = KOL_STATUS_ORDER.indexOf(s as any);
+  return idx === -1 ? KOL_STATUS_ORDER.length : idx;
+};
+
+/**
  * Per-column comparator. Strings → localeCompare, numbers → numeric,
  * arrays → join+localeCompare, missing → push to end of asc / top of desc.
  * Stable ordering for equal values is handled by the caller via
@@ -58,7 +73,8 @@ function compareKolByColumn(a: any, b: any, key: KolSortKey): number {
       case 'content_type': return (row.master_kol?.content_type || []).join(', ');
       case 'deliverables': return (row.deliverables || row.master_kol?.deliverables || []).join(', ');
       case 'pricing':      return row.master_kol?.pricing || '';
-      case 'hh_status':    return row.hh_status || '';
+      // Sort by workflow stage, not alphabetically. See KOL_STATUS_ORDER.
+      case 'hh_status':    return statusOrderIndex(row.hh_status);
       case 'budget_type':  return row.budget_type || '';
       case 'budget':       return row.budget ?? null;
       case 'paid':         return row.paid ?? null;
@@ -149,6 +165,19 @@ function DialogMultiSelect({
   );
 }
 
+// [Campaign Live v1] Preset phases for the Current Phase dropdown on the
+// campaign edit form. Backed by campaigns.current_phase (mig 078). Order
+// reflects the typical KOL campaign lifecycle. Free-text values entered
+// via SQL still render in the client portal — the dropdown just enforces
+// consistency at the UI layer.
+const CURRENT_PHASE_OPTIONS = [
+  'Setup',
+  'Seeding Phase',
+  'Amplification Phase',
+  'Activation Phase',
+  'Reporting Phase',
+] as const;
+
 const CampaignDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -208,10 +237,12 @@ const CampaignDetailsPage = () => {
   const [masterKolForm, setMasterKolForm] = useState<Partial<MasterKOL>>({});
   const [savingMasterKol, setSavingMasterKol] = useState(false);
 
-  // Sort state for the KOL Dashboard table view. null key = original order.
-  // Click a column header to set/toggle. Defaults to ascending on first
-  // click; flips to descending on second; clears on third.
-  const [kolSort, setKolSort] = useState<{ key: KolSortKey | null; dir: 'asc' | 'desc' }>({ key: null, dir: 'asc' });
+  // Sort state for the KOL Dashboard table view.
+  // Default: sort by Status (hh_status) in workflow order (see
+  // KOL_STATUS_ORDER) — surfaces in-progress KOLs together rather than
+  // scattering them through an alphabetical or insertion-order list.
+  // Click a column header to set/toggle. Three-state cycle: asc → desc → cleared.
+  const [kolSort, setKolSort] = useState<{ key: KolSortKey | null; dir: 'asc' | 'desc' }>({ key: 'hh_status', dir: 'asc' });
   // Track cell editing for inline edits
   const [editingCell, setEditingCell] = useState<{ row: string; field: string } | null>(null);
   const [editingValue, setEditingValue] = useState<any>(null);
@@ -1648,6 +1679,9 @@ const CampaignDetailsPage = () => {
         outline: form.outline,
         approved_emails: (form as any).approved_emails?.length > 0 ? (form as any).approved_emails : null,
         approved_domains: (form as any).approved_domains?.length > 0 ? (form as any).approved_domains : null,
+        // [Campaign Live v1] Phase label shown in the client portal's
+        // "Active Campaign" hero. NULL hides the badge.
+        current_phase: form.current_phase,
       });
       // Handle allocations
       // Delete marked allocations
@@ -1707,6 +1741,15 @@ const CampaignDetailsPage = () => {
   const [editingBudget, setEditingBudget] = useState<{ [key: string]: string }>({});
   const [editingWalletId, setEditingWalletId] = useState<string | null>(null);
   const [editingWallet, setEditingWallet] = useState<{ [key: string]: string }>({});
+  // [Wallet edit fix] Tracks when each wallet cell was opened, so we
+  // can distinguish a spurious blur (React mount/render side-effect)
+  // from a genuine user click-away. Without this, an empty wallet
+  // cell becomes un-editable because the autoFocus-triggered blur
+  // closes the input before the user can type.
+  const walletOpenedAtRef = useRef<Record<string, number>>({});
+  // Ref to the currently-mounted wallet input — used to refocus when
+  // we detect a spurious blur.
+  const walletInputRef = useRef<HTMLInputElement | null>(null);
   const [editingPaidId, setEditingPaidId] = useState<string | null>(null);
   const [editingPaid, setEditingPaid] = useState<{ [key: string]: string | number | null }>({});
 
@@ -1745,12 +1788,37 @@ const CampaignDetailsPage = () => {
   };
 
   const handleWalletSave = async (kolId: string) => {
-    const wallet = editingWallet[kolId];
+    const wallet = editingWallet[kolId] ?? '';
     try {
       // Find the campaign KOL to get the master_kol_id
       const campaignKOL = campaignKOLs.find(kol => kol.id === kolId);
       if (!campaignKOL?.master_kol?.id) {
         console.error('Could not find master KOL ID');
+        return;
+      }
+
+      const currentWallet = campaignKOL.master_kol.wallet ?? '';
+
+      // [Wallet edit fix] Three cases when the value is unchanged:
+      //   1. Spurious blur right after the input mounted (React's
+      //      autoFocus interacting with the render cycle / StrictMode
+      //      double-mount). Detect via timestamp (<300ms since open)
+      //      and refocus — DON'T close, so the user can still type.
+      //   2. User genuinely opened the cell and clicked away without
+      //      typing — close silently, no DB write, no toast.
+      //   3. User typed and then reverted to original — close silently.
+      //
+      // Cases 2 + 3 collapse into the same behavior (no save, close).
+      // Case 1 is the new branch that fixes the un-editable empty cell.
+      if (wallet === currentWallet) {
+        const openedAt = walletOpenedAtRef.current[kolId] || 0;
+        const elapsed = Date.now() - openedAt;
+        if (elapsed < 300 && walletInputRef.current) {
+          // Spurious blur — keep the input mounted and refocus.
+          walletInputRef.current.focus();
+          return;
+        }
+        setEditingWalletId(null);
         return;
       }
 
@@ -4128,7 +4196,7 @@ const CampaignDetailsPage = () => {
                       <div className="text-lg font-semibold text-gray-900">{formatDate(campaign?.end_date)}</div>
                     )}
                   </div>
-                  <div className="col-span-2 bg-white p-4 rounded-lg border border-gray-200">
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
                     <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
                       <MapPin className="h-3.5 w-3.5 text-brand" />
                       Region
@@ -4145,6 +4213,50 @@ const CampaignDetailsPage = () => {
                       </Select>
                     ) : (
                       <div className="text-lg font-semibold text-gray-900">{displayRegion(campaign?.region)}</div>
+                    )}
+                  </div>
+                  {/* [Campaign Live v1] Current Phase — displayed as a teal
+                      pill in the client portal's "Active Campaign" hero
+                      once onboarding milestones are all complete. Set to
+                      "— None" (NULL in DB) to hide the badge.
+
+                      Dropdown enforces consistent values across CMs; if a
+                      campaign needs an off-list label, SQL still works
+                      (the column is plain TEXT). */}
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
+                      <Activity className="h-3.5 w-3.5 text-brand" />
+                      Current Phase
+                    </div>
+                    {editMode ? (
+                      <>
+                        <Select
+                          value={form?.current_phase ?? '__none__'}
+                          onValueChange={value =>
+                            handleChange('current_phase' as any, value === '__none__' ? null : value)
+                          }
+                        >
+                          <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand">
+                            <SelectValue placeholder="— None (hide badge)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">— None (hide badge)</SelectItem>
+                            {CURRENT_PHASE_OPTIONS.map(phase => (
+                              <SelectItem key={phase} value={phase}>{phase}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-[10px] text-gray-500 mt-1.5 leading-snug">
+                          Shown in the client portal hero once onboarding completes.
+                        </p>
+                      </>
+                    ) : campaign?.current_phase ? (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand/10 text-brand text-sm font-semibold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand" />
+                        {campaign.current_phase}
+                      </span>
+                    ) : (
+                      <div className="text-sm text-gray-400 italic">Not set</div>
                     )}
                   </div>
                     </div>
@@ -9784,6 +9896,11 @@ const CampaignDetailsPage = () => {
                                         const currentWallet = campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet || '';
                                         setEditingWallet({ [payment.campaign_kol_id]: currentWallet });
                                         setEditingWalletId(payment.campaign_kol_id);
+                                        // [Wallet edit fix] Stamp the open
+                                        // moment so handleWalletSave can
+                                        // tell a spurious blur (right after
+                                        // mount) from a real click-away.
+                                        walletOpenedAtRef.current[payment.campaign_kol_id] = Date.now();
                                       }
                                     } else {
                                       // For non-KOL payments - edit payment wallet
@@ -9796,6 +9913,7 @@ const CampaignDetailsPage = () => {
                                   {payment.campaign_kol_id ? (
                                     editingWalletId === payment.campaign_kol_id ? (
                                       <Input
+                                        ref={walletInputRef}
                                         type="text"
                                         value={editingWallet[payment.campaign_kol_id] || ''}
                                         onChange={e => setEditingWallet({ ...editingWallet, [payment.campaign_kol_id]: e.target.value })}

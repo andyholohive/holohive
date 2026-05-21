@@ -75,6 +75,17 @@ type ContentItem = {
 const formatDate = (dateString: string) =>
   new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 
+// KOL workflow stages, in journey order — used by the default Status
+// sort so rows appear Curated → Contacted → Interested → Onboarded →
+// Concluded (natural pipeline order). Mirrors the admin tracker at
+// app/campaigns/[id]/page.tsx; keep both in sync.
+const KOL_STATUS_ORDER = ['Curated', 'Contacted', 'Interested', 'Onboarded', 'Concluded'] as const;
+const KOL_STATUS_ORDER_INDEX = (s: string | null | undefined): number => {
+  if (!s) return KOL_STATUS_ORDER.length; // unknown → end of list
+  const idx = KOL_STATUS_ORDER.indexOf(s as any);
+  return idx === -1 ? KOL_STATUS_ORDER.length : idx;
+};
+
 const formatCurrency = (amount: number | null | undefined) => {
   if (!amount) return '$0';
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -256,7 +267,10 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
     | 'kol' | 'platform' | 'type' | 'status' | 'activation_date'
     | 'impressions' | 'likes' | 'retweets' | 'comments' | 'bookmarks';
 
-  const [kolSort, setKolSort] = useState<{ key: KolSortKey | null; dir: 'asc' | 'desc' }>({ key: null, dir: 'asc' });
+  // Default: sort by Status (hh_status) in workflow order — see
+  // KOL_STATUS_ORDER below. Surfaces in-progress KOLs together rather
+  // than scattering them through an alphabetical / insertion-order list.
+  const [kolSort, setKolSort] = useState<{ key: KolSortKey | null; dir: 'asc' | 'desc' }>({ key: 'hh_status', dir: 'asc' });
   const [contentSort, setContentSort] = useState<{ key: ContentSortKey | null; dir: 'asc' | 'desc' }>({ key: null, dir: 'asc' });
 
   const toggleKolSort = (key: KolSortKey) => {
@@ -390,7 +404,9 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
         case 'followers':    return row.master_kol?.followers ?? null;
         case 'region':       return row.master_kol?.region || '';
         case 'creator_type': return (row.master_kol?.creator_type || []).join(', ');
-        case 'hh_status':    return row.hh_status || '';
+        // Sort by workflow stage (KOL_STATUS_ORDER), not alphabetically.
+        // Mirrors the admin /campaigns/[id]/page.tsx behavior.
+        case 'hh_status':    return KOL_STATUS_ORDER_INDEX(row.hh_status);
         case 'content_count': return contentCountByKolId.get(row.id) || 0;
         default:             return '';
       }

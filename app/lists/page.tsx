@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2, ChevronDown, Star, Copy, ExternalLink, Eye, LayoutGrid, ChevronLeft, ChevronRight, Shield } from 'lucide-react';
+import { Plus, Search, Edit, List, User, Trash2, Calendar, Users, X, Flag, Globe, Share2, ChevronDown, Star, Copy, ExternalLink, Eye, LayoutGrid, ChevronLeft, ChevronRight, Shield, Mail, Activity, Clock } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
 import ListAccessDialog from '@/components/lists/ListAccessDialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -155,6 +155,43 @@ export default function ListsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('curated');
+
+  // [Access tab v1] Centralized view of WHO has access to each list and
+  // WHO has visited each list. Powered by list_access_grants and
+  // list_email_views. Activates when statusFilter === 'access'.
+  type AccessGrant = {
+    id: string;
+    list_id: string;
+    email: string;
+    granted_at: string;
+    granted_by: string | null;
+    granted_by_name: string | null;
+    expires_at: string | null;
+    revoked_at: string | null;
+    revoked_reason: string | null;
+  };
+  type ListVisit = {
+    id: string;
+    list_id: string;
+    email: string;
+    viewed_at: string;
+    event_type: string | null;
+    click_target: string | null;
+  };
+  const [accessGrants, setAccessGrants] = useState<AccessGrant[]>([]);
+  const [listVisits, setListVisits] = useState<ListVisit[]>([]);
+  const [loadingAccess, setLoadingAccess] = useState(false);
+  // Which list rows are expanded in the per-list overview. Default
+  // collapsed — the summary metrics are usually enough at a glance.
+  const [expandedAccessLists, setExpandedAccessLists] = useState<Set<string>>(new Set());
+  // [Access tab v1] Sort + filter state for the per-list overview.
+  // Default sort: most-active lists first (grants + visits desc),
+  // matching the existing accessOverviewByList ordering.
+  type AccessSortKey = 'name' | 'status' | 'grants' | 'visits' | 'lastVisit' | 'activity';
+  const [accessSort, setAccessSort] = useState<{ key: AccessSortKey; dir: 'asc' | 'desc' }>({ key: 'activity', dir: 'desc' });
+  const [accessSearchTerm, setAccessSearchTerm] = useState('');
+  // Multi-select status filter: empty array = "show all".
+  const [accessStatusFilter, setAccessStatusFilter] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
@@ -536,6 +573,177 @@ export default function ListsPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter]);
+
+  // [Access tab v1] Pull all grants + all visits in two parallel queries
+  // on mount (not lazily on tab activation) so the tab's count badge is
+  // populated from the start. Resolves granted_by user IDs to display
+  // names so the table shows "Granted by Andy" not a UUID.
+  // Data sizes are small (tens of rows) — cheap to always fetch.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingAccess(true);
+      try {
+        // [Access tab v1] list_access_grants is not yet in the generated
+        // database.types.ts — cast the client to `any` to bypass. Easy
+        // fix later: regenerate types or add the table by hand.
+        const supabaseUntyped = supabase as any;
+        const [grantsRes, visitsRes] = await Promise.all([
+          supabaseUntyped
+            .from('list_access_grants')
+            .select('id, list_id, email, granted_at, granted_by, expires_at, revoked_at, revoked_reason')
+            .order('granted_at', { ascending: false }),
+          supabase
+            .from('list_email_views')
+            .select('id, list_id, email, viewed_at, event_type, click_target')
+            .order('viewed_at', { ascending: false }),
+        ]);
+        if (cancelled) return;
+
+        // Resolve granted_by UUID → user name. One round-trip for all
+        // distinct user IDs found in the grants.
+        const grantorIds = Array.from(
+          new Set(((grantsRes.data || []) as any[]).map(g => g.granted_by).filter(Boolean))
+        );
+        let nameMap = new Map<string, string>();
+        if (grantorIds.length > 0) {
+          const { data: usersData } = await supabase
+            .from('users')
+            .select('id, name')
+            .in('id', grantorIds);
+          for (const u of (usersData || []) as any[]) nameMap.set(u.id, u.name);
+        }
+
+        const grants: AccessGrant[] = ((grantsRes.data || []) as any[]).map(g => ({
+          id: g.id,
+          list_id: g.list_id,
+          email: g.email,
+          granted_at: g.granted_at,
+          granted_by: g.granted_by,
+          granted_by_name: g.granted_by ? nameMap.get(g.granted_by) || null : null,
+          expires_at: g.expires_at,
+          revoked_at: g.revoked_at,
+          revoked_reason: g.revoked_reason,
+        }));
+        setAccessGrants(grants);
+        setListVisits((visitsRes.data || []) as ListVisit[]);
+      } catch (err) {
+        console.error('[Access tab] fetch error:', err);
+      } finally {
+        if (!cancelled) setLoadingAccess(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // [Access tab v1] Count of currently-active grants — drives the tab's
+  // badge. Computed cheaply from the already-loaded accessGrants array.
+  const accessTabCount = useMemo(() => {
+    const now = new Date().toISOString();
+    return accessGrants.filter(g => !g.revoked_at && (!g.expires_at || g.expires_at > now)).length;
+  }, [accessGrants]);
+
+  // [Access tab v1] Pre-group access + visits data by list_id for the
+  // overview render. Returns the buckets in lists-order; sort + filter
+  // happens in `filteredSortedAccess` below so users can re-sort
+  // without recomputing the grouping.
+  type AccessBucket = {
+    list: ListItem;
+    activeGrants: AccessGrant[];
+    revokedGrants: AccessGrant[];
+    visits: ListVisit[];
+    lastVisitAt: string | null;
+  };
+  const accessOverviewByList = useMemo<AccessBucket[]>(() => {
+    const now = new Date().toISOString();
+    const isActiveGrant = (g: AccessGrant) =>
+      !g.revoked_at && (!g.expires_at || g.expires_at > now);
+
+    const buckets = new Map<string, AccessBucket>();
+    for (const l of lists) {
+      buckets.set(l.id, { list: l, activeGrants: [], revokedGrants: [], visits: [], lastVisitAt: null });
+    }
+    for (const g of accessGrants) {
+      const b = buckets.get(g.list_id);
+      if (!b) continue;
+      if (isActiveGrant(g)) b.activeGrants.push(g);
+      else b.revokedGrants.push(g);
+    }
+    for (const v of listVisits) {
+      const b = buckets.get(v.list_id);
+      if (!b) continue;
+      b.visits.push(v);
+      if (!b.lastVisitAt || v.viewed_at > b.lastVisitAt) b.lastVisitAt = v.viewed_at;
+    }
+    return Array.from(buckets.values());
+  }, [lists, accessGrants, listVisits]);
+
+  // [Access tab v1] Apply search + status filter + column sort to the
+  // overview. Recomputes only when its inputs change.
+  // List status workflow order (matches the existing status tabs):
+  // curated (in queue) → approved (live) → denied (rejected).
+  const LIST_STATUS_ORDER = ['curated', 'approved', 'denied'] as const;
+  const listStatusOrderIndex = (s: string | null | undefined): number => {
+    if (!s) return LIST_STATUS_ORDER.length;
+    const idx = LIST_STATUS_ORDER.indexOf(s as any);
+    return idx === -1 ? LIST_STATUS_ORDER.length : idx;
+  };
+  const filteredSortedAccess = useMemo<AccessBucket[]>(() => {
+    const q = accessSearchTerm.trim().toLowerCase();
+    let rows = accessOverviewByList;
+    if (q) {
+      rows = rows.filter(b => (b.list.name || '').toLowerCase().includes(q));
+    }
+    if (accessStatusFilter.length > 0) {
+      rows = rows.filter(b => accessStatusFilter.includes(b.list.status || 'curated'));
+    }
+    // Sort (decorate-sort-undecorate for stability on ties)
+    const dir = accessSort.dir === 'asc' ? 1 : -1;
+    const pull = (b: AccessBucket): any => {
+      switch (accessSort.key) {
+        case 'name':       return (b.list.name || '').toLowerCase();
+        case 'status':     return listStatusOrderIndex(b.list.status);
+        case 'grants':     return b.activeGrants.length;
+        case 'visits':     return b.visits.length;
+        case 'lastVisit':  return b.lastVisitAt ? new Date(b.lastVisitAt).getTime() : 0;
+        case 'activity':
+        default:           return b.activeGrants.length + b.visits.length;
+      }
+    };
+    return [...rows]
+      .map((b, i) => ({ b, i }))
+      .sort((a, z) => {
+        const av = pull(a.b);
+        const zv = pull(z.b);
+        const cmp = typeof av === 'number' && typeof zv === 'number'
+          ? (av - zv) * dir
+          : String(av).localeCompare(String(zv)) * dir;
+        return cmp !== 0 ? cmp : a.i - z.i;
+      })
+      .map(x => x.b);
+  }, [accessOverviewByList, accessSearchTerm, accessStatusFilter, accessSort]);
+
+  const toggleAccessSort = (key: AccessSortKey) => {
+    setAccessSort(prev => {
+      if (prev.key !== key) return { key, dir: 'asc' };
+      if (prev.dir === 'asc') return { key, dir: 'desc' };
+      return { key: 'activity', dir: 'desc' }; // third click → reset to default
+    });
+  };
+  const accessSortIcon = (key: AccessSortKey) => {
+    if (accessSort.key !== key) return null;
+    return <span className="ml-0.5 text-[10px] text-gray-500">{accessSort.dir === 'asc' ? '▲' : '▼'}</span>;
+  };
+
+  const toggleAccessExpand = (id: string) => {
+    setExpandedAccessLists(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleEditList = (list: ListItem) => {
     setEditingList(list);
@@ -2274,6 +2482,15 @@ export default function ListsPage() {
                 Denied
                 <Badge variant="secondary" className="ml-2 bg-red-100 text-red-800 pointer-events-none">{statusCounts.denied}</Badge>
               </TabsTrigger>
+              {/* [Access tab v1] Switches the page from the list grid to
+                  a per-list access + visits overview. Same visual
+                  pattern as the status tabs (label + count badge);
+                  badge uses brand tint to set it apart semantically
+                  from the status colors above. */}
+              <TabsTrigger value="access">
+                Access &amp; Visits
+                <Badge variant="secondary" className="ml-2 bg-brand/10 text-brand pointer-events-none">{accessTabCount}</Badge>
+              </TabsTrigger>
             </TabsList>
           </Tabs>
           <div className="flex bg-gray-100 p-1 rounded-lg">
@@ -2295,7 +2512,244 @@ export default function ListsPage() {
             </Button>
           </div>
         </div>
-        {filteredLists.length === 0 ? (
+        {/* [Access tab v1] Centralized access + visits overview. Renders
+            in place of the list grid when the user clicks the
+            "Access & Visits" tab. Each list shows summary metrics; click
+            the chevron to drill into the full grant + visit list. */}
+        {statusFilter === 'access' ? (
+          <div className="space-y-6">
+            {/* Top-level summary stats */}
+            {(() => {
+              const totalActiveGrants = accessOverviewByList.reduce((s, b) => s + b.activeGrants.length, 0);
+              const totalVisits = accessOverviewByList.reduce((s, b) => s + b.visits.length, 0);
+              const listsWithActivity = accessOverviewByList.filter(b => b.activeGrants.length > 0 || b.visits.length > 0).length;
+              const distinctViewers = new Set(listVisits.map(v => v.email.toLowerCase())).size;
+              const StatCard = ({ icon: Icon, label, value }: { icon: any; label: string; value: number }) => (
+                <Card className="border-0 shadow-sm rounded-xl">
+                  <CardContent className="p-5 flex items-center gap-4">
+                    <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-lg shadow-sm flex-shrink-0">
+                      <Icon className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-gray-900 leading-none">{value}</p>
+                      <p className="text-xs text-gray-500 uppercase tracking-wider mt-1">{label}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+              return (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <StatCard icon={Shield} label="Active Grants" value={totalActiveGrants} />
+                  <StatCard icon={Eye} label="Total Visits" value={totalVisits} />
+                  <StatCard icon={Activity} label="Lists w/ Activity" value={listsWithActivity} />
+                  <StatCard icon={Users} label="Distinct Viewers" value={distinctViewers} />
+                </div>
+              );
+            })()}
+
+            {/* [Access tab v1] Search + status filter bar — mirrors the
+                main lists page filtering pattern. Status options are
+                derived from the lists currently in view. */}
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search lists…"
+                  className="pl-10 focus-brand"
+                  value={accessSearchTerm}
+                  onChange={(e) => setAccessSearchTerm(e.target.value)}
+                />
+              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9">
+                    Status
+                    {accessStatusFilter.length > 0 && (
+                      <Badge variant="secondary" className="ml-2 bg-brand/10 text-brand pointer-events-none">
+                        {accessStatusFilter.length}
+                      </Badge>
+                    )}
+                    <ChevronDown className="h-3.5 w-3.5 ml-1.5 text-gray-400" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-2" align="start">
+                  <div className="space-y-1">
+                    {LIST_STATUS_ORDER.map(s => {
+                      const checked = accessStatusFilter.includes(s);
+                      return (
+                        <label key={s} className="flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-gray-100 cursor-pointer capitalize">
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(c) => {
+                              setAccessStatusFilter(prev =>
+                                c ? Array.from(new Set([...prev, s])) : prev.filter(x => x !== s)
+                              );
+                            }}
+                          />
+                          <span>{s}</span>
+                        </label>
+                      );
+                    })}
+                    {accessStatusFilter.length > 0 && (
+                      <button
+                        type="button"
+                        className="w-full text-left text-xs text-gray-500 hover:text-gray-700 px-2 py-1.5 mt-1 border-t border-gray-100"
+                        onClick={() => setAccessStatusFilter([])}
+                      >
+                        Clear filter
+                      </button>
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <span className="text-xs text-gray-500 sm:ml-auto">
+                {filteredSortedAccess.length} of {accessOverviewByList.length} list{accessOverviewByList.length === 1 ? '' : 's'}
+              </span>
+            </div>
+
+            {/* Per-list overview table */}
+            <Card className="border-0 shadow-md rounded-xl overflow-hidden">
+              {loadingAccess ? (
+                <div className="p-12 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-200 border-t-brand mx-auto" />
+                  <p className="text-sm text-gray-500 mt-3">Loading access &amp; visits…</p>
+                </div>
+              ) : filteredSortedAccess.length === 0 ? (
+                <div className="p-12 text-center text-sm text-gray-500">
+                  {accessSearchTerm || accessStatusFilter.length > 0
+                    ? 'No lists match your filters.'
+                    : 'No lists yet.'}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="w-[40px]"></TableHead>
+                      <TableHead className="cursor-pointer select-none hover:text-gray-900" onClick={() => toggleAccessSort('name')}>
+                        List{accessSortIcon('name')}
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none hover:text-gray-900" onClick={() => toggleAccessSort('status')}>
+                        Status{accessSortIcon('status')}
+                      </TableHead>
+                      <TableHead className="text-right cursor-pointer select-none hover:text-gray-900" onClick={() => toggleAccessSort('grants')}>
+                        Active Grants{accessSortIcon('grants')}
+                      </TableHead>
+                      <TableHead className="text-right cursor-pointer select-none hover:text-gray-900" onClick={() => toggleAccessSort('visits')}>
+                        Visits{accessSortIcon('visits')}
+                      </TableHead>
+                      <TableHead className="cursor-pointer select-none hover:text-gray-900" onClick={() => toggleAccessSort('lastVisit')}>
+                        Last Visit{accessSortIcon('lastVisit')}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSortedAccess.map(bucket => {
+                      const isExpanded = expandedAccessLists.has(bucket.list.id);
+                      const hasDetail = bucket.activeGrants.length > 0 || bucket.revokedGrants.length > 0 || bucket.visits.length > 0;
+                      return (
+                        <Fragment key={bucket.list.id}>
+                          <TableRow
+                            className={`${hasDetail ? 'cursor-pointer hover:bg-gray-50/50' : ''} transition-colors`}
+                            onClick={() => hasDetail && toggleAccessExpand(bucket.list.id)}
+                          >
+                            <TableCell className="py-3">
+                              {hasDetail ? (
+                                isExpanded
+                                  ? <ChevronDown className="h-4 w-4 text-gray-400" />
+                                  : <ChevronRight className="h-4 w-4 text-gray-400" />
+                              ) : <span className="inline-block w-4" />}
+                            </TableCell>
+                            <TableCell className="font-medium text-gray-900">{bucket.list.name}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className={`text-xs capitalize ${
+                                bucket.list.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                bucket.list.status === 'denied' ? 'bg-red-100 text-red-800' :
+                                'bg-blue-100 text-blue-800'
+                              }`}>
+                                {bucket.list.status || 'curated'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-gray-900">
+                              {bucket.activeGrants.length}
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-gray-900">
+                              {bucket.visits.length}
+                            </TableCell>
+                            <TableCell className="text-sm text-gray-500">
+                              {bucket.lastVisitAt
+                                ? new Date(bucket.lastVisitAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                : '—'}
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && (
+                            <TableRow className="bg-gray-50/30">
+                              <TableCell colSpan={6} className="py-4 px-6">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                  {/* Active Grants column */}
+                                  <div>
+                                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                      <Shield className="h-3 w-3" /> Who has access ({bucket.activeGrants.length})
+                                    </p>
+                                    {bucket.activeGrants.length === 0 ? (
+                                      <p className="text-xs text-gray-400 italic py-2">No active grants.</p>
+                                    ) : (
+                                      <div className="space-y-1.5">
+                                        {bucket.activeGrants.map(g => (
+                                          <div key={g.id} className="flex items-center gap-2 text-xs bg-white rounded p-2 border border-gray-100">
+                                            <Mail className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                                            <span className="font-medium text-gray-900 truncate flex-1">{g.email}</span>
+                                            <span className="text-gray-400 text-[10px] flex-shrink-0">
+                                              {g.granted_by_name ? `by ${g.granted_by_name} · ` : ''}
+                                              {new Date(g.granted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                              {g.expires_at && ` · exp ${new Date(g.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {bucket.revokedGrants.length > 0 && (
+                                      <p className="text-[10px] text-gray-400 mt-2">
+                                        + {bucket.revokedGrants.length} revoked / expired
+                                      </p>
+                                    )}
+                                  </div>
+                                  {/* Visits column */}
+                                  <div>
+                                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                      <Eye className="h-3 w-3" /> Recent visits ({bucket.visits.length})
+                                    </p>
+                                    {bucket.visits.length === 0 ? (
+                                      <p className="text-xs text-gray-400 italic py-2">No visits yet.</p>
+                                    ) : (
+                                      <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                                        {bucket.visits.slice(0, 20).map(v => (
+                                          <div key={v.id} className="flex items-center gap-2 text-xs bg-white rounded p-2 border border-gray-100">
+                                            <Clock className="h-3 w-3 text-gray-400 flex-shrink-0" />
+                                            <span className="text-gray-900 truncate flex-1">{v.email}</span>
+                                            <span className="text-gray-400 text-[10px] flex-shrink-0">
+                                              {new Date(v.viewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                            </span>
+                                          </div>
+                                        ))}
+                                        {bucket.visits.length > 20 && (
+                                          <p className="text-[10px] text-gray-400 text-center pt-1">+ {bucket.visits.length - 20} older visits</p>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </Card>
+          </div>
+        ) : filteredLists.length === 0 ? (
           <EmptyState
             icon={List}
             title={searchTerm || statusFilter !== 'all'
