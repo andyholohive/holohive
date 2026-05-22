@@ -211,7 +211,7 @@ export class CRMService {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as CRMAffiliate[];
   }
 
   static async getAffiliateById(id: string): Promise<CRMAffiliate | null> {
@@ -222,7 +222,7 @@ export class CRMService {
       .single();
 
     if (error) throw error;
-    return data;
+    return data as unknown as CRMAffiliate | null;
   }
 
   static async createAffiliate(affiliateData: CreateAffiliateData): Promise<CRMAffiliate> {
@@ -237,7 +237,7 @@ export class CRMService {
     // Record stage history
     await this.recordStageHistory('affiliate', data.id, null, affiliateData.status || 'new');
 
-    return data;
+    return data as unknown as CRMAffiliate;
   }
 
   static async updateAffiliate(id: string, updates: Partial<CreateAffiliateData>): Promise<CRMAffiliate> {
@@ -258,7 +258,7 @@ export class CRMService {
       await this.recordStageHistory('affiliate', id, current.status, updates.status);
     }
 
-    return data;
+    return data as unknown as CRMAffiliate;
   }
 
   static async deleteAffiliate(id: string): Promise<void> {
@@ -289,7 +289,7 @@ export class CRMService {
       console.error('Error fetching opportunities:', error);
       throw error;
     }
-    return data || [];
+    return (data || []) as unknown as CRMOpportunity[];
   }
 
   static async getOpportunitiesByStage(stages: OpportunityStage[]): Promise<CRMOpportunity[]> {
@@ -304,7 +304,7 @@ export class CRMService {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as CRMOpportunity[];
   }
 
   static async getOpportunityById(id: string): Promise<CRMOpportunity | null> {
@@ -319,7 +319,7 @@ export class CRMService {
       .single();
 
     if (error) throw error;
-    return data;
+    return data as unknown as CRMOpportunity | null;
   }
 
   static async createOpportunity(opportunityData: CreateOpportunityData): Promise<CRMOpportunity> {
@@ -334,7 +334,7 @@ export class CRMService {
     // Record stage history
     await this.recordStageHistory('opportunity', data.id, null, opportunityData.stage || 'new');
 
-    return data;
+    return data as unknown as CRMOpportunity;
   }
 
   static async updateOpportunity(id: string, updates: Partial<CreateOpportunityData>): Promise<CRMOpportunity> {
@@ -371,7 +371,7 @@ export class CRMService {
       await this.recordStageHistory('opportunity', id, current.stage, updates.stage);
     }
 
-    return data;
+    return data as unknown as CRMOpportunity;
   }
 
   static async deleteOpportunity(id: string): Promise<void> {
@@ -414,7 +414,7 @@ export class CRMService {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as CRMPartner[];
   }
 
   static async getPartnerById(id: string): Promise<CRMPartner | null> {
@@ -428,7 +428,7 @@ export class CRMService {
       .single();
 
     if (error) throw error;
-    return data;
+    return data as unknown as CRMPartner | null;
   }
 
   static async createPartner(partnerData: CreatePartnerData): Promise<CRMPartner> {
@@ -443,7 +443,7 @@ export class CRMService {
     // Record stage history (for status)
     await this.recordStageHistory('partner', data.id, null, partnerData.status || 'active');
 
-    return data;
+    return data as unknown as CRMPartner;
   }
 
   static async updatePartner(id: string, updates: Partial<CreatePartnerData>): Promise<CRMPartner> {
@@ -464,7 +464,7 @@ export class CRMService {
       await this.recordStageHistory('partner', id, current.status, updates.status);
     }
 
-    return data;
+    return data as unknown as CRMPartner;
   }
 
   static async deletePartner(id: string): Promise<void> {
@@ -487,7 +487,7 @@ export class CRMService {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as CRMContact[];
   }
 
   static async getContactById(id: string): Promise<CRMContact | null> {
@@ -498,7 +498,7 @@ export class CRMService {
       .single();
 
     if (error) throw error;
-    return data;
+    return data as unknown as CRMContact | null;
   }
 
   static async createContact(contactData: CreateContactData): Promise<CRMContact> {
@@ -509,7 +509,7 @@ export class CRMService {
       .single();
 
     if (error) throw error;
-    return data;
+    return data as unknown as CRMContact;
   }
 
   static async updateContact(id: string, updates: Partial<CreateContactData>): Promise<CRMContact> {
@@ -521,7 +521,7 @@ export class CRMService {
       .single();
 
     if (error) throw error;
-    return data;
+    return data as unknown as CRMContact;
   }
 
   static async deleteContact(id: string): Promise<void> {
@@ -551,7 +551,7 @@ export class CRMService {
       .single();
 
     if (error) throw error;
-    return data;
+    return data as unknown as CRMContactLink;
   }
 
   static async linkContactToPartner(contactId: string, partnerId: string, role?: string, isPrimary?: boolean): Promise<CRMContactLink> {
@@ -568,7 +568,7 @@ export class CRMService {
       .single();
 
     if (error) throw error;
-    return data;
+    return data as unknown as CRMContactLink;
   }
 
   static async linkContactToAffiliate(contactId: string, affiliateId: string, role?: string, isPrimary?: boolean): Promise<CRMContactLink> {
@@ -585,7 +585,7 @@ export class CRMService {
       .single();
 
     if (error) throw error;
-    return data;
+    return data as unknown as CRMContactLink;
   }
 
   static async getContactsForOpportunity(opportunityId: string): Promise<CRMContactLink[]> {
@@ -599,7 +599,7 @@ export class CRMService {
       .order('is_primary', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as CRMContactLink[];
   }
 
   static async getContactsForPartner(partnerId: string): Promise<CRMContactLink[]> {
@@ -613,7 +613,7 @@ export class CRMService {
       .order('is_primary', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as CRMContactLink[];
   }
 
   static async getContactsForAffiliate(affiliateId: string): Promise<CRMContactLink[]> {
@@ -627,7 +627,7 @@ export class CRMService {
       .order('is_primary', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as CRMContactLink[];
   }
 
   static async unlinkContact(linkId: string): Promise<void> {
@@ -649,7 +649,7 @@ export class CRMService {
       .order('is_primary', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as CRMContactLink[];
   }
 
   // ----------------------------------------
@@ -691,7 +691,7 @@ export class CRMService {
       .order('changed_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as CRMStageHistory[];
   }
 
   // ----------------------------------------
@@ -910,6 +910,6 @@ export class CRMService {
       .order('last_message_at', { ascending: true, nullsFirst: true });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as CRMOpportunity[];
   }
 }

@@ -44,7 +44,7 @@ export class ChangelogService {
       throw error;
     }
 
-    return data || [];
+    return (data || []) as unknown as Changelog[];
   }
 
   /**
@@ -63,7 +63,7 @@ export class ChangelogService {
       throw error;
     }
 
-    return data || [];
+    return (data || []) as unknown as Changelog[];
   }
 
   /**
@@ -107,7 +107,7 @@ export class ChangelogService {
       throw error;
     }
 
-    return data || [];
+    return (data || []) as unknown as Changelog[];
   }
 
   /**
@@ -126,7 +126,7 @@ export class ChangelogService {
       throw error;
     }
 
-    return data;
+    return data as unknown as Changelog | null;
   }
 
   /**

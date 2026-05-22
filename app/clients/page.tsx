@@ -540,9 +540,11 @@ export default function ClientsPage() {
       }
       setLinkedAccounts(accountsMap);
 
-      // Meeting notes
+      // Meeting notes — [TS cleanup] cast DB row → service type at the
+      // boundary; manual interfaces are narrower than the generated
+      // schema (DB allows nulls on more fields).
       const notesMap: Record<string, MeetingNote[]> = {};
-      for (const note of (notesRes.data || [])) {
+      for (const note of (notesRes.data || []) as unknown as MeetingNote[]) {
         if (!notesMap[note.client_id]) notesMap[note.client_id] = [];
         notesMap[note.client_id].push(note);
       }
@@ -550,12 +552,12 @@ export default function ClientsPage() {
 
       // Client contexts
       const ctxMap: Record<string, ClientContext> = {};
-      for (const ctx of (ctxRes.data || [])) ctxMap[ctx.client_id] = ctx;
+      for (const ctx of (ctxRes.data || []) as unknown as ClientContext[]) ctxMap[ctx.client_id] = ctx;
       setClientContexts(ctxMap);
 
       // Decision logs
       const decMap: Record<string, DecisionLogEntry[]> = {};
-      for (const d of (decRes.data || [])) {
+      for (const d of (decRes.data || []) as unknown as DecisionLogEntry[]) {
         if (!decMap[d.client_id]) decMap[d.client_id] = [];
         decMap[d.client_id].push(d);
       }
@@ -563,7 +565,7 @@ export default function ClientsPage() {
 
       // Weekly updates
       const weekMap: Record<string, WeeklyUpdate[]> = {};
-      for (const w of (weekRes.data || [])) {
+      for (const w of (weekRes.data || []) as unknown as WeeklyUpdate[]) {
         if (!weekMap[w.client_id]) weekMap[w.client_id] = [];
         weekMap[w.client_id].push(w);
       }
@@ -611,10 +613,11 @@ export default function ClientsPage() {
       // Cast: see other setMilestoneTemplates site for context.
       setMilestoneTemplates((templateRes.data || []) as Array<{ id: string; name: string; description: string | null; milestones: any[]; is_default: boolean }>);
 
-      // Mindshare configs
+      // Mindshare configs — is_enabled comes back as boolean | null from
+      // the DB; coerce to boolean for the local state.
       const msEnabled: Record<string, boolean> = {};
       for (const mc of (mindshareRes.data || [])) {
-        msEnabled[mc.client_id] = mc.is_enabled;
+        msEnabled[mc.client_id] = mc.is_enabled === true;
       }
       setClientMindshareEnabled(msEnabled);
 
@@ -652,7 +655,7 @@ export default function ClientsPage() {
       .select('*')
       .order('meeting_date', { ascending: false });
     const notesMap: Record<string, MeetingNote[]> = {};
-    for (const note of (data || [])) {
+    for (const note of (data || []) as unknown as MeetingNote[]) {
       if (!notesMap[note.client_id]) notesMap[note.client_id] = [];
       notesMap[note.client_id].push(note);
     }
@@ -663,7 +666,7 @@ export default function ClientsPage() {
   const refreshClientContexts = async () => {
     const { data } = await supabase.from('client_context').select('*');
     const map: Record<string, ClientContext> = {};
-    for (const ctx of (data || [])) map[ctx.client_id] = ctx;
+    for (const ctx of (data || []) as unknown as ClientContext[]) map[ctx.client_id] = ctx;
     setClientContexts(map);
   };
 
@@ -671,7 +674,7 @@ export default function ClientsPage() {
   const refreshDecisionLogs = async () => {
     const { data } = await supabase.from('client_decision_log').select('*').order('decision_date', { ascending: false });
     const map: Record<string, DecisionLogEntry[]> = {};
-    for (const d of (data || [])) {
+    for (const d of (data || []) as unknown as DecisionLogEntry[]) {
       if (!map[d.client_id]) map[d.client_id] = [];
       map[d.client_id].push(d);
     }
@@ -682,7 +685,7 @@ export default function ClientsPage() {
   const refreshWeeklyUpdates = async () => {
     const { data } = await supabase.from('client_weekly_updates').select('*').order('week_of', { ascending: false });
     const map: Record<string, WeeklyUpdate[]> = {};
-    for (const w of (data || [])) {
+    for (const w of (data || []) as unknown as WeeklyUpdate[]) {
       if (!map[w.client_id]) map[w.client_id] = [];
       map[w.client_id].push(w);
     }
