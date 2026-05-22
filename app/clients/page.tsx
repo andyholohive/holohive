@@ -184,6 +184,23 @@ export default function ClientsPage() {
   const [clientContexts, setClientContexts] = useState<Record<string, ClientContext>>({});
   const [contextModalClient, setContextModalClient] = useState<ClientWithAccess | null>(null);
   const [contextForm, setContextForm] = useState<{ engagement_type: string; scope: string; start_date: Date | undefined; milestones: string; client_contacts: string; holohive_contacts: string; telegram_url: string; shared_drive_url: string; gtm_sync_url: string; onboarding_phase: string }>({ engagement_type: '', scope: '', start_date: undefined, milestones: '', client_contacts: '', holohive_contacts: '', telegram_url: '', shared_drive_url: '', gtm_sync_url: '', onboarding_phase: '' });
+  // [Phase edit in popup] The latest in-window campaign for the client
+  // whose Context popup is currently open. Fetched lazily when the
+  // popup opens — picker logic mirrors the client portal hero
+  // (nearest end_date wins; fall back to most recently started).
+  // Shown at the top of the Context tab with an editable phase dropdown.
+  type LatestCampaign = { id: string; name: string; start_date: string | null; end_date: string | null; current_phase: string | null };
+  const [latestCampaign, setLatestCampaign] = useState<LatestCampaign | null>(null);
+  const [savingPhase, setSavingPhase] = useState(false);
+  // Mirror of CURRENT_PHASE_OPTIONS in app/campaigns/[id]/page.tsx +
+  // app/campaigns/page.tsx (3rd duplicate). If you change one, change all.
+  const CURRENT_PHASE_OPTIONS = [
+    'Setup',
+    'Seeding Phase',
+    'Amplification Phase',
+    'Activation Phase',
+    'Reporting Phase',
+  ] as const;
   // Decision log state
   const [clientDecisionLogs, setClientDecisionLogs] = useState<Record<string, DecisionLogEntry[]>>({});
   const [decisionForm, setDecisionForm] = useState<{ decision_date: Date | undefined; summary: string }>({ decision_date: undefined, summary: '' });
@@ -1178,6 +1195,73 @@ export default function ClientsPage() {
     // Load client approved domains
     setClientApprovedDomains((client as any).approved_domains || []);
     setContextDomainInput('');
+
+    // [Phase edit in popup] Find the latest active campaign for this
+    // client so the phase dropdown at the top of the Context tab has
+    // something to edit. Matches the portal hero's picker:
+    //   1. Prefer campaigns where today is in [start, end]
+    //   2. Among those, nearest end_date wins
+    //   3. Fall back to the most recently started non-archived campaign
+    setLatestCampaign(null);
+    (async () => {
+      try {
+        const { data } = await (supabase as any)
+          .from('campaigns')
+          .select('id, name, start_date, end_date, current_phase, archived_at')
+          .eq('client_id', client.id)
+          .is('archived_at', null)
+          .order('start_date', { ascending: false });
+        const rows: LatestCampaign[] = (data || []).map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          start_date: r.start_date,
+          end_date: r.end_date,
+          current_phase: r.current_phase || null,
+        }));
+        if (rows.length === 0) {
+          setLatestCampaign(null);
+          return;
+        }
+        const today = new Date().toISOString().slice(0, 10);
+        const inWindow = rows.filter(r => r.start_date && r.end_date && r.start_date <= today && r.end_date >= today);
+        if (inWindow.length > 0) {
+          const winner = [...inWindow].sort((a, b) => (a.end_date! < b.end_date! ? -1 : 1))[0];
+          setLatestCampaign(winner);
+        } else {
+          // rows already sorted DESC by start_date
+          setLatestCampaign(rows[0]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch latest campaign for phase dropdown:', err);
+        setLatestCampaign(null);
+      }
+    })();
+  };
+
+  // [Phase edit in popup] Save the campaign's phase from the popup's
+  // dropdown. Optimistic local update so the dropdown reflects the new
+  // value immediately. Mirrors the same UPDATE that the campaign edit
+  // page does — uses CampaignService.updateCampaign so the field
+  // validation + side effects stay consistent.
+  const handleLatestCampaignPhaseChange = async (newPhase: string | null) => {
+    if (!latestCampaign) return;
+    const prevPhase = latestCampaign.current_phase;
+    setLatestCampaign({ ...latestCampaign, current_phase: newPhase });
+    setSavingPhase(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('campaigns')
+        .update({ current_phase: newPhase })
+        .eq('id', latestCampaign.id);
+      if (error) throw error;
+      toast({ title: 'Phase updated', description: `${latestCampaign.name} → ${newPhase || 'None'}` });
+    } catch (err: any) {
+      console.error('Failed to update phase:', err);
+      setLatestCampaign({ ...latestCampaign, current_phase: prevPhase });
+      toast({ title: 'Error', description: 'Failed to update phase.', variant: 'destructive' });
+    } finally {
+      setSavingPhase(false);
+    }
   };
 
   const handleContextSubmit = async () => {
@@ -3369,6 +3453,41 @@ export default function ClientsPage() {
               </TabsList>
               <TabsContent value="context">
                 <div className="space-y-4 max-h-[55vh] overflow-y-auto px-1 pb-4">
+                  {/* [Phase edit in popup] Active Campaign banner —
+                      shows the latest in-window campaign name + a
+                      phase dropdown that maps 1:1 to the teal pill
+                      the client sees in the portal hero. Renders only
+                      when a campaign exists; hidden gracefully for
+                      clients with no campaigns yet. */}
+                  {latestCampaign && (
+                    <div className="bg-brand/5 border border-brand/20 rounded-lg p-3 flex items-center gap-3">
+                      <div className="p-1.5 bg-gradient-to-br from-brand to-[#2d6570] rounded-md shadow-sm flex-shrink-0">
+                        <Activity className="h-3.5 w-3.5 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-semibold text-brand uppercase tracking-wider">Active Campaign</p>
+                        <p className="text-sm font-semibold text-gray-900 truncate" title={latestCampaign.name}>
+                          {latestCampaign.name}
+                        </p>
+                      </div>
+                      <Select
+                        value={latestCampaign.current_phase ?? '__none__'}
+                        onValueChange={(v) => handleLatestCampaignPhaseChange(v === '__none__' ? null : v)}
+                        disabled={savingPhase}
+                      >
+                        <SelectTrigger className="w-[170px] h-8 focus-brand flex-shrink-0">
+                          <SelectValue placeholder="— Not set" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">— Not set</SelectItem>
+                          {CURRENT_PHASE_OPTIONS.map(p => (
+                            <SelectItem key={p} value={p}>{p}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   {/* Hidden per May 2026 audit — both fields were
                       captured but barely used:
                         - engagement_type: only rendered as a small pill

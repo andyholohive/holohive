@@ -4230,14 +4230,14 @@ const CampaignDetailsPage = () => {
                       <div className="text-lg font-semibold text-gray-900">{displayRegion(campaign?.region)}</div>
                     )}
                   </div>
-                  {/* [Campaign Live v1] Current Phase — displayed as a teal
-                      pill in the client portal's "Active Campaign" hero
-                      once onboarding milestones are all complete. Set to
-                      "— None" (NULL in DB) to hide the badge.
-
-                      Dropdown enforces consistent values across CMs; if a
-                      campaign needs an off-list label, SQL still works
-                      (the column is plain TEXT). */}
+                  {/* [Phase edit relocation] Current Phase moved to the
+                      Edit Portal popup on /clients (top of the Context
+                      tab) so it lives next to the portal it controls.
+                      The campaign list view still has the inline Phase
+                      column for bulk visibility/editing. Block kept
+                      under `false &&` so the data + handler logic is
+                      preserved — flip to true to restore the field here. */}
+                  {false && (
                   <div className="bg-white p-4 rounded-lg border border-gray-200">
                     <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
                       <Activity className="h-3.5 w-3.5 text-brand" />
@@ -4268,12 +4268,13 @@ const CampaignDetailsPage = () => {
                     ) : campaign?.current_phase ? (
                       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand/10 text-brand text-sm font-semibold">
                         <span className="w-1.5 h-1.5 rounded-full bg-brand" />
-                        {campaign.current_phase}
+                        {campaign?.current_phase}
                       </span>
                     ) : (
                       <div className="text-sm text-gray-400 italic">Not set</div>
                     )}
                   </div>
+                  )}
                     </div>
                   </div>
 
