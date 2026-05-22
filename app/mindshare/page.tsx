@@ -1590,9 +1590,13 @@ export default function MindsharePage() {
                   <SelectTrigger className="h-8 w-32 text-xs focus-brand"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All languages</SelectItem>
-                    {channelLanguages.map(l => (
-                      <SelectItem key={l} value={l}>{l}</SelectItem>
-                    ))}
+                    {channelLanguages.map(l => {
+                      // Map ISO code → full label for the filter dropdown.
+                      // Falls back to the raw code so we don't lose options
+                      // if a new language gets added without us updating this.
+                      const label = ({ ko: 'Korean', en: 'English', ja: 'Japanese', zh: 'Chinese', vi: 'Vietnamese' } as Record<string, string>)[l] || l;
+                      return <SelectItem key={l} value={l}>{label}</SelectItem>;
+                    })}
                   </SelectContent>
                 </Select>
               )}
@@ -1715,13 +1719,13 @@ export default function MindsharePage() {
                         );
                       })()}
                       <Select value={c.language} onValueChange={(v) => setChannelLanguage(c, v)}>
-                        <SelectTrigger className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="ko">ko</SelectItem>
-                          <SelectItem value="en">en</SelectItem>
-                          <SelectItem value="ja">ja</SelectItem>
-                          <SelectItem value="zh">zh</SelectItem>
-                          <SelectItem value="vi">vi</SelectItem>
+                          <SelectItem value="ko">Korean</SelectItem>
+                          <SelectItem value="en">English</SelectItem>
+                          <SelectItem value="ja">Japanese</SelectItem>
+                          <SelectItem value="zh">Chinese</SelectItem>
+                          <SelectItem value="vi">Vietnamese</SelectItem>
                         </SelectContent>
                       </Select>
                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-gray-400 hover:text-red-500" onClick={() => deleteChannel(c)}>
