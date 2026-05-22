@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass } from 'lucide-react';
+import { Users, Megaphone, Crown, List, Building2, PanelLeftClose, PanelLeftOpen, Settings, LogOut, Shield, MessageSquare, Zap, User, FileText, ClipboardList, Sliders, DollarSign, TrendingUp, Handshake, UserPlus, Archive, Sparkles, Link2, ChevronLeft, ChevronRight, BookOpen, CheckCircle, Briefcase, ListTodo, Target, Inbox, Calendar, LayoutDashboard, ShieldCheck, ChevronDown, Bell, Radar, Bot, BarChart3, Star, SlidersHorizontal, Compass, Menu, X } from 'lucide-react';
 import { SidebarCustomizeDialog, NAV_BY_HREF, isItemAvailable, type AvailabilityCtx } from '@/components/SidebarCustomize';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChangelog } from '@/contexts/ChangelogContext';
@@ -35,6 +35,19 @@ export default function Sidebar({ children }: SidebarProps) {
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
   const [changelogPage, setChangelogPage] = useState(0);
   const changelogsPerPage = 3;
+
+  // [Mobile responsive, May 2026] Mobile-only state: when true, the
+  // sidebar slides in from the left over the content with a dim
+  // backdrop. Desktop (lg+) ignores this state entirely — the sidebar
+  // is always in its docked position there. Tied to the hamburger
+  // button in the header (lg:hidden).
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Close mobile sidebar whenever the route changes — otherwise users
+  // tap a nav item and the sidebar stays open over the destination page.
+  useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [pathname]);
 
   // ─── Sidebar customization (bookmarks + hidden) ──────────────────
   // Per-browser persistence in localStorage. We don't key by user.id
@@ -374,9 +387,21 @@ export default function Sidebar({ children }: SidebarProps) {
   return (
     <div className="h-screen bg-gray-50 flex flex-col">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-2 flex-shrink-0">
+      <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-2 flex-shrink-0">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-3">
+            {/* [Mobile, May 2026] Hamburger — opens the sidebar as a
+                slide-in panel on mobile only. Hidden on lg+ where the
+                docked sidebar is always visible. 44×44 tap target. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="lg:hidden h-10 w-10 p-0 -ml-2"
+              onClick={() => setIsMobileSidebarOpen(true)}
+              aria-label="Open navigation"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
             <div className="flex items-center">
               <Image src="/images/logo.png" alt="Logo" width={36} height={36} />
               <span className="ml-2 text-xl font-semibold text-gray-800">Holo Hive</span>
@@ -423,10 +448,44 @@ export default function Sidebar({ children }: SidebarProps) {
           </div>
         </div>
       </header>
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <aside className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-white border-r border-gray-200 flex-shrink-0 transition-all duration-300 ease-in-out`}>
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* [Mobile, May 2026] Backdrop overlay — only renders when the
+            mobile sidebar is open. Click outside to close. Hidden on
+            lg+ since the sidebar is docked there. */}
+        {isMobileSidebarOpen && (
+          <div
+            className="lg:hidden fixed inset-0 z-40 bg-black/50 transition-opacity"
+            onClick={() => setIsMobileSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+        {/* Sidebar — desktop docks it, mobile slides it in from the left
+            as an overlay. On mobile the collapsed state is bypassed
+            (always full width when shown). */}
+        <aside
+          className={`
+            ${isSidebarCollapsed ? 'lg:w-16' : 'lg:w-64'}
+            w-64 bg-white border-r border-gray-200 flex-shrink-0
+            transition-all duration-300 ease-in-out
+            fixed lg:relative h-full top-0 left-0 z-50 lg:z-auto
+            ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          `}
+        >
           <div className="flex flex-col h-full">
+            {/* [Mobile] Close button inside mobile sidebar header. Mirrors
+                the hamburger UX — tap to dismiss. Hidden on lg+. 44px tap. */}
+            <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
+              <span className="font-semibold text-gray-700 text-sm">Navigation</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-10 w-10 p-0"
+                onClick={() => setIsMobileSidebarOpen(false)}
+                aria-label="Close navigation"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
             {/* Navigation */}
             <nav ref={navRef} className="p-4 space-y-4 flex-1 overflow-y-auto">
               {!userProfile ? (
@@ -620,8 +679,10 @@ export default function Sidebar({ children }: SidebarProps) {
             </div>
           </div>
         </aside>
-        {/* Main Content */}
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        {/* Main Content — [Mobile] min-w-0 so flex shrinks correctly
+            when the sidebar floats above it on mobile. Reduced padding
+            on smallest screens (p-4) so cards/tables have more room. */}
+        <main className="flex-1 min-w-0 overflow-y-auto p-4 lg:p-6">{children}</main>
       </div>
 
       {/* Customize Sidebar Dialog */}
