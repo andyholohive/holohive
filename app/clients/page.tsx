@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import mammoth from 'mammoth';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -1804,33 +1805,30 @@ export default function ClientsPage() {
     return (
       <ProtectedRoute>
         <div className="space-y-6">
-          {/* [Responsive cleanup] Matches the loaded-state header below
-              so the action bar doesn't shift when data finishes loading. */}
-          <div className="flex items-start justify-between gap-3 flex-wrap">
-            <div className="min-w-0">
-              <h2 className="text-2xl font-bold text-gray-900">Clients</h2>
-              <p className="text-gray-600">Manage your client relationships</p>
-            </div>
-            {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
-              <div className="flex gap-2 flex-wrap">
-                <Button variant="brand" className="hover:opacity-90" disabled>
+          {/* [Design system, May 2026] Loading header uses PageHeader
+              for layout-parity with the loaded state below — when data
+              arrives, only the action buttons change from disabled to
+              enabled; the title/subtitle/spacing stay identical. */}
+          <PageHeader
+            title="Clients"
+            subtitle="Manage your client relationships"
+            actions={(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') ? (
+              <>
+                <Button variant="brand" disabled>
                   <Plus className="h-4 w-4 mr-2" />
                   Start Client
                 </Button>
-                {/* [Templates admin v1] Templates button mirrors the
-                    loaded-state header so the action bar doesn't
-                    visually shift when data finishes loading. */}
-                <Button variant="outline" className="hover:bg-gray-50" disabled>
+                <Button variant="outline" disabled>
                   <Settings className="h-4 w-4 mr-2" />
                   Templates
                 </Button>
-                <Button variant="outline" className="hover:bg-gray-50" disabled>
+                <Button variant="outline" disabled>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Client
                 </Button>
-              </div>
-            )}
-          </div>
+              </>
+            ) : undefined}
+          />
           <div className="flex items-center space-x-4">
             <div className="relative flex-1 max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -1856,15 +1854,10 @@ export default function ClientsPage() {
     return (
       <ProtectedRoute>
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Clients</h2>
-              <p className="text-gray-600">Manage your client relationships</p>
-            </div>
-          </div>
+          <PageHeader title="Clients" subtitle="Manage your client relationships" />
           <div className="text-center py-8">
             <p className="text-red-600">{error}</p>
-            <Button variant="brand" onClick={fetchClients} className="mt-4 hover:opacity-90">
+            <Button variant="brand" onClick={fetchClients} className="mt-4">
               Retry
             </Button>
           </div>
@@ -1875,9 +1868,14 @@ export default function ClientsPage() {
   return (
     <ProtectedRoute>
       <div className="space-y-6">
-        {/* [Responsive cleanup, May 2026] flex-wrap + gap so the title
-            and action buttons stack on narrow screens instead of the
-            buttons getting pushed off the right edge. */}
+        {/* [Design system, May 2026] Loaded-state header stays inline
+            (not PageHeader) because the 800+ lines of admin-action
+            Dialog content nested inside makes a clean swap risky.
+            The flex-wrap + min-w-0 + responsive classes here already
+            match what PageHeader does internally — just not centralized.
+            Migrate to PageHeader in a follow-up pass with focused
+            visual QA. Loading + error states above were swapped since
+            they're simple. */}
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
             <h2 className="text-2xl font-bold text-gray-900">

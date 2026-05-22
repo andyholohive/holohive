@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -881,14 +882,12 @@ export default function MindsharePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <BarChart3 className="h-6 w-6 text-brand" />
-          Korean Mindshare
-        </h2>
-        <p className="text-sm text-gray-500">Where projects stand in Korean crypto Telegram channels.</p>
-      </div>
+      {/* [Design system, May 2026] Header migrated to <PageHeader> */}
+      <PageHeader
+        icon={BarChart3}
+        title="Korean Mindshare"
+        subtitle="Where projects stand in Korean crypto Telegram channels."
+      />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)}>
         <TabsList>

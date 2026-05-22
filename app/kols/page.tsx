@@ -19,6 +19,7 @@ import { computeRosterScores, tierForScore, type KolScoreResult } from "@/lib/ko
 import type { KolDeliverable } from "@/lib/kolDeliverableService";
 import type { KolChannelSnapshot } from "@/lib/kolChannelSnapshotService";
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageHeader } from '@/components/ui/page-header';
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { KOLService, MasterKOL } from "@/lib/kolService";
@@ -1509,16 +1510,16 @@ export default function KOLsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">KOLs</h2>
-            <p className="text-gray-600">Manage your Key Opinion Leaders</p>
-          </div>
-          <Button variant="brand" className="hover:opacity-90" disabled>
-            <Plus className="h-4 w-4 mr-2" />
-            Add KOL
-          </Button>
-        </div>
+        <PageHeader
+          title="KOLs"
+          subtitle="Manage your Key Opinion Leaders"
+          actions={
+            <Button variant="brand" disabled>
+              <Plus className="h-4 w-4 mr-2" />
+              Add KOL
+            </Button>
+          }
+        />
 
         {/* Column visibility skeleton */}
         <div className="mb-4">
@@ -1557,12 +1558,7 @@ export default function KOLsPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">KOLs</h2>
-            <p className="text-gray-600">Manage your Key Opinion Leaders</p>
-          </div>
-        </div>
+        <PageHeader title="KOLs" subtitle="Manage your Key Opinion Leaders" />
         <div className="text-center py-8">
           <p className="text-red-600">{error}</p>
           <Button onClick={fetchKOLs} className="mt-4">Retry</Button>
@@ -1573,22 +1569,22 @@ export default function KOLsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">KOLs</h2>
-          <p className="text-gray-600">Manage your Key Opinion Leaders</p>
-        </div>
-        <Button variant="brand" size="sm" className="hover:opacity-90" onClick={handleAddNew} disabled={isSavingNewKOL}>
-          {isSavingNewKOL ? (
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-          ) : (
-            <>
-          <Plus className="h-4 w-4 mr-2" />
-          Add KOL
-            </>
-          )}
-        </Button>
-      </div>
+      <PageHeader
+        title="KOLs"
+        subtitle="Manage your Key Opinion Leaders"
+        actions={
+          <Button variant="brand" size="sm" onClick={handleAddNew} disabled={isSavingNewKOL}>
+            {isSavingNewKOL ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+            ) : (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                Add KOL
+              </>
+            )}
+          </Button>
+        }
+      />
 
       {/* Bulk action bar (split into two rows) */}
       {selectedKOLs.length > 0 && (

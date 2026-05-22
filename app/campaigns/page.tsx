@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Copy, ExternalLink, Archive, AlertTriangle, LayoutGrid, List, ChevronLeft, ChevronRight } from "lucide-react";
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageHeader } from '@/components/ui/page-header';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/AuthContext";
@@ -502,20 +503,16 @@ export default function CampaignsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Campaigns</h2>
-            <p className="text-gray-600">Track and manage your marketing campaigns</p>
-          </div>
-          <Button
-            className="hover:opacity-90"
-            style={{ backgroundColor: "#3e8692", color: "white" }}
-            onClick={() => setIsNewCampaignOpen(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Campaign
-          </Button>
-        </div>
+        <PageHeader
+          title="Campaigns"
+          subtitle="Track and manage your marketing campaigns"
+          actions={
+            <Button variant="brand" onClick={() => setIsNewCampaignOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Campaign
+            </Button>
+          }
+        />
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -552,19 +549,10 @@ export default function CampaignsPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Campaigns</h2>
-            <p className="text-gray-600">Track and manage your marketing campaigns</p>
-          </div>
-        </div>
+        <PageHeader title="Campaigns" subtitle="Track and manage your marketing campaigns" />
         <div className="text-center py-8">
           <p className="text-red-600">{error}</p>
-          <Button
-            onClick={fetchCampaigns}
-            className="mt-4 hover:opacity-90"
-            style={{ backgroundColor: "#3e8692", color: "white" }}
-          >
+          <Button onClick={fetchCampaigns} variant="brand" className="mt-4">
             Retry
           </Button>
         </div>
@@ -574,18 +562,17 @@ export default function CampaignsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Campaigns</h2>
-          <p className="text-gray-600">Track and manage your marketing campaigns</p>
-        </div>
-        <Dialog open={isNewCampaignOpen} onOpenChange={setIsNewCampaignOpen}>
-          <DialogTrigger asChild>
-            <Button className="hover:opacity-90" style={{ backgroundColor: "#3e8692", color: "white" }}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Campaign
-            </Button>
-          </DialogTrigger>
+      <PageHeader
+        title="Campaigns"
+        subtitle="Track and manage your marketing campaigns"
+        actions={
+          <Dialog open={isNewCampaignOpen} onOpenChange={setIsNewCampaignOpen}>
+            <DialogTrigger asChild>
+              <Button variant="brand">
+                <Plus className="h-4 w-4 mr-2" />
+                New Campaign
+              </Button>
+            </DialogTrigger>
                             <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-hidden">
               <DialogHeader>
                 <DialogTitle>Create New Campaign</DialogTitle>
@@ -1030,7 +1017,8 @@ export default function CampaignsPage() {
               </form>
             </DialogContent>
           </Dialog>
-      </div>
+        }
+      />
       <div className="flex items-center space-x-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
