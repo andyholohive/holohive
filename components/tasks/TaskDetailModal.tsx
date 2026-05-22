@@ -468,7 +468,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
                   style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.due_date ? '#111827' : '#9ca3af' }}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {form.due_date ? form.due_date.toLocaleDateString() : 'Select date'}
+                  {form.due_date ? form.due_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select date'}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">

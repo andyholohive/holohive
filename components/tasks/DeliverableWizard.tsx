@@ -390,7 +390,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                       style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: '#111827' }}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate.toLocaleDateString()}
+                      {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -578,7 +578,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
                                 {(() => {
                                   const dateStr = dueDateOverrides[s.step_order] || dueDates[s.step_order];
                                   if (!dateStr) return 'Select date';
-                                  return new Date(dateStr + 'T00:00:00').toLocaleDateString();
+                                  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                                 })()}
                               </Button>
                             </PopoverTrigger>

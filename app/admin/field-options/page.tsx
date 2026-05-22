@@ -56,7 +56,7 @@ function SortableRow({ option, onToggleActive, onDelete }: SortableRowProps) {
         </Badge>
       </TableCell>
       <TableCell>
-        {new Date(option.created_at).toLocaleDateString()}
+        {new Date(option.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
       </TableCell>
       <TableCell className="text-right">
         <div className="flex justify-end gap-2">

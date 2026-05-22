@@ -625,7 +625,7 @@ export default function ContactsPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-gray-500 text-sm">
-                      {new Date(contact.created_at).toLocaleDateString()}
+                      {new Date(contact.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>

@@ -5876,7 +5876,7 @@ export default function SalesPipelinePage() {
                       >
                         <Calendar className="mr-2 h-4 w-4" />
                         {activityForm.next_step_date
-                          ? new Date(activityForm.next_step_date).toLocaleDateString()
+                          ? new Date(activityForm.next_step_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                           : 'Next step date'}
                       </Button>
                     </PopoverTrigger>
@@ -6804,7 +6804,7 @@ export default function SalesPipelinePage() {
                   >
                     <Calendar className="mr-2 h-4 w-4" />
                     {activityLogForm.next_step_date
-                      ? new Date(activityLogForm.next_step_date).toLocaleDateString()
+                      ? new Date(activityLogForm.next_step_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                       : 'Select date'}
                   </Button>
                 </PopoverTrigger>

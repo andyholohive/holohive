@@ -355,7 +355,7 @@ export default function PartnersPage() {
                     )}
                     <div className="flex items-center text-sm text-gray-600">
                       <Calendar className="h-4 w-4 mr-2 text-gray-600" />
-                      <span className="text-gray-600">{partner.created_at ? new Date(partner.created_at).toLocaleDateString() : 'Unknown'}</span>
+                      <span className="text-gray-600">{partner.created_at ? new Date(partner.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown'}</span>
                     </div>
                   </div>
                 </CardHeader>

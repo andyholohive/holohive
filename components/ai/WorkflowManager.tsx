@@ -475,7 +475,7 @@ export function WorkflowManager() {
                   {workflow.lastRun && (
                     <div className="flex items-center gap-1 text-gray-500">
                       <Clock className="w-4 h-4" />
-                      <span>{new Date(workflow.lastRun).toLocaleDateString()}</span>
+                      <span>{new Date(workflow.lastRun).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                     </div>
                   )}
                 </div>

@@ -58,7 +58,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
   // Date formatting helpers
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
-    return new Date(dateString).toLocaleDateString();
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const formatDateForInput = (date: Date | undefined) => {

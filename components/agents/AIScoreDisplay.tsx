@@ -159,7 +159,7 @@ export default function AIScoreDisplay({
 
       {lastScoredAt && (
         <div className="text-[10px] text-gray-400">
-          Last scored: {new Date(lastScoredAt).toLocaleDateString()}
+          Last scored: {new Date(lastScoredAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         </div>
       )}
     </div>

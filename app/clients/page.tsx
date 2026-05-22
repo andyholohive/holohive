@@ -2047,7 +2047,7 @@ export default function ClientsPage() {
                                     }}
                                   >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {startClientForm.callDate ? startClientForm.callDate.toLocaleDateString() : 'Select call date'}
+                                    {startClientForm.callDate ? startClientForm.callDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select call date'}
                                   </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
@@ -2120,7 +2120,7 @@ export default function ClientsPage() {
                                     }}
                                   >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {startClientForm.startDate ? startClientForm.startDate.toLocaleDateString() : 'Select start date'}
+                                    {startClientForm.startDate ? startClientForm.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select start date'}
                                   </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
@@ -2153,7 +2153,7 @@ export default function ClientsPage() {
                                     }}
                                   >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {startClientForm.endDate ? startClientForm.endDate.toLocaleDateString() : 'Select end date'}
+                                    {startClientForm.endDate ? startClientForm.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select end date'}
                                   </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
@@ -2234,7 +2234,7 @@ export default function ClientsPage() {
                                     }}
                                   >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {startClientForm.intro_call_date ? startClientForm.intro_call_date.toLocaleDateString() : 'Select intro call date'}
+                                    {startClientForm.intro_call_date ? startClientForm.intro_call_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select intro call date'}
                                   </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
@@ -3266,7 +3266,7 @@ export default function ClientsPage() {
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: decisionForm.decision_date ? '#111827' : '#9ca3af' }}>
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {decisionForm.decision_date ? decisionForm.decision_date.toLocaleDateString() : 'Select date'}
+                            {decisionForm.decision_date ? decisionForm.decision_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select date'}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
@@ -3375,7 +3375,7 @@ export default function ClientsPage() {
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: meetingNoteForm.meeting_date ? '#111827' : '#9ca3af' }}>
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {meetingNoteForm.meeting_date ? meetingNoteForm.meeting_date.toLocaleDateString() : 'Select date'}
+                          {meetingNoteForm.meeting_date ? meetingNoteForm.meeting_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select date'}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
@@ -3576,14 +3576,14 @@ export default function ClientsPage() {
                     {contextModalClient && getLinkedCRMAccount(contextModalClient.id) ? (
                       <div className="flex h-10 w-full items-center rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
                         <CalendarIcon className="mr-2 h-4 w-4 text-gray-400" />
-                        {contextForm.start_date ? contextForm.start_date.toLocaleDateString() : '—'}
+                        {contextForm.start_date ? contextForm.start_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                       </div>
                     ) : (
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: contextForm.start_date ? '#111827' : '#9ca3af' }}>
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {contextForm.start_date ? contextForm.start_date.toLocaleDateString() : 'Select start date'}
+                            {contextForm.start_date ? contextForm.start_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select start date'}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
@@ -4076,7 +4076,7 @@ export default function ClientsPage() {
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: weeklyForm.week_of ? '#111827' : '#9ca3af' }}>
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {weeklyForm.week_of ? weeklyForm.week_of.toLocaleDateString() : 'Select week'}
+                            {weeklyForm.week_of ? weeklyForm.week_of.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select week'}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
@@ -4090,7 +4090,7 @@ export default function ClientsPage() {
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: weeklyForm.next_checkin ? '#111827' : '#9ca3af' }}>
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {weeklyForm.next_checkin ? weeklyForm.next_checkin.toLocaleDateString() : 'Select date'}
+                            {weeklyForm.next_checkin ? weeklyForm.next_checkin.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select date'}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">

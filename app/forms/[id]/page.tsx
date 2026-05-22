@@ -2099,7 +2099,7 @@ export default function FormBuilderPage() {
                   {form.status.charAt(0).toUpperCase() + form.status.slice(1)}
                 </Badge>
                 <span className="text-sm text-gray-500">
-                  Created {new Date(form.created_at).toLocaleDateString()}
+                  Created {new Date(form.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
               </div>
             </div>

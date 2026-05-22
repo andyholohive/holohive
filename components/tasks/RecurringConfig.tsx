@@ -133,7 +133,7 @@ export function RecurringConfigEditor({ value, onChange }: RecurringConfigProps)
               style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: endDate ? '#111827' : '#9ca3af' }}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
-              {endDate ? endDate.toLocaleDateString() : 'Select end date'}
+              {endDate ? endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select end date'}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">

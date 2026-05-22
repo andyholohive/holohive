@@ -1631,7 +1631,7 @@ const CampaignDetailsPage = () => {
   // Add local utility functions
   const formatDate = (dateString: string | undefined | null, fallback: string = "TBD") => {
     if (!dateString) return fallback;
-    return new Date(dateString).toLocaleDateString();
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -11097,7 +11097,7 @@ const CampaignDetailsPage = () => {
                 </div>
                 <div className="flex justify-between mb-2">
                   <span className="font-medium">Dates:</span>
-                  <span>{campaign ? new Date(campaign.start_date).toLocaleDateString() : ''} - {campaign?.end_date ? new Date(campaign.end_date).toLocaleDateString() : 'TBD'}</span>
+                  <span>{campaign ? new Date(campaign.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''} - {campaign?.end_date ? new Date(campaign.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="font-medium">Status:</span>

@@ -751,7 +751,7 @@ export default function FormsPage() {
                         <Eye className="h-3 w-3 ml-1" />
                       </button>
                       <div className="text-xs text-gray-500">
-                        {new Date(form.created_at).toLocaleDateString()}
+                        {new Date(form.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </div>
                     </div>
                     {/* Subdomain Connection */}
@@ -850,7 +850,7 @@ export default function FormsPage() {
                         <TableCell>
                           {lead.deal_value ? `$${lead.deal_value.toLocaleString()}` : '-'}
                         </TableCell>
-                        <TableCell>{new Date(lead.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>{new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
                         <TableCell>
                           <Button
                             variant="outline"
@@ -911,7 +911,7 @@ export default function FormsPage() {
                             {partner.poc_email && <div className="text-gray-500">{partner.poc_email}</div>}
                           </div>
                         </TableCell>
-                        <TableCell>{new Date(partner.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>{new Date(partner.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
                         <TableCell>
                           <Button
                             variant="outline"
@@ -981,7 +981,7 @@ export default function FormsPage() {
                             <ExternalLink className="h-3 w-3 flex-shrink-0" />
                           </a>
                         </TableCell>
-                        <TableCell>{new Date(link.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>{new Date(link.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</TableCell>
                         <TableCell>
                           <Button
                             variant="outline"

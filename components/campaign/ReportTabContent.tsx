@@ -75,7 +75,7 @@ export function ReportTabContent({
   const timelineDataRaw = contents
     .filter(c => c.activation_date)
     .reduce((acc: any[], content) => {
-      const date = new Date(content.activation_date).toLocaleDateString();
+      const date = new Date(content.activation_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
       const existing = acc.find(item => item.date === date);
 
       if (existing) {
@@ -375,7 +375,7 @@ export function ReportTabContent({
                         {file.file_name}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {(file.file_size / 1024 / 1024).toFixed(2)} MB • {new Date(file.created_at).toLocaleDateString()}
+                        {(file.file_size / 1024 / 1024).toFixed(2)} MB • {new Date(file.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">

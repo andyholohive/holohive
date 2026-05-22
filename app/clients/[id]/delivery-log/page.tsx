@@ -921,7 +921,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.logged_at ? '#111827' : '#9ca3af' }}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {form.logged_at ? form.logged_at.toLocaleDateString() : 'Select date'}
+                      {form.logged_at ? form.logged_at.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Select date'}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
