@@ -166,12 +166,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
 
           <div className="text-center text-sm text-gray-600">
             Already have an account?{' '}
-            <button
-              type="button"
-              onClick={onToggleMode}
-              className="hover:underline"
-              style={{ color: '#3e8692' }}
-            >
+            <button type="button" onClick={onToggleMode} className="hover:underline text-brand">
               Sign in
             </button>
           </div>

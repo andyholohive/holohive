@@ -712,11 +712,7 @@ export default function FormsPage() {
                 : 'Create your first form to start collecting data'}
             </p>
             {!searchTerm && statusFilter === 'all' && (
-              <Button
-                onClick={() => setIsCreateDialogOpen(true)}
-                className="hover:opacity-90"
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-              >
+              <Button onClick={() => setIsCreateDialogOpen(true)} className="hover:opacity-90 bg-brand text-white">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Form
               </Button>

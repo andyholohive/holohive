@@ -505,7 +505,7 @@ export function WorkflowManager() {
           <p className="text-gray-600 mb-4">
             Create your first automated workflow to streamline campaign management tasks.
           </p>
-          <Button onClick={() => setIsCreateDialogOpen(true)} className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+          <Button onClick={() => setIsCreateDialogOpen(true)} className="hover:opacity-90 bg-brand text-white">
             <Plus className="w-4 h-4 mr-2" />
             Create Workflow
           </Button>

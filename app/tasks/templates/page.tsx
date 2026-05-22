@@ -163,11 +163,7 @@ export default function TemplatesPage() {
                 <p className="text-sm text-gray-500">Reusable task presets for quick creation</p>
               </div>
             </div>
-            <Button
-              onClick={() => setShowCreateDialog(true)}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              className="hover:opacity-90"
-            >
+            <Button onClick={() => setShowCreateDialog(true)} className="hover:opacity-90 bg-brand text-white">
               <Plus className="h-4 w-4 mr-2" /> New Template
             </Button>
           </div>

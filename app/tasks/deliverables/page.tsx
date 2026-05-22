@@ -282,7 +282,7 @@ export default function DeliverablesPage() {
                     <div className="flex items-center gap-2.5">
                       {groupKey === '__none__'
                         ? <Briefcase className="h-4 w-4 text-gray-400" />
-                        : <Building2 className="h-4 w-4" style={{ color: '#3e8692' }} />}
+                        : <Building2 className="h-4 w-4 text-brand"/>}
                       <span className="text-sm font-semibold text-gray-900">{group.name}</span>
                       <Badge variant="outline" className="text-[10px]">{group.deliverables.length}</Badge>
                     </div>

@@ -1093,30 +1093,12 @@ export default function NetworkPage() {
             />
           </div>
           {activeTab === 'partners' ? (
-            <Button
-              onClick={() => {
-                setEditingPartner(null);
-                setPartnerForm({ name: '', status: 'active' });
-                setPartnerDialogAffiliateMode('link');
-                setNewAffiliateInPartnerDialog({ name: '', status: 'new' });
-                setIsNewPartnerOpen(true);
-              }}
-              className="hover:opacity-90"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button onClick={() => { setEditingPartner(null); setPartnerForm({ name: '', status: 'active' }); setPartnerDialogAffiliateMode('link'); setNewAffiliateInPartnerDialog({ name: '', status: 'new' }); setIsNewPartnerOpen(true); }} className="hover:opacity-90 bg-brand text-white">
               <Plus className="h-4 w-4 mr-2" />
               Add Partner
             </Button>
           ) : (
-            <Button
-              onClick={() => {
-                setEditingAffiliate(null);
-                setAffiliateForm({ name: '', status: 'new' });
-                setIsNewAffiliateOpen(true);
-              }}
-              className="hover:opacity-90"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button onClick={() => { setEditingAffiliate(null); setAffiliateForm({ name: '', status: 'new' }); setIsNewAffiliateOpen(true); }} className="hover:opacity-90 bg-brand text-white">
               <Plus className="h-4 w-4 mr-2" />
               Add Affiliate
             </Button>
@@ -1599,11 +1581,7 @@ export default function NetworkPage() {
                           </TableCell>
                           <TableCell>
                             {partner.affiliate ? (
-                              <Badge
-                                className="text-xs cursor-pointer hover:opacity-80"
-                                style={{ backgroundColor: '#3e8692', color: 'white' }}
-                                onClick={() => handleOpenPartnerAffiliateLink(partner)}
-                              >
+                              <Badge className="text-xs cursor-pointer hover:opacity-80 bg-brand text-white" onClick={() => handleOpenPartnerAffiliateLink(partner)}>
                                 {partner.affiliate.name}
                               </Badge>
                             ) : (
@@ -2999,7 +2977,7 @@ export default function NetworkPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-full" style={{ backgroundColor: '#e8f4f5' }}>
-                        <Handshake className="h-4 w-4" style={{ color: '#3e8692' }} />
+                        <Handshake className="h-4 w-4 text-brand"/>
                       </div>
                       <div>
                         <p className="font-medium text-sm">{linkingPartnerForAffiliate.affiliate.name}</p>
@@ -3322,10 +3300,7 @@ export default function NetworkPage() {
                                 }
                               </Badge>
                               <ArrowRight className="h-3 w-3 text-gray-400" />
-                              <Badge
-                                className="text-xs"
-                                style={{ backgroundColor: '#3e8692', color: 'white' }}
-                              >
+                              <Badge className="text-xs bg-brand text-white">
                                 {historyType === 'partner'
                                   ? partnerStatusLabels[entry.to_stage as PartnerStatus] || entry.to_stage
                                   : affiliateStatusLabels[entry.to_stage as AffiliateStatus] || entry.to_stage
@@ -3333,10 +3308,7 @@ export default function NetworkPage() {
                               </Badge>
                             </>
                           ) : (
-                            <Badge
-                              className="text-xs"
-                              style={{ backgroundColor: '#3e8692', color: 'white' }}
-                            >
+                            <Badge className="text-xs bg-brand text-white">
                               Created as {historyType === 'partner'
                                 ? partnerStatusLabels[entry.to_stage as PartnerStatus] || entry.to_stage
                                 : affiliateStatusLabels[entry.to_stage as AffiliateStatus] || entry.to_stage

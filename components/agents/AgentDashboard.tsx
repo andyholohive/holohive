@@ -322,12 +322,7 @@ export default function AgentDashboard() {
             <p className="text-sm text-gray-500">8-agent sales automation powered by Claude</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              onClick={() => setScoutOpen(true)}
-              style={{ backgroundColor: '#3e8692' }}
-              className="text-white"
-            >
+            <Button size="sm" onClick={() => setScoutOpen(true)} className="text-white bg-brand">
               <Search className="w-4 h-4 mr-1.5" />
               Qualify Prospect
             </Button>
@@ -348,10 +343,10 @@ export default function AgentDashboard() {
           <Card className="border border-gray-200">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <Activity className="w-4 h-4" style={{ color: '#3e8692' }} />
+                <Activity className="w-4 h-4 text-brand"/>
                 Total Runs
               </div>
-              <div className="text-2xl font-bold" style={{ color: '#3e8692' }}>{stats?.total_runs || 0}</div>
+              <div className="text-2xl font-bold text-brand">{stats?.total_runs || 0}</div>
               <div className="text-xs text-gray-400 mt-0.5">
                 {stats?.completed || 0} completed, {stats?.failed || 0} failed
               </div>
@@ -361,7 +356,7 @@ export default function AgentDashboard() {
           <Card className="border border-gray-200">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <Zap className="w-4 h-4" style={{ color: '#3e8692' }} />
+                <Zap className="w-4 h-4 text-brand"/>
                 Tokens Used
               </div>
               <div className="text-2xl font-bold text-gray-900">
@@ -376,7 +371,7 @@ export default function AgentDashboard() {
           <Card className="border border-gray-200">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <DollarSign className="w-4 h-4" style={{ color: '#3e8692' }} />
+                <DollarSign className="w-4 h-4 text-brand"/>
                 Total Cost
               </div>
               <div className="text-2xl font-bold text-gray-900">
@@ -391,7 +386,7 @@ export default function AgentDashboard() {
           <Card className="border border-gray-200">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <ArrowRight className="w-4 h-4" style={{ color: '#3e8692' }} />
+                <ArrowRight className="w-4 h-4 text-brand"/>
                 Pending Handoffs
               </div>
               <div className="text-2xl font-bold text-gray-900">{pendingHandoffs.length}</div>
@@ -633,7 +628,7 @@ export default function AgentDashboard() {
                             {statusBadge(run.status)}
                             <Badge variant="outline" className="text-[10px]">{formatLabel(run.run_type)}</Badge>
                             {run.agent_name === 'SCOUT' && run.status === 'completed' && (
-                              <span className="text-[10px] font-medium hover:underline" style={{ color: '#3e8692' }}>View Report</span>
+                              <span className="text-[10px] font-medium hover:underline text-brand">View Report</span>
                             )}
                           </div>
                           {run.error_message && (

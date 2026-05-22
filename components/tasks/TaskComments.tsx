@@ -134,7 +134,7 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
                   autoFocus
                 />
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={() => handleEditComment(comment.id)} disabled={submitting} className="h-7 text-xs" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                  <Button size="sm" onClick={() => handleEditComment(comment.id)} disabled={submitting} className="h-7 text-xs bg-brand text-white">
                     Save
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => { setEditingCommentId(null); setEditContent(''); }} className="h-7 text-xs">
@@ -180,7 +180,7 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
                 autoFocus
               />
               <div className="flex gap-2 mt-1.5">
-                <Button size="sm" onClick={() => handleAddComment(comment.id)} disabled={!replyContent.trim() || submitting} className="h-7 text-xs" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                <Button size="sm" onClick={() => handleAddComment(comment.id)} disabled={!replyContent.trim() || submitting} className="h-7 text-xs bg-brand text-white">
                   <Send className="h-3 w-3 mr-1" /> Reply
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => { setReplyingTo(null); setReplyContent(''); }} className="h-7 text-xs">
@@ -239,13 +239,7 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
         />
         <div className="flex items-center justify-between mt-2">
           <span className="text-xs text-gray-400">Cmd+Enter to send</span>
-          <Button
-            size="sm"
-            onClick={() => handleAddComment()}
-            disabled={!newComment.trim() || submitting}
-            className="h-7 text-xs"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-          >
+          <Button size="sm" onClick={() => handleAddComment()} disabled={!newComment.trim() || submitting} className="h-7 text-xs bg-brand text-white">
             <Send className="h-3 w-3 mr-1" /> Comment
           </Button>
         </div>

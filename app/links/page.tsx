@@ -555,11 +555,7 @@ export default function LinksPage() {
             <ExternalLink className="h-4 w-4 mr-2" />
             Submission Form
           </Button>
-          <Button
-            onClick={() => openDialog()}
-            className="hover:opacity-90"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-          >
+          <Button onClick={() => openDialog()} className="hover:opacity-90 bg-brand text-white">
             <Plus className="h-4 w-4 mr-2" />
             Add Link
           </Button>

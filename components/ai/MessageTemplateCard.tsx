@@ -133,12 +133,7 @@ export function MessageTemplateCard({ template, onUseTemplate, onPreviewTemplate
 
           {/* Action Buttons */}
           <div className="flex gap-2 pt-2">
-            <Button
-              size="sm"
-              onClick={() => onUseTemplate(template)}
-              className="flex-1 hover:opacity-90"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button size="sm" onClick={() => onUseTemplate(template)} className="flex-1 hover:opacity-90 bg-brand text-white">
               <MessageSquare className="w-4 h-4 mr-2" />
               Use Template
             </Button>

@@ -633,12 +633,7 @@ export default function ProspectsTab() {
           <Settings className="w-4 h-4 mr-1.5" />
           ICP Settings
         </Button>
-        <Button
-          size="sm"
-          onClick={() => { setScraperResult(null); setScraperError(null); setScraperOpen(true); }}
-          style={{ backgroundColor: '#3e8692', color: 'white' }}
-          className="hover:opacity-90 h-9"
-        >
+        <Button size="sm" onClick={() => { setScraperResult(null); setScraperError(null); setScraperOpen(true); }} className="hover:opacity-90 h-9 bg-brand text-white">
           <Download className="w-4 h-4 mr-1.5" />
           Import Prospects
         </Button>
@@ -647,7 +642,7 @@ export default function ProspectsTab() {
       {/* Bulk actions */}
       {selected.length > 0 && (
         <div className="flex items-center gap-3 mb-3 px-4 py-2.5 rounded-lg" style={{ backgroundColor: '#3e869215', border: '1px solid #3e869240' }}>
-          <span className="text-sm font-medium" style={{ color: '#3e8692' }}>{selected.length} selected</span>
+          <span className="text-sm font-medium text-brand">{selected.length} selected</span>
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={selectAll}>Select All on Page</Button>
           <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setSelected([])}>Deselect</Button>
           <div className="flex-1" />
@@ -699,8 +694,8 @@ export default function ProspectsTab() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 rounded-t-lg border border-b-0" style={{ backgroundColor: '#3e869210', borderColor: '#3e869230' }}>
         <div className="flex items-center gap-2">
-          <Globe className="h-4 w-4" style={{ color: '#3e8692' }} />
-          <h4 className="font-semibold" style={{ color: '#3e8692' }}>Prospects</h4>
+          <Globe className="h-4 w-4 text-brand"/>
+          <h4 className="font-semibold text-brand">Prospects</h4>
           <Badge variant="secondary" className="text-xs font-medium">{total}</Badge>
         </div>
         {totalPages > 1 && (
@@ -738,12 +733,7 @@ export default function ProspectsTab() {
                     <Globe className="w-10 h-10 mx-auto mb-3 text-gray-300" />
                     <p className="text-sm font-medium text-gray-700 mb-1">No prospects yet</p>
                     <p className="text-xs text-gray-400 mb-4">Import projects from DropsTab to start discovering new prospects.</p>
-                    <Button
-                      size="sm"
-                      onClick={() => { setScraperResult(null); setScraperError(null); setScraperOpen(true); }}
-                      style={{ backgroundColor: '#3e8692', color: 'white' }}
-                      className="hover:opacity-90"
-                    >
+                    <Button size="sm" onClick={() => { setScraperResult(null); setScraperError(null); setScraperOpen(true); }} className="hover:opacity-90 bg-brand text-white">
                       <Download className="w-4 h-4 mr-1.5" />
                       Import Prospects
                     </Button>

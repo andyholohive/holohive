@@ -681,12 +681,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
           </Button>
 
           {step < 3 ? (
-            <Button
-              size="sm"
-              onClick={() => setStep(step + 1)}
-              disabled={!canAdvance()}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button className="bg-brand text-white" size="sm" onClick={() => setStep(step + 1)} disabled={!canAdvance()}>
               Next <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (

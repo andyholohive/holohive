@@ -329,17 +329,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                     className={`focus-brand flex-1 ${hasError ? 'border-red-500' : ''}`}
                   />
                   {index === answers.length - 1 && (
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        setMultipleAnswers(prev => ({
-                          ...prev,
-                          [field.id]: [...answers, '']
-                        }));
-                      }}
-                      style={{ backgroundColor: '#3e8692', color: 'white' }}
-                      className="hover:opacity-90"
-                    >
+                    <Button type="button" onClick={() => { setMultipleAnswers(prev => ({ ...prev, [field.id]: [...answers, ''] })); }} className="hover:opacity-90 bg-brand text-white">
                       +
                     </Button>
                   )}
@@ -476,17 +466,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                     className={`focus-brand flex-1 ${hasError ? 'border-red-500' : ''}`}
                   />
                   {index === answers.length - 1 && (
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        setMultipleAnswers(prev => ({
-                          ...prev,
-                          [field.id]: [...answers, '']
-                        }));
-                      }}
-                      style={{ backgroundColor: '#3e8692', color: 'white' }}
-                      className="hover:opacity-90"
-                    >
+                    <Button type="button" onClick={() => { setMultipleAnswers(prev => ({ ...prev, [field.id]: [...answers, ''] })); }} className="hover:opacity-90 bg-brand text-white">
                       +
                     </Button>
                   )}

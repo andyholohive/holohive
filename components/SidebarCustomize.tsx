@@ -260,11 +260,7 @@ export function SidebarCustomizeDialog({
             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
             Reset
           </Button>
-          <Button
-            onClick={() => onOpenChange(false)}
-            className="hover:opacity-90"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-          >
+          <Button onClick={() => onOpenChange(false)} className="hover:opacity-90 bg-brand text-white">
             Done
           </Button>
         </DialogFooter>

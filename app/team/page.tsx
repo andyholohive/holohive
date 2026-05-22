@@ -586,13 +586,7 @@ export default function TeamPage() {
                         </Select>
                       </div>
                       <div className="flex gap-2">
-                        <Button
-                          onClick={() => handleApprove(member)}
-                          disabled={approvingId === member.id || rejectingId === member.id}
-                          className="flex-1 text-white hover:opacity-90"
-                          style={{ backgroundColor: '#3e8692' }}
-                          size="sm"
-                        >
+                        <Button onClick={() => handleApprove(member)} disabled={approvingId === member.id || rejectingId === member.id} className="flex-1 text-white hover:opacity-90 bg-brand" size="sm">
                           {approvingId === member.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (

@@ -736,17 +736,7 @@ export default function ChatPage() {
                   className="flex-1 text-sm min-h-[48px] max-h-[200px] resize-none focus-brand overflow-y-auto"
                   rows={1}
                 />
-                <Button
-                  onClick={async () => {
-                    if (message.trim()) {
-                      await createNewSession();
-                    }
-                  }}
-                  disabled={!message.trim()}
-                  size="sm"
-                  className="h-12 w-12 p-0 rounded-xl hover:opacity-90 transition-all duration-200 flex-shrink-0"
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                >
+                <Button onClick={async () => { if (message.trim()) { await createNewSession(); } }} disabled={!message.trim()} size="sm" className="h-12 w-12 p-0 rounded-xl hover:opacity-90 transition-all duration-200 flex-shrink-0 bg-brand text-white">
                   <Send className="h-5 w-5" />
                 </Button>
               </div>
@@ -1097,12 +1087,7 @@ export default function ChatPage() {
             >
               Cancel
             </Button>
-            <Button
-              onClick={handleCreateListFromKOLs}
-              disabled={!newListName.trim() || creatingList}
-              className="hover:opacity-90"
-              style={{ backgroundColor: "#3e8692", color: "white" }}
-            >
+            <Button onClick={handleCreateListFromKOLs} disabled={!newListName.trim() || creatingList} className="hover:opacity-90 bg-brand text-white">
               {creatingList ? 'Creating...' : 'Create List'}
             </Button>
           </DialogFooter>

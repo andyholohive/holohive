@@ -213,7 +213,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Settings className="w-5 h-5" style={{ color: '#3e8692' }} />
+            <Settings className="w-5 h-5 text-brand"/>
             ICP Scoring Settings
           </DialogTitle>
           <DialogDescription>

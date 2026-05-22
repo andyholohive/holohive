@@ -1005,12 +1005,7 @@ export default function CampaignsPage() {
                   <Button type="button" variant="outline" onClick={() => setIsNewCampaignOpen(false)}>
                     Cancel
                   </Button>
-                  <Button
-                    type="submit"
-                    disabled={isSubmittingCampaign || !newCampaign.client_id || !newCampaign.name.trim() || !newCampaign.total_budget || !newCampaign.start_date}
-                    className="hover:opacity-90"
-                    style={{ backgroundColor: "#3e8692", color: "white" }}
-                  >
+                  <Button type="submit" disabled={isSubmittingCampaign || !newCampaign.client_id || !newCampaign.name.trim() || !newCampaign.total_budget || !newCampaign.start_date} className="hover:opacity-90 bg-brand text-white">
                     {isSubmittingCampaign ? "Creating..." : "Create Campaign"}
                   </Button>
                 </DialogFooter>
@@ -1126,11 +1121,7 @@ export default function CampaignsPage() {
             : "No campaigns yet."}
         >
           {(userProfile?.role === "super_admin" || userProfile?.role === "admin") && !searchTerm && statusFilter === "all" && (
-            <Button
-              className="hover:opacity-90"
-              style={{ backgroundColor: "#3e8692", color: "white" }}
-              onClick={() => setIsNewCampaignOpen(true)}
-            >
+            <Button className="hover:opacity-90 bg-brand text-white" onClick={() => setIsNewCampaignOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Create Your First Campaign
             </Button>

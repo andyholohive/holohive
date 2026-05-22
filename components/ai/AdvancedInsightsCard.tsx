@@ -62,7 +62,7 @@ export function AdvancedInsightsCard({ insights, onApplyInsight, onDismiss }: Ad
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5" style={{ color: '#3e8692' }} />
+            <Zap className="w-5 h-5 text-brand"/>
             <CardTitle className="text-lg font-semibold text-gray-900">
               AI Insights & Predictions
             </CardTitle>
@@ -140,12 +140,7 @@ export function AdvancedInsightsCard({ insights, onApplyInsight, onDismiss }: Ad
               
               {insight.actionable && onApplyInsight && (
                 <div className="flex gap-2 pt-2">
-                  <Button
-                    size="sm"
-                    onClick={() => onApplyInsight(insight)}
-                    className="flex items-center gap-2 hover:opacity-90"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  >
+                  <Button size="sm" onClick={() => onApplyInsight(insight)} className="flex items-center gap-2 hover:opacity-90 bg-brand text-white">
                     <Target className="w-3 h-3" />
                     Apply Insight
                   </Button>
@@ -164,7 +159,7 @@ export function AdvancedInsightsCard({ insights, onApplyInsight, onDismiss }: Ad
         
         <div className="bg-gray-100 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-2">
-            <Lightbulb className="w-4 h-4" style={{ color: '#3e8692' }} />
+            <Lightbulb className="w-4 h-4 text-brand"/>
             <span className="text-sm font-medium text-gray-900">Pro Tip</span>
           </div>
           <p className="text-sm text-gray-700">

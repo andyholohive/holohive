@@ -1663,12 +1663,7 @@ export default function TelegramChatsPage() {
 
                         {/* Right: Actions */}
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <Button
-                            size="sm"
-                            onClick={() => openMessageDialog(chat)}
-                            style={{ backgroundColor: '#3e8692', color: 'white' }}
-                            className="hover:opacity-90"
-                          >
+                          <Button size="sm" onClick={() => openMessageDialog(chat)} className="hover:opacity-90 bg-brand text-white">
                             <MessageSquare className="h-4 w-4 mr-1.5" />
                             Send Message
                           </Button>
@@ -2229,12 +2224,7 @@ export default function TelegramChatsPage() {
 
                         {/* Right: Actions */}
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <Button
-                            size="sm"
-                            onClick={() => openMessageDialog(chat)}
-                            style={{ backgroundColor: '#3e8692', color: 'white' }}
-                            className="hover:opacity-90"
-                          >
+                          <Button size="sm" onClick={() => openMessageDialog(chat)} className="hover:opacity-90 bg-brand text-white">
                             <MessageSquare className="h-4 w-4 mr-1.5" />
                             Send Message
                           </Button>
@@ -2272,10 +2262,7 @@ export default function TelegramChatsPage() {
             <p className="text-gray-600">
               Bot commands that respond to users ({commands.length} total)
             </p>
-            <Button
-              onClick={() => openCommandDialog()}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button className="bg-brand text-white" onClick={() => openCommandDialog()}>
               <Plus className="h-4 w-4 mr-2" />
               Add Command
             </Button>
@@ -2298,10 +2285,7 @@ export default function TelegramChatsPage() {
                 <p className="text-gray-500 max-w-md mx-auto mb-4">
                   Add bot commands that will respond when users type them in Telegram chats.
                 </p>
-                <Button
-                  onClick={() => openCommandDialog()}
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                >
+                <Button className="bg-brand text-white" onClick={() => openCommandDialog()}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Your First Command
                 </Button>

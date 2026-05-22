@@ -1220,12 +1220,7 @@ export default function FloatingChat() {
             >
               Cancel
             </Button>
-            <Button
-              onClick={handleCreateListFromKOLs}
-              disabled={!newListName.trim() || creatingList}
-              className="hover:opacity-90"
-              style={{ backgroundColor: "#3e8692", color: "white" }}
-            >
+            <Button onClick={handleCreateListFromKOLs} disabled={!newListName.trim() || creatingList} className="hover:opacity-90 bg-brand text-white">
               {creatingList ? 'Creating...' : 'Create List'}
             </Button>
           </DialogFooter>

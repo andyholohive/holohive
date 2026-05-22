@@ -250,10 +250,10 @@ export default function FundingRadarPanel() {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#3e869220' }}>
-                <DollarSign className="w-4 h-4" style={{ color: '#3e8692' }} />
+                <DollarSign className="w-4 h-4 text-brand"/>
               </div>
               <div>
-                <h3 className="font-semibold text-sm" style={{ color: '#3e8692' }}>Funding Radar</h3>
+                <h3 className="font-semibold text-sm text-brand">Funding Radar</h3>
                 <p className="text-[11px] text-gray-500">VC-backed projects &amp; funding rounds</p>
               </div>
             </div>
@@ -473,7 +473,7 @@ export default function FundingRadarPanel() {
                               {promoting === p.id ? (
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                               ) : (
-                                <ArrowRight className="w-3.5 h-3.5" style={{ color: '#3e8692' }} />
+                                <ArrowRight className="w-3.5 h-3.5 text-brand"/>
                               )}
                             </Button>
                           </TooltipTrigger>
@@ -547,8 +547,8 @@ export default function FundingRadarPanel() {
         {recentRounds.length > 0 && (
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <RefreshCw className="w-3.5 h-3.5" style={{ color: '#3e8692' }} />
-              <h4 className="font-semibold text-sm" style={{ color: '#3e8692' }}>Recent Funding Rounds Detected</h4>
+              <RefreshCw className="w-3.5 h-3.5 text-brand"/>
+              <h4 className="font-semibold text-sm text-brand">Recent Funding Rounds Detected</h4>
               <Badge variant="secondary" className="text-[10px]">{recentRounds.length}</Badge>
             </div>
             <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">

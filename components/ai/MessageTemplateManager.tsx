@@ -354,12 +354,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
                   <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button
-                    type="submit"
-                    disabled={!newTemplate.name.trim() || !newTemplate.content.trim()}
-                    className="hover:opacity-90"
-                    style={{ backgroundColor: "#3e8692", color: "white" }}
-                  >
+                  <Button type="submit" disabled={!newTemplate.name.trim() || !newTemplate.content.trim()} className="hover:opacity-90 bg-brand text-white">
                     Create Template
                   </Button>
                 </DialogFooter>
@@ -430,7 +425,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
               : 'Create your first message template to get started.'}
           </p>
           {!searchTerm && categoryFilter === 'all' && toneFilter === 'all' && audienceFilter === 'all' && (
-                          <Button onClick={() => setIsCreateDialogOpen(true)} className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                          <Button onClick={() => setIsCreateDialogOpen(true)} className="hover:opacity-90 bg-brand text-white">
                 <Plus className="w-4 h-4 mr-2" />
                 Create Template
               </Button>

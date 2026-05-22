@@ -531,7 +531,7 @@ export default function SubmissionsPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" style={{ color: '#3e8692' }} />
+              <User className="h-5 w-5 text-brand"/>
               {selectedSubmission?.name}
             </DialogTitle>
           </DialogHeader>
@@ -599,12 +599,7 @@ export default function SubmissionsPage() {
                     <ArrowRight className="h-4 w-4 mr-1.5" /> Open in pipeline
                   </Button>
                 ) : (
-                  <Button
-                    onClick={() => convertToOpportunity(selectedSubmission)}
-                    disabled={converting}
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                    className="hover:opacity-90"
-                  >
+                  <Button onClick={() => convertToOpportunity(selectedSubmission)} disabled={converting} className="hover:opacity-90 bg-brand text-white">
                     {converting ? (
                       <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Converting…</>
                     ) : (

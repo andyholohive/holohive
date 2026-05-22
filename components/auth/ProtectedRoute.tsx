@@ -72,7 +72,7 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
           </div>
           <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
             <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#3e869215' }}>
-              <Clock className="h-8 w-8" style={{ color: '#3e8692' }} />
+              <Clock className="h-8 w-8 text-brand"/>
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
               Pending Approval

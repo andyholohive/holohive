@@ -400,13 +400,7 @@ export default function TemplatesPage() {
                   >
                     View Full
                   </Button>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => handleCopyTemplate(template)}
-                    className="w-full"
-                    style={{ backgroundColor: '#3e8692' }}
-                  >
+                  <Button variant="default" size="sm" onClick={() => handleCopyTemplate(template)} className="w-full bg-brand">
                     <Copy className="h-4 w-4 mr-1" />
                     Copy
                   </Button>
@@ -556,19 +550,7 @@ export default function TemplatesPage() {
                       >
                         View Full
                       </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => {
-                          navigator.clipboard.writeText(example.content);
-                          toast({
-                            title: 'Copied!',
-                            description: 'Message copied to clipboard',
-                          });
-                        }}
-                        className="w-full"
-                        style={{ backgroundColor: '#3e8692' }}
-                      >
+                      <Button variant="default" size="sm" onClick={() => { navigator.clipboard.writeText(example.content); toast({ title: 'Copied!', description: 'Message copied to clipboard', }); }} className="w-full bg-brand">
                         <Copy className="h-4 w-4 mr-1" />
                         Copy
                       </Button>
@@ -642,11 +624,7 @@ export default function TemplatesPage() {
 
               {/* Actions */}
               <div className="flex gap-2 pt-4">
-                <Button
-                  onClick={() => handleCopyTemplate(selectedTemplate)}
-                  className="flex-1"
-                  style={{ backgroundColor: '#3e8692' }}
-                >
+                <Button onClick={() => handleCopyTemplate(selectedTemplate)} className="flex-1 bg-brand">
                   <Copy className="h-4 w-4 mr-2" />
                   Copy Template
                 </Button>
@@ -746,17 +724,7 @@ export default function TemplatesPage() {
 
               {/* Actions */}
               <div className="flex gap-2 pt-4">
-                <Button
-                  onClick={() => {
-                    navigator.clipboard.writeText(selectedExample.content);
-                    toast({
-                      title: 'Copied!',
-                      description: 'Message copied to clipboard',
-                    });
-                  }}
-                  className="flex-1"
-                  style={{ backgroundColor: '#3e8692' }}
-                >
+                <Button onClick={() => { navigator.clipboard.writeText(selectedExample.content); toast({ title: 'Copied!', description: 'Message copied to clipboard', }); }} className="flex-1 bg-brand">
                   <Copy className="h-4 w-4 mr-2" />
                   Copy Message
                 </Button>

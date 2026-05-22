@@ -3489,7 +3489,7 @@ export default function SalesPipelinePage() {
                                 >
                                   <Zap className="h-3 w-3" />
                                 </Button>
-                                <div className="absolute bottom-full right-0 mb-1.5 px-2.5 py-1 text-white text-[11px] rounded-md whitespace-nowrap opacity-0 pointer-events-none group-hover/bump:opacity-100 transition-opacity z-50" style={{ backgroundColor: '#3e8692' }}>
+                                <div className="absolute bottom-full right-0 mb-1.5 px-2.5 py-1 text-white text-[11px] rounded-md whitespace-nowrap opacity-0 pointer-events-none group-hover/bump:opacity-100 transition-opacity z-50 bg-brand">
                                   Record bump #{opp.bump_number + 1}
                                 </div>
                               </div>
@@ -4944,9 +4944,9 @@ export default function SalesPipelinePage() {
         {slideOverMode === 'view' && actionGuidance && (
           <div className="px-6 py-3 border-b border-sky-200" style={{ backgroundColor: '#f0f9fa' }}>
             <div className="flex items-start gap-2">
-              <Zap className="h-4 w-4 flex-shrink-0 mt-0.5" style={{ color: '#3e8692' }} />
+              <Zap className="h-4 w-4 flex-shrink-0 mt-0.5 text-brand"/>
               <div>
-                <p className="text-sm font-semibold" style={{ color: '#3e8692' }}>{actionGuidance.label}</p>
+                <p className="text-sm font-semibold text-brand">{actionGuidance.label}</p>
                 <p className="text-xs text-gray-600 mt-0.5">{actionGuidance.hint}</p>
               </div>
               <Button
@@ -5032,7 +5032,7 @@ export default function SalesPipelinePage() {
                   <span className="text-xs text-gray-500">Affiliate</span>
                   {opp.affiliate ? (
                     <div className="mt-0.5">
-                      <Badge className="text-xs" style={{ backgroundColor: '#3e8692', color: 'white' }}>{opp.affiliate.name}</Badge>
+                      <Badge className="text-xs bg-brand text-white">{opp.affiliate.name}</Badge>
                     </div>
                   ) : (
                     <p className="font-medium mt-0.5 text-gray-400">—</p>
@@ -6022,12 +6022,12 @@ export default function SalesPipelinePage() {
                                 {STAGE_LABELS[entry.from_stage as SalesPipelineStage] || entry.from_stage}
                               </Badge>
                               <ArrowRight className="h-3 w-3 text-gray-400" />
-                              <Badge className="text-[10px]" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                              <Badge className="text-[10px] bg-brand text-white">
                                 {STAGE_LABELS[entry.to_stage as SalesPipelineStage] || entry.to_stage}
                               </Badge>
                             </>
                           ) : (
-                            <Badge className="text-[10px]" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                            <Badge className="text-[10px] bg-brand text-white">
                               Created as {STAGE_LABELS[entry.to_stage as SalesPipelineStage] || entry.to_stage}
                             </Badge>
                           )}
@@ -7124,11 +7124,7 @@ export default function SalesPipelinePage() {
           >
             <Download className="h-4 w-4 mr-1" /> Export CSV
           </Button>
-          <Button
-            onClick={() => { setForm({ name: '', owner_id: user?.id || undefined }); setIsCreateOpen(true); }}
-            className="hover:opacity-90"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-          >
+          <Button onClick={() => { setForm({ name: '', owner_id: user?.id || undefined }); setIsCreateOpen(true); }} className="hover:opacity-90 bg-brand text-white">
             <Plus className="h-4 w-4 mr-2" />
             New Opportunity
           </Button>

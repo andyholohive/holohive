@@ -101,24 +101,14 @@ export function LoginForm({ onToggleMode, onForgotPassword }: LoginFormProps) {
           <GoogleSignInButton mode="signin" />
 
           <div className="text-center">
-            <button
-              type="button"
-              onClick={onForgotPassword}
-              className="text-sm hover:underline"
-              style={{ color: '#3e8692' }}
-            >
+            <button type="button" onClick={onForgotPassword} className="text-sm hover:underline text-brand">
               Forgot your password?
             </button>
           </div>
           
           <div className="text-center text-sm text-gray-600">
             Don't have an account?{' '}
-            <button
-              type="button"
-              onClick={onToggleMode}
-              className="hover:underline"
-              style={{ color: '#3e8692' }}
-            >
+            <button type="button" onClick={onToggleMode} className="hover:underline text-brand">
               Sign up
             </button>
           </div>

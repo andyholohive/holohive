@@ -391,16 +391,7 @@ export default function ContactsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button
-            onClick={() => {
-              setEditingContact(null);
-              setContactForm({ name: '' });
-              resetLinkState();
-              setIsNewContactOpen(true);
-            }}
-            className="hover:opacity-90"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-          >
+          <Button onClick={() => { setEditingContact(null); setContactForm({ name: '' }); resetLinkState(); setIsNewContactOpen(true); }} className="hover:opacity-90 bg-brand text-white">
             <Plus className="h-4 w-4 mr-2" />
             Add Contact
           </Button>
@@ -543,16 +534,7 @@ export default function ContactsPage() {
             {searchTerm ? 'Try adjusting your search or filters.' : 'Add your first contact to get started.'}
           </p>
           {!searchTerm && (
-            <Button
-              className="mt-4"
-              onClick={() => {
-                setEditingContact(null);
-                setContactForm({ name: '' });
-                resetLinkState();
-                setIsNewContactOpen(true);
-              }}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button className="mt-4 bg-brand text-white" onClick={() => { setEditingContact(null); setContactForm({ name: '' }); resetLinkState(); setIsNewContactOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" />
               Add Your First Contact
             </Button>

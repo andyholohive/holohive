@@ -1173,13 +1173,7 @@ export default function KOLsPage() {
                         >
                           Cancel
                         </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => handleAddNewOption('in_house', newOptionValue, false)}
-                          disabled={!newOptionValue.trim()}
-                          className="h-6 px-2 text-xs hover:opacity-90"
-                          style={{ backgroundColor: '#3e8692', color: 'white' }}
-                        >
+                        <Button size="sm" onClick={() => handleAddNewOption('in_house', newOptionValue, false)} disabled={!newOptionValue.trim()} className="h-6 px-2 text-xs hover:opacity-90 bg-brand text-white">
                           Add
                         </Button>
                       </div>
@@ -1916,12 +1910,7 @@ export default function KOLsPage() {
                         >
                           Cancel
                         </Button>
-                        <Button
-                          onClick={() => handleAddNewOption('in_house', newOptionValueBulk, true)}
-                          disabled={!newOptionValueBulk.trim()}
-                          className="text-xs hover:opacity-90"
-                          style={{ backgroundColor: '#3e8692', color: 'white' }}
-                        >
+                        <Button onClick={() => handleAddNewOption('in_house', newOptionValueBulk, true)} disabled={!newOptionValueBulk.trim()} className="text-xs hover:opacity-90 bg-brand text-white">
                           Add Option
                         </Button>
                       </div>

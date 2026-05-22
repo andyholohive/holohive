@@ -126,11 +126,7 @@ export default function AISuggestionCard({ type, suggestion, onApply, onDismiss 
 
         {/* Action Buttons */}
         <div className="flex space-x-2 pt-2">
-          <Button
-            onClick={() => onApply(suggestion)}
-            className="flex-1 hover:opacity-90"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-          >
+          <Button onClick={() => onApply(suggestion)} className="flex-1 hover:opacity-90 bg-brand text-white">
             <Plus className="h-4 w-4 mr-2" />
             {isCampaign ? 'Create Campaign' : 'Create List'}
           </Button>

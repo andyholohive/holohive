@@ -2632,24 +2632,7 @@ export default function ClientsPage() {
                             className="focus-brand min-h-[60px] flex-1"
                           />
                         </div>
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            const entries = domainInput
-                              .split(/[\n,]+/)
-                              .map(entry => entry.trim().toLowerCase().replace(/^@/, ''))
-                              .filter(entry => entry.length > 0 && /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(entry));
-                            const current = newClient.approved_domains;
-                            const newDomains = entries.filter(d => !current.includes(d));
-                            if (newDomains.length > 0) {
-                              setNewClient({ ...newClient, approved_domains: [...current, ...newDomains] });
-                              setDomainInput('');
-                            }
-                          }}
-                          disabled={!domainInput.trim()}
-                          className="hover:opacity-90 w-fit"
-                          style={{ backgroundColor: '#3e8692', color: 'white' }}
-                        >
+                        <Button type="button" onClick={() => { const entries = domainInput .split(/[\n,]+/) .map(entry => entry.trim().toLowerCase().replace(/^@/, '')) .filter(entry => entry.length> 0 && /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(entry)); const current = newClient.approved_domains; const newDomains = entries.filter(d => !current.includes(d)); if (newDomains.length> 0) { setNewClient({ ...newClient, approved_domains: [...current, ...newDomains] }); setDomainInput(''); } }} disabled={!domainInput.trim()} className="hover:opacity-90 w-fit bg-brand text-white">
                           Add Domains
                         </Button>
                         {newClient.approved_domains.length > 0 && (

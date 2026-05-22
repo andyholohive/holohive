@@ -251,11 +251,7 @@ export default function ResetPasswordPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
               
-              <Button 
-                onClick={() => router.push('/auth')}
-                className="w-full mt-4 hover:opacity-90"
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-              >
+              <Button onClick={() => router.push('/auth')} className="w-full mt-4 hover:opacity-90 bg-brand text-white">
                 Back to Sign In
               </Button>
             </CardContent>

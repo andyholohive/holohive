@@ -184,11 +184,7 @@ export default function AutomationsPage() {
                 <p className="text-sm text-gray-500">Manage automation rules and view execution history</p>
               </div>
             </div>
-            <Button
-              onClick={() => setShowCreateDialog(true)}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              className="hover:opacity-90"
-            >
+            <Button onClick={() => setShowCreateDialog(true)} className="hover:opacity-90 bg-brand text-white">
               <Plus className="h-4 w-4 mr-2" /> New Rule
             </Button>
           </div>

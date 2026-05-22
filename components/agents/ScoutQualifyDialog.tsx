@@ -171,8 +171,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                   <div>
                     <h3 className="text-base font-semibold text-gray-900">{report.project_name}</h3>
                     {report.report?.url_analyzed && (
-                      <a href={report.report.url_analyzed} target="_blank" rel="noopener noreferrer"
-                         className="text-xs hover:underline flex items-center gap-1" style={{ color: '#3e8692' }}>
+                      <a href={report.report.url_analyzed} target="_blank" rel="noopener noreferrer" className="text-xs hover:underline flex items-center gap-1 text-brand">
                         {report.report.url_analyzed}
                         <ExternalLink className="w-3 h-3" />
                       </a>
@@ -188,7 +187,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                 {/* Score Summary */}
                 <div className="grid grid-cols-4 gap-2">
                   <div className="bg-gray-50 rounded-lg p-2.5 text-center">
-                    <div className="text-xl font-bold" style={{ color: '#3e8692' }}>{report.composite_score}</div>
+                    <div className="text-xl font-bold text-brand">{report.composite_score}</div>
                     <div className="text-[10px] text-gray-500 font-medium">Score</div>
                   </div>
                   <div className="bg-gray-50 rounded-lg p-2.5 text-center">
@@ -208,7 +207,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                 {/* Action Tier */}
                 <div className="flex items-center gap-2">
                   <Label className="text-sm text-gray-500">Action Tier</Label>
-                  <Badge className="text-white text-xs" style={{ backgroundColor: '#3e8692' }}>{formatLabel(report.action_tier)}</Badge>
+                  <Badge className="text-white text-xs bg-brand">{formatLabel(report.action_tier)}</Badge>
                 </div>
 
                 {report.disqualification_reason && (
@@ -324,11 +323,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
             </ScrollArea>
             <DialogFooter>
               <Button variant="outline" onClick={handleClose}>Close</Button>
-              <Button
-                onClick={() => { setReport(null); setUrl(''); setCompanyName(''); }}
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-                className="hover:opacity-90"
-              >
+              <Button onClick={() => { setReport(null); setUrl(''); setCompanyName(''); }} className="hover:opacity-90 bg-brand text-white">
                 Qualify Another
               </Button>
             </DialogFooter>
