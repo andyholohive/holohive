@@ -867,11 +867,23 @@ export default function MindsharePage() {
           </TabsTrigger>
           <TabsTrigger value="projects" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" /> Projects
-            <Badge variant="secondary" className="ml-1 text-xs">{projects.length}</Badge>
+            {/* Render the count badge only after the underlying fetch
+                has resolved at least once — otherwise it flashes "0"
+                on first paint before settling. Pattern matches the
+                Channels tab below. */}
+            {projectsLoading && projects.length === 0 ? (
+              <span className="ml-1 inline-block h-4 w-6 rounded bg-gray-100 animate-pulse" />
+            ) : (
+              <Badge variant="secondary" className="ml-1 text-xs">{projects.length}</Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="channels" className="flex items-center gap-2">
             <Radio className="h-4 w-4" /> Channels
-            <Badge variant="secondary" className="ml-1 text-xs">{channels.filter(c => c.is_active).length}</Badge>
+            {channelsLoading && channels.length === 0 ? (
+              <span className="ml-1 inline-block h-4 w-6 rounded bg-gray-100 animate-pulse" />
+            ) : (
+              <Badge variant="secondary" className="ml-1 text-xs">{channels.filter(c => c.is_active).length}</Badge>
+            )}
           </TabsTrigger>
         </TabsList>
 
