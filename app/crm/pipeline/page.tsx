@@ -1080,10 +1080,7 @@ export default function PipelinePage() {
                   </Badge>
                 )}
                 {opp.affiliate && (
-                  <Badge
-                    className="text-xs"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  >
+                  <Badge className="text-xs bg-brand text-white">
                     {opp.affiliate.name}
                   </Badge>
                 )}
@@ -1581,7 +1578,7 @@ export default function PipelinePage() {
                   className="w-32 h-8 justify-between text-xs focus-brand"
                 >
                   {opp.affiliate ? (
-                    <Badge className="text-xs truncate" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                    <Badge className="text-xs truncate bg-brand text-white">
                       {opp.affiliate.name}
                     </Badge>
                   ) : (
@@ -2083,8 +2080,7 @@ export default function PipelinePage() {
               });
               setIsNewOpportunityOpen(true);
             }}
-            className="hover:opacity-90"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
+            variant="brand"
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Opportunity
@@ -2938,18 +2934,12 @@ export default function PipelinePage() {
                                 {stageLabels[entry.from_stage as OpportunityStage] || entry.from_stage}
                               </Badge>
                               <ArrowRight className="h-3 w-3 text-gray-400" />
-                              <Badge
-                                className="text-xs"
-                                style={{ backgroundColor: '#3e8692', color: 'white' }}
-                              >
+                              <Badge className="text-xs bg-brand text-white">
                                 {stageLabels[entry.to_stage as OpportunityStage] || entry.to_stage}
                               </Badge>
                             </>
                           ) : (
-                            <Badge
-                              className="text-xs"
-                              style={{ backgroundColor: '#3e8692', color: 'white' }}
-                            >
+                            <Badge className="text-xs bg-brand text-white">
                               Created as {stageLabels[entry.to_stage as OpportunityStage] || entry.to_stage}
                             </Badge>
                           )}

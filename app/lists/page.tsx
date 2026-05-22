@@ -1439,8 +1439,8 @@ export default function ListsPage() {
                             }
                           }}
                           disabled={!emailInput.trim()}
-                          className="hover:opacity-90 w-fit"
-                          style={{ backgroundColor: '#3e8692', color: 'white' }}
+                          variant="brand"
+                          className="w-fit"
                         >
                           Add Emails
                         </Button>

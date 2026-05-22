@@ -4598,8 +4598,8 @@ const CampaignDetailsPage = () => {
                               }
                             }}
                             disabled={!emailInput.trim()}
-                            className="hover:opacity-90 w-fit"
-                            style={{ backgroundColor: '#3e8692', color: 'white' }}
+                            variant="brand"
+                            className="w-fit"
                           >
                             Add
                           </Button>
@@ -4810,7 +4810,7 @@ const CampaignDetailsPage = () => {
 
                 {editMode && (
                   <div className="flex gap-2 mt-6 col-span-2">
-                    <Button variant="default" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
+                    <Button variant="brand" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
                     <Button variant="outline" onClick={handleCancel} disabled={saving}>Cancel</Button>
                   </div>
                 )}

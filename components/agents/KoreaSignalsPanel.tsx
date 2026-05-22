@@ -588,7 +588,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           <Card className="border border-gray-200">
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4" style={{ color: '#3e8692' }} />
+                <Zap className="w-4 h-4 text-brand" />
                 <span className="text-sm font-semibold text-gray-900">Scan Complete</span>
                 <Badge variant="outline" className="text-[10px] font-medium">{scanResult.scan_duration_seconds}s</Badge>
               </div>
@@ -605,7 +605,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <div className="flex items-center gap-1.5 mb-1">
-                    <Timer className="w-3.5 h-3.5" style={{ color: '#3e8692' }} />
+                    <Timer className="w-3.5 h-3.5 text-brand" />
                     <span className="text-xs text-gray-500">Duration</span>
                   </div>
                   <div className="text-2xl font-bold text-gray-900">{scanResult.scan_duration_seconds}s</div>
@@ -613,16 +613,16 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
 
                 <div>
                   <div className="flex items-center gap-1.5 mb-1">
-                    <Radar className="w-3.5 h-3.5" style={{ color: '#3e8692' }} />
+                    <Radar className="w-3.5 h-3.5 text-brand" />
                     <span className="text-xs text-gray-500">Signals</span>
                   </div>
-                  <div className="text-2xl font-bold" style={{ color: '#3e8692' }}>{scanResult.signals_inserted}</div>
+                  <div className="text-2xl font-bold text-brand">{scanResult.signals_inserted}</div>
                   <div className="text-xs text-gray-400 mt-0.5">{scanResult.prospects_with_signals} prospects matched</div>
                 </div>
 
                 <div>
                   <div className="flex items-center gap-1.5 mb-1">
-                    <DollarSign className="w-3.5 h-3.5" style={{ color: '#3e8692' }} />
+                    <DollarSign className="w-3.5 h-3.5 text-brand" />
                     <span className="text-xs text-gray-500">Claude Cost</span>
                   </div>
                   <div className="text-2xl font-bold text-gray-900">
@@ -637,7 +637,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
 
                 <div>
                   <div className="flex items-center gap-1.5 mb-1">
-                    <Cpu className="w-3.5 h-3.5" style={{ color: '#3e8692' }} />
+                    <Cpu className="w-3.5 h-3.5 text-brand" />
                     <span className="text-xs text-gray-500">Sources</span>
                   </div>
                   <div className="text-2xl font-bold text-gray-900">
@@ -681,7 +681,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                   </div>
                 )}
                 {scanResult.discovery && scanResult.discovery.new_prospects > 0 && (
-                  <div className="flex items-start gap-2 text-xs font-medium" style={{ color: '#3e8692' }}>
+                  <div className="flex items-start gap-2 text-xs font-medium text-brand">
                     <Zap className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     <span>
                       {scanResult.discovery.new_prospects} new prospects discovered via signals
@@ -699,10 +699,10 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           <Card className="border border-gray-200">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <Zap className="w-4 h-4" style={{ color: '#3e8692' }} />
+                <Zap className="w-4 h-4 text-brand" />
                 Korea Opportunities
               </div>
-              <div className="text-2xl font-bold" style={{ color: '#3e8692' }}>{koreaOpportunities}</div>
+              <div className="text-2xl font-bold text-brand">{koreaOpportunities}</div>
               <div className="text-xs text-gray-400 mt-0.5">
                 {[
                   byType.korea_partnership && `${byType.korea_partnership} partnerships`,
@@ -716,7 +716,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           <Card className="border border-gray-200">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <Zap className="w-4 h-4" style={{ color: '#3e8692' }} />
+                <Zap className="w-4 h-4 text-brand" />
                 Partnerships
               </div>
               <div className="text-2xl font-bold text-gray-900">{(byType.korea_partnership || 0) + (byType.korea_community || 0)}</div>
@@ -729,7 +729,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           <Card className="border border-gray-200">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <Bot className="w-4 h-4" style={{ color: '#3e8692' }} />
+                <Bot className="w-4 h-4 text-brand" />
                 AI Research
               </div>
               <div className="text-2xl font-bold text-gray-900">
@@ -744,7 +744,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           <Card className="border border-gray-200">
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                <Clock className="w-4 h-4" style={{ color: '#3e8692' }} />
+                <Clock className="w-4 h-4 text-brand" />
                 New This Week
               </div>
               <div className="text-2xl font-bold text-gray-900">{recentCount}</div>
@@ -866,8 +866,8 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                   onClick={() => scanMenuOpen ? handleScan() : setScanMenuOpen(true)}
                   disabled={scanning}
                   size="sm"
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  className="hover:opacity-90 h-8 text-xs rounded-r-none px-4"
+                  variant="brand"
+                  className="h-8 text-xs rounded-r-none px-4"
                 >
                   {scanning ? (
                     <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Scanning{modeClaude ? ' (AI)' : ''}...</>
@@ -880,8 +880,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 px-1.5 rounded-l-none border-l-0"
-                  style={scanMenuOpen ? { backgroundColor: '#3e8692', color: 'white', borderColor: '#3e8692' } : {}}
+                  className={`h-8 px-1.5 rounded-l-none border-l-0 ${scanMenuOpen ? 'bg-brand text-white border-brand hover:bg-brand/90' : ''}`}
                   onClick={() => setScanMenuOpen(!scanMenuOpen)}
                   disabled={scanning}
                 >
@@ -963,7 +962,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
             <div className="px-4 py-3 border-b border-gray-100">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" style={{ color: '#3e8692' }} />
+                  <TrendingUp className="w-4 h-4 text-brand" />
                   <span className="text-sm font-semibold text-gray-900">Top Prospects</span>
                   <Badge variant="secondary" className="text-xs font-medium">{filteredProspects.length}</Badge>
                 </div>
@@ -1088,7 +1087,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           <Card className="border border-gray-200">
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Newspaper className="w-4 h-4" style={{ color: '#3e8692' }} />
+                <Newspaper className="w-4 h-4 text-brand" />
                 <span className="text-sm font-semibold text-gray-900">Recent Signals</span>
               </div>
               <div className="flex items-center gap-2">
@@ -1213,7 +1212,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Radar className="w-5 h-5" style={{ color: '#3e8692' }} />
+                <Radar className="w-5 h-5 text-brand" />
                 Signals for {detailName}
               </DialogTitle>
               <DialogDescription>
@@ -1328,7 +1327,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           <AlertDialogFooter>
             <AlertDialogCancel disabled={!!promoting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
+              className="bg-brand text-white hover:bg-brand/90"
               disabled={!!promoting}
               onClick={async () => {
                 if (!confirmPromote) return;
