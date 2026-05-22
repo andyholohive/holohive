@@ -23,7 +23,7 @@ import { Treemap, ResponsiveContainer } from 'recharts';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
-type Range = '24h' | '7d' | '30d';
+type Range = '24h' | '7d' | '14d' | '30d' | '90d';
 
 interface LeaderboardItem {
   project_id: string;
@@ -382,6 +382,10 @@ export default function MindsharePage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [preTgeOnly, setPreTgeOnly] = useState(false);
+  // [Categorical dashboards v1] Full category list returned by the
+  // API regardless of active filter — keeps the dropdown stable when
+  // the user narrows the view.
+  const [allCategories, setAllCategories] = useState<string[]>(['all']);
   const [sortKey, setSortKey] = useState<SortKey>('mindshare_pct');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   // Treemap tier toggle — Top 20 vs Top 21-50, mirroring Kaito's split
@@ -418,31 +422,39 @@ export default function MindsharePage() {
   const loadLeaderboard = useCallback(async () => {
     setLeaderboardLoading(true);
     try {
-      const res = await fetch(`/api/mindshare/leaderboard?range=${range}&language=${language}`);
+      // [Categorical dashboards v1] Category + preTge filters are now
+      // server-side so mindshare_pct + total_mentions are correct
+      // within the filtered view. Search stays client-side (instant
+      // filter, no extra round-trip).
+      const params = new URLSearchParams({ range, language });
+      if (categoryFilter !== 'all') params.set('category', categoryFilter);
+      if (preTgeOnly) params.set('preTge', 'true');
+      const res = await fetch(`/api/mindshare/leaderboard?${params.toString()}`);
       const json = await res.json();
       setLeaderboard(json.items || []);
       setTotalMentions(json.total_mentions || 0);
+      // Capture all_categories the first time (or whenever the API
+      // returns it). Keeps dropdown stable across filtered fetches.
+      if (Array.isArray(json.all_categories)) {
+        setAllCategories(['all', ...json.all_categories]);
+      }
     } catch (err) {
       console.error('Error loading leaderboard:', err);
     } finally {
       setLeaderboardLoading(false);
     }
-  }, [range, language]);
+  }, [range, language, categoryFilter, preTgeOnly]);
 
   useEffect(() => { loadLeaderboard(); }, [loadLeaderboard]);
 
-  // Derive filtered + sorted view
+  // [Categorical dashboards v1] Client-side filter is now just search +
+  // sort (category + preTge moved to API). Keeps search instant without
+  // forcing a refetch on every keystroke.
   const filteredSorted = useMemo(() => {
     let arr = leaderboard;
     if (search.trim()) {
       const q = search.toLowerCase();
       arr = arr.filter(i => i.name.toLowerCase().includes(q));
-    }
-    if (categoryFilter !== 'all') {
-      arr = arr.filter(i => (i.category || 'Uncategorized') === categoryFilter);
-    }
-    if (preTgeOnly) {
-      arr = arr.filter(i => i.is_pre_tge);
     }
     const dir = sortDir === 'asc' ? 1 : -1;
     return [...arr].sort((a, b) => {
@@ -451,13 +463,16 @@ export default function MindsharePage() {
       if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
       return String(av || '').localeCompare(String(bv || '')) * dir;
     });
-  }, [leaderboard, search, categoryFilter, preTgeOnly, sortKey, sortDir]);
+  }, [leaderboard, search, sortKey, sortDir]);
 
+  // Categories list comes from the API (stable across filtered fetches).
+  // Falls back to deriving from current leaderboard if API didn't send.
   const categories = useMemo(() => {
+    if (allCategories.length > 1) return allCategories;
     const set = new Set<string>();
     leaderboard.forEach(i => set.add(i.category || 'Uncategorized'));
     return ['all', ...Array.from(set).sort()];
-  }, [leaderboard]);
+  }, [allCategories, leaderboard]);
 
   // Top Gainers / Top Losers panels — derived from the same leaderboard
   // data, sorted by delta_pct. Only include items with mentions in the
@@ -775,7 +790,7 @@ export default function MindsharePage() {
         <TabsContent value="leaderboard" className="space-y-4 mt-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-2">
-              {(['24h', '7d', '30d'] as const).map(r => (
+              {(['24h', '7d', '14d', '30d', '90d'] as const).map(r => (
                 <Button
                   key={r}
                   variant={range === r ? 'default' : 'outline'}
@@ -783,7 +798,11 @@ export default function MindsharePage() {
                   className={range === r ? 'bg-brand text-white hover:bg-brand/90' : ''}
                   onClick={() => setRange(r)}
                 >
-                  {r === '24h' ? 'Last 24h' : r === '7d' ? 'Last 7 days' : 'Last 30 days'}
+                  {r === '24h' ? 'Last 24h'
+                    : r === '7d'  ? 'Last 7 days'
+                    : r === '14d' ? 'Last 14 days'
+                    : r === '30d' ? 'Last 30 days'
+                    : 'Last 90 days'}
                 </Button>
               ))}
               <span className="ml-2 text-xs text-gray-500">{totalMentions.toLocaleString()} total mentions</span>

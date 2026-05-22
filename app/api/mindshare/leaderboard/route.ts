@@ -36,12 +36,25 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const url = new URL(request.url);
-  const range = (url.searchParams.get('range') || '7d') as '24h' | '7d' | '30d';
-  const days = range === '24h' ? 1 : range === '7d' ? 7 : 30;
+  // [Categorical dashboards v1] Added 14d + 90d ranges to match 3ridge's
+  // time windows. 14d uses 2x days for the prior window per the same
+  // pattern as the others.
+  const range = (url.searchParams.get('range') || '7d') as '24h' | '7d' | '14d' | '30d' | '90d';
+  const days = range === '24h' ? 1
+    : range === '7d' ? 7
+    : range === '14d' ? 14
+    : range === '30d' ? 30
+    : /* 90d */ 90;
   // Language filter — 'all' uses the precomputed mindshare_daily (fast).
   // Specific languages recompute from tg_mentions joined with the channel
   // table on the fly. Slower but accurate for whatever channel scope.
   const language = (url.searchParams.get('language') || 'all').toLowerCase();
+  // [Categorical dashboards v1] Category + Pre-TGE filters live in the
+  // API now (was client-side). Server-side filtering means total_mentions
+  // + mindshare_pct are computed within the filtered set — clicking
+  // "L1" gives you Solana's share OF L1, not its share OF EVERYTHING.
+  const category = url.searchParams.get('category'); // null or 'all' = no filter
+  const preTgeOnly = url.searchParams.get('preTge') === 'true';
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -86,10 +99,27 @@ export async function GET(request: Request) {
           .lte('message_date', currentEnd + 'T23:59:59')
           .not('project_id', 'is', null)
           .eq('channel.language', language),
-    (supabase as any)
-      .from('mindshare_projects')
-      .select('id, name, client_id, category, is_pre_tge, twitter_handle, website_url, is_active')
-      .eq('is_active', true),
+    (() => {
+      // Apply category + preTge filters at the project-fetch layer so
+      // the daily-row reduce only sees the narrowed set, which makes
+      // total_mentions + mindshare_pct accurate for the filtered view.
+      let projectsQuery = (supabase as any)
+        .from('mindshare_projects')
+        .select('id, name, client_id, category, is_pre_tge, twitter_handle, website_url, is_active')
+        .eq('is_active', true);
+      if (category && category !== 'all') {
+        // 'Uncategorized' is the UI label for NULL category — translate it.
+        if (category === 'Uncategorized') {
+          projectsQuery = projectsQuery.is('category', null);
+        } else {
+          projectsQuery = projectsQuery.eq('category', category);
+        }
+      }
+      if (preTgeOnly) {
+        projectsQuery = projectsQuery.eq('is_pre_tge', true);
+      }
+      return projectsQuery;
+    })(),
   ]);
 
   // Reshape per-mention rows into the same daily-row shape so the rest
@@ -177,6 +207,18 @@ export async function GET(request: Request) {
   // Sort descending by mention count by default; UI can re-sort
   .sort((a, b) => b.mention_count - a.mention_count);
 
+  // [Categorical dashboards v1] Always return the full list of
+  // categories (independent of the active filter) so the dropdown
+  // stays stable when the user narrows the view. One small extra
+  // round-trip — worth it for UX correctness.
+  const { data: allProjectRows } = await (supabase as any)
+    .from('mindshare_projects')
+    .select('category')
+    .eq('is_active', true);
+  const allCategories = Array.from(
+    new Set(((allProjectRows || []) as any[]).map(r => r.category || 'Uncategorized'))
+  ).sort();
+
   return NextResponse.json({
     range,
     period: { from: currentStart, to: currentEnd },
@@ -184,5 +226,10 @@ export async function GET(request: Request) {
     spark_period: { from: sparkStart, to: currentEnd },
     total_mentions: currentTotal,
     items,
+    all_categories: allCategories,
+    filtered_by: {
+      category: category && category !== 'all' ? category : null,
+      pre_tge_only: preTgeOnly,
+    },
   });
 }
