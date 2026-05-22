@@ -21,6 +21,7 @@ import { TaskDetailModal } from '@/components/tasks/TaskDetailModal';
 import { DeliverableWizard } from '@/components/tasks/DeliverableWizard';
 import { RecurringConfigEditor } from '@/components/tasks/RecurringConfig';
 import { DeliverableService } from '@/lib/deliverableService';
+import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { toneClassName, type BadgeTone } from '@/components/ui/status-badge';
 import {
@@ -46,6 +47,7 @@ import {
   RefreshCw,
   ListChecks,
   X,
+  Link2,
 } from 'lucide-react';
 
 const STALE_DAYS = 7;
@@ -222,6 +224,11 @@ export default function TasksPage() {
   // bridge into this view. When unset, the list is unfiltered (all
   // clients + unassigned tasks).
   const clientFilterId = searchParams.get('client');
+  // [HQ Tasks ↔ Action Board link] When the Action Board on /clients
+  // links here, it passes ?actionItem=<id> so the list narrows to
+  // just the tasks linked to that one client action item. Filter
+  // chip shows + a Clear link, mirroring the client filter pattern.
+  const actionItemFilterId = searchParams.get('actionItem');
 
   const [tasks, setTasks] = useState<Task[]>([]);
   // [Subtasks v1] Tracks which parent tasks are expanded to show their
@@ -337,6 +344,11 @@ export default function TasksPage() {
   // checklists become visible from the table view (was previously
   // hidden inside the detail modal).
   const [checklistCounts, setChecklistCounts] = useState<Record<string, { done: number; total: number }>>({});
+  // [HQ Tasks ↔ Action Board link, May 2026] action item id → text label.
+  // Populated by a small bulk fetch alongside the task list so the
+  // "Client task" badge tooltip can show the linked item's text
+  // without a per-row query.
+  const [actionItemLabels, setActionItemLabels] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchTasks();
@@ -384,6 +396,22 @@ export default function TasksPage() {
         });
         setDeliverableProgress(progress);
       }).catch(() => {});
+      // [HQ Tasks ↔ Action Board link] Resolve linked action-item
+      // texts for any task carrying a client_action_item_id, so the
+      // "Client task" badge can show a meaningful tooltip without
+      // per-row queries. Single bulk select.
+      const linkedIds = Array.from(new Set(data.map(t => t.client_action_item_id).filter((x): x is string => !!x)));
+      if (linkedIds.length > 0) {
+        const { data: items } = await (supabase as any)
+          .from('client_action_items')
+          .select('id, text')
+          .in('id', linkedIds);
+        const labels: Record<string, string> = {};
+        for (const it of (items || []) as any[]) labels[it.id] = it.text;
+        setActionItemLabels(labels);
+      } else {
+        setActionItemLabels({});
+      }
     } catch (error) {
       console.error('Error fetching tasks:', error);
     }
@@ -473,6 +501,13 @@ export default function TasksPage() {
       tabFiltered = tabFiltered.filter(t => t.client_id === clientFilterId);
     }
 
+    // ?actionItem=<uuid> URL filter — bridge from the Action Board on
+    // /clients. Narrows to just the HQ tasks linked to that single
+    // client action item.
+    if (actionItemFilterId) {
+      tabFiltered = tabFiltered.filter(t => t.client_action_item_id === actionItemFilterId);
+    }
+
     // Hide completed unless the user has toggled them on.
     if (!showCompleted) {
       tabFiltered = tabFiltered.filter(t => t.status !== 'complete');
@@ -488,7 +523,7 @@ export default function TasksPage() {
       t.task_type.toLowerCase().includes(term) ||
       (t.created_by_name && t.created_by_name.toLowerCase().includes(term))
     ).sort((a, b) => a.sort_order - b.sort_order);
-  }, [tasks, activeTab, searchTerm, showCompleted, clientFilterId]);
+  }, [tasks, activeTab, searchTerm, showCompleted, clientFilterId, actionItemFilterId]);
 
   // Group filtered tasks by assigned_to
   const groupedByUser = useMemo(() => {
@@ -932,6 +967,22 @@ export default function TasksPage() {
                 {isTaskStale(task) && (
                   <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700 flex-shrink-0">
                     <Clock className="h-2.5 w-2.5" /> Stale
+                  </span>
+                )}
+                {/* [HQ Tasks ↔ Action Board link, May 2026] Lights up
+                    when this task is tied to a client Action Board item.
+                    Tooltip shows the linked item's text — fetched into
+                    actionItemLabels keyed by client_action_item_id. */}
+                {task.client_action_item_id && (
+                  <span
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 flex-shrink-0"
+                    title={
+                      actionItemLabels[task.client_action_item_id]
+                        ? `Linked: ${actionItemLabels[task.client_action_item_id]}`
+                        : 'Linked to a client Action Board item'
+                    }
+                  >
+                    <Link2 className="h-2.5 w-2.5" /> Client task
                   </span>
                 )}
               </span>
@@ -1494,6 +1545,34 @@ export default function TasksPage() {
                         onClick={() => router.replace('/tasks')}
                         className="hover:bg-brand/20 rounded-full p-0.5"
                         aria-label="Clear client filter"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                  {/* [HQ Tasks ↔ Action Board link] Pill for the
+                      ?actionItem= URL filter. Sits next to the client
+                      pill (they typically come together since action
+                      items are scoped per client). Clears just the
+                      actionItem param while preserving ?client=. */}
+                  {actionItemFilterId && (
+                    <div className="mb-2 ml-2 inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full text-xs font-medium">
+                      <Link2 className="h-3 w-3" />
+                      <span>
+                        Client task: {actionItemLabels[actionItemFilterId] || '…'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Preserve client filter if it's set
+                          if (clientFilterId) {
+                            router.replace(`/tasks?client=${clientFilterId}`);
+                          } else {
+                            router.replace('/tasks');
+                          }
+                        }}
+                        className="hover:bg-emerald-100 rounded-full p-0.5"
+                        aria-label="Clear action item filter"
                       >
                         <X className="h-3 w-3" />
                       </button>

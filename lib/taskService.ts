@@ -28,6 +28,12 @@ export type Task = {
   completed_at: string | null;
   recurring_config: Record<string, any> | null;
   template_id: string | null;
+  // [HQ Tasks ↔ Action Board link, May 2026] Optional FK to the
+  // client_action_items row this task contributes to. One-to-many:
+  // many tasks may point at the same action item. Nullable for
+  // internal-only tasks. ON DELETE SET NULL in the migration so
+  // deleting an action item never cascades into real HQ work.
+  client_action_item_id: string | null;
 };
 
 export type TaskInsert = Omit<Task, 'id' | 'created_at' | 'updated_at' | 'sort_order'> & {

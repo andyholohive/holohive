@@ -219,6 +219,11 @@ export default function ClientsPage() {
   const [clientMindshareEnabled, setClientMindshareEnabled] = useState<Record<string, boolean>>({});
   // Action items & milestones state
   const [clientActionItems, setClientActionItems] = useState<Record<string, ActionItem[]>>({});
+  // [HQ Tasks ↔ Action Board link, May 2026] Per-action-item count of
+  // linked HQ tasks. Powers the badge on each Action Board row that
+  // shows "3 HQ tasks" → click jumps to /tasks?client=X&actionItem=Y.
+  // Keyed by client_action_items.id, value = count.
+  const [actionItemTaskCounts, setActionItemTaskCounts] = useState<Record<string, number>>({});
   const [clientMilestones, setClientMilestones] = useState<Record<string, Milestone[]>>({});
   const [actionItemForm, setActionItemForm] = useState<{ text: string; court: 'yours' | 'ours'; attachment_url: string; attachment_label: string }>({ text: '', court: 'yours', attachment_url: '', attachment_label: '' });
   const [editingActionItemId, setEditingActionItemId] = useState<string | null>(null);
@@ -570,6 +575,28 @@ export default function ClientsPage() {
         actionMap[item.client_id].push(item as ActionItem);
       }
       setClientActionItems(actionMap);
+
+      // [HQ Tasks ↔ Action Board link] Bulk-count HQ tasks linked to
+      // every action item we just loaded. One query, indexed by the
+      // FK we added in the tasks_link_to_client_action_items
+      // migration. Cheap because tasks.client_action_item_id is
+      // sparse (most tasks have it null).
+      const allItemIds = (actionRes.data || []).map((i: any) => i.id);
+      if (allItemIds.length > 0) {
+        const { data: linkedTasks } = await (supabase as any)
+          .from('tasks')
+          .select('client_action_item_id')
+          .in('client_action_item_id', allItemIds);
+        const counts: Record<string, number> = {};
+        for (const t of (linkedTasks || []) as any[]) {
+          if (t.client_action_item_id) {
+            counts[t.client_action_item_id] = (counts[t.client_action_item_id] || 0) + 1;
+          }
+        }
+        setActionItemTaskCounts(counts);
+      } else {
+        setActionItemTaskCounts({});
+      }
 
       // Milestones
       const msMap: Record<string, Milestone[]> = {};
@@ -3757,6 +3784,27 @@ export default function ClientsPage() {
                           <div className="flex items-center gap-2">
                             <Checkbox checked={item.is_done} onCheckedChange={() => toggleActionItemDone(item)} />
                             <span className={`flex-1 text-sm ${item.is_done ? 'line-through text-gray-400' : 'text-gray-700'}`}>{item.text}</span>
+                            {/* [HQ Tasks ↔ Action Board link, May 2026]
+                                Linked HQ task count + click-through. Only
+                                renders when at least one HQ task points at
+                                this action item. Goes to the filtered HQ
+                                Tasks view (?client=X&actionItem=Y) so the
+                                admin can see exactly what internal work
+                                covers this client-facing item. */}
+                            {(actionItemTaskCounts[item.id] || 0) > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/tasks?client=${item.client_id}&actionItem=${item.id}`);
+                                }}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                                title="View linked HQ tasks"
+                              >
+                                <ListTodo className="h-3 w-3" />
+                                {actionItemTaskCounts[item.id]} HQ task{actionItemTaskCounts[item.id] === 1 ? '' : 's'}
+                              </button>
+                            )}
                             <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-gray-100" onClick={() => toggleActionItemHidden(item)}>
                               {item.is_hidden ? <EyeOff className="h-3.5 w-3.5 text-gray-400" /> : <Eye className="h-3.5 w-3.5 text-gray-400" />}
                             </Button>

@@ -22,6 +22,7 @@ import { SubtaskList } from './SubtaskList';
 import { RecurringConfigEditor } from './RecurringConfig';
 import { DeliverableProgressTracker } from './DeliverableProgressTracker';
 import { DeliverableService } from '@/lib/deliverableService';
+import { supabase } from '@/lib/supabase';
 import {
   Calendar as CalendarIcon,
   Circle,
@@ -126,8 +127,19 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
     status: 'to_do' as string,
     priority: 'medium' as string,
     client_id: '' as string,
+    // [HQ Tasks ↔ Action Board link, May 2026] Optional FK to a
+    // client_action_items row. Dropdown is gated on client_id being
+    // set — picking an action item without a client doesn't make
+    // sense (action items are scoped per client).
+    client_action_item_id: '' as string,
     recurring_config: null as Record<string, any> | null,
   });
+
+  // [Action Board link] Items for the currently-selected client.
+  // Re-fetched whenever form.client_id changes. Empty list when no
+  // client selected.
+  type ActionItemOption = { id: string; text: string; is_done: boolean; milestone_name: string | null };
+  const [actionItems, setActionItems] = useState<ActionItemOption[]>([]);
 
   useEffect(() => {
     if (task) {
@@ -143,6 +155,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
         status: task.status || 'to_do',
         priority: task.priority || 'medium',
         client_id: task.client_id || '',
+        client_action_item_id: task.client_action_item_id || '',
         recurring_config: task.recurring_config || null,
       });
       // Check if this task has a linked deliverable
@@ -162,12 +175,54 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
         status: 'to_do',
         priority: 'medium',
         client_id: '',
+        client_action_item_id: '',
         recurring_config: null,
       });
       setActiveDetailTab('details');
       setHasDeliverable(false);
     }
   }, [task, open]);
+
+  // [Action Board link] Load this client's action items (with their
+  // parent milestone name for context) whenever the selected client
+  // changes. Skipped when no client is set; clears stale options.
+  useEffect(() => {
+    let cancelled = false;
+    if (!form.client_id) {
+      setActionItems([]);
+      return;
+    }
+    (async () => {
+      const { data, error } = await (supabase as any)
+        .from('client_action_items')
+        .select('id, text, is_done, milestone:client_milestones(name)')
+        .eq('client_id', form.client_id)
+        .eq('is_hidden', false)
+        .order('display_order', { ascending: true });
+      if (cancelled) return;
+      if (error) { setActionItems([]); return; }
+      const opts: ActionItemOption[] = ((data || []) as any[]).map(r => ({
+        id: r.id,
+        text: r.text,
+        is_done: !!r.is_done,
+        milestone_name: r.milestone?.name || null,
+      }));
+      setActionItems(opts);
+    })();
+    return () => { cancelled = true; };
+  }, [form.client_id]);
+
+  // Clear the action item selection if the user changes client (the
+  // old action item belongs to a different client and would orphan).
+  useEffect(() => {
+    if (!form.client_action_item_id) return;
+    if (!actionItems.find(a => a.id === form.client_action_item_id)) {
+      setForm(prev => ({ ...prev, client_action_item_id: '' }));
+    }
+    // Intentionally only depends on actionItems — when the list
+    // refreshes, prune the selection if it's no longer valid.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actionItems]);
 
   const handleSubmit = async () => {
     if (!form.task_name.trim() || !form.frequency || !form.task_type) return;
@@ -194,6 +249,11 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
       // Only admins can change client assignment
       if (canEditClient) {
         payload.client_id = form.client_id || null;
+        // [Action Board link] Action item link rides along with client
+        // changes — it's scoped per client. If no client is set, force
+        // null. Non-admins keep the existing link unchanged (the form
+        // also disables the dropdown for them).
+        payload.client_action_item_id = form.client_id ? (form.client_action_item_id || null) : null;
       }
 
       if (task) {
@@ -519,6 +579,57 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
             />
           </div>
         </div>
+
+        {/* [HQ Tasks ↔ Action Board link, May 2026] Client action item
+            picker. Only renders when a client is selected — action items
+            are scoped per client, so no picker is meaningful without one.
+            Groups options by milestone for context. Completed items are
+            shown but visually muted. */}
+        {form.client_id && (userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
+          <div className="grid gap-2">
+            <Label className="flex items-center gap-2">
+              Linked client task
+              <span className="text-[10px] text-gray-400 font-normal">Optional — ties this internal task to a client Action Board item</span>
+            </Label>
+            <Select
+              value={form.client_action_item_id || '_none'}
+              onValueChange={(v) => setForm({ ...form, client_action_item_id: v === '_none' ? '' : v })}
+            >
+              <SelectTrigger className="focus-brand">
+                <SelectValue placeholder={actionItems.length === 0 ? 'No action items for this client yet' : 'Select an action item…'} />
+              </SelectTrigger>
+              <SelectContent className="max-h-72">
+                <SelectItem value="_none">No link</SelectItem>
+                {actionItems.length > 0 && (
+                  (() => {
+                    // Group by milestone for readability — admins know the
+                    // milestone structure better than the raw text.
+                    const groups = new Map<string, ActionItemOption[]>();
+                    for (const a of actionItems) {
+                      const k = a.milestone_name || '(No milestone)';
+                      const arr = groups.get(k) || [];
+                      arr.push(a);
+                      groups.set(k, arr);
+                    }
+                    return Array.from(groups.entries()).flatMap(([msName, items]) => [
+                      <div key={`hdr-${msName}`} className="px-2 py-1 text-[10px] uppercase tracking-wide text-gray-400 font-semibold">
+                        {msName}
+                      </div>,
+                      ...items.map(a => (
+                        <SelectItem key={a.id} value={a.id}>
+                          <span className={a.is_done ? 'text-gray-400 line-through' : ''}>
+                            {a.text}
+                          </span>
+                          {a.is_done && <span className="ml-2 text-[10px] text-gray-400">done</span>}
+                        </SelectItem>
+                      )),
+                    ]);
+                  })()
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* Recurring Config */}
         <RecurringConfigEditor
