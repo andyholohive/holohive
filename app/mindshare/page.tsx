@@ -681,7 +681,10 @@ export default function MindsharePage() {
       setChannelsLoading(false);
     }
   }, []);
-  useEffect(() => { if (tab === 'channels') loadChannels(); }, [tab, loadChannels]);
+  // Load channels on mount so the tab badge counter ("Channels (34)")
+  // reflects the real count before the user clicks into the tab. Cheap
+  // query — one select against a small table.
+  useEffect(() => { loadChannels(); }, [loadChannels]);
 
   const channelLanguages = useMemo(() => {
     const set = new Set<string>();
