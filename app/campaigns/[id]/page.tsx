@@ -3832,7 +3832,12 @@ const CampaignDetailsPage = () => {
               </CardHeader>
                 <CardContent className="pt-6">
                     <div className="grid grid-cols-2 gap-x-8 gap-y-8">
-                                {!editMode && (
+                                {/* [May 2026 audit] Recent Updates carousel
+                                    hidden — feature had near-zero usage and
+                                    cluttered the Info tab. State + handlers
+                                    + the campaign_updates table all stay,
+                                    so re-enable by flipping `false` below. */}
+                                {false && !editMode && (
                   <div className="flex items-center justify-between col-span-2">
                     {/* Campaign Updates Carousel */}
                     <div className="flex-1 max-w-md">
@@ -4026,7 +4031,11 @@ const CampaignDetailsPage = () => {
                                   const { error } = await supabase
                                     .from('campaign_updates')
                                     .insert({
-                                      campaign_id: campaign.id,
+                                      // Non-null assertion: this code is in a
+                                      // `false && ...` dead branch (Updates
+                                      // section hidden per May 2026 audit).
+                                      // TS still type-checks the JSX though.
+                                      campaign_id: campaign!.id,
                                       update_text: updateText.trim()
                                     });
                                   
@@ -4086,6 +4095,11 @@ const CampaignDetailsPage = () => {
                       <h3 className="text-lg font-semibold text-gray-900">Campaign Overview</h3>
                     </div>
                     <div className="space-y-5">
+                      {/* [May 2026 audit] Outline field hidden — Description
+                          (the client-facing field below) covers the same
+                          ground. Data + handler still wired so the save
+                          payload preserves whatever was previously typed. */}
+                      {false && (
                       <div className="bg-white p-4 rounded-lg border border-gray-200">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
@@ -4103,9 +4117,10 @@ const CampaignDetailsPage = () => {
                             rows={3}
                           />
                         ) : (
-                          <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{campaign.outline || <span className="text-gray-400 italic">No outline provided</span>}</div>
+                          <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{campaign?.outline || <span className="text-gray-400 italic">No outline provided</span>}</div>
                         )}
                       </div>
+                      )}
                       <div className="bg-white p-4 rounded-lg border border-gray-200">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
@@ -4465,6 +4480,11 @@ const CampaignDetailsPage = () => {
                           })()
                         )}
                       </div>
+                      {/* [May 2026 audit] Call Support hidden — flag was
+                          rarely toggled and the value wasn't surfaced
+                          anywhere downstream. Form state + save still
+                          plumbed so existing data isn't lost. */}
+                      {false && (
                       <div className="bg-white p-4 rounded-lg border border-gray-200">
                         <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Call Support</div>
                         {editMode ? (
@@ -4485,6 +4505,7 @@ const CampaignDetailsPage = () => {
                           </div>
                         )}
                       </div>
+                      )}
                     </div>
                   </div>
 
