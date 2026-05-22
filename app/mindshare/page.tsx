@@ -761,6 +761,36 @@ export default function MindsharePage() {
   // invites for the ones still marked 'left'.
   const [checkingBotStatus, setCheckingBotStatus] = useState<false | 'all' | string>(false);
   const [botInfo, setBotInfo] = useState<{ id: number; username: string } | null>(null);
+  // [Resolve chat IDs from UI] In-app replacement for the
+  // backfill-channel-tg-id curl. Calls an admin-gated mirror endpoint
+  // that runs the same Telegram getChat loop but accepts a Supabase
+  // session instead of CRON_SECRET.
+  const [resolvingTgIds, setResolvingTgIds] = useState(false);
+  const resolveChatIds = async () => {
+    if (resolvingTgIds) return;
+    setResolvingTgIds(true);
+    try {
+      const res = await fetch('/api/mindshare/channels/backfill-tg-ids', { method: 'POST' });
+      const json = await res.json();
+      if (!res.ok) {
+        toast({ title: 'Resolve failed', description: json.error, variant: 'destructive' });
+        return;
+      }
+      if (json.attempted === 0) {
+        toast({ title: 'Nothing to resolve', description: json.message || 'All channels already have chat IDs.' });
+      } else {
+        toast({
+          title: 'Chat IDs resolved',
+          description: `${json.succeeded}/${json.attempted} resolved${json.failed ? `, ${json.failed} failed (likely rate-limited — click again in 30s)` : ''}`,
+        });
+      }
+      await loadChannels();
+    } catch (err: any) {
+      toast({ title: 'Resolve failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setResolvingTgIds(false);
+    }
+  };
   const checkBotStatus = async (channelId?: string) => {
     if (checkingBotStatus) return;
     setCheckingBotStatus(channelId || 'all');
@@ -1529,6 +1559,13 @@ export default function MindsharePage() {
             const errored = eligible.filter(c => c.bot_status === 'error').length;
             const pct = eligible.length > 0 ? Math.round((member / eligible.length) * 100) : 0;
             const allGood = unknown === 0 && left === 0 && errored === 0 && eligible.length > 0;
+            // [Resolve chat IDs from UI] Count of channels with a
+            // username but no channel_tg_id yet — these can't be bot-
+            // checked until we resolve their numeric ID via Telegram
+            // getChat. Drives the "Resolve N chat IDs" button below.
+            const needsResolution = channels.filter(c =>
+              c.is_active && !c.channel_tg_id && c.channel_username
+            ).length;
             return (
               <div className={`border rounded-lg p-4 ${allGood ? 'bg-emerald-50 border-emerald-200' : left > 0 || unknown > 0 ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
                 <div className="flex items-start gap-3">
@@ -1564,19 +1601,41 @@ export default function MindsharePage() {
                       </div>
                     )}
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={checkingBotStatus === 'all'}
-                    onClick={() => checkBotStatus()}
-                    className="flex-shrink-0"
-                  >
-                    {checkingBotStatus === 'all' ? (
-                      <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Checking…</>
-                    ) : (
-                      <><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Check all</>
+                  <div className="flex flex-col items-stretch gap-2 flex-shrink-0">
+                    {/* [Resolve chat IDs from UI] Replaces the old curl.
+                        Only renders when there are channels missing
+                        channel_tg_id — typically right after a bulk
+                        channel import. Click runs Telegram getChat per
+                        unresolved row + writes the resolved IDs back.
+                        Idempotent so re-clicking is safe (also fixes
+                        rate-limit failures from the previous run). */}
+                    {needsResolution > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={resolvingTgIds}
+                        onClick={resolveChatIds}
+                      >
+                        {resolvingTgIds ? (
+                          <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Resolving…</>
+                        ) : (
+                          <><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Resolve {needsResolution} chat ID{needsResolution === 1 ? '' : 's'}</>
+                        )}
+                      </Button>
                     )}
-                  </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={checkingBotStatus === 'all'}
+                      onClick={() => checkBotStatus()}
+                    >
+                      {checkingBotStatus === 'all' ? (
+                        <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Checking…</>
+                      ) : (
+                        <><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Check all</>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
             );
