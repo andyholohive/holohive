@@ -1804,13 +1804,15 @@ export default function ClientsPage() {
     return (
       <ProtectedRoute>
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
+          {/* [Responsive cleanup] Matches the loaded-state header below
+              so the action bar doesn't shift when data finishes loading. */}
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
               <h2 className="text-2xl font-bold text-gray-900">Clients</h2>
               <p className="text-gray-600">Manage your client relationships</p>
             </div>
             {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
-              <div className="flex space-x-3">
+              <div className="flex gap-2 flex-wrap">
                 <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} disabled>
                   <Plus className="h-4 w-4 mr-2" />
                   Start Client
@@ -1873,15 +1875,18 @@ export default function ClientsPage() {
   return (
     <ProtectedRoute>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
+        {/* [Responsive cleanup, May 2026] flex-wrap + gap so the title
+            and action buttons stack on narrow screens instead of the
+            buttons getting pushed off the right edge. */}
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
             <h2 className="text-2xl font-bold text-gray-900">
               {filteredPartnerName ? `Clients - ${filteredPartnerName}` : 'Clients'}
             </h2>
             <p className="text-gray-600">Manage your client relationships</p>
             {filteredPartnerName && (
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={() => router.push('/clients')}
                 className="text-sm mt-2"
@@ -1891,7 +1896,7 @@ export default function ClientsPage() {
             )}
           </div>
           {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
-            <div className="flex space-x-3">
+            <div className="flex gap-2 flex-wrap">
               <Dialog open={isStartClientOpen} onOpenChange={setIsStartClientOpen}>
                 <DialogTrigger asChild>
                   <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
@@ -2755,36 +2760,41 @@ export default function ClientsPage() {
                 <Card key={client.id} className="transition-shadow group flex flex-col h-full">
                   <CardHeader className="pb-4">
                     <div className="mb-3">
-                      <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
-                        <div className="flex items-center gap-2">
+                      {/* [Responsive cleanup, May 2026] flex-wrap + min-w-0
+                          so a long client name or many linked accounts
+                          push the hover-action buttons to a new line
+                          instead of off the card. Action buttons
+                          flex-shrink-0 so they never compress. */}
+                      <div className="flex items-start justify-between gap-2 text-lg font-semibold text-gray-600 mb-2 flex-wrap">
+                        <div className="flex items-center gap-2 min-w-0 flex-wrap flex-1">
                           {(client as any).logo_url ? (
                             <img
                               src={(client as any).logo_url}
                               alt={client.name}
-                              className="h-8 w-8 object-contain rounded-lg"
+                              className="h-8 w-8 object-contain rounded-lg flex-shrink-0"
                             />
                           ) : (
-                            <div className="bg-gray-100 p-1.5 rounded-lg">
+                            <div className="bg-gray-100 p-1.5 rounded-lg flex-shrink-0">
                               <Building2 className="h-5 w-5 text-gray-600" />
                             </div>
                           )}
-                          <span>{client.name}</span>
+                          <span className="truncate min-w-0">{client.name}</span>
                           {linkedAccounts[client.id] && linkedAccounts[client.id].length > 0 && (
                             linkedAccounts[client.id].map((account) => (
                               <Badge
                                 key={account.id}
                                 variant="outline"
-                                className="text-xs cursor-pointer hover:bg-gray-100"
+                                className="text-xs cursor-pointer hover:bg-gray-100 max-w-full"
                                 onClick={() => router.push('/crm/pipeline?tab=accounts')}
                               >
-                                <LinkIcon className="h-3 w-3 mr-1" />
-                                <span className="font-semibold">{account.name}</span>
+                                <LinkIcon className="h-3 w-3 mr-1 flex-shrink-0" />
+                                <span className="font-semibold truncate">{account.name}</span>
                               </Badge>
                             ))
                           )}
                         </div>
                         {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
-                          <div className="flex items-center space-x-1">
+                          <div className="flex items-center space-x-1 flex-shrink-0">
                             <Button variant="ghost" size="sm" onClick={() => openSharePortal(client)} className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2" title="Share portal">
                               <Share2 className="h-4 w-4 text-gray-600" />
                             </Button>
@@ -2797,14 +2807,19 @@ export default function ClientsPage() {
                           </div>
                         )}
                       </div>
-                      <div className="flex gap-2">
-                        <Badge variant={client.is_active ? 'default' : 'secondary'} className="text-xs" style={client.is_active ? { backgroundColor: '#3e8692', color: 'white', borderColor: '#3e8692' } : {}}>
+                      {/* [Responsive cleanup] flex-wrap so the partner
+                          badge (can be long) drops to a new line on
+                          narrow cards. max-w-full + truncate on each
+                          badge keeps a single very-long partner name
+                          inside the card. */}
+                      <div className="flex gap-2 flex-wrap">
+                        <Badge variant={client.is_active ? 'default' : 'secondary'} className="text-xs flex-shrink-0" style={client.is_active ? { backgroundColor: '#3e8692', color: 'white', borderColor: '#3e8692' } : {}}>
                           {client.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                         {client.is_whitelisted && (
-                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 hover:bg-green-100 hover:text-green-800 cursor-default pointer-events-none">
-                            <Building2 className="h-3 w-3 mr-1" />
-                            {client.whitelist_partner_name || 'Unknown Partner'}
+                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 hover:bg-green-100 hover:text-green-800 cursor-default pointer-events-none max-w-full">
+                            <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
+                            <span className="truncate">{client.whitelist_partner_name || 'Unknown Partner'}</span>
                           </Badge>
                         )}
                       </div>
@@ -2948,12 +2963,18 @@ export default function ClientsPage() {
                         </div>
                       );
                     })()}
+                    {/* [Responsive cleanup, May 2026] flex-wrap with
+                        flex-1 + min-w-0 so the two campaign buttons sit
+                        side-by-side when there's room and stack neatly
+                        on cramped widths. Without flex-wrap they were
+                        overflowing the card right edge at the lg
+                        breakpoint where each card is ~320px wide. */}
                     {(client.campaign_count || 0) > 0 ? (
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" className="w-full" onClick={() => router.push(`/campaigns?clientId=${client.id}`)}>
+                      <div className="flex gap-2 flex-wrap">
+                        <Button variant="outline" size="sm" className="flex-1 min-w-[120px]" onClick={() => router.push(`/campaigns?clientId=${client.id}`)}>
                           View Campaigns
                         </Button>
-                        <Button variant="outline" size="sm" className="w-full" onClick={() => router.push(`/campaigns?add=1&clientId=${client.id}`)}>
+                        <Button variant="outline" size="sm" className="flex-1 min-w-[120px]" onClick={() => router.push(`/campaigns?add=1&clientId=${client.id}`)}>
                           Add Campaign
                         </Button>
                       </div>
@@ -2976,26 +2997,38 @@ export default function ClientsPage() {
                         the row regardless of how much content sits
                         above (campaign count, badges, milestone bar
                         all vary per client). */}
+                    {/* [Responsive cleanup, May 2026] The 3-button row
+                        (Open / Edit / Visits) was overflowing the card
+                        at the lg breakpoint (3-column grid → cards
+                        ~320px). Fixes:
+                        - flex-wrap so buttons drop to a second row
+                          instead of pushing off the card
+                        - min-w-[110px] floor so each button keeps a
+                          tappable size when it does wrap
+                        - inner spans get truncate + min-w-0 so even a
+                          single button label can't overflow
+                        - px-2 (was default) shaves horizontal padding
+                          so all three usually still fit at lg */}
                     <div className="mt-auto pt-3 border-t border-gray-100">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex-1"
+                          className="flex-1 min-w-[110px] px-2"
                           onClick={() => router.push(`/public/portal/${client.id}`)}
                         >
-                          <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                          Open Portal
+                          <ExternalLink className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                          <span className="truncate">Open Portal</span>
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex-1"
+                          className="flex-1 min-w-[110px] px-2"
                           onClick={() => openContextModal(client)}
                           title="Edit client portal context + action board"
                         >
-                          <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                          Edit Portal
+                          <Pencil className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                          <span className="truncate">Edit Portal</span>
                           {clientContexts[client.id] && (
                             <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0" title="Set up" />
                           )}
@@ -3003,12 +3036,12 @@ export default function ClientsPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex-1"
+                          className="flex-1 min-w-[110px] px-2"
                           onClick={() => openAccessLogModal(client)}
                           title="Portal visit history"
                         >
-                          <Eye className="h-3.5 w-3.5 mr-1.5" />
-                          Visits
+                          <Eye className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
+                          <span className="truncate">Visits</span>
                           {(portalAccessSummary[client.id]?.count_30d || 0) > 0 && (
                             <span className="ml-1.5 text-[10px] font-semibold text-brand bg-brand/10 px-1.5 rounded flex-shrink-0">
                               {portalAccessSummary[client.id]!.count_30d}
