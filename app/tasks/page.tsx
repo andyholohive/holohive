@@ -81,14 +81,11 @@ type TeamMember = {
 
 type EditingCell = { taskId: string; field: string } | null;
 
-const FREQUENCIES = ['one-time', 'daily', 'weekly', 'monthly', 'recurring'] as const;
-const FREQUENCY_LABELS: Record<string, string> = {
-  'one-time': 'One-Time',
-  'daily': 'Daily',
-  'weekly': 'Weekly',
-  'monthly': 'Monthly',
-  'recurring': 'Recurring',
-};
+// [Frequency consolidation, May 2026] FREQUENCIES + FREQUENCY_LABELS
+// removed. The user-facing dropdown is gone; tasks.frequency is now
+// auto-derived from recurring_config. Tab filtering, column display,
+// and badges all read recurring_config directly. The DB column stays
+// populated for back-compat with the cron cloner's fallback path.
 const TASK_TYPES = [
   'Admin & Operations',
   'Finance & Invoicing',
@@ -118,14 +115,10 @@ const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color:
 // tones that don't exist in the shared palette. Mapped them to the
 // closest neighbors (info / purple / slate) — visually similar, no
 // hidden semantic loss.
-const FREQUENCY_TONES: Record<string, BadgeTone> = {
-  'one-time': 'neutral',
-  daily:      'info',
-  weekly:     'success',
-  monthly:    'purple',
-  recurring:  'warning',
-};
-
+// [Frequency consolidation, May 2026] FREQUENCY_TONES + frequencyBadge
+// removed — the Frequency column was deleted in favor of the unified
+// Repeats column (uses recurring_config). Kept the BadgeTone import
+// since TYPE_TONES still uses it.
 const TYPE_TONES: Record<string, BadgeTone> = {
   'Admin & Operations':    'slate',
   'Finance & Invoicing':   'success',
@@ -136,9 +129,6 @@ const TYPE_TONES: Record<string, BadgeTone> = {
   'Performance Review':    'purple',
   'Research & Analytics':  'slate',
 };
-
-const frequencyBadge = (freq: string) =>
-  toneClassName(FREQUENCY_TONES[freq] ?? 'neutral');
 
 const typeBadge = (type: string) =>
   toneClassName(TYPE_TONES[type] ?? 'neutral');
@@ -172,6 +162,10 @@ const COL: Record<string, string> = {
   client: 'w-[100px]',
   dueDate: 'w-[90px]',
   comment: 'w-[100px]',
+  // [Frequency consolidation] `frequency` column width kept for back-
+  // compat with old user preferences (saved column-order arrays may
+  // still reference it); the cell render switch ignores it, so unused
+  // entries fall through harmlessly.
   frequency: 'w-[90px]',
   type: 'w-[110px]',
   link: 'w-[60px]',
@@ -198,11 +192,11 @@ const COLUMN_DEFS: { key: ColumnKey; label: string }[] = [
   { key: 'client', label: 'Client' },
   { key: 'dueDate', label: 'Due Date' },
   { key: 'comment', label: 'Comment' },
-  { key: 'frequency', label: 'Frequency' },
-  // Recurring auto-recreate config (placed next to Frequency since
-  // they're semantically related). Clicking opens a popover with the
-  // shared RecurringConfigEditor used in the task detail modal.
-  { key: 'recurring', label: 'Recurring' },
+  // [Frequency consolidation, May 2026] The standalone 'frequency'
+  // column was removed — it was redundant with this Repeats column,
+  // which already opens the RecurringConfigEditor popover. One field,
+  // one source of truth.
+  { key: 'recurring', label: 'Repeats' },
   { key: 'type', label: 'Type' },
   { key: 'link', label: 'Link' },
   { key: 'createdBy', label: 'Created By' },
@@ -455,12 +449,15 @@ export default function TasksPage() {
   // Visual grouping in renderTaskTable keeps them right under their
   // parent in the list, with an indent + parent-name subtitle on the
   // row itself so users can see context at a glance.
+  // [Frequency consolidation] Tabs now read recurring_config directly,
+  // not the legacy frequency string. A task is "recurring" iff
+  // recurring_config is non-null; otherwise it's one-time.
   const oneTimeCount = useMemo(() =>
-    tasks.filter(t => t.frequency === 'one-time' && visibilityFilter(t)).length,
+    tasks.filter(t => !t.recurring_config && visibilityFilter(t)).length,
     [tasks, showCompleted]
   );
   const recurringCount = useMemo(() =>
-    tasks.filter(t => t.frequency !== 'one-time' && visibilityFilter(t)).length,
+    tasks.filter(t => !!t.recurring_config && visibilityFilter(t)).length,
     [tasks, showCompleted]
   );
   const deliverableCount = useMemo(() =>
@@ -482,9 +479,9 @@ export default function TasksPage() {
   const filtered = useMemo(() => {
     let tabFiltered: Task[];
     if (activeTab === 'one-time') {
-      tabFiltered = tasks.filter(t => t.frequency === 'one-time');
+      tabFiltered = tasks.filter(t => !t.recurring_config);
     } else if (activeTab === 'recurring') {
-      tabFiltered = tasks.filter(t => t.frequency !== 'one-time');
+      tabFiltered = tasks.filter(t => !!t.recurring_config);
     } else {
       // Deliverables tab: parents + their subtasks (so users see the
       // full deliverable picture in one view).
@@ -631,9 +628,16 @@ export default function TasksPage() {
    * in lib/taskService. Optimistic local update + server roundtrip.
    */
   const saveRecurringConfig = async (taskId: string, config: any | null) => {
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, recurring_config: config, updated_at: new Date().toISOString() } : t));
+    // [Frequency consolidation] When the user toggles Repeats on/off,
+    // keep tasks.frequency in sync so legacy readers (cron cloner
+    // fallback, MCP tools) see the right value. derived = 'recurring'
+    // when config is set, 'one-time' otherwise.
+    const derivedFrequency = config ? 'recurring' : 'one-time';
+    setTasks(prev => prev.map(t => t.id === taskId
+      ? { ...t, recurring_config: config, frequency: derivedFrequency, updated_at: new Date().toISOString() }
+      : t));
     try {
-      await TaskService.updateTask(taskId, { recurring_config: config });
+      await TaskService.updateTask(taskId, { recurring_config: config, frequency: derivedFrequency });
     } catch (error) {
       console.error('Error saving recurring_config:', error);
       await fetchTasks();
@@ -740,7 +744,14 @@ export default function TasksPage() {
     try {
       const assignedTo = groupKey === '_unassigned' ? null : groupKey;
       const assignedMember = assignedTo ? teamMembers.find(m => m.id === assignedTo) : null;
-      const defaultFrequency = activeTab === 'one-time' ? 'one-time' : activeTab === 'recurring' ? 'daily' : 'one-time';
+      // [Frequency consolidation] Inline-add inherits the active tab's
+      // recurrence: One-Time tab → no recurring_config; Recurring tab
+      // → default weekly config (user can refine in the popover/modal).
+      // tasks.frequency field is set in sync so the DB stays consistent
+      // for legacy readers.
+      const isRecurringTab = activeTab === 'recurring';
+      const defaultRecurringConfig = isRecurringTab ? { frequency: 'weekly' as const } : null;
+      const defaultFrequency = isRecurringTab ? 'recurring' : 'one-time';
       const defaultType = 'General';
 
       await TaskService.createTask({
@@ -749,6 +760,7 @@ export default function TasksPage() {
         assigned_to_name: assignedMember?.name || null,
         frequency: defaultFrequency,
         task_type: defaultType,
+        recurring_config: defaultRecurringConfig,
         created_by: user.id,
         created_by_name: userProfile.name || userProfile.email || 'Unknown',
         status: 'to_do',
@@ -791,7 +803,10 @@ export default function TasksPage() {
 
   const colLabel: Record<ColumnKey, string> = {
     taskName: 'Task Name', priority: 'Priority', assignee: 'Assignee', client: 'Client', dueDate: 'Due Date', comment: 'Comment',
-    frequency: 'Frequency', recurring: 'Recurring', type: 'Type', link: 'Link',
+    // [Frequency consolidation] 'frequency' label kept for back-compat
+    // with saved prefs (renders empty cell); 'recurring' relabeled to
+    // 'Repeats' for the user-facing column header.
+    frequency: 'Frequency', recurring: 'Repeats', type: 'Type', link: 'Link',
     createdBy: 'Created By', created: 'Created',
     completedAt: 'Completed',
   };
@@ -1146,27 +1161,20 @@ export default function TasksPage() {
           </td>
         );
       }
+      // [Frequency consolidation] No-op for any saved column-order
+      // arrays that still include 'frequency' — renders an empty
+      // cell to keep table alignment instead of dropping the <td>.
+      // Safe to delete this case after a few months of user pref
+      // turnover.
       case 'frequency':
-        return (
-          <td key={col} className={`py-3 px-3 ${COL.frequency}`}>
-            <Select value={task.frequency} onValueChange={(v) => saveSelectField(task.id, 'frequency', v)}>
-              <SelectTrigger
-                className={`border-none shadow-none bg-transparent w-auto h-auto ${frequencyBadge(task.frequency)} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
-                style={{ outline: 'none', boxShadow: 'none' }}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {FREQUENCIES.map((f) => <SelectItem key={f} value={f}>{FREQUENCY_LABELS[f]}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </td>
-        );
+        return <td key={col} className={`py-3 px-3 ${COL.frequency}`} />;
       case 'recurring': {
-        // Auto-recreate-on-completion config (separate from `frequency`,
-        // which is just metadata). Was previously only editable inside
-        // the task detail modal — exposing it here as a popover trigger
-        // so users can toggle it without opening the modal.
+        // [Frequency consolidation, May 2026] Now labeled "Repeats" in
+        // the column header. The legacy 'frequency' cell case was
+        // removed — it duplicated this column. Cell still opens the
+        // shared RecurringConfigEditor popover; turning it on/off
+        // is the single user-facing control for whether a task
+        // auto-recreates on completion.
         const isOn = !!task.recurring_config;
         const cfg = task.recurring_config as any | null;
         const summary = cfg?.frequency

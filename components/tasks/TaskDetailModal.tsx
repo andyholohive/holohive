@@ -60,10 +60,10 @@ interface TaskDetailModalProps {
   onSaved: () => void;
 }
 
-const FREQUENCIES = ['one-time', 'daily', 'weekly', 'monthly', 'recurring'] as const;
-const FREQUENCY_LABELS: Record<string, string> = {
-  'one-time': 'One-Time', 'daily': 'Daily', 'weekly': 'Weekly', 'monthly': 'Monthly', 'recurring': 'Recurring',
-};
+// [Frequency consolidation] FREQUENCIES + FREQUENCY_LABELS removed —
+// the user-facing dropdown is gone. `tasks.frequency` is now auto-set
+// to 'one-time' or 'recurring' based on whether recurring_config is
+// present. See handleSubmit below.
 const TASK_TYPES = [
   'Admin & Operations', 'Finance & Invoicing', 'General', 'Tech & Tools',
   'Marketing & Sales', 'Client Delivery', 'Performance Review', 'Research & Analytics',
@@ -119,7 +119,8 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
     task_name: '',
     assigned_to: '' as string,
     due_date: undefined as Date | undefined,
-    frequency: '' as string,
+    // [Frequency consolidation] frequency removed from form state —
+    // auto-derived from recurring_config at save time.
     task_type: '' as string,
     link: '',
     latest_comment: '',
@@ -147,7 +148,6 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
         task_name: task.task_name,
         assigned_to: task.assigned_to || '',
         due_date: task.due_date ? new Date(task.due_date + 'T00:00:00') : undefined,
-        frequency: task.frequency,
         task_type: task.task_type,
         link: task.link || '',
         latest_comment: task.latest_comment || '',
@@ -167,7 +167,6 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
         task_name: '',
         assigned_to: '',
         due_date: undefined,
-        frequency: '',
         task_type: '',
         link: '',
         latest_comment: '',
@@ -225,19 +224,26 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
   }, [actionItems]);
 
   const handleSubmit = async () => {
-    if (!form.task_name.trim() || !form.frequency || !form.task_type) return;
+    // [Frequency consolidation] frequency is no longer required from
+    // the user — it's auto-derived from recurring_config below.
+    if (!form.task_name.trim() || !form.task_type) return;
     if (!user?.id || !userProfile) return;
 
     setSubmitting(true);
     try {
       const assignedMember = teamMembers.find(m => m.id === form.assigned_to);
       const canEditClient = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+      // [Frequency consolidation] Auto-derive the legacy `frequency`
+      // field from `recurring_config` so the DB stays consistent for
+      // any reader still on the old column (cron cloner fallback,
+      // MCP tools, etc.). The user no longer picks this.
+      const derivedFrequency = form.recurring_config ? 'recurring' : 'one-time';
       const payload: Record<string, any> = {
         task_name: form.task_name.trim(),
         assigned_to: form.assigned_to || null,
         assigned_to_name: assignedMember?.name || null,
         due_date: form.due_date ? toLocalDateString(form.due_date) : null,
-        frequency: form.frequency,
+        frequency: derivedFrequency,
         task_type: form.task_type,
         link: form.link.trim() || null,
         latest_comment: form.latest_comment.trim() || null,
@@ -371,7 +377,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
             className="hover:opacity-90"
             style={{ backgroundColor: '#3e8692', color: 'white' }}
             onClick={handleSubmit}
-            disabled={!form.task_name.trim() || !form.frequency || !form.task_type || submitting}
+            disabled={!form.task_name.trim() || !form.task_type || submitting}
           >
             {submitting ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
@@ -484,28 +490,22 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          {/* Frequency */}
-          <div className="grid gap-2">
-            <Label>Frequency <span className="text-red-500">*</span></Label>
-            <Select value={form.frequency} onValueChange={(v) => setForm({ ...form, frequency: v })}>
-              <SelectTrigger className="focus-brand"><SelectValue placeholder="Select frequency" /></SelectTrigger>
-              <SelectContent>
-                {FREQUENCIES.map((f) => <SelectItem key={f} value={f}>{FREQUENCY_LABELS[f]}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-
+        {/* [Frequency consolidation, May 2026] Frequency dropdown
+            removed — was a redundant second control for the same
+            concept as the RecurringConfigEditor below. The tasks.frequency
+            DB column is auto-derived on save: 'one-time' when no
+            recurring_config, 'recurring' otherwise. Legacy fallback
+            paths in lib/taskService still read frequency, so the column
+            stays populated for back-compat. */}
+        <div className="grid gap-2">
           {/* Task Type */}
-          <div className="grid gap-2">
-            <Label>Task Type <span className="text-red-500">*</span></Label>
-            <Select value={form.task_type} onValueChange={(v) => setForm({ ...form, task_type: v })}>
-              <SelectTrigger className="focus-brand"><SelectValue placeholder="Select type" /></SelectTrigger>
-              <SelectContent>
-                {TASK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+          <Label>Task Type <span className="text-red-500">*</span></Label>
+          <Select value={form.task_type} onValueChange={(v) => setForm({ ...form, task_type: v })}>
+            <SelectTrigger className="focus-brand"><SelectValue placeholder="Select type" /></SelectTrigger>
+            <SelectContent>
+              {TASK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
