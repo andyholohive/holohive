@@ -684,9 +684,13 @@ export default function LinksPage() {
                   </Button>
                 </div>
 
-                {/* Client Links Table */}
+                {/* Client Links Table — [Responsive cleanup, May 2026]
+                    overflow-x-auto so the wide table (Name + URL + Type +
+                    Access + actions = 5 columns ≈ 850px min) scrolls
+                    horizontally on narrow viewports instead of overflowing
+                    the card. */}
                 {!isCollapsed && (
-                  <div className="bg-white rounded-b-lg border border-gray-200 border-t-0 overflow-hidden">
+                  <div className="bg-white rounded-b-lg border border-gray-200 border-t-0 overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-gray-50/50">
