@@ -834,6 +834,20 @@ export default function ClientsPage() {
           attachment_url: attachUrl,
           attachment_label: attachLabel,
         });
+        // [Portal notification cleanup] Notify the client when a new
+        // task lands in their court. court='mine' = HH's task → silent
+        // (internal). court='yours' = client's to-do → fire so they
+        // see it in the bell. Bulk inserts from milestone templates
+        // (see line ~775) intentionally skip this — those are setup-
+        // time operations, not incremental adds.
+        if (actionItemForm.court === 'yours') {
+          await logActivity(
+            contextModalClient.id,
+            'task_added',
+            'New task for you',
+            actionItemForm.text.trim(),
+          );
+        }
       }
       await refreshActionItems();
       setIsActionItemFormOpen(false);
@@ -893,9 +907,14 @@ export default function ClientsPage() {
     const ms = Object.values(clientMilestones).flat().find(m => m.id === id);
     await supabase.from('client_milestones').update({ status }).eq('id', id);
     await refreshMilestones();
-    if (ms) {
-      const label = status === 'complete' ? 'completed' : status === 'active' ? 'activated' : 'set to upcoming';
-      await logActivity(ms.client_id, 'milestone_status', `Milestone ${label}`, ms.name);
+    // [Portal notification cleanup] Only fire a client notification
+    // for completions. Toggling active/upcoming was creating noise
+    // during onboarding — admins flip statuses many times while
+    // setting up a client, and each one was reaching the bell. Per
+    // user ask: only milestone completions, new client tasks, and
+    // resource updates should notify.
+    if (ms && status === 'complete') {
+      await logActivity(ms.client_id, 'milestone_status', 'Milestone completed', ms.name);
     }
   };
 

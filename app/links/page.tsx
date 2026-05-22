@@ -301,16 +301,11 @@ export default function LinksPage() {
         if (error) throw error;
         toast({ title: 'Link created' });
 
-        // Log activity for client-access links
-        if (formData.access === 'client' && formData.client_id) {
-          await supabase.from('client_activity_log').insert({
-            client_id: formData.client_id,
-            activity_type: 'link_added',
-            title: 'New resource shared',
-            description: formData.name.trim(),
-            created_by: user?.id || null,
-          });
-        }
+        // [Portal notification cleanup] Removed link_added activity log
+        // per user ask — was firing on every client-access link, adding
+        // noise during onboarding. Resource updates already cover the
+        // "we shared something new" case via resource_updated. If we
+        // later want links to notify, add it back as an opt-in.
 
         // Send Telegram notification to terminal chat (same as form submission)
         try {

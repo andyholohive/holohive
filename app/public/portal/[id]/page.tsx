@@ -3642,13 +3642,24 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             return new Date(activity.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                           })();
 
+                          // [Portal notification cleanup] task_added is the
+                          // new type for client-court action items. Renders
+                          // amber so the client can distinguish "you have a
+                          // new to-do" from "we shipped something" updates.
+                          // link_added stays in the switch for historical
+                          // entries — no new ones are written.
                           const iconColor = activity.activity_type === 'milestone_status' ? 'bg-brand'
+                            : activity.activity_type === 'task_added' ? 'bg-amber-500'
                             : activity.activity_type === 'campaign_status' ? 'bg-blue-500'
                             : activity.activity_type === 'link_added' ? 'bg-purple-500'
                             : activity.activity_type === 'resource_updated' ? 'bg-green-500'
                             : 'bg-gray-400';
 
+                          // Client tasks live inside the milestones section
+                          // (action items hang off each milestone), so the
+                          // bell scrolls there.
                           const scrollTarget = activity.activity_type === 'milestone_status' ? 'section-milestones'
+                            : activity.activity_type === 'task_added' ? 'section-milestones'
                             : activity.activity_type === 'campaign_status' ? 'section-campaigns'
                             : activity.activity_type === 'link_added' || activity.activity_type === 'resource_updated' ? 'section-resources'
                             : null;
