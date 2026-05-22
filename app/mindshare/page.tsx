@@ -1072,6 +1072,16 @@ export default function MindsharePage() {
                           <ExternalLink className="h-3.5 w-3.5" />
                         </a>
                       )}
+                      {/* [Storyteller v1] Link to the full per-project
+                          deep-dive page (richer than this dialog —
+                          ALL channels, trend deltas, NEW badges). */}
+                      <a
+                        href={`/mindshare/project/${detailData.project.id}`}
+                        className="ml-auto text-xs text-brand hover:underline inline-flex items-center gap-1"
+                        title="Open full Storyteller view (all channels + trend deltas)"
+                      >
+                        Storyteller view →
+                      </a>
                     </DialogTitle>
                     <DialogDescription>
                       {detailData.total_mentions_in_window.toLocaleString()} mentions
