@@ -84,12 +84,15 @@ export async function POST(request: Request) {
     channel_name: string;
     channel_username: string | null;
     status: string;
+    chat_type: string | null;
+    member_count: number | null;
     last_message_at: string | null;
     error?: string;
   }> = [];
 
   for (const ch of channels) {
     if (!ch.channel_tg_id) continue;
+    // (a) Bot membership status
     const memberResp = await TelegramService.getChatMember(ch.channel_tg_id, me.id);
     let status: string;
     let errorMsg: string | undefined;
@@ -100,9 +103,30 @@ export async function POST(request: Request) {
       status = memberResp.status;
     }
 
-    // Latest message timestamp for this chat — confirms the bot is
-    // actually receiving messages (membership alone isn't enough proof;
-    // private channels can mute bots, etc.).
+    // (b) Chat metadata (type + member count). One extra Telegram call
+    // per channel, but it's piggybacking the same iteration so the
+    // overhead is just the network round-trip. Lets the UI rank
+    // channels by reach so the admin invites the bot to big ones first.
+    // Note: Bot API getChat returns member_count for groups/supergroups
+    // but NOT for channels — for channels we'd need getChatMembersCount,
+    // which is also part of the Bot API. We try getChat first since it
+    // gives us type too; if member_count is missing and type='channel',
+    // fall back. Keeps one round-trip for groups (the common case).
+    let memberCount: number | null = null;
+    let chatType: string | null = null;
+    const chatResp = await TelegramService.getChat(ch.channel_tg_id);
+    if (!('error' in chatResp)) {
+      chatType = chatResp.type;
+      if (typeof (chatResp as any).member_count === 'number') {
+        memberCount = (chatResp as any).member_count;
+      }
+    }
+    // Bot API caps the member_count for huge channels at "approximate"
+    // values — that's fine for ranking purposes. We don't need exact.
+
+    // (c) Latest message timestamp — confirms the bot is actually
+    // receiving messages (membership alone isn't enough proof; e.g.
+    // bot is in a chat but all messages are media which we skip).
     const { data: lastMsg } = await (supabase as any)
       .from('telegram_messages')
       .select('message_date')
@@ -112,13 +136,16 @@ export async function POST(request: Request) {
       .maybeSingle();
     const lastMessageAt: string | null = lastMsg?.message_date || null;
 
-    // Persist
+    // Persist everything in one update
     await (supabase as any)
       .from('tg_monitored_channels')
       .update({
         bot_status: status,
         bot_status_checked_at: new Date().toISOString(),
         last_message_at: lastMessageAt,
+        ...(chatType ? { chat_type: chatType } : {}),
+        ...(memberCount !== null ? { member_count: memberCount } : {}),
+        ...(chatType || memberCount !== null ? { metadata_checked_at: new Date().toISOString() } : {}),
       })
       .eq('id', ch.id);
 
@@ -127,12 +154,17 @@ export async function POST(request: Request) {
       channel_name: ch.channel_name,
       channel_username: ch.channel_username,
       status,
+      chat_type: chatType,
+      member_count: memberCount,
       last_message_at: lastMessageAt,
       ...(errorMsg ? { error: errorMsg } : {}),
     });
 
     if (!singleChannelId) {
-      await new Promise(r => setTimeout(r, 150));
+      // 250ms now (was 150ms) to cover the extra getChat call we add
+      // per row. 74 channels × 250ms = ~18.5s + ~74×(2×network) ≈ 30s,
+      // still well under the 60s maxDuration.
+      await new Promise(r => setTimeout(r, 250));
     }
   }
 

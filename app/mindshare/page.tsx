@@ -74,6 +74,13 @@ interface MonitoredChannel {
   bot_status?: string | null;
   bot_status_checked_at?: string | null;
   last_message_at?: string | null;
+  // [Channel metadata] Captured alongside bot status. member_count
+  // lets the admin invite the bot to the highest-reach channels first;
+  // chat_type tells them whether they need admin rights (channels) or
+  // can add the bot as a regular member (groups).
+  member_count?: number | null;
+  chat_type?: string | null;
+  metadata_checked_at?: string | null;
 }
 
 type SortKey = 'mindshare_pct' | 'mention_count' | 'name' | 'delta_pct' | 'channel_reach' | 'score';
@@ -643,6 +650,10 @@ export default function MindsharePage() {
   const [channelsLoading, setChannelsLoading] = useState(true);
   const [channelSearch, setChannelSearch] = useState('');
   const [channelLanguageFilter, setChannelLanguageFilter] = useState<string>('all');
+  // [Channel metadata] Sort key for the channel list. 'members' is the
+  // pragmatic default once we have metadata — surfaces highest-reach
+  // channels so the admin invites the bot there first.
+  const [channelSort, setChannelSort] = useState<'name' | 'members' | 'bot'>('name');
   const [importText, setImportText] = useState('');
   const [importing, setImporting] = useState(false);
 
@@ -802,13 +813,38 @@ export default function MindsharePage() {
 
   // ─── Render ─────────────────────────────────────────────────────
 
-  const filteredChannels = channels.filter(c => {
-    if (channelLanguageFilter !== 'all' && c.language !== channelLanguageFilter) return false;
-    if (!channelSearch) return true;
-    const q = channelSearch.toLowerCase();
-    return c.channel_name.toLowerCase().includes(q)
-      || (c.channel_username || '').toLowerCase().includes(q);
-  });
+  const filteredChannels = channels
+    .filter(c => {
+      if (channelLanguageFilter !== 'all' && c.language !== channelLanguageFilter) return false;
+      if (!channelSearch) return true;
+      const q = channelSearch.toLowerCase();
+      return c.channel_name.toLowerCase().includes(q)
+        || (c.channel_username || '').toLowerCase().includes(q);
+    })
+    // [Channel metadata] Sort by user-selected key. 'members' surfaces
+    // highest-reach channels first — that's the right order for the
+    // bot-invitation workflow (invite to biggest, fall back to MTProto
+    // for admin-only channels later). 'bot' surfaces channels that
+    // still need a bot invite (left/unknown sort to the top). Default
+    // 'name' is alphabetical (original behavior).
+    .sort((a, b) => {
+      if (channelSort === 'members') {
+        const av = a.member_count ?? -1;
+        const bv = b.member_count ?? -1;
+        if (av !== bv) return bv - av;
+      } else if (channelSort === 'bot') {
+        const rank = (s?: string | null) => {
+          if (s === 'left' || s === 'kicked') return 0;
+          if (!s || s === 'unknown') return 1;
+          if (s === 'error') return 2;
+          return 3; // member/admin/creator
+        };
+        const ar = rank(a.bot_status);
+        const br = rank(b.bot_status);
+        if (ar !== br) return ar - br;
+      }
+      return a.channel_name.localeCompare(b.channel_name);
+    });
 
   return (
     <div className="space-y-6">
@@ -1538,6 +1574,17 @@ export default function MindsharePage() {
                 Monitored channels{' '}
                 <Badge variant="secondary" className="ml-1 text-xs">{filteredChannels.length}{filteredChannels.length !== channels.length && ` of ${channels.length}`}</Badge>
               </h3>
+              {/* [Channel metadata] Sort selector — defaults to alpha,
+                  but "by members" is the right pick once we've run
+                  "Check all" once. */}
+              <Select value={channelSort} onValueChange={(v) => setChannelSort(v as any)}>
+                <SelectTrigger className="h-8 w-36 text-xs focus-brand"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Sort: name</SelectItem>
+                  <SelectItem value="members">Sort: members (high → low)</SelectItem>
+                  <SelectItem value="bot">Sort: bot needed first</SelectItem>
+                </SelectContent>
+              </Select>
               {channelLanguages.length > 1 && (
                 <Select value={channelLanguageFilter} onValueChange={setChannelLanguageFilter}>
                   <SelectTrigger className="h-8 w-32 text-xs focus-brand"><SelectValue /></SelectTrigger>
@@ -1587,8 +1634,40 @@ export default function MindsharePage() {
                             </a>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500">{c.channel_username ? `@${c.channel_username}` : '—'}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-gray-500">{c.channel_username ? `@${c.channel_username}` : '—'}</p>
+                          {/* [Channel metadata] Chat type hint — channels
+                              need admin rights to add a bot. Tooltip
+                              spells out the invitation requirement. */}
+                          {c.chat_type && (
+                            <span
+                              className={`text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                                c.chat_type === 'channel'
+                                  ? 'bg-purple-50 text-purple-700 border border-purple-100'
+                                  : 'bg-blue-50 text-blue-700 border border-blue-100'
+                              }`}
+                              title={
+                                c.chat_type === 'channel'
+                                  ? 'Broadcast channel — bot must be added as admin (not regular member)'
+                                  : `${c.chat_type} — bot can be added as a regular member`
+                              }
+                            >
+                              {c.chat_type}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      {/* [Channel metadata] Member count badge — reach
+                          signal so admin can prioritize bot-invite work
+                          on the biggest channels first. */}
+                      {typeof c.member_count === 'number' && (
+                        <span
+                          className="text-[10px] px-2 py-0.5 rounded-full tabular-nums bg-gray-100 text-gray-700 border border-gray-200"
+                          title={`~${c.member_count.toLocaleString()} members (Telegram approximate)`}
+                        >
+                          {c.member_count >= 1000 ? `${(c.member_count / 1000).toFixed(1)}K` : c.member_count}
+                        </span>
+                      )}
                       <span
                         className={`text-[10px] px-2 py-0.5 rounded-full tabular-nums ${activityClass}`}
                         title={`${hits7d} mentions in last 7 days`}
