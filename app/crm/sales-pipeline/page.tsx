@@ -184,11 +184,37 @@ export default function SalesPipelinePage() {
   };
   const [salesFunnel, setSalesFunnel] = useState<SalesFunnelData | null>(null);
   const [salesFunnelWindow, setSalesFunnelWindow] = useState<7 | 14 | 30>(7);
+  // [Funnel-not-loading fix, May 2026] Previously the fetch swallowed
+  // every failure silently (.catch(() => {})), so a 401 from the API
+  // auth middleware or any other non-2xx left the user staring at
+  // perpetual skeleton cards with no clue why. Now: log on non-ok so
+  // we can see the cause in DevTools, and set a fallback zero-state
+  // so the cards render instead of staying as skeletons forever.
   useEffect(() => {
-    fetch(`/api/analytics/sales-funnel?days=${salesFunnelWindow}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d && typeof d.outreach === 'number') setSalesFunnel(d); })
-      .catch(() => {});
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/analytics/sales-funnel?days=${salesFunnelWindow}`);
+        if (!r.ok) {
+          console.error(`[sales-funnel] fetch failed: ${r.status} ${r.statusText}`);
+          if (!cancelled) {
+            // Render zeros instead of skeleton so the funnel doesn't
+            // appear permanently broken — the user can see something
+            // happened and the rest of the page is functional.
+            setSalesFunnel({ outreach: 0, replies: 0, calls_booked: 0, calls_taken: 0, proposals_sent: 0 } as SalesFunnelData);
+          }
+          return;
+        }
+        const d = await r.json();
+        if (!cancelled && d && typeof d.outreach === 'number') setSalesFunnel(d);
+      } catch (err) {
+        console.error('[sales-funnel] fetch threw:', err);
+        if (!cancelled) {
+          setSalesFunnel({ outreach: 0, replies: 0, calls_booked: 0, calls_taken: 0, proposals_sent: 0 } as SalesFunnelData);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
   }, [salesFunnelWindow]);
 
   // UI state
@@ -196,7 +222,14 @@ export default function SalesPipelinePage() {
   const [actionsSearch, setActionsSearch] = useState('');
   const [pipelineSearch, setPipelineSearch] = useState('');
   const [orbitSearch, setOrbitSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery'>('actions');
+  // [Actions consolidation, May 2026] Default landed on 'actions' but
+  // the Actions tab was removed in commit b3addd4 — Radix Tabs was
+  // getting value="actions" with no matching TabsTrigger/TabsContent
+  // (silent no-op but visually the page reads as 'nothing selected').
+  // Default is now 'overview' to match the new tab strip. 'actions'
+  // stays in the union because setActiveTab('actions') is still called
+  // from a few legacy alert-card click handlers we haven't migrated.
+  const [activeTab, setActiveTab] = useState<'actions' | 'outreach' | 'pipeline' | 'orbit' | 'overview' | 'templates' | 'discovery'>('overview');
   const [viewMode, setViewMode] = useState<'kanban' | 'table'>('table');
   const [pathFilter, setPathFilter] = useState<'all' | 'closer' | 'sdr'>('all');
   // Overall-tab unified search — broadcasts into Outreach/Pipeline/Orbit
