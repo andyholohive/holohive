@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Dialog,
   DialogContent,
@@ -20,11 +21,12 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2, ExternalLink, Pencil, Save, X } from "lucide-react";
 import { MasterKOL, KOLService } from "@/lib/kolService";
-import {
-  KolDeliverableService,
-  type KolDeliverable,
-  type CreateKolDeliverableInput,
-} from "@/lib/kolDeliverableService";
+// [May 2026 KOL overhaul follow-up] The Deliverables tab now reads
+// directly from the campaign-side `contents` table (instead of the
+// orphan kol_deliverables table). KolDeliverableService is still used
+// by lib/kolScoringEngine + MCP tools — those are out of scope for
+// this change and stay pointed at the old source until separately
+// migrated.
 import {
   KolCallLogService,
   CALL_TYPES,
@@ -274,16 +276,51 @@ function DimensionBar({ label, value }: { label: string; value: number | null })
 
 /* ─────────────────────────── Deliverables tab ─────────────────────────── */
 
-interface CampaignOption {
+/**
+ * [May 2026 KOL overhaul follow-up] The Deliverables tab now pulls
+ * from `contents` (the campaign-side deliverables table) via the
+ * campaign_kols join, instead of the orphan kol_deliverables table.
+ * Rationale:
+ *   - contents is where deliverables actually get logged today (271+
+ *     real rows) via the campaign workflow. kol_deliverables had ~1
+ *     row total — effectively dead.
+ *   - One source of truth per concept; eliminates drift between
+ *     "what the campaign says we delivered" vs "what the KOL profile
+ *     says we delivered."
+ *
+ * UX is read-mostly: engagement metrics and notes are inline-editable
+ * here (those are the KOL-centric updates), but adding new rows or
+ * changing campaign assignment happens on the campaign detail page.
+ * A "View in campaign" link surfaces on every row.
+ *
+ * Per the user's exclusion list, we deliberately don't surface
+ * post_link, brief_number, brief_topic, date_brief_sent, date_posted,
+ * views_48h, or reactions even though some of those have rough
+ * equivalents in contents. The display sticks to:
+ *   - Campaign (joined), Type, Status, Platform
+ *   - Impressions (views_24h proxy), Retweets (forwards proxy)
+ *   - Likes, Comments, Bookmarks (contents-native bonus metrics)
+ *   - Notes
+ */
+interface ContentDeliverableRow {
   id: string;
-  name: string;
+  campaign_id: string;
+  type: string | null;
+  status: string | null;
+  platform: string | null;
+  impressions: number | null;
+  retweets: number | null;
+  likes: number | null;
+  comments: number | null;
+  bookmarks: number | null;
+  notes: string | null;
+  updated_at: string | null;
+  campaign: { id: string; name: string } | null;
 }
 
 function DeliverablesTab({ kolId, onMetricsChanged }: { kolId: string; onMetricsChanged?: () => void }) {
-  const [list, setList] = useState<KolDeliverable[]>([]);
+  const [list, setList] = useState<ContentDeliverableRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -291,10 +328,26 @@ function DeliverablesTab({ kolId, onMetricsChanged }: { kolId: string; onMetrics
     (async () => {
       setLoading(true);
       try {
-        const rows = await KolDeliverableService.getForKol(kolId);
-        if (!cancelled) setList(rows);
-      } catch {
-        if (!cancelled) toast({ title: "Failed to load deliverables", variant: "destructive" });
+        // Join chain: master_kols.id → campaign_kols.master_kol_id
+        //   → campaign_kols.id = contents.campaign_kols_id
+        // We use !inner on campaign_kols so contents rows whose
+        // campaign_kol isn't this KOL get filtered out.
+        const { data, error } = await (supabase as any)
+          .from('contents')
+          .select(`
+            id, campaign_id, type, status, platform,
+            impressions, retweets, likes, comments, bookmarks, notes,
+            updated_at,
+            campaign:campaigns(id, name),
+            campaign_kol:campaign_kols!inner(id, master_kol_id)
+          `)
+          .eq('campaign_kol.master_kol_id', kolId)
+          .order('updated_at', { ascending: false });
+        if (error) throw error;
+        if (!cancelled) setList((data || []) as ContentDeliverableRow[]);
+      } catch (err) {
+        console.error('[KolProfileModal] failed to load contents:', err);
+        if (!cancelled) toast({ title: 'Failed to load deliverables', variant: 'destructive' });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -302,76 +355,35 @@ function DeliverablesTab({ kolId, onMetricsChanged }: { kolId: string; onMetrics
     return () => { cancelled = true; };
   }, [kolId, toast]);
 
-  // Pull non-archived campaigns once for the dropdown. Lightweight —
-  // typical org has <200 active campaigns so no pagination needed.
-  useEffect(() => {
-    (async () => {
-      const { data } = await (supabase as any)
-        .from("campaigns")
-        .select("id, name")
-        .is("archived_at", null)
-        .order("created_at", { ascending: false });
-      setCampaigns((data || []) as CampaignOption[]);
-    })();
-  }, []);
-
-  const handleAdded = (row: KolDeliverable) => {
-    setList((prev) => [row, ...prev]);
-    setShowAddForm(false);
-    toast({ title: "Deliverable logged" });
+  // Optimistic update — applied to local state on save; toast on
+  // server error and roll back. Matches the pattern used elsewhere in
+  // the modal.
+  const handleRowSaved = (updated: ContentDeliverableRow) => {
+    setList((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
     onMetricsChanged?.();
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm("Delete this deliverable?")) return;
-    const previous = list;
-    setList((prev) => prev.filter((d) => d.id !== id));
-    try {
-      await KolDeliverableService.delete(id);
-      onMetricsChanged?.();
-    } catch {
-      setList(previous);
-      toast({ title: "Failed to delete", variant: "destructive" });
-    }
   };
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-xs text-gray-500">
-          {list.length} deliverable{list.length === 1 ? "" : "s"} logged.
-          {list.length < 3 && (
-            <span className="ml-1 text-amber-600">
-              Score requires 3+ entries (Phase 3).
-            </span>
-          )}
+          {list.length} deliverable{list.length === 1 ? '' : 's'} across all campaigns.
         </p>
-        {!showAddForm && (
-          <Button size="sm" variant="outline" onClick={() => setShowAddForm(true)}>
-            <Plus className="h-3 w-3 mr-1" /> Add Deliverable
-          </Button>
-        )}
+        <p className="text-[11px] text-gray-400">
+          To add a deliverable, open the campaign and use its Contents tab.
+        </p>
       </div>
-
-      {showAddForm && (
-        <DeliverableForm
-          kolId={kolId}
-          campaigns={campaigns}
-          onCancel={() => setShowAddForm(false)}
-          onSaved={handleAdded}
-        />
-      )}
 
       {loading ? (
         <p className="text-xs text-gray-500">Loading…</p>
       ) : list.length === 0 ? (
         <p className="text-xs text-gray-500 italic p-4 bg-gray-50 rounded-md text-center">
-          No deliverables logged yet. Click "Add Deliverable" after a KOL posts.
+          No deliverables yet. They'll appear here once content is added to a campaign the KOL is on.
         </p>
       ) : (
         <div className="space-y-2">
           {list.map((d) => (
-            <DeliverableRow key={d.id} d={d} onDelete={() => handleDelete(d.id)} />
+            <ContentDeliverableRowView key={d.id} row={d} onSaved={handleRowSaved} />
           ))}
         </div>
       )}
@@ -379,37 +391,200 @@ function DeliverablesTab({ kolId, onMetricsChanged }: { kolId: string; onMetrics
   );
 }
 
-function DeliverableRow({ d, onDelete }: { d: KolDeliverable; onDelete: () => void }) {
+/**
+ * Single contents row, displayed read-only by default with a Pencil
+ * button that flips into an inline edit form for the engagement
+ * metrics + notes only. Other fields (campaign/type/status/platform)
+ * are managed from the campaign detail page — a "View in campaign"
+ * link surfaces in the corner.
+ */
+function ContentDeliverableRowView({
+  row,
+  onSaved,
+}: {
+  row: ContentDeliverableRow;
+  onSaved: (updated: ContentDeliverableRow) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [impressions, setImpressions] = useState<string>(row.impressions?.toString() ?? '');
+  const [retweets, setRetweets] = useState<string>(row.retweets?.toString() ?? '');
+  const [likes, setLikes] = useState<string>(row.likes?.toString() ?? '');
+  const [comments, setComments] = useState<string>(row.comments?.toString() ?? '');
+  const [bookmarks, setBookmarks] = useState<string>(row.bookmarks?.toString() ?? '');
+  const [notes, setNotes] = useState<string>(row.notes ?? '');
+  const { toast } = useToast();
+
+  const numOrNull = (s: string): number | null => {
+    if (!s.trim()) return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    const patch = {
+      impressions: numOrNull(impressions) ?? 0,
+      retweets: numOrNull(retweets) ?? 0,
+      likes: numOrNull(likes) ?? 0,
+      comments: numOrNull(comments) ?? 0,
+      bookmarks: numOrNull(bookmarks) ?? 0,
+      notes: notes.trim() || null,
+    };
+    try {
+      const { data, error } = await (supabase as any)
+        .from('contents')
+        .update(patch)
+        .eq('id', row.id)
+        .select(`
+          id, campaign_id, type, status, platform,
+          impressions, retweets, likes, comments, bookmarks, notes,
+          updated_at,
+          campaign:campaigns(id, name),
+          campaign_kol:campaign_kols!inner(id, master_kol_id)
+        `)
+        .single();
+      if (error) throw error;
+      onSaved(data as ContentDeliverableRow);
+      setEditing(false);
+      toast({ title: 'Saved' });
+    } catch (err) {
+      console.error('[KolProfileModal] save content patch failed:', err);
+      toast({ title: 'Save failed', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    // Reset form state to original row
+    setImpressions(row.impressions?.toString() ?? '');
+    setRetweets(row.retweets?.toString() ?? '');
+    setLikes(row.likes?.toString() ?? '');
+    setComments(row.comments?.toString() ?? '');
+    setBookmarks(row.bookmarks?.toString() ?? '');
+    setNotes(row.notes ?? '');
+    setEditing(false);
+  };
+
+  // Status badge color — match the campaign-side conventions where
+  // possible. Falls back to gray for unknown values.
+  const statusClass = (() => {
+    const s = (row.status || '').toLowerCase();
+    if (s === 'published' || s === 'completed' || s === 'posted') return 'bg-emerald-50 text-emerald-700 border border-emerald-100';
+    if (s === 'scheduled' || s === 'planned') return 'bg-blue-50 text-blue-700 border border-blue-100';
+    if (s === 'cancelled' || s === 'rejected') return 'bg-rose-50 text-rose-700 border border-rose-100';
+    return 'bg-gray-100 text-gray-600';
+  })();
+
   return (
     <div className="border border-gray-200 rounded-md p-3 bg-white">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold">#{d.brief_number} {d.brief_topic}</span>
-            {d.campaign && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700">
-                {d.campaign.name}
+            {row.campaign && (
+              <Link
+                href={`/campaigns/${row.campaign.id}`}
+                className="text-sm font-semibold text-gray-900 hover:text-brand inline-flex items-center gap-1"
+                title="Open campaign"
+              >
+                {row.campaign.name}
+                <ExternalLink className="h-3 w-3 text-gray-400" />
+              </Link>
+            )}
+            {row.type && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-100">
+                {row.type}
+              </span>
+            )}
+            {row.platform && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 uppercase tracking-wide">
+                {row.platform}
+              </span>
+            )}
+            {row.status && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded ${statusClass}`}>
+                {row.status}
               </span>
             )}
           </div>
-          <div className="mt-1 text-xs text-gray-600">
-            <a href={d.post_link} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline truncate block max-w-md">
-              {d.post_link}
-            </a>
-          </div>
-          <div className="mt-2 grid grid-cols-5 gap-2 text-xs">
-            <Stat label="24h Views" value={d.views_24h} />
-            <Stat label="48h Views" value={d.views_48h} />
-            <Stat label="Forwards" value={d.forwards} />
-            <Stat label="Reactions" value={d.reactions} />
-            <Stat label="Activations" value={d.activation_participants} />
-          </div>
-          {d.notes && <p className="mt-2 text-xs text-gray-600 italic">"{d.notes}"</p>}
+
+          {/* Engagement metrics — read mode shows the Stat grid;
+              edit mode swaps to number inputs. Includes the spec
+              fields we kept (impressions ≈ views_24h, retweets ≈
+              forwards) plus contents-native bonus metrics. */}
+          {!editing ? (
+            <div className="mt-2 grid grid-cols-5 gap-2 text-xs">
+              <Stat label="Impressions" value={row.impressions} />
+              <Stat label="Retweets" value={row.retweets} />
+              <Stat label="Likes" value={row.likes} />
+              <Stat label="Comments" value={row.comments} />
+              <Stat label="Bookmarks" value={row.bookmarks} />
+            </div>
+          ) : (
+            <div className="mt-2 grid grid-cols-5 gap-2">
+              <NumField label="Impressions" value={impressions} onChange={setImpressions} />
+              <NumField label="Retweets" value={retweets} onChange={setRetweets} />
+              <NumField label="Likes" value={likes} onChange={setLikes} />
+              <NumField label="Comments" value={comments} onChange={setComments} />
+              <NumField label="Bookmarks" value={bookmarks} onChange={setBookmarks} />
+            </div>
+          )}
+
+          {!editing && row.notes && (
+            <p className="mt-2 text-xs text-gray-600 italic">&quot;{row.notes}&quot;</p>
+          )}
+          {editing && (
+            <div className="mt-2">
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Notes (optional)"
+                className="min-h-[50px] text-xs"
+              />
+            </div>
+          )}
         </div>
-        <Button size="sm" variant="ghost" onClick={onDelete} title="Delete">
-          <Trash2 className="h-3 w-3 text-red-500" />
-        </Button>
+
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {!editing ? (
+            <Button size="sm" variant="ghost" onClick={() => setEditing(true)} title="Edit metrics & notes">
+              <Pencil className="h-3 w-3 text-gray-500" />
+            </Button>
+          ) : (
+            <>
+              <Button size="sm" variant="ghost" onClick={handleCancel} disabled={saving} title="Cancel">
+                <X className="h-3 w-3 text-gray-500" />
+              </Button>
+              <Button size="sm" variant="ghost" onClick={handleSave} disabled={saving} title="Save">
+                <Save className="h-3 w-3 text-emerald-600" />
+              </Button>
+            </>
+          )}
+        </div>
       </div>
+    </div>
+  );
+}
+
+function NumField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-0.5">
+      <div className="text-[10px] text-gray-500 uppercase text-center">{label}</div>
+      <Input
+        type="number"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-7 text-xs text-center"
+      />
     </div>
   );
 }
@@ -423,127 +598,11 @@ function Stat({ label, value }: { label: string; value: number | null }) {
   );
 }
 
-function DeliverableForm({
-  kolId,
-  campaigns,
-  onCancel,
-  onSaved,
-}: {
-  kolId: string;
-  campaigns: CampaignOption[];
-  onCancel: () => void;
-  onSaved: (row: KolDeliverable) => void;
-}) {
-  const [campaignId, setCampaignId] = useState("");
-  const [briefNumber, setBriefNumber] = useState<number>(1);
-  const [briefTopic, setBriefTopic] = useState("");
-  const [postLink, setPostLink] = useState("");
-  const today = new Date().toISOString().slice(0, 10);
-  const [dateBriefSent, setDateBriefSent] = useState(today);
-  const [datePosted, setDatePosted] = useState(today);
-  const [views24h, setViews24h] = useState<string>("");
-  const [views48h, setViews48h] = useState<string>("");
-  const [forwards, setForwards] = useState<string>("");
-  const [reactions, setReactions] = useState<string>("");
-  const [activations, setActivations] = useState<string>("");
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
-  const { toast } = useToast();
-
-  // Auto-suggest the next brief number when the campaign changes.
-  useEffect(() => {
-    if (!campaignId) return;
-    KolDeliverableService.nextBriefNumber(kolId, campaignId)
-      .then(setBriefNumber)
-      .catch(() => setBriefNumber(1));
-  }, [kolId, campaignId]);
-
-  const numOrNull = (s: string): number | null => {
-    if (!s.trim()) return null;
-    const n = Number(s);
-    return Number.isFinite(n) ? n : null;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!campaignId) {
-      toast({ title: "Campaign required", variant: "destructive" });
-      return;
-    }
-    if (!briefTopic.trim() || !postLink.trim()) {
-      toast({ title: "Topic and post link are required", variant: "destructive" });
-      return;
-    }
-    setSaving(true);
-    const input: CreateKolDeliverableInput = {
-      kol_id: kolId,
-      campaign_id: campaignId,
-      brief_number: briefNumber,
-      brief_topic: briefTopic.trim(),
-      post_link: postLink.trim(),
-      date_brief_sent: new Date(dateBriefSent).toISOString(),
-      date_posted: new Date(datePosted).toISOString(),
-      views_24h: numOrNull(views24h),
-      views_48h: numOrNull(views48h),
-      forwards: numOrNull(forwards),
-      reactions: numOrNull(reactions),
-      activation_participants: numOrNull(activations),
-      notes: notes.trim() || null,
-    };
-    try {
-      const row = await KolDeliverableService.create(input);
-      onSaved(row);
-    } catch {
-      toast({ title: "Failed to save deliverable", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="border border-gray-200 rounded-md p-3 bg-gray-50 space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        <FormField label="Campaign *">
-          <Select value={campaignId} onValueChange={setCampaignId}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select campaign…" /></SelectTrigger>
-            <SelectContent>
-              {campaigns.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </FormField>
-        <FormField label="Brief #">
-          <Input type="number" min={1} value={briefNumber} onChange={(e) => setBriefNumber(Number(e.target.value) || 1)} className="h-8 text-xs" />
-        </FormField>
-        <FormField label="Brief Topic *">
-          <Input value={briefTopic} onChange={(e) => setBriefTopic(e.target.value)} className="h-8 text-xs" placeholder="e.g. Valiant Onboarding" />
-        </FormField>
-        <FormField label="Post Link *">
-          <Input value={postLink} onChange={(e) => setPostLink(e.target.value)} className="h-8 text-xs" placeholder="https://…" />
-        </FormField>
-        <FormField label="Date Brief Sent">
-          <Input type="date" value={dateBriefSent} onChange={(e) => setDateBriefSent(e.target.value)} className="h-8 text-xs" />
-        </FormField>
-        <FormField label="Date Posted">
-          <Input type="date" value={datePosted} onChange={(e) => setDatePosted(e.target.value)} className="h-8 text-xs" />
-        </FormField>
-      </div>
-      <div className="grid grid-cols-5 gap-2">
-        <FormField label="24h Views"><Input type="number" value={views24h} onChange={(e) => setViews24h(e.target.value)} className="h-8 text-xs" /></FormField>
-        <FormField label="48h Views"><Input type="number" value={views48h} onChange={(e) => setViews48h(e.target.value)} className="h-8 text-xs" /></FormField>
-        <FormField label="Forwards"><Input type="number" value={forwards} onChange={(e) => setForwards(e.target.value)} className="h-8 text-xs" /></FormField>
-        <FormField label="Reactions"><Input type="number" value={reactions} onChange={(e) => setReactions(e.target.value)} className="h-8 text-xs" /></FormField>
-        <FormField label="Activations"><Input type="number" value={activations} onChange={(e) => setActivations(e.target.value)} className="h-8 text-xs" /></FormField>
-      </div>
-      <FormField label="Notes">
-        <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-[50px] text-xs" placeholder="Anything unusual?" />
-      </FormField>
-      <div className="flex justify-end gap-2 pt-1">
-        <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={saving}>Cancel</Button>
-        <Button type="submit" size="sm" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
-      </div>
-    </form>
-  );
-}
+// [May 2026 KOL overhaul follow-up] The old DeliverableForm (which
+// wrote to kol_deliverables) was removed in favor of editing
+// existing contents rows inline. New deliverables are now created
+// from the campaign detail page's Contents tab — that's the single
+// source of truth.
 
 function FormField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -685,9 +744,12 @@ function SnapshotRow({ s, onDelete }: { s: KolChannelSnapshot; onDelete: () => v
               </span>
             )}
           </div>
-          <div className="mt-2 grid grid-cols-5 gap-2 text-xs">
+          {/* [May 2026 KOL overhaul follow-up] avg_forwards_per_post
+              intentionally dropped per the user's exclusion list. The
+              column still exists in kol_channel_snapshots for
+              compatibility but isn't surfaced or written from the UI. */}
+          <div className="mt-2 grid grid-cols-4 gap-2 text-xs">
             <Stat label="Avg Views" value={s.avg_views_per_post} />
-            <Stat label="Avg Forwards" value={s.avg_forwards_per_post} />
             <Stat label="Avg Reactions" value={s.avg_reactions_per_post} />
             <Stat label="Posts/Wk" value={s.posting_frequency != null ? Number(s.posting_frequency) : null} />
             {/* Engagement rate (avg_views / followers) — formatted as
@@ -727,7 +789,9 @@ function SnapshotForm({
   const [snapshotDate, setSnapshotDate] = useState(firstOfMonth);
   const [followerCount, setFollowerCount] = useState<string>("");
   const [avgViews, setAvgViews] = useState<string>("");
-  const [avgForwards, setAvgForwards] = useState<string>("");
+  // [May 2026 KOL overhaul follow-up] avgForwards field removed per
+  // user's exclusion list. avg_forwards_per_post column kept in the
+  // table for compat but no longer set from the UI.
   const [avgReactions, setAvgReactions] = useState<string>("");
   const [postingFreq, setPostingFreq] = useState<string>("");
   const [notes, setNotes] = useState("");
@@ -753,7 +817,6 @@ function SnapshotForm({
       snapshot_date: snapshotDate,
       follower_count: followers,
       avg_views_per_post: numOrNull(avgViews),
-      avg_forwards_per_post: numOrNull(avgForwards),
       avg_reactions_per_post: numOrNull(avgReactions),
       posting_frequency: numOrNull(postingFreq),
       notes: notes.trim() || null,
@@ -778,9 +841,8 @@ function SnapshotForm({
           <Input type="number" min={0} value={followerCount} onChange={(e) => setFollowerCount(e.target.value)} className="h-8 text-xs" placeholder="e.g. 12500" />
         </FormField>
       </div>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <FormField label="Avg Views"><Input type="number" value={avgViews} onChange={(e) => setAvgViews(e.target.value)} className="h-8 text-xs" /></FormField>
-        <FormField label="Avg Forwards"><Input type="number" value={avgForwards} onChange={(e) => setAvgForwards(e.target.value)} className="h-8 text-xs" /></FormField>
         <FormField label="Avg Reactions"><Input type="number" value={avgReactions} onChange={(e) => setAvgReactions(e.target.value)} className="h-8 text-xs" /></FormField>
         <FormField label="Posts/Week"><Input type="number" step="0.1" value={postingFreq} onChange={(e) => setPostingFreq(e.target.value)} className="h-8 text-xs" /></FormField>
       </div>
