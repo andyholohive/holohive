@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -4341,11 +4342,15 @@ export default function SalesPipelinePage() {
           </div>
         </div>
 
-        {/* Empty state */}
+        {/* Empty state — [Design system, May 2026] using shared EmptyState */}
         {forecastOpps.length === 0 && (
-          <div className="text-center py-12 bg-white border border-gray-200 rounded-lg">
-            <TrendingUp className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">No proposals out yet. Move a deal to <span className="font-medium">Proposal Sent</span> to see it here.</p>
+          <div className="bg-white border border-gray-200 rounded-lg">
+            <EmptyState
+              icon={TrendingUp}
+              title="No proposals out yet"
+              description="Move a deal to Proposal Sent to see it here."
+              className="py-12"
+            />
           </div>
         )}
 

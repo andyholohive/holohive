@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1394,7 +1395,11 @@ export default function MindsharePage() {
                 {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
               </div>
             ) : projects.length === 0 ? (
-              <div className="py-12 text-center text-sm text-gray-500">No projects yet. Add one to start tracking.</div>
+              <EmptyState
+                icon={BarChart3}
+                title="No projects yet"
+                description="Add a project to start tracking its share of voice in Korean Telegram channels."
+              />
             ) : (
               <Table>
                 <TableHeader>

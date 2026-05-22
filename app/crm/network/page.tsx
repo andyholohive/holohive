@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Checkbox } from '@/components/ui/checkbox';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { KpiCard } from '@/components/ui/kpi-card';
@@ -1697,8 +1698,12 @@ export default function NetworkPage() {
             /* Partners Cards View */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredPartners.length === 0 ? (
-                <div className="col-span-full text-center py-8">
-                  <p className="text-gray-600">No partners found.</p>
+                <div className="col-span-full">
+                  <EmptyState
+                    icon={Handshake}
+                    title="No partners found"
+                    description="Adjust your filters or add a new partner to get started."
+                  />
                 </div>
               ) : (
                 filteredPartners.map((partner) => (
@@ -2195,8 +2200,12 @@ export default function NetworkPage() {
             /* Affiliates Cards View */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredAffiliates.length === 0 ? (
-                <div className="col-span-full text-center py-8">
-                  <p className="text-gray-600">No affiliates found.</p>
+                <div className="col-span-full">
+                  <EmptyState
+                    icon={Users}
+                    title="No affiliates found"
+                    description="Adjust your filters or add a new affiliate to get started."
+                  />
               </div>
             ) : (
               filteredAffiliates.map((affiliate) => (
