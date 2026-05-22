@@ -17,7 +17,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import {
   BarChart3, Plus, Trash2, Radio, AlertTriangle, Search, TrendingUp, TrendingDown,
-  Minus, Edit, RefreshCw, Upload, ExternalLink, Crown, Download,
+  Minus, Edit, RefreshCw, Upload, ExternalLink, Crown, Download, Bot, CheckCircle2,
+  XCircle, HelpCircle, ShieldAlert,
 } from 'lucide-react';
 import { Treemap, ResponsiveContainer } from 'recharts';
 
@@ -66,6 +67,13 @@ interface MonitoredChannel {
   channel_tg_id: string | null;
   language: string;
   is_active: boolean;
+  // [Bot membership tracking] Populated by
+  // /api/mindshare/channels/check-bot-status. Until bot_status is
+  // 'member'/'administrator'/'creator', the scanner won't receive
+  // any messages from this chat, so mindshare stays empty for it.
+  bot_status?: string | null;
+  bot_status_checked_at?: string | null;
+  last_message_at?: string | null;
 }
 
 type SortKey = 'mindshare_pct' | 'mention_count' | 'name' | 'delta_pct' | 'channel_reach' | 'score';
@@ -729,6 +737,43 @@ export default function MindsharePage() {
       await loadLeaderboard();
     } finally {
       setScanning(false);
+    }
+  };
+
+  // [Bot membership tracking] Checks whether the HH bot is actually
+  // a member of each monitored chat. Without membership the scanner
+  // can't receive messages, no matter how many chats are in the
+  // registry. Surfaces in the Channels tab so the admin can chase
+  // invites for the ones still marked 'left'.
+  const [checkingBotStatus, setCheckingBotStatus] = useState<false | 'all' | string>(false);
+  const [botInfo, setBotInfo] = useState<{ id: number; username: string } | null>(null);
+  const checkBotStatus = async (channelId?: string) => {
+    if (checkingBotStatus) return;
+    setCheckingBotStatus(channelId || 'all');
+    try {
+      const res = await fetch('/api/mindshare/channels/check-bot-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(channelId ? { channel_id: channelId } : {}),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast({ title: 'Bot status check failed', description: json.error, variant: 'destructive' });
+        return;
+      }
+      if (json.bot) setBotInfo(json.bot);
+      const memberCount = (json.summary?.member || 0) + (json.summary?.administrator || 0) + (json.summary?.creator || 0);
+      toast({
+        title: channelId ? 'Status updated' : 'Bot status checked',
+        description: channelId
+          ? `Status: ${json.results?.[0]?.status || 'unknown'}`
+          : `${memberCount}/${json.attempted} channels have the bot as a member`,
+      });
+      await loadChannels();
+    } catch (err: any) {
+      toast({ title: 'Check failed', description: err?.message, variant: 'destructive' });
+    } finally {
+      setCheckingBotStatus(false);
     }
   };
 
@@ -1418,6 +1463,74 @@ export default function MindsharePage() {
             </div>
           </div>
 
+          {/* [Bot membership tracking] Summary banner — answers
+              "is the bot actually in our channels?" at a glance. Until
+              the bot is invited to a channel, mindshare can't receive
+              any messages from it, so this is the single most important
+              piece of operational state on the page. */}
+          {(() => {
+            const eligible = channels.filter(c => c.is_active && c.channel_tg_id);
+            const member = eligible.filter(c =>
+              c.bot_status === 'member' || c.bot_status === 'administrator' || c.bot_status === 'creator'
+            ).length;
+            const left = eligible.filter(c => c.bot_status === 'left' || c.bot_status === 'kicked').length;
+            const unknown = eligible.filter(c => !c.bot_status || c.bot_status === 'unknown').length;
+            const errored = eligible.filter(c => c.bot_status === 'error').length;
+            const pct = eligible.length > 0 ? Math.round((member / eligible.length) * 100) : 0;
+            const allGood = unknown === 0 && left === 0 && errored === 0 && eligible.length > 0;
+            return (
+              <div className={`border rounded-lg p-4 ${allGood ? 'bg-emerald-50 border-emerald-200' : left > 0 || unknown > 0 ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}`}>
+                <div className="flex items-start gap-3">
+                  <Bot className={`h-5 w-5 mt-0.5 flex-shrink-0 ${allGood ? 'text-emerald-600' : 'text-amber-600'}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-sm">
+                        Bot membership: <span className="tabular-nums">{member} / {eligible.length}</span> channels ({pct}%)
+                      </h3>
+                      {botInfo && (
+                        <a
+                          href={`https://t.me/${botInfo.username}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-gray-600 hover:text-brand underline decoration-dotted"
+                          title="Open bot on Telegram"
+                        >
+                          @{botInfo.username}
+                        </a>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {allGood
+                        ? 'All active channels have the bot as a member. Mindshare will receive messages from every channel.'
+                        : 'The Telegram scanner only sees messages from chats the bot is a member of. Channels marked "left" or "unknown" need a bot invite.'}
+                    </p>
+                    {(unknown > 0 || left > 0 || errored > 0) && (
+                      <div className="flex items-center gap-3 mt-2 text-[11px] tabular-nums">
+                        {member > 0 && <span className="inline-flex items-center gap-1 text-emerald-700"><CheckCircle2 className="h-3 w-3" /> {member} member</span>}
+                        {left > 0 && <span className="inline-flex items-center gap-1 text-rose-700"><XCircle className="h-3 w-3" /> {left} not-joined</span>}
+                        {unknown > 0 && <span className="inline-flex items-center gap-1 text-gray-600"><HelpCircle className="h-3 w-3" /> {unknown} unchecked</span>}
+                        {errored > 0 && <span className="inline-flex items-center gap-1 text-amber-700"><ShieldAlert className="h-3 w-3" /> {errored} errored</span>}
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={checkingBotStatus === 'all'}
+                    onClick={() => checkBotStatus()}
+                    className="flex-shrink-0"
+                  >
+                    {checkingBotStatus === 'all' ? (
+                      <><RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Checking…</>
+                    ) : (
+                      <><RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Check all</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Channel list */}
           <div className="bg-white border border-gray-200 rounded-lg">
             <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-3">
@@ -1482,6 +1595,46 @@ export default function MindsharePage() {
                       >
                         {hits7d} / 7d
                       </span>
+                      {/* [Bot membership tracking] Per-row status pill +
+                          single-channel recheck. Click the pill to
+                          recheck just this channel (useful right after
+                          you invite the bot). */}
+                      {(() => {
+                        const status = c.bot_status || 'unknown';
+                        const isMember = status === 'member' || status === 'administrator' || status === 'creator';
+                        const isLeft = status === 'left' || status === 'kicked';
+                        const pillClass = isMember
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                          : isLeft
+                            ? 'bg-rose-50 text-rose-700 border border-rose-100'
+                            : status === 'error'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-100'
+                              : 'bg-gray-100 text-gray-500';
+                        const label = isMember
+                          ? (status === 'administrator' ? 'admin' : status === 'creator' ? 'owner' : 'in')
+                          : isLeft ? 'not in'
+                            : status === 'error' ? 'error'
+                              : 'unknown';
+                        return (
+                          <button
+                            type="button"
+                            disabled={checkingBotStatus === c.id || checkingBotStatus === 'all'}
+                            onClick={() => checkBotStatus(c.id)}
+                            className={`text-[10px] px-2 py-0.5 rounded-full ${pillClass} hover:opacity-80 transition-opacity disabled:opacity-50 inline-flex items-center gap-1`}
+                            title={
+                              checkingBotStatus === c.id ? 'Checking…' :
+                              `Bot status: ${status}${c.bot_status_checked_at ? ` (checked ${new Date(c.bot_status_checked_at).toLocaleString()})` : ''}. Click to recheck.`
+                            }
+                          >
+                            {checkingBotStatus === c.id ? (
+                              <RefreshCw className="h-2.5 w-2.5 animate-spin" />
+                            ) : (
+                              <Bot className="h-2.5 w-2.5" />
+                            )}
+                            {label}
+                          </button>
+                        );
+                      })()}
                       <Select value={c.language} onValueChange={(v) => setChannelLanguage(c, v)}>
                         <SelectTrigger className="h-7 w-20 text-xs"><SelectValue /></SelectTrigger>
                         <SelectContent>

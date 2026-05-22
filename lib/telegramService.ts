@@ -286,6 +286,80 @@ export class TelegramService {
   }
 
   /**
+   * Resolve the bot's own identity (id, username, first_name).
+   *
+   * Cached in-process for the lifetime of the server because the bot's
+   * own ID never changes between deploys — saves a network call on
+   * every getChatMember lookup that needs to pass the bot's user ID.
+   *
+   * Used by the mindshare bot-membership checker to ask Telegram
+   * "is THIS bot in THAT chat?".
+   */
+  private static _meCache: { id: number; username: string; first_name: string } | null = null;
+  static async getMe(): Promise<
+    { id: number; username: string; first_name: string } | { error: string }
+  > {
+    if (this._meCache) return this._meCache;
+    if (!this.botToken) return { error: 'TELEGRAM_BOT_TOKEN not configured' };
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${this.botToken}/getMe`);
+      const data = await response.json();
+      if (!data.ok) return { error: data.description || `getMe failed (${response.status})` };
+      this._meCache = {
+        id: data.result.id,
+        username: data.result.username,
+        first_name: data.result.first_name,
+      };
+      return this._meCache;
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  /**
+   * Check whether a specific user (default: the bot itself) is a member
+   * of a chat, and at what status.
+   *
+   * Returns Telegram's ChatMember status string:
+   *   'creator' | 'administrator' | 'member' | 'restricted' | 'left' | 'kicked'
+   *
+   * Used by mindshare to detect which Korean KOL channels the bot has
+   * actually been invited to (vs which ones we just have the chat_id
+   * for via getChat but can't receive messages from).
+   *
+   * Common errors:
+   *   - "Bad Request: chat not found" → channel_tg_id is wrong or chat deleted
+   *   - "Bad Request: user not found" → bot never interacted with the chat;
+   *     for our purposes this is the same as 'left' (not a member)
+   */
+  static async getChatMember(
+    chatId: string,
+    userId: number,
+  ): Promise<
+    | { status: 'creator' | 'administrator' | 'member' | 'restricted' | 'left' | 'kicked'; [key: string]: any }
+    | { error: string }
+  > {
+    if (!this.botToken) return { error: 'TELEGRAM_BOT_TOKEN not configured' };
+    try {
+      const response = await fetch(
+        `https://api.telegram.org/bot${this.botToken}/getChatMember?chat_id=${encodeURIComponent(chatId)}&user_id=${userId}`,
+      );
+      const data = await response.json();
+      if (!data.ok) {
+        // "user not found" specifically means the bot has never been
+        // added — equivalent to 'left' for our tracking purposes.
+        if (data.description && /user not found/i.test(data.description)) {
+          return { status: 'left' };
+        }
+        return { error: data.description || `getChatMember failed (${response.status})` };
+      }
+      return data.result;
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  /**
    * Send a message to a specific chat (for CRM integration)
    */
   static async sendToChat(
