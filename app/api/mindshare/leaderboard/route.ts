@@ -161,6 +161,29 @@ export async function GET(request: Request) {
 
   // Compute totals across all projects to derive mindshare %
   let currentTotal = 0, priorTotal = 0;
+  // [Weighted score v1] Recency × Reach × Uniqueness model, inspired by
+  // 3ridge's composite ranking. We compute the raw score here and
+  // normalize against the highest-scoring project below so the result
+  // lives on a clean 0-100 scale users can read at a glance.
+  //
+  //   recency_weighted = Σ (mentions_on_day × recency_weight(day))
+  //     recency_weight goes from 1.0 (today) → 0.5 (oldest day in
+  //     window). Linear ramp; rewards recent attention without
+  //     completely discarding older mentions.
+  //
+  //   reach_factor = log10(channel_reach_sum + 1)
+  //     Dampens scale so a project with 100 daily-channel-hits doesn't
+  //     dominate one with 50 by 2x. channel_reach_sum is the existing
+  //     daily-distinct overcount — fine as a *reach intensity* proxy.
+  //
+  //   uniqueness = days_with_mentions / days_in_window
+  //     "Sustained vs spike." A project mentioned every day in the
+  //     window scores 1.0; a one-day spike scores 1/days. True channel
+  //     uniqueness would need an extra per-project tg_mentions query —
+  //     temporal spread is a defensible proxy with zero extra IO.
+  //
+  //   raw_score = recency_weighted × reach_factor × uniqueness
+  let maxRawScore = 0;
   const projectStats = ((projects || []) as Project[]).map(p => {
     const rows = rowsByProject.get(p.id) || [];
     const current = sumInRange(rows, currentStart, currentEnd);
@@ -178,7 +201,29 @@ export async function GET(request: Request) {
     }
     const channels = sumInRange(rows.map(r => ({ ...r, mention_count: r.channel_reach })), currentStart, currentEnd);
 
-    return { project: p, current, prior, spark, channels };
+    // Weighted score components — all computed over the *current*
+    // window only (prior window is used for the Δ comparison, not the
+    // score itself).
+    let recencyWeighted = 0;
+    let daysWithMentions = 0;
+    for (let i = 0; i < days; i++) {
+      const d = fmt(minusDays(today, i));
+      if (d < currentStart) break;
+      const row = rows.find(r => r.day === d);
+      const count = row?.mention_count || 0;
+      // Linear ramp 1.0 (today, i=0) → 0.5 (oldest day, i=days-1).
+      // Guard days===1 so we don't divide by zero — single-day window
+      // just keeps weight at 1.0.
+      const weight = days > 1 ? 1 - (i / (days - 1)) * 0.5 : 1;
+      recencyWeighted += count * weight;
+      if (count > 0) daysWithMentions++;
+    }
+    const reachFactor = Math.log10(channels + 1);
+    const uniqueness = days > 0 ? daysWithMentions / days : 0;
+    const rawScore = recencyWeighted * reachFactor * uniqueness;
+    if (rawScore > maxRawScore) maxRawScore = rawScore;
+
+    return { project: p, current, prior, spark, channels, rawScore };
   });
 
   // Final shape — mindshare % computed against the period total
@@ -188,6 +233,10 @@ export async function GET(request: Request) {
     const deltaPct = mindsharePct - priorMindsharePct;
     // Mention-count change relative to the prior window (used for "↑ 22%" kind of badges)
     const mentionDeltaPct = s.prior > 0 ? ((s.current - s.prior) / s.prior) * 100 : (s.current > 0 ? 100 : 0);
+    // [Weighted score v1] Normalize the raw score to 0-100 against the
+    // leader so the UI gets a clean readable number. If no project has
+    // any score (empty window), everyone gets 0.
+    const score = maxRawScore > 0 ? (s.rawScore / maxRawScore) * 100 : 0;
     return {
       project_id: s.project.id,
       name: s.project.name,
@@ -201,6 +250,7 @@ export async function GET(request: Request) {
       mindshare_pct: mindsharePct,
       delta_pct: deltaPct,
       mention_delta_pct: mentionDeltaPct,
+      score,
       spark: s.spark,
     };
   })

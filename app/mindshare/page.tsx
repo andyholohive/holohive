@@ -38,6 +38,10 @@ interface LeaderboardItem {
   mindshare_pct: number;
   delta_pct: number;
   mention_delta_pct: number;
+  // [Weighted score v1] 0-100 composite of recency × reach × uniqueness,
+  // normalized so the top project = 100. Computed server-side; see the
+  // leaderboard route for the formula.
+  score: number;
   spark: number[];
 }
 
@@ -64,7 +68,7 @@ interface MonitoredChannel {
   is_active: boolean;
 }
 
-type SortKey = 'mindshare_pct' | 'mention_count' | 'name' | 'delta_pct' | 'channel_reach';
+type SortKey = 'mindshare_pct' | 'mention_count' | 'name' | 'delta_pct' | 'channel_reach' | 'score';
 
 // ─── Sparkline ──────────────────────────────────────────────────────
 // Tiny inline SVG so we don't pull a chart lib for one feature. 14
@@ -526,13 +530,14 @@ export default function MindsharePage() {
   // pasting a snapshot into a weekly report or sharing with the team.
   const exportCsv = () => {
     if (filteredSorted.length === 0) return;
-    const header = ['Rank', 'Project', 'Category', 'Mentions', 'Mindshare %', 'Δ vs prior %', 'Channels', 'Pre-TGE'];
+    const header = ['Rank', 'Project', 'Category', 'Mentions', 'Mindshare %', 'Score', 'Δ vs prior %', 'Channels', 'Pre-TGE'];
     const rows = filteredSorted.map((item, i) => [
       i + 1,
       item.name,
       item.category || '',
       item.mention_count,
       item.mindshare_pct.toFixed(2),
+      item.score.toFixed(1),
       item.delta_pct.toFixed(2),
       item.channel_reach,
       item.is_pre_tge ? 'yes' : 'no',
@@ -991,6 +996,18 @@ export default function MindsharePage() {
                         Mindshare{sortIndicator('mindshare_pct')}
                       </button>
                     </TableHead>
+                    {/* [Weighted score v1] Composite recency × reach × uniqueness,
+                        normalized 0-100 against the top project. Hover for the
+                        breakdown. */}
+                    <TableHead className="text-right">
+                      <button
+                        onClick={() => toggleSort('score')}
+                        className="hover:underline inline-flex items-center font-medium"
+                        title="Composite score: recency × reach × uniqueness, normalized to 100"
+                      >
+                        Score{sortIndicator('score')}
+                      </button>
+                    </TableHead>
                     <TableHead className="text-right">
                       <button onClick={() => toggleSort('delta_pct')} className="hover:underline inline-flex items-center font-medium">
                         Δ{sortIndicator('delta_pct')}
@@ -1036,6 +1053,14 @@ export default function MindsharePage() {
                         </TableCell>
                         <TableCell className="text-right tabular-nums">{item.mention_count.toLocaleString()}</TableCell>
                         <TableCell className="text-right tabular-nums font-medium">{item.mindshare_pct.toFixed(2)}%</TableCell>
+                        {/* [Weighted score v1] Top project renders as 100.0 by
+                            definition; lighter gray below to signal it's
+                            relative-to-leader, not absolute. */}
+                        <TableCell className="text-right tabular-nums">
+                          <span className={item.score >= 50 ? 'font-semibold text-gray-900' : 'text-gray-600'}>
+                            {item.score.toFixed(1)}
+                          </span>
+                        </TableCell>
                         <TableCell className={`text-right tabular-nums ${deltaColor}`}>
                           <span className="inline-flex items-center gap-1 justify-end">
                             {trendIcon}
