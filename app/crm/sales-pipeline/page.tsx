@@ -21,7 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Plus, UserPlus, Minus, Search, Trash2, X, LayoutGrid, TableIcon, GripVertical, Loader2,
-  Target, AlertTriangle, ArrowRight, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronUp,
+  Target, AlertTriangle, ArrowRight, MoreHorizontal, ChevronDown, ChevronRight, ChevronLeft, ChevronUp, HelpCircle,
   Phone, MessageSquare, Calendar, FileText, StickyNote, Zap, RotateCcw, Clock, Edit, Copy, Check, ChevronsUpDown,
   Building2, TrendingUp, DollarSign, Users, Hash, BarChart3, Activity, Send, ArrowUpDown, Paperclip, Eye, Image,
   Sparkles, Twitter, Download, History,
@@ -214,6 +214,29 @@ export default function SalesPipelinePage() {
   // and Attention Cards). Independent of `activeTab` so users can keep
   // both views in mind without one resetting the other.
   const [topSectionTab, setTopSectionTab] = useState<'forecast' | 'metrics'>('forecast');
+
+  // [Sales-pipeline space optimization, May 2026] The Forecast/Metrics
+  // block can be 400-1200px tall depending on proposal count and team
+  // size. Defaults to collapsed so the operational tabs land above the
+  // fold; a 1-line summary stays visible so users still see the
+  // headline numbers without expanding. localStorage-persisted per
+  // user so power users (sales managers) can pin it open once and
+  // stay that way.
+  const [showAnalytics, setShowAnalytics] = useState<boolean>(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const v = window.localStorage.getItem('sp_showAnalytics');
+    if (v === '1') setShowAnalytics(true);
+  }, []);
+  const toggleAnalytics = useCallback(() => {
+    setShowAnalytics(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('sp_showAnalytics', next ? '1' : '0');
+      }
+      return next;
+    });
+  }, []);
 
   // DnD state
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -4287,25 +4310,29 @@ export default function SalesPipelinePage() {
     ];
 
     return (
-      <div className="pb-8 space-y-6">
+      <div className="pb-4 space-y-4">
+        {/* [Space optimization, May 2026] Tightened pb-8 → pb-4 and
+            space-y-6 → space-y-4 inside the Forecast tab. Was adding
+            ~80px of unused vertical padding. KPI strip cell padding
+            also trimmed p-4 → p-3 for the same reason. */}
         {/* KPI strip — high-level pipeline health */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-3">
             <div className="text-xs text-gray-500 uppercase tracking-wide">Pipeline value</div>
             <div className="text-2xl font-bold text-gray-900 mt-1">${forecastKpis.totalValue.toLocaleString()}</div>
             <div className="text-xs text-gray-500 mt-1">{forecastOpps.length} active deal{forecastOpps.length === 1 ? '' : 's'}</div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-3">
             <div className="text-xs text-gray-500 uppercase tracking-wide">Weighted forecast</div>
             <div className="text-2xl font-bold text-emerald-700 mt-1">${Math.round(forecastKpis.weighted).toLocaleString()}</div>
             <div className="text-xs text-gray-500 mt-1">Stage-weighted probability</div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-3">
             <div className="text-xs text-gray-500 uppercase tracking-wide">This month</div>
             <div className="text-2xl font-bold text-sky-700 mt-1">${forecastKpis.thisMonthValue.toLocaleString()}</div>
             <div className="text-xs text-gray-500 mt-1">Expected to close</div>
           </div>
-          <div className={`border rounded-lg p-4 ${forecastKpis.atRiskCount > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
+          <div className={`border rounded-lg p-3 ${forecastKpis.atRiskCount > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
             <div className={`text-xs uppercase tracking-wide ${forecastKpis.atRiskCount > 0 ? 'text-red-700' : 'text-gray-500'}`}>At risk</div>
             <div className={`text-2xl font-bold mt-1 ${forecastKpis.atRiskCount > 0 ? 'text-red-700' : 'text-gray-400'}`}>
               {forecastKpis.atRiskCount}
@@ -4523,7 +4550,12 @@ export default function SalesPipelinePage() {
       .sort((a, b) => b.metrics.touch1s - a.metrics.touch1s);
 
     return (
-      <div className="pb-8 space-y-6">
+      <div className="pb-4 space-y-4">
+        {/* [Space optimization, May 2026] Tightened pb-8 → pb-4 and
+            space-y-6 → space-y-4 inside the Metrics tab. Methodology
+            block (80px of text at the bottom) moved into a popover
+            on the Team comparison header to save space without
+            losing the explanatory text. */}
         {/* Controls */}
         <div className="flex flex-wrap items-center gap-3">
           <Select value={selectedId} onValueChange={setMetricsUserId}>
@@ -4554,11 +4586,11 @@ export default function SalesPipelinePage() {
         </div>
 
         {/* Per-user scorecard */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">{selectedUser?.name || 'Select a user'}</h3>
-              <p className="text-xs text-gray-500">Last {metricsRangeDays} days</p>
+              <h3 className="text-base font-semibold text-gray-900">{selectedUser?.name || 'Select a user'}</h3>
+              <p className="text-[11px] text-gray-500">Last {metricsRangeDays} days</p>
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -4575,8 +4607,33 @@ export default function SalesPipelinePage() {
 
         {/* Team comparison */}
         <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-900">Team comparison</h4>
+          <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <h4 className="text-sm font-semibold text-gray-900">Team comparison</h4>
+              {/* [Space optimization] Methodology popover — the previous
+                  ~80px disclosure block at the bottom of the tab was
+                  always-visible explainer text. Same content, behind
+                  a help icon. */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    title="How metrics are computed"
+                    aria-label="How metrics are computed"
+                  >
+                    <HelpCircle className="h-3.5 w-3.5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent side="bottom" align="start" className="w-[400px] text-xs text-gray-600 space-y-1.5 leading-relaxed">
+                  <p className="font-semibold text-gray-900 mb-1">How metrics are computed</p>
+                  <p>· <strong>Touch 1s sent</strong> — opportunities owned by the rep in <code className="bg-gray-100 px-1 rounded text-[10px]">cold_dm</code> with <code className="bg-gray-100 px-1 rounded text-[10px]">bump_number ≥ 1</code> created in the window.</p>
+                  <p>· <strong>Replies</strong> — proxy: opps that moved past <code className="bg-gray-100 px-1 rounded text-[10px]">cold_dm</code> (created or last-updated in window). Improve by logging inbound activities explicitly.</p>
+                  <p>· <strong>Qualified</strong> — opps with at least 3 of 5 BANT+ qualification checks marked, set on the opportunity slide-over.</p>
+                  <p>· <strong>Calls booked / held / no-shows</strong> — bookings where the booking page is owned by the rep. Mark held / no-show on /crm/meetings after each call.</p>
+                </PopoverContent>
+              </Popover>
+            </div>
             <span className="text-xs text-gray-500">{teamRows.length} active rep{teamRows.length === 1 ? '' : 's'}</span>
           </div>
           {teamRows.length === 0 ? (
@@ -4629,14 +4686,9 @@ export default function SalesPipelinePage() {
           )}
         </div>
 
-        {/* Methodology disclosure — managers always ask "what counts as a reply?" */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-xs text-gray-600 space-y-1">
-          <p><strong>How metrics are computed:</strong></p>
-          <p>· <strong>Touch 1s sent</strong> — opportunities owned by the rep in <code>cold_dm</code> with <code>bump_number ≥ 1</code> created in the window.</p>
-          <p>· <strong>Replies</strong> — proxy: opps that moved past <code>cold_dm</code> (created or last-updated in window). Improve by logging inbound activities explicitly.</p>
-          <p>· <strong>Qualified</strong> — opps with at least 3 of 5 BANT+ qualification checks marked, set on the opportunity slide-over.</p>
-          <p>· <strong>Calls booked / held / no-shows</strong> — bookings where the booking page is owned by the rep. Mark held / no-show on /crm/meetings after each call.</p>
-        </div>
+        {/* [Space optimization] Methodology block moved into a
+            popover on the Team comparison header above. Same content,
+            ~80px saved. */}
       </div>
     );
   };
@@ -7099,7 +7151,14 @@ export default function SalesPipelinePage() {
         </div>
       </div>
 
-      {/* Weekly Activity Funnel — canonical 5-stage outbound funnel.
+      {/* [Sales-pipeline space optimization, May 2026] Combined
+          "Pipeline Activity" container — was previously two separate
+          cards (Weekly Funnel + Attention Cards grid) with a 24px gap.
+          Merging them into one card saves ~100px of vertical real
+          estate, removes a redundant border, and visually groups two
+          things that belong together (volume signal + urgency signal).
+
+          Weekly Activity Funnel — canonical 5-stage outbound funnel.
           Outreach → Replies → Calls Booked → Calls Taken → Proposals.
           Counts DISTINCT opportunities per stage (one prospect DM'd 5x
           = 1 outreach). Backed by:
@@ -7189,147 +7248,203 @@ export default function SalesPipelinePage() {
             );
           })()
         )}
+
+        {/* [Space optimization] Attention Cards moved inside this
+            container — same five urgency tiles, but the shared border
+            + tighter divider (vs the previous standalone grid with a
+            24px gap above it) saves about 100px while making the
+            relationship between activity volume (funnel) and urgency
+            (alerts) more obvious. */}
+        <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+          {/* Booking Needed */}
+          <Card
+            className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'booking_needed' ? 'ring-2 ring-red-400 shadow-md' : ''} ${alertMetrics.bamfamViolations > 0 ? 'border-l-red-500 bg-red-50' : 'border-l-gray-200 bg-white'}`}
+            onClick={() => {
+              if (alertCardFilter === 'booking_needed') { setAlertCardFilter('none'); return; }
+              setAlertCardFilter('booking_needed'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
+            }}
+          >
+            <CardContent className="pt-2.5 pb-2.5 px-3">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Calendar className={`h-3.5 w-3.5 ${alertMetrics.bamfamViolations > 0 ? 'text-red-500' : 'text-gray-400'}`} />
+                <p className={`text-[10px] font-semibold uppercase tracking-wider ${alertMetrics.bamfamViolations > 0 ? 'text-red-500' : 'text-gray-400'}`}>Booking Needed</p>
+              </div>
+              <p className={`text-xl font-bold leading-none ${alertMetrics.bamfamViolations > 0 ? 'text-red-700' : 'text-gray-900'}`}>{alertMetrics.bamfamViolations}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">No future meeting</p>
+            </CardContent>
+          </Card>
+
+          {/* Overdue */}
+          <Card
+            className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'overdue' ? 'ring-2 ring-orange-400 shadow-md' : ''} ${alertMetrics.overdueFollowups > 0 ? 'border-l-orange-500 bg-orange-50' : 'border-l-gray-200 bg-white'}`}
+            onClick={() => {
+              if (alertCardFilter === 'overdue') { setAlertCardFilter('none'); return; }
+              setAlertCardFilter('overdue'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
+            }}
+          >
+            <CardContent className="pt-2.5 pb-2.5 px-3">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Clock className={`h-3.5 w-3.5 ${alertMetrics.overdueFollowups > 0 ? 'text-orange-500' : 'text-gray-400'}`} />
+                <p className={`text-[10px] font-semibold uppercase tracking-wider ${alertMetrics.overdueFollowups > 0 ? 'text-orange-500' : 'text-gray-400'}`}>Overdue</p>
+              </div>
+              <p className={`text-xl font-bold leading-none ${alertMetrics.overdueFollowups > 0 ? 'text-orange-700' : 'text-gray-900'}`}>{alertMetrics.overdueFollowups}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Past meeting date</p>
+            </CardContent>
+          </Card>
+
+          {/* Stale */}
+          <Card
+            className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'stale' ? 'ring-2 ring-amber-400 shadow-md' : ''} ${alertMetrics.staleDeals > 0 ? 'border-l-amber-500 bg-amber-50' : 'border-l-gray-200 bg-white'}`}
+            onClick={() => {
+              if (alertCardFilter === 'stale') { setAlertCardFilter('none'); return; }
+              setAlertCardFilter('stale'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
+            }}
+          >
+            <CardContent className="pt-2.5 pb-2.5 px-3">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <RotateCcw className={`h-3.5 w-3.5 ${alertMetrics.staleDeals > 0 ? 'text-amber-500' : 'text-gray-400'}`} />
+                <p className={`text-[10px] font-semibold uppercase tracking-wider ${alertMetrics.staleDeals > 0 ? 'text-amber-600' : 'text-gray-400'}`}>Stale (7d+)</p>
+              </div>
+              <p className={`text-xl font-bold leading-none ${alertMetrics.staleDeals > 0 ? 'text-amber-700' : 'text-gray-900'}`}>{alertMetrics.staleDeals}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">No contact 7+ days</p>
+            </CardContent>
+          </Card>
+
+          {/* At Risk */}
+          <Card
+            className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'at_risk' ? 'ring-2 ring-rose-400 shadow-md' : ''} ${alertMetrics.dealsAtRisk > 0 ? 'border-l-rose-500 bg-rose-50' : 'border-l-gray-200 bg-white'}`}
+            onClick={() => {
+              if (alertCardFilter === 'at_risk') { setAlertCardFilter('none'); return; }
+              setAlertCardFilter('at_risk'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
+            }}
+          >
+            <CardContent className="pt-2.5 pb-2.5 px-3">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <TrendingUp className={`h-3.5 w-3.5 ${alertMetrics.dealsAtRisk > 0 ? 'text-rose-500' : 'text-gray-400'}`} />
+                <p className={`text-[10px] font-semibold uppercase tracking-wider ${alertMetrics.dealsAtRisk > 0 ? 'text-rose-500' : 'text-gray-400'}`}>At Risk</p>
+              </div>
+              <p className={`text-xl font-bold leading-none ${alertMetrics.dealsAtRisk > 0 ? 'text-rose-700' : 'text-gray-900'}`}>{alertMetrics.dealsAtRisk}</p>
+              <p className="text-[10px] text-gray-400 mt-0.5">Closing, temp &lt; 40</p>
+            </CardContent>
+          </Card>
+
+          {/* Meetings */}
+          <Card
+            className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'meetings' ? 'ring-2 ring-blue-400 shadow-md' : ''} ${alertMetrics.meetingsToday > 0 ? 'border-l-blue-500 bg-blue-50' : 'border-l-gray-200 bg-white'}`}
+            onClick={() => {
+              if (alertCardFilter === 'meetings') { setAlertCardFilter('none'); return; }
+              setAlertCardFilter('meetings'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
+            }}
+          >
+            <CardContent className="pt-2.5 pb-2.5 px-3">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Calendar className={`h-3.5 w-3.5 ${alertMetrics.meetingsToday > 0 ? 'text-blue-500' : 'text-gray-400'}`} />
+                <p className={`text-[10px] font-semibold uppercase tracking-wider ${alertMetrics.meetingsToday > 0 ? 'text-blue-500' : 'text-gray-400'}`}>Meetings</p>
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <p className={`text-xl font-bold leading-none ${alertMetrics.meetingsToday > 0 ? 'text-blue-700' : 'text-gray-900'}`}>
+                  {alertMetrics.meetingsToday > 0 ? alertMetrics.meetingsToday : alertMetrics.meetingsThisWeek}
+                </p>
+                {alertMetrics.meetingsToday > 0 && alertMetrics.meetingsThisWeek > alertMetrics.meetingsToday && (
+                  <p className="text-[10px] text-blue-400">+{alertMetrics.meetingsThisWeek - alertMetrics.meetingsToday} wk</p>
+                )}
+              </div>
+              <p className="text-[10px] text-gray-400 mt-0.5">{alertMetrics.meetingsToday > 0 ? 'Today' : 'This week'}</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      {/* Forecast + Metrics — separate sub-section so the manager-style
-          analytics live above the operational tabs. Independent state
-          (topSectionTab) keeps it from resetting when the user switches
-          main tabs below. */}
+      {/* [Sales-pipeline space optimization, May 2026] Forecast +
+          Metrics is now collapsible — the full Tabs view is 400-1200px
+          tall and was always-visible above the operational tabs, so
+          users scrolled past it on every visit. The summary strip
+          surfaces the four most-asked numbers (pipeline value,
+          weighted forecast, this-month value, at-risk count) so
+          managers still see headline data without expanding. State
+          persists in localStorage so sales-focused users can pin it
+          open once. */}
       <div className="bg-white rounded-xl border border-gray-200">
-        <Tabs value={topSectionTab} onValueChange={v => setTopSectionTab(v as 'forecast' | 'metrics')}>
-          <div className="flex items-center justify-between px-5 pt-4 border-b border-gray-100">
-            <TabsList className="bg-transparent p-0 h-auto gap-1">
-              <TabsTrigger
-                value="forecast"
-                className="flex items-center gap-2 data-[state=active]:bg-brand-light data-[state=active]:text-brand data-[state=active]:shadow-none rounded-md px-3 py-1.5 text-sm"
-              >
-                <TrendingUp className="h-4 w-4" />
-                Forecast
-                {forecastOpps.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 text-[10px]">{forecastOpps.length}</Badge>
-                )}
+        <button
+          type="button"
+          onClick={toggleAnalytics}
+          className="w-full flex items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50 transition-colors text-left"
+          aria-expanded={showAnalytics}
+          aria-controls="sp-analytics-panel"
+        >
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <BarChart3 className="h-4 w-4 text-brand flex-shrink-0" />
+            <span className="text-sm font-semibold text-gray-900 uppercase tracking-wider flex-shrink-0">
+              Forecast & Metrics
+            </span>
+            {/* Always-visible summary strip — replaces the need to
+                expand for the four most-referenced numbers. Hidden when
+                expanded so the full Tabs view (with its own KPI strip)
+                doesn't visually duplicate. */}
+            {!showAnalytics && (
+              <span className="hidden sm:flex items-center gap-3 ml-2 text-xs text-gray-600 flex-wrap min-w-0">
+                <span className="tabular-nums">
+                  <span className="text-gray-400">Pipeline</span>{' '}
+                  <span className="font-semibold text-gray-900">${forecastKpis.totalValue.toLocaleString()}</span>
+                </span>
+                <span className="tabular-nums">
+                  <span className="text-gray-400">Weighted</span>{' '}
+                  <span className="font-semibold text-emerald-700">${Math.round(forecastKpis.weighted).toLocaleString()}</span>
+                </span>
+                <span className="tabular-nums">
+                  <span className="text-gray-400">This month</span>{' '}
+                  <span className="font-semibold text-sky-700">${forecastKpis.thisMonthValue.toLocaleString()}</span>
+                </span>
                 {forecastKpis.atRiskCount > 0 && (
-                  <Badge variant="secondary" className="ml-1 bg-red-100 text-red-700 hover:bg-red-100 text-[10px]" title={`${forecastKpis.atRiskCount} at-risk`}>
-                    {forecastKpis.atRiskCount} at-risk
-                  </Badge>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
+                    {forecastKpis.atRiskCount} at risk
+                  </span>
                 )}
-              </TabsTrigger>
-              <TabsTrigger
-                value="metrics"
-                className="flex items-center gap-2 data-[state=active]:bg-brand-light data-[state=active]:text-brand data-[state=active]:shadow-none rounded-md px-3 py-1.5 text-sm"
-              >
-                <BarChart3 className="h-4 w-4" />
-                Metrics
-              </TabsTrigger>
-            </TabsList>
+              </span>
+            )}
           </div>
-          <TabsContent value="forecast" className="mt-0 p-5 pt-4">
-            {renderForecastTab()}
-          </TabsContent>
-          <TabsContent value="metrics" className="mt-0 p-5 pt-4">
-            {renderMetricsTab()}
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* Attention Cards — urgency items for managers (clickable, always unfiltered) */}
-      <div className="grid grid-cols-5 gap-3">
-        {/* Booking Needed */}
-        <Card
-          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'booking_needed' ? 'ring-2 ring-red-400 shadow-md' : ''} ${alertMetrics.bamfamViolations > 0 ? 'border-l-red-500 bg-red-50' : 'border-l-gray-200 bg-white'}`}
-          onClick={() => {
-            if (alertCardFilter === 'booking_needed') { setAlertCardFilter('none'); return; }
-            setAlertCardFilter('booking_needed'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
-          }}
-        >
-          <CardContent className="pt-3 pb-3 px-4">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Calendar className={`h-3.5 w-3.5 ${alertMetrics.bamfamViolations > 0 ? 'text-red-500' : 'text-gray-400'}`} />
-              <p className={`text-[11px] font-semibold uppercase tracking-wider ${alertMetrics.bamfamViolations > 0 ? 'text-red-500' : 'text-gray-400'}`}>Booking Needed</p>
-            </div>
-            <p className={`text-2xl font-bold leading-none ${alertMetrics.bamfamViolations > 0 ? 'text-red-700' : 'text-gray-900'}`}>{alertMetrics.bamfamViolations}</p>
-            <p className="text-[11px] text-gray-400 mt-1">No future meeting set</p>
-          </CardContent>
-        </Card>
-
-        {/* Overdue */}
-        <Card
-          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'overdue' ? 'ring-2 ring-orange-400 shadow-md' : ''} ${alertMetrics.overdueFollowups > 0 ? 'border-l-orange-500 bg-orange-50' : 'border-l-gray-200 bg-white'}`}
-          onClick={() => {
-            if (alertCardFilter === 'overdue') { setAlertCardFilter('none'); return; }
-            setAlertCardFilter('overdue'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
-          }}
-        >
-          <CardContent className="pt-3 pb-3 px-4">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Clock className={`h-3.5 w-3.5 ${alertMetrics.overdueFollowups > 0 ? 'text-orange-500' : 'text-gray-400'}`} />
-              <p className={`text-[11px] font-semibold uppercase tracking-wider ${alertMetrics.overdueFollowups > 0 ? 'text-orange-500' : 'text-gray-400'}`}>Overdue</p>
-            </div>
-            <p className={`text-2xl font-bold leading-none ${alertMetrics.overdueFollowups > 0 ? 'text-orange-700' : 'text-gray-900'}`}>{alertMetrics.overdueFollowups}</p>
-            <p className="text-[11px] text-gray-400 mt-1">Past meeting date</p>
-          </CardContent>
-        </Card>
-
-        {/* Stale */}
-        <Card
-          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'stale' ? 'ring-2 ring-amber-400 shadow-md' : ''} ${alertMetrics.staleDeals > 0 ? 'border-l-amber-500 bg-amber-50' : 'border-l-gray-200 bg-white'}`}
-          onClick={() => {
-            if (alertCardFilter === 'stale') { setAlertCardFilter('none'); return; }
-            setAlertCardFilter('stale'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
-          }}
-        >
-          <CardContent className="pt-3 pb-3 px-4">
-            <div className="flex items-center gap-1.5 mb-1">
-              <RotateCcw className={`h-3.5 w-3.5 ${alertMetrics.staleDeals > 0 ? 'text-amber-500' : 'text-gray-400'}`} />
-              <p className={`text-[11px] font-semibold uppercase tracking-wider ${alertMetrics.staleDeals > 0 ? 'text-amber-600' : 'text-gray-400'}`}>Stale (7d+)</p>
-            </div>
-            <p className={`text-2xl font-bold leading-none ${alertMetrics.staleDeals > 0 ? 'text-amber-700' : 'text-gray-900'}`}>{alertMetrics.staleDeals}</p>
-            <p className="text-[11px] text-gray-400 mt-1">No contact in 7+ days</p>
-          </CardContent>
-        </Card>
-
-        {/* At Risk */}
-        <Card
-          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'at_risk' ? 'ring-2 ring-rose-400 shadow-md' : ''} ${alertMetrics.dealsAtRisk > 0 ? 'border-l-rose-500 bg-rose-50' : 'border-l-gray-200 bg-white'}`}
-          onClick={() => {
-            if (alertCardFilter === 'at_risk') { setAlertCardFilter('none'); return; }
-            setAlertCardFilter('at_risk'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
-          }}
-        >
-          <CardContent className="pt-3 pb-3 px-4">
-            <div className="flex items-center gap-1.5 mb-1">
-              <TrendingUp className={`h-3.5 w-3.5 ${alertMetrics.dealsAtRisk > 0 ? 'text-rose-500' : 'text-gray-400'}`} />
-              <p className={`text-[11px] font-semibold uppercase tracking-wider ${alertMetrics.dealsAtRisk > 0 ? 'text-rose-500' : 'text-gray-400'}`}>At Risk</p>
-            </div>
-            <p className={`text-2xl font-bold leading-none ${alertMetrics.dealsAtRisk > 0 ? 'text-rose-700' : 'text-gray-900'}`}>{alertMetrics.dealsAtRisk}</p>
-            <p className="text-[11px] text-gray-400 mt-1">Closing deals, temp &lt; 40</p>
-          </CardContent>
-        </Card>
-
-        {/* Meetings */}
-        <Card
-          className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'meetings' ? 'ring-2 ring-blue-400 shadow-md' : ''} ${alertMetrics.meetingsToday > 0 ? 'border-l-blue-500 bg-blue-50' : 'border-l-gray-200 bg-white'}`}
-          onClick={() => {
-            if (alertCardFilter === 'meetings') { setAlertCardFilter('none'); return; }
-            setAlertCardFilter('meetings'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
-          }}
-        >
-          <CardContent className="pt-3 pb-3 px-4">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Calendar className={`h-3.5 w-3.5 ${alertMetrics.meetingsToday > 0 ? 'text-blue-500' : 'text-gray-400'}`} />
-              <p className={`text-[11px] font-semibold uppercase tracking-wider ${alertMetrics.meetingsToday > 0 ? 'text-blue-500' : 'text-gray-400'}`}>Meetings</p>
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <p className={`text-2xl font-bold leading-none ${alertMetrics.meetingsToday > 0 ? 'text-blue-700' : 'text-gray-900'}`}>
-                {alertMetrics.meetingsToday > 0 ? alertMetrics.meetingsToday : alertMetrics.meetingsThisWeek}
-              </p>
-              {alertMetrics.meetingsToday > 0 && alertMetrics.meetingsThisWeek > alertMetrics.meetingsToday && (
-                <p className="text-xs text-blue-400">+{alertMetrics.meetingsThisWeek - alertMetrics.meetingsToday} wk</p>
-              )}
-            </div>
-            <p className="text-[11px] text-gray-400 mt-1">{alertMetrics.meetingsToday > 0 ? 'Today' : 'This week'}</p>
-          </CardContent>
-        </Card>
+          <ChevronDown
+            className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform ${showAnalytics ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {showAnalytics && (
+          <div id="sp-analytics-panel" className="border-t border-gray-100">
+            <Tabs value={topSectionTab} onValueChange={v => setTopSectionTab(v as 'forecast' | 'metrics')}>
+              <div className="flex items-center justify-between px-5 pt-4 border-b border-gray-100">
+                <TabsList className="bg-transparent p-0 h-auto gap-1">
+                  <TabsTrigger
+                    value="forecast"
+                    className="flex items-center gap-2 data-[state=active]:bg-brand-light data-[state=active]:text-brand data-[state=active]:shadow-none rounded-md px-3 py-1.5 text-sm"
+                  >
+                    <TrendingUp className="h-4 w-4" />
+                    Forecast
+                    {forecastOpps.length > 0 && (
+                      <Badge variant="secondary" className="ml-1 text-[10px]">{forecastOpps.length}</Badge>
+                    )}
+                    {forecastKpis.atRiskCount > 0 && (
+                      <Badge variant="secondary" className="ml-1 bg-red-100 text-red-700 hover:bg-red-100 text-[10px]" title={`${forecastKpis.atRiskCount} at-risk`}>
+                        {forecastKpis.atRiskCount} at-risk
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="metrics"
+                    className="flex items-center gap-2 data-[state=active]:bg-brand-light data-[state=active]:text-brand data-[state=active]:shadow-none rounded-md px-3 py-1.5 text-sm"
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                    Metrics
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+              <TabsContent value="forecast" className="mt-0 p-5 pt-4">
+                {renderForecastTab()}
+              </TabsContent>
+              <TabsContent value="metrics" className="mt-0 p-5 pt-4">
+                {renderMetricsTab()}
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
       </div>
 
       {/* Sales Dashboard */}
