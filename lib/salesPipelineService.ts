@@ -203,6 +203,48 @@ export interface SalesPipelineOpportunity extends CRMOpportunity {
 
 export type ActivityDirection = 'outbound' | 'inbound';
 
+/**
+ * Unified timeline entry — produced by getUnifiedTimeline().
+ *
+ * Wraps four heterogeneous sources (manual activities, stage history,
+ * bookings, Telegram messages) in one shape so the slide-over render
+ * doesn't have to branch per-source beyond an icon lookup. The
+ * `source` discriminator is preserved so callers can style per origin
+ * (e.g. dim Telegram rows, bold stage changes).
+ */
+export type TimelineSource = 'activity' | 'stage_change' | 'meeting' | 'telegram';
+export interface TimelineEntry {
+  /** Synthetic stable id — prefixed per source so it stays unique
+   *  across the merged feed (act-XXX / stage-XXX / booking-XXX / tg-XXX). */
+  id: string;
+  source: TimelineSource;
+  /** ActivityType when source='activity'. For other sources, a coarse
+   *  category that maps to an icon in the render layer ('stage_change',
+   *  'meeting', 'message'). */
+  type: ActivityType | 'stage_change';
+  title: string;
+  description: string | null;
+  outcome?: string | null;
+  next_step?: string | null;
+  next_step_date?: string | null;
+  attachment_url?: string | null;
+  attachment_name?: string | null;
+  direction?: ActivityDirection;
+  created_at: string;
+}
+
+/**
+ * Human-readable stage label for the timeline ("Stage: cold DM → warm
+ * response"). Mirrors STAGE_LABELS in the sales-pipeline page but kept
+ * here because the service shouldn't depend on a UI module.
+ */
+function humanStage(s: string): string {
+  return (s || '')
+    .replace(/_/g, ' ')
+    .replace(/\bv2\b/, '')
+    .trim();
+}
+
 export interface CRMActivity {
   id: string;
   opportunity_id: string;
@@ -510,6 +552,148 @@ export class SalesPipelineService {
     // Runtime guarantee — the migration backfilled all rows to 'outbound'
     // and the createActivity write path always sets it.
     return (data || []) as unknown as CRMActivity[];
+  }
+
+  /**
+   * Unified per-opportunity timeline. Merges four sources into one
+   * chronological feed so the slide-over can render a single list
+   * instead of users having to log everything manually.
+   *
+   * Sources (in priority order):
+   *   1. crm_activities — manual logs + auto-stamped bumps (existing)
+   *   2. crm_stage_history — every stage transition with prior/new stage
+   *   3. bookings — meetings booked + their attendance status (held / no-show)
+   *   4. telegram_messages — chat for this opp's Telegram group, when set.
+   *      Capped at 25 most-recent messages to keep noise down. Skipped
+   *      entirely when opportunity.gc is null.
+   *
+   * Temperature changes (a 5th source the user requested) are NOT
+   * included — there's no temperature_score_history table, so we can't
+   * surface a meaningful before/after. If a history table lands later,
+   * the same shape can be plugged in here.
+   *
+   * Each source's rows are mapped to a common TimelineEntry shape so
+   * the render layer doesn't need per-source branching beyond an
+   * icon + variant lookup.
+   */
+  static async getUnifiedTimeline(
+    opportunityId: string,
+    opp?: { gc?: string | null },
+  ): Promise<TimelineEntry[]> {
+    type TelegramMsg = {
+      id: string;
+      from_user_name: string | null;
+      from_username: string | null;
+      text: string | null;
+      message_date: string;
+    };
+
+    // Fire all reads in parallel — they're independent.
+    const [actsRes, stageRes, bookingsRes, telegramRes] = await Promise.all([
+      supabase
+        .from('crm_activities')
+        .select('*')
+        .eq('opportunity_id', opportunityId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('crm_stage_history')
+        .select('id, from_stage, to_stage, changed_at, notes')
+        .eq('opportunity_id', opportunityId)
+        .order('changed_at', { ascending: false }),
+      supabase
+        .from('bookings')
+        .select('id, booker_name, booker_email, meeting_date, start_time, status, attendance_status, notes, created_at')
+        .eq('opportunity_id', opportunityId)
+        .order('created_at', { ascending: false }),
+      // Skip Telegram fetch when there's no group chat set.
+      // Cast as Promise<{ data: TelegramMsg[] | null }> so TS doesn't
+      // complain about the conditional shape.
+      opp?.gc
+        ? supabase
+            .from('telegram_messages')
+            .select('id, from_user_name, from_username, text, message_date')
+            .eq('chat_id', opp.gc)
+            .order('message_date', { ascending: false })
+            .limit(25)
+        : Promise.resolve({ data: null as TelegramMsg[] | null }),
+    ]);
+
+    const entries: TimelineEntry[] = [];
+
+    // 1. Manual + auto-stamped activities (existing crm_activities source)
+    for (const a of (actsRes.data || []) as any[]) {
+      entries.push({
+        id: `act-${a.id}`,
+        source: 'activity',
+        type: a.type as ActivityType,
+        title: a.title,
+        description: a.description,
+        outcome: a.outcome,
+        next_step: a.next_step,
+        next_step_date: a.next_step_date,
+        attachment_url: a.attachment_url,
+        attachment_name: a.attachment_name,
+        direction: a.direction,
+        created_at: a.created_at,
+      });
+    }
+
+    // 2. Stage transitions
+    for (const s of (stageRes.data || []) as any[]) {
+      entries.push({
+        id: `stage-${s.id}`,
+        source: 'stage_change',
+        type: 'stage_change',
+        title: s.from_stage
+          ? `Stage: ${humanStage(s.from_stage)} → ${humanStage(s.to_stage)}`
+          : `Stage set to ${humanStage(s.to_stage)}`,
+        description: s.notes,
+        created_at: s.changed_at,
+      });
+    }
+
+    // 3. Meeting events. Each booking emits one entry, with attendance
+    //    folded into the title/outcome when present (so users see
+    //    "Discovery call — Held" or "Discovery call — No-show").
+    for (const b of (bookingsRes.data || []) as any[]) {
+      const isPast = new Date(b.meeting_date) < new Date();
+      const attendance = b.attendance_status as string | null;
+      const attendanceSuffix = isPast && attendance
+        ? attendance === 'held' ? ' — Held'
+          : attendance === 'no_show' ? ' — No-show'
+          : ''
+        : '';
+      entries.push({
+        id: `booking-${b.id}`,
+        source: 'meeting',
+        type: 'meeting',
+        title: `Meeting with ${b.booker_name || b.booker_email}${attendanceSuffix}`,
+        description: b.notes,
+        outcome: attendance,
+        created_at: b.meeting_date || b.created_at,
+      });
+    }
+
+    // 4. Telegram messages. Cleaned to remove media-only noise (the
+    //    bot stores "[Media]" placeholders). Truncated to 200 chars
+    //    inline; the slide-over already truncates long text on display.
+    for (const m of (telegramRes.data || []) as TelegramMsg[]) {
+      const text = (m.text || '').trim();
+      if (!text || text === '[Media]') continue;
+      const sender = m.from_user_name || m.from_username || 'Unknown';
+      entries.push({
+        id: `tg-${m.id}`,
+        source: 'telegram',
+        type: 'message',
+        title: `Telegram · ${sender}`,
+        description: text.length > 280 ? text.slice(0, 280) + '…' : text,
+        created_at: m.message_date,
+      });
+    }
+
+    // Sort newest-first across all sources.
+    entries.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    return entries;
   }
 
   static async createActivity(activityData: CreateActivityData): Promise<CRMActivity> {

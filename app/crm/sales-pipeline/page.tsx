@@ -60,6 +60,8 @@ import {
   SalesPipelineService,
   SalesPipelineOpportunity,
   CRMActivity,
+  TimelineEntry,
+  TimelineSource,
   SalesPipelineStage,
   Bucket,
   DmAccount,
@@ -291,7 +293,12 @@ export default function SalesPipelinePage() {
       setStageHistoryLoading(false);
     }
   };
-  const [activities, setActivities] = useState<CRMActivity[]>([]);
+  // [Activity Timeline auto-stamp, May 2026] Switched from manual-only
+  // CRMActivity[] to the unified TimelineEntry[] which merges manual
+  // activities + stage transitions + meeting events + Telegram messages
+  // into one chronological feed. Render layer below branches per
+  // source for icon/styling; everything else is unchanged.
+  const [activities, setActivities] = useState<TimelineEntry[]>([]);
   const [activityForm, setActivityForm] = useState<CreateActivityData>({ opportunity_id: '', type: 'note', title: '' });
   const [activityMeetingDate, setActivityMeetingDate] = useState<string | undefined>(undefined);
   const [activityMeetingTime, setActivityMeetingTime] = useState<string | undefined>(undefined);
@@ -759,7 +766,11 @@ export default function SalesPipelinePage() {
 
   const fetchActivities = async (oppId: string) => {
     try {
-      const acts = await SalesPipelineService.getActivities(oppId);
+      // [Activity Timeline auto-stamp] Pull the unified feed (manual +
+      // stage history + bookings + Telegram). Pass the opp so the
+      // service can scope Telegram messages by gc (group chat id).
+      const opp = opportunities.find(o => o.id === oppId);
+      const acts = await SalesPipelineService.getUnifiedTimeline(oppId, opp ? { gc: opp.gc } : undefined);
       setActivities(acts);
     } catch (err) {
       console.error('Error fetching activities:', err);
@@ -2327,7 +2338,12 @@ export default function SalesPipelinePage() {
     );
   };
 
-  const activityIcon = (type: ActivityType) => {
+  // [Auto-stamp, May 2026] Accepts the union 'ActivityType | "stage_change"'
+  // so synthetic timeline entries from crm_stage_history can render
+  // their own icon. The render layer never relies on the helper's
+  // return being non-null — JSX renders {undefined} as nothing — so
+  // an unhandled type just shows no icon.
+  const activityIcon = (type: ActivityType | 'stage_change') => {
     switch (type) {
       case 'call': return <Phone className="h-3.5 w-3.5" />;
       case 'message': return <MessageSquare className="h-3.5 w-3.5" />;
@@ -2335,6 +2351,7 @@ export default function SalesPipelinePage() {
       case 'proposal': return <FileText className="h-3.5 w-3.5" />;
       case 'note': return <StickyNote className="h-3.5 w-3.5" />;
       case 'bump': return <Zap className="h-3.5 w-3.5" />;
+      case 'stage_change': return <ArrowRight className="h-3.5 w-3.5" />;
     }
   };
 
@@ -5950,14 +5967,32 @@ export default function SalesPipelinePage() {
                 </div>
               </div>
 
-              {/* Activity list */}
+              {/* Activity list — [Auto-stamp, May 2026] now renders the
+                  unified TimelineEntry feed (manual + stage + meetings
+                  + Telegram). Source-specific styling lives in the
+                  helpers below the map; per-entry render is mostly
+                  source-agnostic. */}
               <div className="space-y-4">
                 {activities.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-6">No activities yet</p>
-                ) : activities.map(act => (
+                  <p className="text-sm text-gray-400 text-center py-6">No activity yet</p>
+                ) : activities.map(act => {
+                  // Per-source visual treatment so the user can scan
+                  // origin at a glance: manual = gray, stage_change =
+                  // brand-tinted, meeting = sky, telegram = subtle.
+                  const sourceStyle =
+                    act.source === 'stage_change' ? { wrapper: 'bg-brand/10 text-brand', badge: 'bg-brand/10 text-brand border-brand/30' } :
+                    act.source === 'meeting'      ? { wrapper: 'bg-purple-100 text-purple-700', badge: 'bg-purple-50 text-purple-700 border-purple-200' } :
+                    act.source === 'telegram'     ? { wrapper: 'bg-sky-50 text-sky-600',    badge: 'bg-sky-50 text-sky-700 border-sky-200' } :
+                    { wrapper: 'bg-gray-100 text-gray-500', badge: '' };
+                  const sourceLabel =
+                    act.source === 'stage_change' ? 'stage' :
+                    act.source === 'meeting'      ? 'meeting' :
+                    act.source === 'telegram'     ? 'telegram' :
+                    act.type;
+                  return (
                   <div key={act.id} className="flex gap-3">
                     <div className="mt-0.5 flex flex-col items-center">
-                      <div className="p-2 rounded-full bg-gray-100 text-gray-500">
+                      <div className={`p-2 rounded-full ${sourceStyle.wrapper}`}>
                         {activityIcon(act.type)}
                       </div>
                       <div className="w-px flex-1 bg-gray-200 mt-2" />
@@ -5965,7 +6000,7 @@ export default function SalesPipelinePage() {
                     <div className="flex-1 min-w-0 pb-4 overflow-hidden">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium text-gray-900 break-words">{linkifyText(act.title)}</span>
-                        <Badge variant="outline" className="text-[10px] px-1.5 capitalize flex-shrink-0">{act.type}</Badge>
+                        <Badge variant="outline" className={`text-[10px] px-1.5 capitalize flex-shrink-0 ${sourceStyle.badge}`}>{sourceLabel}</Badge>
                       </div>
                       {act.description && <p className="text-sm text-gray-600 mt-1 break-words overflow-wrap-anywhere" style={{ overflowWrap: 'anywhere' }}>{linkifyText(act.description)}</p>}
                       {act.outcome && (
@@ -6001,7 +6036,8 @@ export default function SalesPipelinePage() {
                       </span>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
