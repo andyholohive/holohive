@@ -618,12 +618,7 @@ export default function ChatPage() {
               <p className="text-xs text-gray-500">Powered by GPT-4o</p>
             </div>
           </div>
-          <Button
-            onClick={createNewSession}
-            className="w-full"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-            disabled={loading}
-          >
+          <Button variant="brand" onClick={createNewSession} className="w-full" disabled={loading}>
             <Plus className="w-4 h-4 mr-2" />
             New Chat
           </Button>
@@ -1028,13 +1023,7 @@ export default function ChatPage() {
                   className="flex-1 text-sm min-h-[48px] max-h-[200px] resize-none focus-brand overflow-y-auto"
                   rows={1}
                 />
-                <Button
-                  onClick={sendMessage}
-                  disabled={!message.trim() || sending}
-                  size="sm"
-                  className="h-12 w-12 p-0 rounded-xl hover:opacity-90 transition-all duration-200 flex-shrink-0"
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                >
+                <Button variant="brand" onClick={sendMessage} disabled={!message.trim() || sending} size="sm" className="h-12 w-12 p-0 rounded-xl hover:opacity-90 transition-all duration-200 flex-shrink-0">
                   {sending ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                   ) : (

@@ -590,12 +590,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
                 </div>
 
                 <div className="pt-4">
-                  <Button
-                    type="submit"
-                    disabled={submitting || !bookerName.trim() || !bookerEmail.trim()}
-                    className="w-full h-12 text-base font-medium rounded-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  >
+                  <Button variant="brand" type="submit" disabled={submitting || !bookerName.trim() || !bookerEmail.trim()} className="w-full h-12 text-base font-medium rounded-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                     {submitting ? (
                       <>
                         <Loader className="h-5 w-5 animate-spin" />

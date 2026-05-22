@@ -671,13 +671,7 @@ export default function ProspectsTab() {
           >
             <Eye className="h-3 w-3 mr-1" /> Mark Potential
           </Button>
-          <Button
-            size="sm"
-            className="h-7 text-xs text-white"
-            style={{ backgroundColor: '#3e8692' }}
-            onClick={handleBulkPromote}
-            disabled={bulkActing}
-          >
+          <Button variant="brand" size="sm" className="h-7 text-xs text-white" onClick={handleBulkPromote} disabled={bulkActing}>
             {bulkActing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <ArrowRight className="h-3 w-3 mr-1" />}
             Add to Pipeline
           </Button>
@@ -1079,12 +1073,7 @@ export default function ProspectsTab() {
               {scraperResult ? 'Done' : 'Cancel'}
             </Button>
             {(!scraperResult || scraperRunning) && (
-              <Button
-                onClick={handleRunScraper}
-                disabled={scraperRunning || (scraperSource === 'dropstab' && scraperTabs.length === 0)}
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-                className="hover:opacity-90"
-              >
+              <Button variant="brand" onClick={handleRunScraper} disabled={scraperRunning || (scraperSource === 'dropstab' && scraperTabs.length === 0)} className="hover:opacity-90">
                 {scraperRunning ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />

@@ -1295,11 +1295,11 @@ export default function ListsPage() {
               <p className="text-gray-600">Manage your KOL lists and notes</p>
             </div>
             <div className="flex space-x-3">
-              <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} disabled>
+              <Button variant="brand" className="hover:opacity-90" disabled>
                 <List className="h-4 w-4 mr-2" />
                 Combine Lists
               </Button>
-              <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} disabled>
+              <Button variant="brand" className="hover:opacity-90" disabled>
                 <Plus className="h-4 w-4 mr-2" />
                 Add List
               </Button>
@@ -1341,7 +1341,7 @@ export default function ListsPage() {
           </div>
           <div className="text-center py-8">
             <p className="text-red-600">{error}</p>
-            <Button onClick={fetchLists} className="mt-4 hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+            <Button variant="brand" onClick={fetchLists} className="mt-4 hover:opacity-90">
               Retry
             </Button>
           </div>
@@ -1359,10 +1359,7 @@ export default function ListsPage() {
             <p className="text-gray-600">Manage your KOL lists and notes</p>
           </div>
           <div className="flex space-x-3">
-            <Button
-              className="hover:opacity-90"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              onClick={() => setIsCombineListsDialogOpen(true)}
+            <Button variant="brand" className="hover:opacity-90" onClick={() => setIsCombineListsDialogOpen(true)}
               disabled={lists.length < 2}
               title={lists.length < 2 ? "Need at least 2 lists to combine" : "Combine multiple lists into one"}
             >
@@ -1377,7 +1374,7 @@ export default function ListsPage() {
               }
             }}>
               <DialogTrigger asChild>
-                <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                <Button variant="brand" className="hover:opacity-90">
                   <Plus className="h-4 w-4 mr-2" />
                   Add List
                 </Button>
@@ -1874,12 +1871,7 @@ export default function ListsPage() {
                     <Button type="button" variant="outline" onClick={handleCloseListModal}>
                       Cancel
                     </Button>
-                    <Button 
-                      type="submit" 
-                      disabled={isSubmitting || !newList.name.trim()} 
-                      className="hover:opacity-90" 
-                      style={{ backgroundColor: '#3e8692', color: 'white' }}
-                    >
+                    <Button variant="brand" type="submit" disabled={isSubmitting || !newList.name.trim()} className="hover:opacity-90">
                       {isSubmitting ? (isEditMode ? 'Saving...' : 'Creating...') : (isEditMode ? 'Save List' : 'Create List')}
                     </Button>
                   </DialogFooter>
@@ -2439,12 +2431,7 @@ export default function ListsPage() {
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={isCombining || !combinedListName.trim() || selectedListsToCombine.length === 0}
-                  className="hover:opacity-90"
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                >
+                <Button variant="brand" type="submit" disabled={isCombining || !combinedListName.trim() || selectedListsToCombine.length === 0} className="hover:opacity-90">
                   {isCombining ? 'Combining...' : 'Combine Lists'}
                 </Button>
               </DialogFooter>
@@ -2757,10 +2744,7 @@ export default function ListsPage() {
               : 'No lists yet.'}
           >
             {!searchTerm && statusFilter === 'all' && (
-              <Button
-                className="hover:opacity-90"
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-                onClick={() => { setIsEditMode(false); setIsNewListOpen(true); }}
+              <Button variant="brand" className="hover:opacity-90" onClick={() => { setIsEditMode(false); setIsNewListOpen(true); }}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Your First List

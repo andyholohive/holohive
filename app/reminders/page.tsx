@@ -538,7 +538,7 @@ export default function RemindersPage() {
                 <h2 className="text-2xl font-bold text-gray-900">Reminders</h2>
                 <p className="text-gray-600">Automated Telegram reminders for your team</p>
               </div>
-              <Button disabled className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+              <Button variant="brand" disabled className="hover:opacity-90">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Reminder
               </Button>
@@ -578,7 +578,7 @@ export default function RemindersPage() {
           <h2 className="text-2xl font-bold text-gray-900">Reminders</h2>
           <p className="text-gray-600">Automated Telegram reminders for your team</p>
         </div>
-        <Button onClick={openCreate} className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+        <Button variant="brand" onClick={openCreate} className="hover:opacity-90">
           <Plus className="h-4 w-4 mr-2" />
           Add Reminder
         </Button>
@@ -626,11 +626,7 @@ export default function RemindersPage() {
               <div className="text-center py-12">
                 <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600 mb-4">No reminders configured. Create your first reminder to get started.</p>
-                <Button
-                  onClick={openCreate}
-                  className="hover:opacity-90"
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                >
+                <Button variant="brand" onClick={openCreate} className="hover:opacity-90">
                   <Plus className="h-4 w-4 mr-2" />
                   Create Your First Reminder
                 </Button>
@@ -1008,7 +1004,7 @@ export default function RemindersPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialog(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving} className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+            <Button variant="brand" onClick={handleSave} disabled={saving} className="hover:opacity-90">
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {editingRule ? 'Save Changes' : 'Create Reminder'}
             </Button>

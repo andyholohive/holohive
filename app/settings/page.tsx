@@ -706,12 +706,7 @@ function SettingsContent() {
 
               {/* Save Button */}
               <div className="flex justify-end pt-4 border-t">
-                <Button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="hover:opacity-90"
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                >
+                <Button variant="brand" onClick={handleSave} disabled={saving} className="hover:opacity-90">
                   {saving ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -926,12 +921,7 @@ function SettingsContent() {
 
                   {/* Save Button */}
                   <div className="flex justify-end pt-4 border-t">
-                    <Button
-                      onClick={handleSaveBooking}
-                      disabled={bookingSaving}
-                      className="hover:opacity-90"
-                      style={{ backgroundColor: '#3e8692', color: 'white' }}
-                    >
+                    <Button variant="brand" onClick={handleSaveBooking} disabled={bookingSaving} className="hover:opacity-90">
                       {bookingSaving ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1035,12 +1025,7 @@ function SettingsContent() {
                     </span>
                   </div>
                   <div className="pt-4 border-t">
-                    <Button
-                      onClick={handleConnectGoogle}
-                      disabled={googleActionLoading}
-                      className="hover:opacity-90"
-                      style={{ backgroundColor: '#3e8692', color: 'white' }}
-                    >
+                    <Button variant="brand" onClick={handleConnectGoogle} disabled={googleActionLoading} className="hover:opacity-90">
                       <Video className="h-4 w-4 mr-2" />
                       Connect Google Calendar
                     </Button>
@@ -1157,12 +1142,7 @@ function SettingsContent() {
                           </Button>
                         </>
                       ) : (
-                        <Button
-                          onClick={handleRegisterWebhook}
-                          disabled={webhookActionLoading}
-                          className="hover:opacity-90"
-                          style={{ backgroundColor: '#3e8692', color: 'white' }}
-                        >
+                        <Button variant="brand" onClick={handleRegisterWebhook} disabled={webhookActionLoading} className="hover:opacity-90">
                           {webhookActionLoading ? (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           ) : (

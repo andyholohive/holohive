@@ -333,11 +333,7 @@ export default function ActionBoardTemplatesPage() {
           <h2 className="text-2xl font-bold text-gray-900">Action Board Templates</h2>
           <p className="text-gray-600">Reusable milestone sets you can apply to any client's Action Board.</p>
         </div>
-        <Button
-          className="hover:opacity-90 flex-shrink-0"
-          style={{ backgroundColor: '#3e8692', color: 'white' }}
-          onClick={openNew}
-        >
+        <Button variant="brand" className="hover:opacity-90 flex-shrink-0" onClick={openNew}>
           <Plus className="h-4 w-4 mr-2" />
           New Template
         </Button>
@@ -633,12 +629,7 @@ export default function ActionBoardTemplatesPage() {
 
           <DialogFooter className="border-t border-gray-100 pt-4 flex-shrink-0">
             <Button variant="outline" onClick={() => setEditorOpen(false)}>Cancel</Button>
-            <Button
-              className="hover:opacity-90"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              onClick={handleSave}
-              disabled={saving || !editName.trim()}
-            >
+            <Button variant="brand" className="hover:opacity-90" onClick={handleSave} disabled={saving || !editName.trim()}>
               {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Template'}
             </Button>
           </DialogFooter>

@@ -406,7 +406,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
               <Button variant="outline" size="sm" onClick={handleCancel}>
                 Cancel
               </Button>
-              <Button size="sm" onClick={handleSave} style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+              <Button variant="brand" size="sm" onClick={handleSave} className="hover:opacity-90">
                 <Save className="h-4 w-4 mr-2" />
                 Save
               </Button>
@@ -604,7 +604,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
               <Button variant="outline" size="sm" onClick={handleCancel}>
                 Cancel
               </Button>
-              <Button size="sm" onClick={handleSave} style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+              <Button variant="brand" size="sm" onClick={handleSave} className="hover:opacity-90">
                 <Save className="h-4 w-4 mr-2" />
                 Save
               </Button>
@@ -931,7 +931,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                   className="focus-brand"
                   disabled={editFieldType === 'select' && isYesNoDropdown}
                 />
-                <Button type="button" onClick={addOption} size="sm" style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">Add</Button>
+                <Button variant="brand" type="button" onClick={addOption} size="sm" className="hover:opacity-90">Add</Button>
               </div>
               <div className="space-y-1">
                 {editOptions.map((option, index) => (
@@ -961,7 +961,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
             <Button variant="outline" size="sm" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button size="sm" onClick={handleSave} style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+            <Button variant="brand" size="sm" onClick={handleSave} className="hover:opacity-90">
               <Save className="h-4 w-4 mr-2" />
               Save
             </Button>
@@ -2166,7 +2166,7 @@ export default function FormBuilderPage() {
                             <Button variant="outline" size="sm" onClick={() => setIsEditingInfo(false)}>
                               Cancel
                             </Button>
-                            <Button size="sm" onClick={handleSaveInfo} disabled={isSavingInfo} className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                            <Button variant="brand" size="sm" onClick={handleSaveInfo} disabled={isSavingInfo} className="hover:opacity-90">
                               <Save className="h-4 w-4 mr-2" />
                               Save
                             </Button>
@@ -2455,12 +2455,7 @@ export default function FormBuilderPage() {
                                   className="focus-brand flex-1"
                                   disabled
                                 />
-                                <Button
-                                  type="button"
-                                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                                  className="hover:opacity-90"
-                                  disabled
-                                >
+                                <Button variant="brand" type="button" className="hover:opacity-90" disabled>
                                   +
                                 </Button>
                               </div>
@@ -2499,12 +2494,7 @@ export default function FormBuilderPage() {
                                   className="focus-brand flex-1"
                                   disabled
                                 />
-                                <Button
-                                  type="button"
-                                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                                  className="hover:opacity-90"
-                                  disabled
-                                >
+                                <Button variant="brand" type="button" className="hover:opacity-90" disabled>
                                   +
                                 </Button>
                               </div>
@@ -2957,7 +2947,7 @@ export default function FormBuilderPage() {
                   <Label>Options</Label>
                   <div className="flex gap-2 mb-2">
                     <Input value={optionInput} onChange={(e) => setOptionInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addOption())} placeholder="Add option" className="focus-brand" />
-                    <Button type="button" onClick={addOption} size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>Add</Button>
+                    <Button variant="brand" type="button" onClick={addOption} size="sm" className="hover:opacity-90">Add</Button>
                   </div>
                   <div className="space-y-1">
                     {fieldForm.options.map((option, index) => (
@@ -2974,7 +2964,7 @@ export default function FormBuilderPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsFieldDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleSaveField} disabled={isSavingField} className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+              <Button variant="brand" onClick={handleSaveField} disabled={isSavingField} className="hover:opacity-90">
                 {isSavingField ? 'Saving...' : 'Save Field'}
               </Button>
             </DialogFooter>
@@ -3189,7 +3179,7 @@ export default function FormBuilderPage() {
               <Button variant="outline" onClick={() => setConnectDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSaveConnect} disabled={savingConnect} className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+              <Button variant="brand" onClick={handleSaveConnect} disabled={savingConnect} className="hover:opacity-90">
                 {savingConnect ? 'Saving...' : 'Save'}
               </Button>
             </DialogFooter>

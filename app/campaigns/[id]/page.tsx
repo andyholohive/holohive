@@ -3991,7 +3991,7 @@ const CampaignDetailsPage = () => {
                     <div className="flex-shrink-0">
                       <Dialog open={isAddUpdateDialogOpen} onOpenChange={setIsAddUpdateDialogOpen}>
                         <DialogTrigger asChild>
-                          <Button size="sm" style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+                          <Button variant="brand" size="sm" className="hover:opacity-90">
                             <Plus className="h-4 w-4 mr-2" />
                             Add Update
                           </Button>
@@ -4020,10 +4020,7 @@ const CampaignDetailsPage = () => {
                             }}>
                               Cancel
                             </Button>
-                            <Button
-                              style={{ backgroundColor: '#3e8692', color: 'white' }}
-                              disabled={!updateText.trim() || isAddingUpdate}
-                              onClick={async () => {
+                            <Button variant="brand" disabled={!updateText.trim() || isAddingUpdate} onClick={async () => {
                                 if (!updateText.trim()) return;
                                 
                                 setIsAddingUpdate(true);
@@ -4835,7 +4832,7 @@ const CampaignDetailsPage = () => {
                   
                   <Dialog open={isAddKOLsDialogOpen} onOpenChange={setIsAddKOLsDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button size="sm" style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+                      <Button variant="brand" size="sm" className="hover:opacity-90">
                         <Plus className="h-4 w-4 mr-2" />
                         Add KOLs
                       </Button>
@@ -5119,11 +5116,7 @@ const CampaignDetailsPage = () => {
                        <Button variant="outline" onClick={() => setIsAddKOLsDialogOpen(false)}>
                          Cancel
                        </Button>
-                       <Button
-                         onClick={handleAddKOLs}
-                         disabled={newKOLData.selectedKOLs.length === 0 || isAddingKOLs}
-                         style={{ backgroundColor: '#3e8692', color: 'white' }}
-                       >
+                       <Button variant="brand" onClick={handleAddKOLs} disabled={newKOLData.selectedKOLs.length === 0 || isAddingKOLs}>
                          {isAddingKOLs ? (
                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
                          ) : (
@@ -7028,11 +7021,7 @@ const CampaignDetailsPage = () => {
                 <div className="flex items-center">
                   <Dialog open={false} onOpenChange={setIsAddContentsDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button
-                        size="sm"
-                        style={{ backgroundColor: '#3e8692', color: 'white' }}
-                        className="hover:opacity-90"
-                        onClick={async (e) => {
+                      <Button variant="brand" size="sm" className="hover:opacity-90" onClick={async (e) => {
                           e.preventDefault();
                           const newId = `new-${Date.now()}`;
                           const newContent: any = {
@@ -7242,18 +7231,7 @@ const CampaignDetailsPage = () => {
                       </div>
                       <DialogFooter>
                         <Button variant="outline" onClick={() => setIsAddContentsDialogOpen(false)}>Cancel</Button>
-                        <Button
-                          style={{ backgroundColor: '#3e8692', color: 'white' }}
-                          disabled={
-                            !addContentData.campaign_kols_id ||
-                            !addContentData.activation_date ||
-                            !addContentData.content_link ||
-                            !addContentData.platform ||
-                            !addContentData.type ||
-                            !addContentData.status ||
-                            isAddingContent
-                          }
-                          onClick={async () => {
+                        <Button variant="brand" disabled={ !addContentData.campaign_kols_id || !addContentData.activation_date || !addContentData.content_link || !addContentData.platform || !addContentData.type || !addContentData.status || isAddingContent } onClick={async () => {
                             setIsAddingContent(true);
                             const payload = {
                               campaign_id: campaign?.id,
@@ -8915,7 +8893,7 @@ const CampaignDetailsPage = () => {
                   </Button>
                   <Dialog open={isAddingPayment} onOpenChange={setIsAddingPayment}>
                     <DialogTrigger asChild>
-                      <Button size="sm" style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+                      <Button variant="brand" size="sm" className="hover:opacity-90">
                         <Plus className="h-4 w-4 mr-2" />
                         Record Payment
                       </Button>
@@ -9392,12 +9370,7 @@ const CampaignDetailsPage = () => {
                         }}>
                           Cancel
                         </Button>
-                        <Button
-                          onClick={paymentType === 'kol' ? handleAddMultiKOLPayments : handleAddNonKOLPayment}
-                          disabled={paymentType === 'kol' ? selectedKOLsForPayment.length === 0 : !nonKOLPayment.recipient_name.trim() || !nonKOLPayment.amount}
-                          style={{ backgroundColor: '#3e8692', color: 'white' }}
-                          className="hover:opacity-90"
-                        >
+                        <Button variant="brand" onClick={paymentType === 'kol' ? handleAddMultiKOLPayments : handleAddNonKOLPayment} disabled={paymentType === 'kol' ? selectedKOLsForPayment.length === 0 : !nonKOLPayment.recipient_name.trim() || !nonKOLPayment.amount} className="hover:opacity-90">
                           {paymentType === 'kol'
                             ? `Record ${selectedKOLsForPayment.length > 0 ? `${selectedKOLsForPayment.length} Payment${selectedKOLsForPayment.length > 1 ? 's' : ''}` : 'Payment'}`
                             : 'Record Expense'
@@ -11094,12 +11067,7 @@ const CampaignDetailsPage = () => {
             <Button variant="outline" onClick={() => setIsEditingPayment(false)}>
               Cancel
             </Button>
-            <Button 
-              onClick={handleUpdatePayment} 
-              disabled={!newPaymentData.campaign_kol_id || newPaymentData.amount <= 0}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              className="hover:opacity-90"
-            >
+            <Button variant="brand" onClick={handleUpdatePayment} disabled={!newPaymentData.campaign_kol_id || newPaymentData.amount <= 0} className="hover:opacity-90">
               Update Payment
             </Button>
           </DialogFooter>
@@ -11419,12 +11387,7 @@ const CampaignDetailsPage = () => {
                 Done Editing
               </Button>
             )}
-            <Button
-              onClick={sendPaymentNotification}
-              disabled={sendingPaymentNotification || !paymentNotificationMessage.trim()}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              className="hover:opacity-90"
-            >
+            <Button variant="brand" onClick={sendPaymentNotification} disabled={sendingPaymentNotification || !paymentNotificationMessage.trim()} className="hover:opacity-90">
               {sendingPaymentNotification ? 'Sending...' : 'Send Notification'}
             </Button>
           </DialogFooter>
@@ -11740,12 +11703,7 @@ const CampaignDetailsPage = () => {
             <Button variant="outline" onClick={() => { setEditingMasterKol(null); setMasterKolForm({}); }}>
               Cancel
             </Button>
-            <Button
-              onClick={handleSaveMasterKol}
-              disabled={savingMasterKol}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              className="hover:opacity-90"
-            >
+            <Button variant="brand" onClick={handleSaveMasterKol} disabled={savingMasterKol} className="hover:opacity-90">
               {savingMasterKol ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>

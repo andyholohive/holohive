@@ -866,12 +866,7 @@ export default function AnalyticsPage() {
             <Button variant="outline" onClick={() => setEditOpen(false)} disabled={editSubmitting}>
               Cancel
             </Button>
-            <Button
-              onClick={submitEdit}
-              disabled={editSubmitting || !editAmount.trim()}
-              className="hover:opacity-90"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button variant="brand" onClick={submitEdit} disabled={editSubmitting || !editAmount.trim()} className="hover:opacity-90">
               {editSubmitting && <Loader2 className="h-3 w-3 mr-2 animate-spin" />}
               Save
             </Button>

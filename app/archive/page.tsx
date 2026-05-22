@@ -565,12 +565,7 @@ export default function ArchivePage() {
               <Button variant="outline" onClick={() => setIsRestoreDialogOpen(false)} disabled={isProcessing}>
                 Cancel
               </Button>
-              <Button
-                onClick={confirmRestore}
-                disabled={isProcessing}
-                className="hover:opacity-90"
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-              >
+              <Button variant="brand" onClick={confirmRestore} disabled={isProcessing} className="hover:opacity-90">
                 {isProcessing ? 'Restoring...' : 'Restore'}
               </Button>
             </DialogFooter>

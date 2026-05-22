@@ -255,12 +255,7 @@ export function CustomColorPicker({
           >
             Cancel
           </Button>
-          <Button
-            type="button"
-            onClick={handleApply}
-            className="flex-1 hover:opacity-90"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-          >
+          <Button variant="brand" type="button" onClick={handleApply} className="flex-1 hover:opacity-90">
             Apply Color
           </Button>
         </div>

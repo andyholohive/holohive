@@ -333,11 +333,7 @@ export function ReportTabContent({
               onChange={onCustomMessageChange}
               placeholder="Add a custom message that will be displayed in the public report..."
             />
-            <Button
-              onClick={onSaveCustomMessage}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              className="hover:opacity-90"
-            >
+            <Button variant="brand" onClick={onSaveCustomMessage} className="hover:opacity-90">
               Save Message
             </Button>
           </div>

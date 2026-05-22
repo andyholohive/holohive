@@ -977,11 +977,7 @@ export default function LinksPage() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button variant="brand" onClick={handleSubmit} disabled={isSubmitting}>
               {isSubmitting ? 'Saving...' : editingLink ? 'Update' : 'Add Link'}
             </Button>
           </DialogFooter>

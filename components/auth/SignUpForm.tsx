@@ -73,11 +73,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button 
-            onClick={onToggleMode} 
-            className="w-full hover:opacity-90"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-          >
+          <Button variant="brand" onClick={onToggleMode} className="w-full hover:opacity-90">
             Back to Sign In
           </Button>
         </CardContent>
@@ -152,12 +148,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
             />
           </div>
           
-          <Button
-            type="submit"
-            className="w-full hover:opacity-90"
-            disabled={loading}
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-          >
+          <Button variant="brand" type="submit" className="w-full hover:opacity-90" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create Account
           </Button>

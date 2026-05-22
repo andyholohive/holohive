@@ -259,13 +259,7 @@ export default function FundingRadarPanel() {
             </div>
           </div>
 
-          <Button
-            onClick={handleScan}
-            disabled={scanning}
-            size="sm"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-            className="hover:opacity-90 h-8"
-          >
+          <Button variant="brand" onClick={handleScan} disabled={scanning} size="sm" className="hover:opacity-90 h-8">
             {scanning ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
@@ -355,13 +349,7 @@ export default function FundingRadarPanel() {
                 ? 'No projects with Korean VC backing detected yet.'
                 : 'Run a scan to discover recently funded crypto projects.'}
             </p>
-            <Button
-              onClick={handleScan}
-              disabled={scanning}
-              size="sm"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              className="hover:opacity-90"
-            >
+            <Button variant="brand" onClick={handleScan} disabled={scanning} size="sm" className="hover:opacity-90">
               <Radar className="w-4 h-4 mr-1.5" />
               Scan Funding Rounds
             </Button>

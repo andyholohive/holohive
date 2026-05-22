@@ -1813,7 +1813,7 @@ export default function ClientsPage() {
             </div>
             {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
               <div className="flex gap-2 flex-wrap">
-                <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} disabled>
+                <Button variant="brand" className="hover:opacity-90" disabled>
                   <Plus className="h-4 w-4 mr-2" />
                   Start Client
                 </Button>
@@ -1864,7 +1864,7 @@ export default function ClientsPage() {
           </div>
           <div className="text-center py-8">
             <p className="text-red-600">{error}</p>
-            <Button onClick={fetchClients} className="mt-4 hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+            <Button variant="brand" onClick={fetchClients} className="mt-4 hover:opacity-90">
               Retry
             </Button>
           </div>
@@ -1899,7 +1899,7 @@ export default function ClientsPage() {
             <div className="flex gap-2 flex-wrap">
               <Dialog open={isStartClientOpen} onOpenChange={setIsStartClientOpen}>
                 <DialogTrigger asChild>
-                  <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                  <Button variant="brand" className="hover:opacity-90">
                     <Plus className="h-4 w-4 mr-2" />
                     Start Client
                   </Button>
@@ -2467,11 +2467,7 @@ export default function ClientsPage() {
                           </Button>
                         )}
                         {startClientStep < startClientSections.length - 1 ? (
-                          <Button
-                            type="button"
-                            className="hover:opacity-90"
-                            style={{ backgroundColor: '#3e8692', color: 'white' }}
-                            onClick={() => {
+                          <Button variant="brand" type="button" className="hover:opacity-90" onClick={() => {
                               if (isStepValid()) {
                                 setStartClientStep(startClientStep + 1);
                               }
@@ -2481,13 +2477,7 @@ export default function ClientsPage() {
                             Next
                           </Button>
                         ) : (
-                          <Button
-                            type="button"
-                            className="hover:opacity-90"
-                            style={{ backgroundColor: '#3e8692', color: 'white' }}
-                            onClick={handleStartClientSubmit}
-                            disabled={!isStepValid() || isStartClientSubmitting}
-                          >
+                          <Button variant="brand" type="button" className="hover:opacity-90" onClick={handleStartClientSubmit} disabled={!isStepValid() || isStartClientSubmitting}>
                             {isStartClientSubmitting ? 'Starting...' : 'Start Client'}
                           </Button>
                         )}
@@ -2695,7 +2685,7 @@ export default function ClientsPage() {
                       <Button type="button" variant="outline" onClick={handleCloseClientModal}>
                         Cancel
                       </Button>
-                      <Button type="submit" disabled={isSubmitting || !newClient.name.trim() || !newClient.email.trim()} className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                      <Button variant="brand" type="submit" disabled={isSubmitting || !newClient.name.trim() || !newClient.email.trim()} className="hover:opacity-90">
                         {isSubmitting ? (isEditMode ? 'Saving...' : 'Creating...') : (isEditMode ? 'Save Client' : 'Create Client')}
                       </Button>
                     </DialogFooter>
@@ -2747,7 +2737,7 @@ export default function ClientsPage() {
                 }
               </p>
               {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && !searchTerm && !filteredPartnerName && statusFilter === 'all' && (
-                <Button className="mt-4 hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={() => { setIsEditMode(false); setIsNewClientOpen(true); }}>
+                <Button variant="brand" className="mt-4 hover:opacity-90" onClick={() => { setIsEditMode(false); setIsNewClientOpen(true); }}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Your First Client
                 </Button>
@@ -3280,7 +3270,7 @@ export default function ClientsPage() {
               </TabsList>
               <TabsContent value="decisions" className="space-y-4 max-h-[55vh] overflow-y-auto px-1 pb-4">
                 {!isDecisionFormOpen && (
-                  <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={() => { setIsDecisionFormOpen(true); setEditingDecisionId(null); setDecisionForm({ decision_date: new Date(), summary: '' }); }}>
+                  <Button variant="brand" size="sm" className="hover:opacity-90" onClick={() => { setIsDecisionFormOpen(true); setEditingDecisionId(null); setDecisionForm({ decision_date: new Date(), summary: '' }); }}>
                     <Plus className="h-4 w-4 mr-1" /> Add Decision
                   </Button>
                 )}
@@ -3305,7 +3295,7 @@ export default function ClientsPage() {
                       <Input value={decisionForm.summary} onChange={(e) => setDecisionForm({ ...decisionForm, summary: e.target.value })} placeholder="1-2 line decision summary" className="focus-brand" />
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleDecisionSubmit} disabled={!decisionForm.summary.trim() || !decisionForm.decision_date}>
+                      <Button variant="brand" size="sm" className="hover:opacity-90" onClick={handleDecisionSubmit} disabled={!decisionForm.summary.trim() || !decisionForm.decision_date}>
                         {editingDecisionId ? 'Save' : 'Add'}
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => { setIsDecisionFormOpen(false); setEditingDecisionId(null); }}>Cancel</Button>
@@ -3343,7 +3333,7 @@ export default function ClientsPage() {
               <TabsContent value="notes" className="space-y-4 max-h-[55vh] overflow-y-auto px-1 pb-4">
               {!isNoteFormOpen && (
                 <div className="flex items-center gap-2">
-                  <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={() => openNoteForm()}>
+                  <Button variant="brand" size="sm" className="hover:opacity-90" onClick={() => openNoteForm()}>
                     <Plus className="h-4 w-4 mr-1" /> Add Note
                   </Button>
                   <Button
@@ -3464,7 +3454,7 @@ export default function ClientsPage() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleNoteFormSubmit} disabled={!meetingNoteForm.title.trim() || !meetingNoteForm.meeting_date}>
+                    <Button variant="brand" size="sm" className="hover:opacity-90" onClick={handleNoteFormSubmit} disabled={!meetingNoteForm.title.trim() || !meetingNoteForm.meeting_date}>
                       {editingNoteId ? 'Save' : 'Add'}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => { setIsNoteFormOpen(false); setEditingNoteId(null); }}>Cancel</Button>
@@ -3795,7 +3785,7 @@ export default function ClientsPage() {
                 </div>
                 <DialogFooter className="mt-4">
                   <Button variant="outline" onClick={() => setContextModalClient(null)}>Cancel</Button>
-                  <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleContextSubmit}>Save Context</Button>
+                  <Button variant="brand" className="hover:opacity-90" onClick={handleContextSubmit}>Save Context</Button>
                 </DialogFooter>
               </TabsContent>
               <TabsContent value="actionboard">
@@ -3918,7 +3908,7 @@ export default function ClientsPage() {
                           <p className="text-xs font-medium text-gray-700">Save current milestones as a reusable template</p>
                           <Input value={saveTemplateName} onChange={(e) => setSaveTemplateName(e.target.value)} placeholder="Template name..." className="focus-brand" autoFocus />
                           <div className="flex items-center gap-2">
-                            <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} disabled={!saveTemplateName.trim()} onClick={async () => {
+                            <Button variant="brand" size="sm" className="hover:opacity-90" disabled={!saveTemplateName.trim()} onClick={async () => {
                               if (contextModalClient) {
                                 const ok = await saveAsTemplate(contextModalClient.id, saveTemplateName.trim());
                                 if (ok) {
@@ -3946,7 +3936,7 @@ export default function ClientsPage() {
                           <Input value={milestoneForm.subtitle} onChange={(e) => setMilestoneForm({ ...milestoneForm, subtitle: e.target.value })} placeholder="Subtitle (optional)" className="focus-brand" />
                           <Input value={milestoneForm.status_message} onChange={(e) => setMilestoneForm({ ...milestoneForm, status_message: e.target.value })} placeholder="Status message for client (optional)" className="focus-brand" />
                           <div className="flex items-center gap-2">
-                            <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleMilestoneSubmit} disabled={!milestoneForm.name.trim()}>
+                            <Button variant="brand" size="sm" className="hover:opacity-90" onClick={handleMilestoneSubmit} disabled={!milestoneForm.name.trim()}>
                               {editingMilestoneId ? 'Save' : 'Add'}
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => { setIsMilestoneFormOpen(false); setEditingMilestoneId(null); }}>Cancel</Button>
@@ -4052,7 +4042,7 @@ export default function ClientsPage() {
                                           <SelectItem value="ours">Holo Hive</SelectItem>
                                         </SelectContent>
                                       </Select>
-                                      <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleActionItemSubmit} disabled={!actionItemForm.text.trim()}>
+                                      <Button variant="brand" size="sm" className="hover:opacity-90" onClick={handleActionItemSubmit} disabled={!actionItemForm.text.trim()}>
                                         {editingActionItemId ? 'Save' : 'Add'}
                                       </Button>
                                       <Button size="sm" variant="outline" onClick={() => { setIsActionItemFormOpen(false); setEditingActionItemId(null); setActionItemForm({ text: '', court: 'yours', attachment_url: '', attachment_label: '' }); }}>Cancel</Button>
@@ -4089,7 +4079,7 @@ export default function ClientsPage() {
             </DialogHeader>
             <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1 pb-4">
               {!isWeeklyFormOpen && (
-                <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={() => openWeeklyForm()}>
+                <Button variant="brand" size="sm" className="hover:opacity-90" onClick={() => openWeeklyForm()}>
                   <Plus className="h-4 w-4 mr-1" /> Add Update
                 </Button>
               )}
@@ -4138,7 +4128,7 @@ export default function ClientsPage() {
                     <Textarea value={weeklyForm.open_questions} onChange={(e) => setWeeklyForm({ ...weeklyForm, open_questions: e.target.value })} placeholder="Blockers or open items..." className="focus-brand" rows={2} />
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleWeeklySubmit} disabled={!weeklyForm.current_focus.trim() || !weeklyForm.week_of}>
+                    <Button variant="brand" size="sm" className="hover:opacity-90" onClick={handleWeeklySubmit} disabled={!weeklyForm.current_focus.trim() || !weeklyForm.week_of}>
                       {editingWeeklyId ? 'Save' : 'Add'}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => { setIsWeeklyFormOpen(false); setEditingWeeklyId(null); }}>Cancel</Button>

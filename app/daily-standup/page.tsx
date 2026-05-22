@@ -255,10 +255,7 @@ export default function DailyStandupPage() {
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Submission Form
               </Button>
-              <Button
-                className="hover:opacity-90"
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-                onClick={() => openForm()}
+              <Button variant="brand" className="hover:opacity-90" onClick={() => openForm()}
                 disabled={hasSubmittedToday && !editingId}
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -333,10 +330,7 @@ export default function DailyStandupPage() {
                     {standups.length === 0 ? 'No stand-up submissions yet.' : 'No entries match your filters.'}
                   </p>
                   {standups.length === 0 && !hasSubmittedToday && (
-                    <Button
-                      className="mt-4 hover:opacity-90"
-                      style={{ backgroundColor: '#3e8692', color: 'white' }}
-                      onClick={() => openForm()}
+                    <Button variant="brand" className="mt-4 hover:opacity-90" onClick={() => openForm()}
                     >
                       <Plus className="h-4 w-4 mr-2" /> Submit Your First Stand-Up
                     </Button>
@@ -503,12 +497,7 @@ export default function DailyStandupPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsFormOpen(false); setEditingId(null); }}>Cancel</Button>
-            <Button
-              className="hover:opacity-90"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              onClick={handleSubmit}
-              disabled={!form.completed_yesterday || !form.priorities.trim() || !form.output_goal.trim() || submitting}
-            >
+            <Button variant="brand" className="hover:opacity-90" onClick={handleSubmit} disabled={!form.completed_yesterday || !form.priorities.trim() || !form.output_goal.trim() || submitting}>
               {submitting ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
               ) : editingId ? 'Save Changes' : 'Submit'}

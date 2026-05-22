@@ -300,12 +300,7 @@ export default function TemplatesPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
-            <Button
-              onClick={handleCreate}
-              disabled={!form.name || !form.task_name_template || creating}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              className="hover:opacity-90"
-            >
+            <Button variant="brand" onClick={handleCreate} disabled={!form.name || !form.task_name_template || creating} className="hover:opacity-90">
               {creating ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> : 'Create Template'}
             </Button>
           </DialogFooter>

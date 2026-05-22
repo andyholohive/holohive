@@ -690,12 +690,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
               Next <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (
-            <Button
-              size="sm"
-              onClick={handleSubmit}
-              disabled={submitting}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button variant="brand" size="sm" onClick={handleSubmit} disabled={submitting}>
               {submitting ? (
                 <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creating...</>
               ) : (

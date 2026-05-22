@@ -280,10 +280,7 @@ export default function DeliverableTemplatesPage() {
               <p className="text-sm text-gray-500">Manage workflow templates and their steps</p>
             </div>
           </div>
-          <Button
-            className="hover:opacity-90"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-            onClick={() => openEditTemplate()}
+          <Button variant="brand" className="hover:opacity-90" onClick={() => openEditTemplate()}
           >
             <Plus className="h-4 w-4 mr-2" />
             New Template
@@ -416,7 +413,7 @@ export default function DeliverableTemplatesPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
-            <Button size="sm" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleSaveTemplate}>
+            <Button variant="brand" size="sm" onClick={handleSaveTemplate}>
               {editingTemplate ? 'Update' : 'Create'}
             </Button>
           </DialogFooter>
@@ -474,7 +471,7 @@ export default function DeliverableTemplatesPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setStepDialogOpen(false)}>Cancel</Button>
-            <Button size="sm" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={handleSaveStep}>
+            <Button variant="brand" size="sm" onClick={handleSaveStep}>
               {editingStep ? 'Update' : 'Add'}
             </Button>
           </DialogFooter>

@@ -1518,10 +1518,7 @@ export default function TasksPage() {
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    className="hover:opacity-90"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  >
+                  <Button variant="brand" className="hover:opacity-90">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Task
                     <ChevronDown className="h-3 w-3 ml-1.5 opacity-70" />
@@ -1684,10 +1681,7 @@ export default function TasksPage() {
                   {tasks.length === 0 ? 'No tasks yet.' : 'No tasks match your filters.'}
                 </p>
                 {tasks.length === 0 && (
-                  <Button
-                    className="mt-4 hover:opacity-90"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                    onClick={() => openForm()}
+                  <Button variant="brand" className="mt-4 hover:opacity-90" onClick={() => openForm()}
                   >
                     <Plus className="h-4 w-4 mr-2" /> Create Your First Task
                   </Button>

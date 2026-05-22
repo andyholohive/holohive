@@ -272,7 +272,7 @@ export function WorkflowManager() {
         <h2 className="text-xl font-semibold text-gray-900">Automated Workflows</h2>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+            <Button variant="brand" className="hover:opacity-90">
               <Plus className="w-4 h-4 mr-2" />
               New Workflow
             </Button>

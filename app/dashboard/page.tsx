@@ -384,12 +384,7 @@ export default function DashboardPage() {
           title="No dashboard snapshot yet."
           description="Click Refresh to generate the first snapshot, or wait for Monday morning's automatic refresh."
         >
-          <Button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="hover:opacity-90"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-          >
+          <Button variant="brand" onClick={handleRefresh} disabled={refreshing} className="hover:opacity-90">
             {refreshing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Generate first snapshot
           </Button>

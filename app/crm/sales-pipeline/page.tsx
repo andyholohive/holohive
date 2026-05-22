@@ -4925,7 +4925,7 @@ export default function SalesPipelinePage() {
                 <Button type="button" variant="outline" onClick={() => { setSlideOverMode('view'); setEditingOpp(null); setForm({ name: '' }); }}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting || !form.name.trim()} className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                <Button variant="brand" type="submit" disabled={isSubmitting || !form.name.trim()} className="hover:opacity-90">
                   {isSubmitting ? 'Saving...' : 'Update'}
                 </Button>
               </div>
@@ -5890,13 +5890,7 @@ export default function SalesPipelinePage() {
                       />
                     </PopoverContent>
                   </Popover>
-                  <Button
-                    size="sm"
-                    className="h-9 text-sm hover:opacity-90"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                    onClick={handleAddActivity}
-                    disabled={isActivitySubmitting || !activityForm.title.trim()}
-                  >
+                  <Button variant="brand" size="sm" className="h-9 text-sm hover:opacity-90" onClick={handleAddActivity} disabled={isActivitySubmitting || !activityForm.title.trim()}>
                     {isActivitySubmitting ? '...' : 'Add'}
                   </Button>
                 </div>
@@ -6440,12 +6434,7 @@ export default function SalesPipelinePage() {
               <Button type="button" variant="outline" onClick={() => { setIsCreateOpen(false); setEditingOpp(null); setForm({ name: '' }); }}>
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting || !form.name.trim()}
-                className="hover:opacity-90"
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-              >
+              <Button variant="brand" type="submit" disabled={isSubmitting || !form.name.trim()} className="hover:opacity-90">
                 {isSubmitting ? 'Saving...' : isEdit ? 'Update' : 'Create'}
               </Button>
             </DialogFooter>
@@ -6829,12 +6818,7 @@ export default function SalesPipelinePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setActivityLogPrompt(null); setActivityLogForm({ title: '', description: '', outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined, co_owner_ids: undefined }); }}>Cancel</Button>
-            <Button
-              onClick={confirmActivityLog}
-              disabled={isActivityLogSubmitting}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              className="hover:opacity-90"
-            >
+            <Button variant="brand" onClick={confirmActivityLog} disabled={isActivityLogSubmitting} className="hover:opacity-90">
               {isActivityLogSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Log Activity
             </Button>
@@ -6874,7 +6858,7 @@ export default function SalesPipelinePage() {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => { setOrbitPrompt(null); setOrbitFollowupDays(90); }}>Cancel</Button>
-          <Button onClick={confirmOrbit} style={{ backgroundColor: '#3e8692' }}>Confirm</Button>
+          <Button variant="brand" onClick={confirmOrbit}>Confirm</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -6987,7 +6971,7 @@ export default function SalesPipelinePage() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={skipClosedWon}>Skip</Button>
-            <Button onClick={confirmClosedWon} disabled={!canConfirm} style={{ backgroundColor: '#3e8692' }}>Confirm</Button>
+            <Button variant="brand" onClick={confirmClosedWon} disabled={!canConfirm}>Confirm</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -7010,7 +6994,7 @@ export default function SalesPipelinePage() {
         />
         <DialogFooter>
           <Button variant="outline" onClick={() => setTgHandlePrompt(null)}>Cancel</Button>
-          <Button onClick={confirmTgHandle} disabled={!tgHandleValue.trim()} style={{ backgroundColor: '#3e8692' }} className="text-white hover:opacity-90">Confirm</Button>
+          <Button variant="brand" onClick={confirmTgHandle} disabled={!tgHandleValue.trim()} className="text-white hover:opacity-90">Confirm</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -7045,7 +7029,7 @@ export default function SalesPipelinePage() {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setBucketPrompt(null)}>Cancel</Button>
-          <Button onClick={confirmBucket} style={{ backgroundColor: '#3e8692' }} className="text-white hover:opacity-90">Confirm</Button>
+          <Button variant="brand" onClick={confirmBucket} className="text-white hover:opacity-90">Confirm</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -8225,7 +8209,7 @@ export default function SalesPipelinePage() {
                       </button>
                     ))}
                   </div>
-                  <Button size="sm" onClick={openCreateDialog} style={{ backgroundColor: '#3e8692' }} className="text-white hover:opacity-90">
+                  <Button variant="brand" size="sm" onClick={openCreateDialog} className="text-white hover:opacity-90">
                     <Plus className="h-4 w-4 mr-1" />
                     New Template
                   </Button>
@@ -8507,12 +8491,7 @@ export default function SalesPipelinePage() {
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setIsTemplateDialogOpen(false)}>Cancel</Button>
-                      <Button
-                        onClick={editingTemplate ? handleUpdateTemplate : handleCreateTemplate}
-                        disabled={isTemplateSubmitting || !templateForm.name || !templateForm.content}
-                        style={{ backgroundColor: '#3e8692' }}
-                        className="text-white hover:opacity-90"
-                      >
+                      <Button variant="brand" onClick={editingTemplate ? handleUpdateTemplate : handleCreateTemplate} disabled={isTemplateSubmitting || !templateForm.name || !templateForm.content} className="text-white hover:opacity-90">
                         {isTemplateSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                         {editingTemplate ? 'Save Changes' : 'Create Template'}
                       </Button>

@@ -288,7 +288,7 @@ export default function FieldOptionsPage() {
             </div>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+                <Button variant="brand" className="hover:opacity-90">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Option
                 </Button>
@@ -336,7 +336,7 @@ export default function FieldOptionsPage() {
                   <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={handleAddOption} style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+                  <Button variant="brand" onClick={handleAddOption} className="hover:opacity-90">
                     Add Option
                   </Button>
                 </DialogFooter>

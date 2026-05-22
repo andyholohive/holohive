@@ -619,7 +619,7 @@ export default function DeliveryLogsPage() {
                     <Plus className="h-4 w-4 mr-1" />
                     Add Inline
                   </Button>
-                  <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={() => openForm()}>
+                  <Button variant="brand" className="hover:opacity-90" onClick={() => openForm()}>
                     <Expand className="h-4 w-4 mr-2" />
                     Add via Form
                   </Button>
@@ -742,7 +742,7 @@ export default function DeliveryLogsPage() {
                       <Button variant="outline" onClick={() => setIsAddingInline(true)}>
                         <Plus className="h-4 w-4 mr-1" /> Add Inline
                       </Button>
-                      <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} onClick={() => openForm()}>
+                      <Button variant="brand" className="hover:opacity-90" onClick={() => openForm()}>
                         <Expand className="h-4 w-4 mr-2" /> Add via Form
                       </Button>
                     </div>
@@ -1064,12 +1064,7 @@ export default function DeliveryLogsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsFormOpen(false); setEditingId(null); }}>Cancel</Button>
-            <Button
-              className="hover:opacity-90"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              onClick={handleSubmit}
-              disabled={!form.work_type || !form.action.trim() || !form.logged_at}
-            >
+            <Button variant="brand" className="hover:opacity-90" onClick={handleSubmit} disabled={!form.work_type || !form.action.trim() || !form.logged_at}>
               {editingId ? 'Save Changes' : 'Add Entry'}
             </Button>
           </DialogFooter>

@@ -261,14 +261,7 @@ export default function ListAccessDialog({ listId, open, onOpenChange }: Props) 
                   onKeyDown={e => { if (e.key === 'Enter') handleAddEmail(); }}
                   className="h-9 text-sm"
                 />
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-9 text-xs hover:opacity-90"
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  onClick={handleAddEmail}
-                  disabled={busyKey === 'grant'}
-                >
+                <Button variant="brand" type="button" size="sm" className="h-9 text-xs hover:opacity-90" onClick={handleAddEmail} disabled={busyKey === 'grant'}>
                   {busyKey === 'grant' && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
                   Add
                 </Button>

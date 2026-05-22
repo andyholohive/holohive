@@ -569,7 +569,7 @@ export default function FormsPage() {
           {activeTab === 'forms' && (
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }}>
+                <Button variant="brand" className="hover:opacity-90">
                   <Plus className="h-4 w-4 mr-2" />
                   Create Form
                 </Button>
@@ -621,12 +621,7 @@ export default function FormsPage() {
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button
-                  onClick={handleCreateForm}
-                  disabled={isSubmitting}
-                  className="hover:opacity-90"
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                >
+                <Button variant="brand" onClick={handleCreateForm} disabled={isSubmitting} className="hover:opacity-90">
                   {isSubmitting ? 'Creating...' : 'Create Form'}
                 </Button>
               </DialogFooter>
@@ -1125,12 +1120,7 @@ export default function FormsPage() {
               >
                 Cancel
               </Button>
-              <Button
-                onClick={handleDuplicateForm}
-                disabled={isDuplicating || !duplicateFormName.trim()}
-                className="hover:opacity-90"
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-              >
+              <Button variant="brand" onClick={handleDuplicateForm} disabled={isDuplicating || !duplicateFormName.trim()} className="hover:opacity-90">
                 {isDuplicating ? 'Duplicating...' : 'Duplicate Form'}
               </Button>
             </DialogFooter>

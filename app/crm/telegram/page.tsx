@@ -2743,11 +2743,7 @@ export default function TelegramChatsPage() {
             <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={handleLink}
-              disabled={linking}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button variant="brand" onClick={handleLink} disabled={linking}>
               {linking ? 'Saving...' : (selectedOpportunityId && selectedOpportunityId !== '__none__') ? 'Link Chat' : 'Unlink Chat'}
             </Button>
           </DialogFooter>
@@ -2844,11 +2840,7 @@ export default function TelegramChatsPage() {
             <Button variant="outline" onClick={() => setKolLinkDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={handleLinkKol}
-              disabled={linking}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button variant="brand" onClick={handleLinkKol} disabled={linking}>
               {linking ? 'Saving...' : (selectedKolId && selectedKolId !== '__none__') ? 'Link Chat' : 'Unlink Chat'}
             </Button>
           </DialogFooter>
@@ -2938,11 +2930,7 @@ export default function TelegramChatsPage() {
             <Button variant="outline" onClick={() => setClientLinkDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={handleLinkClient}
-              disabled={linking}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button variant="brand" onClick={handleLinkClient} disabled={linking}>
               {linking ? 'Saving...' : (selectedClientId && selectedClientId !== '__none__') ? 'Link Chat' : 'Unlink Chat'}
             </Button>
           </DialogFooter>
@@ -3041,11 +3029,7 @@ export default function TelegramChatsPage() {
             <Button variant="outline" onClick={() => setCommandDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={handleSaveCommand}
-              disabled={savingCommand}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button variant="brand" onClick={handleSaveCommand} disabled={savingCommand}>
               {savingCommand ? 'Saving...' : editingCommand ? 'Update Command' : 'Add Command'}
             </Button>
           </DialogFooter>
@@ -3091,11 +3075,7 @@ export default function TelegramChatsPage() {
             >
               Cancel
             </Button>
-            <Button
-              onClick={handleSendMessage}
-              disabled={sendingMessage || !messageContent.trim()}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button variant="brand" onClick={handleSendMessage} disabled={sendingMessage || !messageContent.trim()}>
               {sendingMessage ? 'Sending...' : 'Send Message'}
             </Button>
           </DialogFooter>

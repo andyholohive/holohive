@@ -1412,13 +1412,7 @@ export default function NetworkPage() {
                   </Select>
                 </div>
                 {/* Apply Button */}
-                <Button
-                  size="sm"
-                  onClick={handleBulkUpdatePartners}
-                  disabled={Object.keys(bulkPartnerEdit).length === 0}
-                  className="h-8 hover:opacity-90"
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                >
+                <Button variant="brand" size="sm" onClick={handleBulkUpdatePartners} disabled={Object.keys(bulkPartnerEdit).length === 0} className="h-8 hover:opacity-90">
                   Apply Changes
                 </Button>
                 {/* Delete Button */}
@@ -1913,13 +1907,7 @@ export default function NetworkPage() {
                   </Select>
                 </div>
                 {/* Apply Button */}
-                <Button
-                  size="sm"
-                  onClick={handleBulkUpdateAffiliates}
-                  disabled={Object.keys(bulkAffiliateEdit).length === 0}
-                  className="h-8 hover:opacity-90"
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                >
+                <Button variant="brand" size="sm" onClick={handleBulkUpdateAffiliates} disabled={Object.keys(bulkAffiliateEdit).length === 0} className="h-8 hover:opacity-90">
                   Apply Changes
                 </Button>
                 {/* Delete Button */}
@@ -2658,12 +2646,7 @@ export default function NetworkPage() {
               <Button type="button" variant="outline" onClick={() => setIsNewPartnerOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting || !partnerForm.name.trim()}
-                className="hover:opacity-90"
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-              >
+              <Button variant="brand" type="submit" disabled={isSubmitting || !partnerForm.name.trim()} className="hover:opacity-90">
                 {isSubmitting ? 'Saving...' : editingPartner ? 'Save Changes' : 'Create Partner'}
               </Button>
             </DialogFooter>
@@ -2819,12 +2802,7 @@ export default function NetworkPage() {
               <Button type="button" variant="outline" onClick={() => setIsNewAffiliateOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting || !affiliateForm.name.trim()}
-                className="hover:opacity-90"
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-              >
+              <Button variant="brand" type="submit" disabled={isSubmitting || !affiliateForm.name.trim()} className="hover:opacity-90">
                 {isSubmitting ? 'Saving...' : editingAffiliate ? 'Save Changes' : 'Create Affiliate'}
               </Button>
             </DialogFooter>
@@ -2943,12 +2921,7 @@ export default function NetworkPage() {
                       Primary contact
                     </Label>
                   </div>
-                  <Button
-                    onClick={handleLinkContactToPartner}
-                    disabled={!selectedContactId || isSubmitting}
-                    className="w-full hover:opacity-90"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  >
+                  <Button variant="brand" onClick={handleLinkContactToPartner} disabled={!selectedContactId || isSubmitting} className="w-full hover:opacity-90">
                     <LinkIcon className="h-4 w-4 mr-2" />
                     Link Contact
                   </Button>
@@ -2992,12 +2965,7 @@ export default function NetworkPage() {
                       Primary contact
                     </Label>
                   </div>
-                  <Button
-                    onClick={handleCreateAndLinkContactToPartner}
-                    disabled={!newContactForm.name.trim() || isSubmitting}
-                    className="w-full hover:opacity-90"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  >
+                  <Button variant="brand" onClick={handleCreateAndLinkContactToPartner} disabled={!newContactForm.name.trim() || isSubmitting} className="w-full hover:opacity-90">
                     <Plus className="h-4 w-4 mr-2" />
                     {isSubmitting ? 'Creating...' : 'Create & Link Contact'}
                   </Button>
@@ -3100,12 +3068,7 @@ export default function NetworkPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button
-                    onClick={handleSavePartnerAffiliateLink}
-                    disabled={!selectedAffiliateForPartner || isSubmitting}
-                    className="w-full hover:opacity-90"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  >
+                  <Button variant="brand" onClick={handleSavePartnerAffiliateLink} disabled={!selectedAffiliateForPartner || isSubmitting} className="w-full hover:opacity-90">
                     <LinkIcon className="h-4 w-4 mr-2" />
                     {isSubmitting ? 'Saving...' : 'Link Affiliate'}
                   </Button>
@@ -3138,12 +3101,7 @@ export default function NetworkPage() {
                     className="focus-brand"
                     rows={2}
                   />
-                  <Button
-                    onClick={handleCreateAndLinkAffiliateToPartner}
-                    disabled={!newAffiliateFormForPartner.name.trim() || isSubmitting}
-                    className="w-full hover:opacity-90"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  >
+                  <Button variant="brand" onClick={handleCreateAndLinkAffiliateToPartner} disabled={!newAffiliateFormForPartner.name.trim() || isSubmitting} className="w-full hover:opacity-90">
                     <Plus className="h-4 w-4 mr-2" />
                     {isSubmitting ? 'Creating...' : 'Create & Link Affiliate'}
                   </Button>
@@ -3270,12 +3228,7 @@ export default function NetworkPage() {
                       Primary contact
                     </Label>
                   </div>
-                  <Button
-                    onClick={handleLinkContactToAffiliate}
-                    disabled={!selectedContactId || isSubmitting}
-                    className="w-full hover:opacity-90"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  >
+                  <Button variant="brand" onClick={handleLinkContactToAffiliate} disabled={!selectedContactId || isSubmitting} className="w-full hover:opacity-90">
                     <LinkIcon className="h-4 w-4 mr-2" />
                     Link Contact
                   </Button>
@@ -3319,12 +3272,7 @@ export default function NetworkPage() {
                       Primary contact
                     </Label>
                   </div>
-                  <Button
-                    onClick={handleCreateAndLinkContactToAffiliate}
-                    disabled={!newContactForm.name.trim() || isSubmitting}
-                    className="w-full hover:opacity-90"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  >
+                  <Button variant="brand" onClick={handleCreateAndLinkContactToAffiliate} disabled={!newContactForm.name.trim() || isSubmitting} className="w-full hover:opacity-90">
                     <Plus className="h-4 w-4 mr-2" />
                     {isSubmitting ? 'Creating...' : 'Create & Link Contact'}
                   </Button>

@@ -186,11 +186,7 @@ export default function ChangelogModal() {
             ) : (
               <div />
             )}
-            <Button
-              onClick={handleDismiss}
-              style={{ backgroundColor: '#3e8692' }}
-              className="text-white hover:opacity-90"
-            >
+            <Button variant="brand" onClick={handleDismiss} className="text-white hover:opacity-90">
               Got it!
             </Button>
           </div>

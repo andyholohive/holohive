@@ -666,11 +666,7 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
               )}
             </div>
 
-            <Button
-              type="submit"
-              className="w-full hover:opacity-90"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button variant="brand" type="submit" className="w-full hover:opacity-90">
               Verify Email
             </Button>
           </form>

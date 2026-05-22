@@ -1384,7 +1384,7 @@ export default function MindsharePage() {
             <p className="text-sm text-gray-600">
               The universe ranked on the leaderboard. Includes your clients (auto-seeded) plus competitor benchmarks you add manually.
             </p>
-            <Button onClick={openCreateProject} style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+            <Button variant="brand" onClick={openCreateProject} className="hover:opacity-90">
               <Plus className="h-4 w-4 mr-1.5" /> Add Project
             </Button>
           </div>
@@ -1485,7 +1485,7 @@ export default function MindsharePage() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setEditingProject(null)}>Cancel</Button>
-                <Button onClick={saveProject} disabled={savingProject} style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+                <Button variant="brand" onClick={saveProject} disabled={savingProject} className="hover:opacity-90">
                   {savingProject ? 'Saving...' : 'Save'}
                 </Button>
               </DialogFooter>
@@ -1514,7 +1514,7 @@ export default function MindsharePage() {
               />
               <div className="flex items-center justify-between mt-3">
                 <p className="text-xs text-gray-500">All imports default to <strong>language=ko</strong> + active.</p>
-                <Button onClick={handleBulkImport} disabled={!importText.trim() || importing} style={{ backgroundColor: '#3e8692', color: 'white' }} className="hover:opacity-90">
+                <Button variant="brand" onClick={handleBulkImport} disabled={!importText.trim() || importing} className="hover:opacity-90">
                   <Upload className="h-3.5 w-3.5 mr-1.5" /> {importing ? 'Importing...' : 'Import'}
                 </Button>
               </div>

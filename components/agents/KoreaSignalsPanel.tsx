@@ -946,8 +946,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                       {scanCadence ? `${scanCadence} cadence` : [modeApi && 'API', modeWeb && 'Web', modeClaude && 'Claude'].filter(Boolean).join(' + ') || 'None'}
                       {' · '}{recencyMonths === 1 ? '1 month' : `${recencyMonths} months`}
                     </span>
-                    <Button size="sm" className="h-7 text-xs" style={{ backgroundColor: '#3e8692', color: 'white' }}
-                      onClick={handleScan}>
+                    <Button variant="brand" size="sm" className="h-7 text-xs" onClick={handleScan}>
                       <Radar className="w-3 h-3 mr-1" /> Run
                     </Button>
                   </div>
@@ -1226,11 +1225,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
             {detailProspectId && detailStatus !== 'promoted' && (
               <div className="flex items-center justify-between p-2.5 rounded-lg border border-gray-200 bg-gray-50">
                 <span className="text-xs text-gray-500">This prospect is not in your pipeline yet.</span>
-                <Button
-                  size="sm"
-                  className="h-7 text-xs"
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  onClick={() => { setConfirmPromote({ id: detailProspectId, name: detailName, score: topProspects.find(p => p.id === detailProspectId)?.korea_relevancy_score || 0 }); }}
+                <Button variant="brand" size="sm" className="h-7 text-xs" onClick={() => { setConfirmPromote({ id: detailProspectId, name: detailName, score: topProspects.find(p => p.id === detailProspectId)?.korea_relevancy_score || 0 }); }}
                   disabled={promoting === detailProspectId}
                 >
                   {promoting === detailProspectId
@@ -1448,12 +1443,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
           </div>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" size="sm" onClick={() => setManualSignalOpen(false)}>Cancel</Button>
-            <Button
-              size="sm"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              onClick={handleManualSignalSubmit}
-              disabled={manualSignalSubmitting || !manualSignalData.prospect_name || !manualSignalData.headline}
-            >
+            <Button variant="brand" size="sm" onClick={handleManualSignalSubmit} disabled={manualSignalSubmitting || !manualSignalData.prospect_name || !manualSignalData.headline}>
               {manualSignalSubmitting ? <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Adding...</> : 'Add Signal'}
             </Button>
           </div>

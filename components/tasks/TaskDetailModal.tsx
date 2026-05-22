@@ -373,12 +373,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
             </Button>
           )}
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button
-            className="hover:opacity-90"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-            onClick={handleSubmit}
-            disabled={!form.task_name.trim() || !form.task_type || submitting}
-          >
+          <Button variant="brand" className="hover:opacity-90" onClick={handleSubmit} disabled={!form.task_name.trim() || !form.task_type || submitting}>
             {submitting ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
             ) : isEditing ? 'Save Changes' : 'Add Task'}

@@ -321,12 +321,7 @@ export default function ResetPasswordPage() {
                 />
               </div>
               
-              <Button 
-                type="submit" 
-                className="w-full hover:opacity-90" 
-                disabled={loading}
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-              >
+              <Button variant="brand" type="submit" className="w-full hover:opacity-90" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Update Password
               </Button>

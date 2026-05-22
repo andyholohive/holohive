@@ -254,12 +254,7 @@ export default function StandupSubmitPage() {
               />
             </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              disabled={isSubmitting || checkingToday}
-            >
+            <Button variant="brand" type="submit" className="w-full" disabled={isSubmitting || checkingToday}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

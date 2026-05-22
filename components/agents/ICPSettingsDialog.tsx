@@ -363,12 +363,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
             {rescoring ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
             Save & Rescore All
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={saving}
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-            className="hover:opacity-90"
-          >
+          <Button variant="brand" onClick={handleSave} disabled={saving} className="hover:opacity-90">
             {saving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : null}
             Save
           </Button>

@@ -659,12 +659,7 @@ export default function FloatingChat() {
   if (!isOpen) {
     return (
       <div className="fixed bottom-6 right-6 z-50">
-        <Button
-          onClick={toggleChat}
-          size="lg"
-          className="w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 p-3"
-          style={{ backgroundColor: '#3e8692' }}
-        >
+        <Button variant="brand" onClick={toggleChat} size="lg" className="w-14 h-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 p-3">
           <MessageSquare className="w-6 h-6 text-white" />
         </Button>
       </div>
@@ -1148,13 +1143,7 @@ export default function FloatingChat() {
                       className="flex-1 text-sm min-h-[60px] max-h-[120px] resize-none focus-brand overflow-y-auto"
                       rows={1}
                     />
-                    <Button
-                      onClick={sendMessage}
-                      disabled={!message.trim() || sending}
-                      size="sm"
-                      className="h-10 w-10 p-0 rounded-xl hover:opacity-90 transition-all duration-200 flex-shrink-0"
-                      style={{ backgroundColor: '#3e8692', color: 'white' }}
-                    >
+                    <Button variant="brand" onClick={sendMessage} disabled={!message.trim() || sending} size="sm" className="h-10 w-10 p-0 rounded-xl hover:opacity-90 transition-all duration-200 flex-shrink-0">
                       {sending ? (
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                       ) : (

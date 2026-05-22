@@ -822,11 +822,7 @@ export default function TeamPage() {
 
                                 {/* Orphan-state action: backfill via getChat. */}
                                 {state === 'orphan' && (
-                                  <Button
-                                    size="sm"
-                                    className="w-full hover:opacity-90"
-                                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                                    onClick={() => handleBackfillTgChat(member)}
+                                  <Button variant="brand" size="sm" className="w-full hover:opacity-90" onClick={() => handleBackfillTgChat(member)}
                                     disabled={backfillingId === member.id}
                                   >
                                     {backfillingId === member.id ? (

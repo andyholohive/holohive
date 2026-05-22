@@ -582,7 +582,7 @@ export default function SOPsPage() {
               <h2 className="text-2xl font-bold text-gray-900">SOPs</h2>
               <p className="text-gray-600">Standard Operating Procedures</p>
             </div>
-            <Button disabled style={{ backgroundColor: '#3e8692', color: 'white' }}>
+            <Button variant="brand" disabled>
               <Plus className="h-4 w-4 mr-2" />
               Create SOP
             </Button>
@@ -618,11 +618,7 @@ export default function SOPsPage() {
             <h2 className="text-2xl font-bold text-gray-900">SOPs</h2>
             <p className="text-gray-600">Standard Operating Procedures</p>
           </div>
-          <Button
-            onClick={handleCreateNew}
-            className="hover:opacity-90"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-          >
+          <Button variant="brand" onClick={handleCreateNew} className="hover:opacity-90">
             <Plus className="h-4 w-4 mr-2" />
             Create SOP
           </Button>
@@ -743,11 +739,7 @@ export default function SOPsPage() {
                 : 'No SOPs yet. Create your first SOP to get started.'}
             </p>
             {!searchTerm && statusFilter === 'all' && categoryFilter === 'all' && ownerFilter === 'all' && (
-              <Button
-                onClick={handleCreateNew}
-                className="hover:opacity-90"
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-              >
+              <Button variant="brand" onClick={handleCreateNew} className="hover:opacity-90">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Your First SOP
               </Button>
@@ -1051,12 +1043,7 @@ export default function SOPsPage() {
                 <Button type="button" variant="outline" onClick={() => setIsCreateEditOpen(false)}>
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="hover:opacity-90"
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                >
+                <Button variant="brand" type="submit" disabled={isSubmitting} className="hover:opacity-90">
                   {isSubmitting ? 'Saving...' : (editingSOP ? 'Update SOP' : 'Create SOP')}
                 </Button>
               </DialogFooter>
@@ -1160,11 +1147,7 @@ export default function SOPsPage() {
                         DeliverableWizard pre-loaded with the template +
                         SOP name as the initial deliverable title. */}
                     {viewingSOP.deliverable_template_id && (
-                      <Button
-                        size="sm"
-                        className="hover:opacity-90"
-                        style={{ backgroundColor: '#3e8692', color: 'white' }}
-                        onClick={() => {
+                      <Button variant="brand" size="sm" className="hover:opacity-90" onClick={() => {
                           setWizardTemplateId(viewingSOP.deliverable_template_id);
                           setWizardInitialTitle(viewingSOP.name);
                           setIsViewOpen(false);

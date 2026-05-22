@@ -144,12 +144,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
             </div>
             <DialogFooter>
               <Button variant="outline" type="button" onClick={handleClose}>Cancel</Button>
-              <Button
-                type="submit"
-                disabled={loading || (!url && !companyName)}
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-                className="hover:opacity-90"
-              >
+              <Button variant="brand" type="submit" disabled={loading || (!url && !companyName)} className="hover:opacity-90">
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />

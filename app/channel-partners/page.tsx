@@ -223,7 +223,7 @@ export default function PartnersPage() {
               <p className="text-gray-600">Manage your channel partner relationships</p>
             </div>
             <div className="flex space-x-3">
-              <Button className="hover:opacity-90" style={{ backgroundColor: '#3e8692', color: 'white' }} disabled>
+              <Button variant="brand" className="hover:opacity-90" disabled>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Partner
               </Button>
@@ -255,10 +255,7 @@ export default function PartnersPage() {
           </div>
           {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
             <div>
-              <Button
-                className="hover:opacity-90"
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-                onClick={() => { setIsEditMode(false); setIsNewPartnerOpen(true); }}
+              <Button variant="brand" className="hover:opacity-90" onClick={() => { setIsEditMode(false); setIsNewPartnerOpen(true); }}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Partner
@@ -286,10 +283,7 @@ export default function PartnersPage() {
                 {searchTerm ? 'No partners found matching your search.' : 'No partners found.'}
               </p>
               {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && !searchTerm && (
-                <Button
-                  className="mt-4 hover:opacity-90"
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  onClick={() => { setIsEditMode(false); setIsNewPartnerOpen(true); }}
+                <Button variant="brand" className="mt-4 hover:opacity-90" onClick={() => { setIsEditMode(false); setIsNewPartnerOpen(true); }}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Your First Partner
@@ -461,12 +455,7 @@ export default function PartnersPage() {
                 <Button type="button" variant="outline" onClick={handleClosePartnerModal}>
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
-                  disabled={isSubmitting || !newPartner.name.trim()} 
-                  className="hover:opacity-90" 
-                  style={{ backgroundColor: '#3e8692', color: 'white' }}
-                >
+                <Button variant="brand" type="submit" disabled={isSubmitting || !newPartner.name.trim()} className="hover:opacity-90">
                   {isSubmitting ? (isEditMode ? 'Saving...' : 'Creating...') : (isEditMode ? 'Save Partner' : 'Create Partner')}
                 </Button>
               </DialogFooter>

@@ -283,11 +283,7 @@ export default function ChangelogAdminPage() {
           <h2 className="text-2xl font-bold text-gray-900">Changelog Management</h2>
           <p className="text-gray-600">Create and manage portal update announcements</p>
         </div>
-        <Button
-          onClick={openCreateDialog}
-          style={{ backgroundColor: '#3e8692', color: 'white' }}
-          className="hover:opacity-90"
-        >
+        <Button variant="brand" onClick={openCreateDialog} className="hover:opacity-90">
           <Plus className="h-4 w-4 mr-2" />
           New Changelog
         </Button>
@@ -307,11 +303,7 @@ export default function ChangelogAdminPage() {
             <p className="text-gray-500 max-w-md mx-auto mb-4">
               Create your first changelog to announce updates to your users.
             </p>
-            <Button
-              onClick={openCreateDialog}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              className="hover:opacity-90"
-            >
+            <Button variant="brand" onClick={openCreateDialog} className="hover:opacity-90">
               <Plus className="h-4 w-4 mr-2" />
               Create First Changelog
             </Button>
@@ -465,12 +457,7 @@ Use markdown-like formatting:
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              className="hover:opacity-90"
-            >
+            <Button variant="brand" onClick={handleSave} disabled={saving} className="hover:opacity-90">
               {saving ? 'Saving...' : (editingChangelog ? 'Update' : 'Create')}
             </Button>
           </DialogFooter>

@@ -1514,11 +1514,7 @@ export default function KOLsPage() {
             <h2 className="text-2xl font-bold text-gray-900">KOLs</h2>
             <p className="text-gray-600">Manage your Key Opinion Leaders</p>
           </div>
-          <Button
-            className="hover:opacity-90"
-            style={{ backgroundColor: '#3e8692', color: 'white' }}
-            disabled
-          >
+          <Button variant="brand" className="hover:opacity-90" disabled>
             <Plus className="h-4 w-4 mr-2" />
             Add KOL
           </Button>
@@ -1582,13 +1578,7 @@ export default function KOLsPage() {
           <h2 className="text-2xl font-bold text-gray-900">KOLs</h2>
           <p className="text-gray-600">Manage your Key Opinion Leaders</p>
         </div>
-        <Button 
-          size="sm"
-          className="hover:opacity-90" 
-          style={{ backgroundColor: '#3e8692', color: 'white' }}
-          onClick={handleAddNew}
-          disabled={isSavingNewKOL}
-        >
+        <Button variant="brand" size="sm" className="hover:opacity-90" onClick={handleAddNew} disabled={isSavingNewKOL}>
           {isSavingNewKOL ? (
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
           ) : (

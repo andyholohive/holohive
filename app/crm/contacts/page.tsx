@@ -1042,12 +1042,7 @@ export default function ContactsPage() {
               <Button type="button" variant="outline" onClick={() => setIsNewContactOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting || !contactForm.name.trim()}
-                className="hover:opacity-90"
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-              >
+              <Button variant="brand" type="submit" disabled={isSubmitting || !contactForm.name.trim()} className="hover:opacity-90">
                 {isSubmitting ? 'Saving...' : editingContact ? 'Save Changes' : 'Create Contact'}
               </Button>
             </DialogFooter>

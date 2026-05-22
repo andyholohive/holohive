@@ -2404,13 +2404,7 @@ export default function PipelinePage() {
               </div>
             )}
             {/* Apply Button */}
-            <Button
-              size="sm"
-              onClick={handleBulkUpdate}
-              disabled={Object.keys(bulkEdit).length === 0}
-              className="h-8 hover:opacity-90"
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-            >
+            <Button variant="brand" size="sm" onClick={handleBulkUpdate} disabled={Object.keys(bulkEdit).length === 0} className="h-8 hover:opacity-90">
               Apply Changes
             </Button>
             {/* Delete Button */}
@@ -2732,12 +2726,7 @@ export default function PipelinePage() {
               <Button type="button" variant="outline" onClick={() => setIsNewOpportunityOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={isSubmitting || !opportunityForm.name.trim()}
-                className="hover:opacity-90"
-                style={{ backgroundColor: '#3e8692', color: 'white' }}
-              >
+              <Button variant="brand" type="submit" disabled={isSubmitting || !opportunityForm.name.trim()} className="hover:opacity-90">
                 {isSubmitting ? 'Saving...' : editingOpportunity ? 'Save Changes' : 'Create Opportunity'}
               </Button>
             </DialogFooter>
@@ -2860,12 +2849,7 @@ export default function PipelinePage() {
                       Primary contact
                     </Label>
                   </div>
-                  <Button
-                    onClick={handleLinkContact}
-                    disabled={!selectedContactId || isSubmitting}
-                    className="w-full hover:opacity-90"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  >
+                  <Button variant="brand" onClick={handleLinkContact} disabled={!selectedContactId || isSubmitting} className="w-full hover:opacity-90">
                     <LinkIcon className="h-4 w-4 mr-2" />
                     Link Contact
                   </Button>
@@ -2909,12 +2893,7 @@ export default function PipelinePage() {
                       Primary contact
                     </Label>
                   </div>
-                  <Button
-                    onClick={handleCreateAndLinkContact}
-                    disabled={!newContactForm.name.trim() || isSubmitting}
-                    className="w-full hover:opacity-90"
-                    style={{ backgroundColor: '#3e8692', color: 'white' }}
-                  >
+                  <Button variant="brand" onClick={handleCreateAndLinkContact} disabled={!newContactForm.name.trim() || isSubmitting} className="w-full hover:opacity-90">
                     <Plus className="h-4 w-4 mr-2" />
                     {isSubmitting ? 'Creating...' : 'Create & Link Contact'}
                   </Button>
@@ -3064,11 +3043,7 @@ export default function PipelinePage() {
             <Button variant="outline" onClick={handleKeepAsLead}>
               Keep as Lead
             </Button>
-            <Button
-              onClick={handleConvertToDeal}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              className="hover:opacity-90"
-            >
+            <Button variant="brand" onClick={handleConvertToDeal} className="hover:opacity-90">
               Convert to Deal
             </Button>
           </DialogFooter>
@@ -3093,11 +3068,7 @@ export default function PipelinePage() {
             <Button variant="outline" onClick={handleKeepAsDeal}>
               Keep as Deal
             </Button>
-            <Button
-              onClick={handleConvertToAccount}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              className="hover:opacity-90"
-            >
+            <Button variant="brand" onClick={handleConvertToAccount} className="hover:opacity-90">
               Convert to Account
             </Button>
           </DialogFooter>
