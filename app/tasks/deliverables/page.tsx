@@ -51,7 +51,7 @@ const ICON_MAP: Record<string, any> = {
 
 const STATUS_CONFIG: Record<string, { label: string; icon: any; color: string; bg: string }> = {
   active: { label: 'Active', icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
-  complete: { label: 'Complete', icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
+  complete: { label: 'Complete', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
   cancelled: { label: 'Cancelled', icon: XCircle, color: 'text-gray-500', bg: 'bg-gray-50' },
 };
 
@@ -60,7 +60,7 @@ const SUBTASK_STATUS: Record<string, { icon: any; color: string }> = {
   in_progress: { icon: PlayCircle, color: 'text-blue-500' },
   paused: { icon: PauseCircle, color: 'text-amber-500' },
   ready_for_feedback: { icon: MessageCircle, color: 'text-purple-500' },
-  complete: { icon: CheckCircle2, color: 'text-green-500' },
+  complete: { icon: CheckCircle2, color: 'text-emerald-500' },
 };
 
 type TeamMember = { id: string; name: string; email: string; role: string };

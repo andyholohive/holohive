@@ -910,7 +910,7 @@ export default function ChatPage() {
                                           disabled={feedback.sent}
                                           className={`text-xs px-2 py-1 rounded transition-colors flex items-center gap-1 ml-auto ${
                                             feedback.sent
-                                              ? 'bg-green-100 text-green-700 cursor-not-allowed'
+                                              ? 'bg-emerald-100 text-emerald-700 cursor-not-allowed'
                                               : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
                                           }`}
                                         >
@@ -918,7 +918,7 @@ export default function ChatPage() {
                                         </button>
                                       </div>
                                       {feedback.sent && (
-                                        <p className="text-xs text-green-600">
+                                        <p className="text-xs text-emerald-600">
                                           Will be used to improve future messages!
                                         </p>
                                       )}

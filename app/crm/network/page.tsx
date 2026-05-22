@@ -201,13 +201,13 @@ export default function NetworkPage() {
 
   // Status colors matching pipeline page styling
   const partnerStatusColors: Record<PartnerStatus, { bg: string; text: string }> = {
-    active: { bg: 'bg-green-50', text: 'text-green-700' },
+    active: { bg: 'bg-emerald-50', text: 'text-emerald-700' },
     inactive: { bg: 'bg-gray-50', text: 'text-gray-700' }
   };
 
   const affiliateStatusColors: Record<AffiliateStatus, { bg: string; text: string }> = {
     new: { bg: 'bg-blue-50', text: 'text-blue-700' },
-    active: { bg: 'bg-green-50', text: 'text-green-700' },
+    active: { bg: 'bg-emerald-50', text: 'text-emerald-700' },
     inactive: { bg: 'bg-gray-50', text: 'text-gray-700' }
   };
 
@@ -2254,7 +2254,7 @@ export default function NetworkPage() {
                       <div className="flex items-center gap-2">
                         <Badge
                           className={`capitalize cursor-default hover:bg-inherit ${
-                            affiliate.status === 'active' ? 'bg-green-100 text-green-800 hover:bg-green-100' :
+                            affiliate.status === 'active' ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100' :
                             affiliate.status === 'new' ? 'bg-blue-100 text-blue-800 hover:bg-blue-100' :
                             'bg-gray-100 text-gray-800 hover:bg-gray-100'
                           }`}

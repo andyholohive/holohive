@@ -58,7 +58,7 @@ const formatFollowers = (followers: number | null): string => {
 const getListStatusColor = (status: string) => {
   switch (status) {
     case 'curated': return 'bg-blue-100 text-blue-800';
-    case 'approved': return 'bg-green-100 text-green-800';
+    case 'approved': return 'bg-emerald-100 text-emerald-800';
     case 'denied': return 'bg-red-100 text-red-800';
     default: return 'bg-gray-100 text-gray-800';
   }
@@ -68,7 +68,7 @@ const getStatusColor = (status: string) => {
   switch (status) {
     case 'curated': return 'bg-blue-100 text-blue-800';
     case 'interested': return 'bg-yellow-100 text-yellow-800';
-    case 'onboarded': return 'bg-green-100 text-green-800';
+    case 'onboarded': return 'bg-emerald-100 text-emerald-800';
     case 'concluded': return 'bg-gray-100 text-gray-800';
     default: return 'bg-gray-100 text-gray-800';
   }
@@ -131,7 +131,7 @@ const getCreatorTypeColor = (type: string) => {
     'Drama-Forward': 'bg-red-100 text-red-800',
     'Skeptic': 'bg-orange-100 text-orange-800',
     'Educator': 'bg-blue-100 text-blue-800',
-    'Bridge Builder': 'bg-green-100 text-green-800',
+    'Bridge Builder': 'bg-emerald-100 text-emerald-800',
     'Visionary': 'bg-indigo-100 text-indigo-800',
     'Onboarder': 'bg-teal-100 text-teal-800',
     'General': 'bg-gray-100 text-gray-800',
@@ -139,7 +139,7 @@ const getCreatorTypeColor = (type: string) => {
     'Crypto': 'bg-yellow-100 text-yellow-800',
     'Memecoin': 'bg-orange-100 text-orange-800',
     'NFT': 'bg-purple-100 text-purple-800',
-    'Trading': 'bg-green-100 text-green-800',
+    'Trading': 'bg-emerald-100 text-emerald-800',
     'AI': 'bg-blue-100 text-blue-800',
     'Research': 'bg-indigo-100 text-indigo-800',
     'Airdrop': 'bg-teal-100 text-teal-800',

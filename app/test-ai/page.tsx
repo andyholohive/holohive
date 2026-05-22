@@ -151,7 +151,7 @@ export default function TestAIPage() {
           <CardTitle>Debug Logs</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="bg-black text-green-400 p-4 rounded-lg h-64 overflow-y-auto font-mono text-sm">
+          <div className="bg-black text-emerald-400 p-4 rounded-lg h-64 overflow-y-auto font-mono text-sm">
             {logs.length > 0 ? (
               logs.map((log, index) => (
                 <div key={index}>{log}</div>

@@ -2374,7 +2374,7 @@ export default function SalesPipelinePage() {
                   <Badge variant="outline" className="text-xs bg-white border-blue-300 text-blue-600">Closer</Badge>
                 )}
                 {opp.dm_account === 'sdr' && (
-                  <Badge variant="outline" className="text-xs bg-white border-green-300 text-green-600">SDR</Badge>
+                  <Badge variant="outline" className="text-xs bg-white border-emerald-300 text-emerald-600">SDR</Badge>
                 )}
                 {opp.source && (
                   <Badge variant="outline" className="text-xs bg-white capitalize">
@@ -2402,7 +2402,7 @@ export default function SalesPipelinePage() {
                 {opp.stage === 'warm' && opp.warm_sub_state && (
                   <div className="flex items-center gap-1.5">
                     <MessageSquare className="h-3 w-3 flex-shrink-0" />
-                    <span className={opp.warm_sub_state === 'interested' ? 'text-green-600 font-medium' : 'text-gray-500'}>
+                    <span className={opp.warm_sub_state === 'interested' ? 'text-emerald-600 font-medium' : 'text-gray-500'}>
                       {opp.warm_sub_state === 'interested' ? 'Interested' : 'Silent'}
                     </span>
                   </div>
@@ -2412,7 +2412,7 @@ export default function SalesPipelinePage() {
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-green-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-red-400'}`}
+                      className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-emerald-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-red-400'}`}
                       style={{ width: `${opp.temperature_score}%` }}
                     />
                   </div>
@@ -2784,7 +2784,7 @@ export default function SalesPipelinePage() {
                               {stage === 'warm' && (
                                 <TableCell>
                                   {opp.warm_sub_state ? (
-                                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${opp.warm_sub_state === 'interested' ? 'border-green-300 text-green-600 bg-green-50' : 'border-gray-300 text-gray-500 bg-gray-50'}`}>
+                                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${opp.warm_sub_state === 'interested' ? 'border-emerald-300 text-emerald-600 bg-emerald-50' : 'border-gray-300 text-gray-500 bg-gray-50'}`}>
                                       {opp.warm_sub_state === 'interested' ? 'Interested' : 'Silent'}
                                     </Badge>
                                   ) : (
@@ -3957,7 +3957,7 @@ export default function SalesPipelinePage() {
                       <div className="flex items-center gap-1">
                         <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                           <div
-                            className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-green-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-red-400'}`}
+                            className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-emerald-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-red-400'}`}
                             style={{ width: `${opp.temperature_score}%` }}
                           />
                         </div>
@@ -4741,7 +4741,7 @@ export default function SalesPipelinePage() {
                       </Badge>
                     )}
                     {opp.dm_account && (
-                      <Badge variant="outline" className={`text-xs ${opp.dm_account === 'closer' ? 'border-blue-300 text-blue-600' : 'border-green-300 text-green-600'}`}>
+                      <Badge variant="outline" className={`text-xs ${opp.dm_account === 'closer' ? 'border-blue-300 text-blue-600' : 'border-emerald-300 text-emerald-600'}`}>
                         {opp.dm_account === 'closer' ? 'Closer' : opp.dm_account === 'sdr' ? 'SDR' : 'Other'}
                       </Badge>
                     )}
@@ -4973,7 +4973,7 @@ export default function SalesPipelinePage() {
                   <div className="flex items-center gap-2 mt-1">
                     <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-green-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-red-400'}`}
+                        className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-emerald-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-red-400'}`}
                         style={{ width: `${opp.temperature_score}%` }}
                       />
                     </div>
@@ -7014,7 +7014,7 @@ export default function SalesPipelinePage() {
               onClick={() => setBucketValue(b)}
               className={`flex-1 py-3 rounded-lg text-center font-semibold text-lg border-2 transition-all ${
                 bucketValue === b
-                  ? b === 'A' ? 'border-green-500 bg-green-50 text-green-700'
+                  ? b === 'A' ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                     : b === 'B' ? 'border-amber-500 bg-amber-50 text-amber-700'
                     : 'border-gray-400 bg-gray-50 text-gray-600'
                   : 'border-gray-200 text-gray-400 hover:border-gray-300'

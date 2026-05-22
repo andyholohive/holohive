@@ -69,7 +69,7 @@ const triggerBadge = (trigger: string) => {
   switch (trigger) {
     case 'Client Request': return 'bg-purple-100 text-purple-800';
     case 'Follow-Up Needed': return 'bg-yellow-100 text-yellow-800';
-    case 'SOP': return 'bg-green-100 text-green-800';
+    case 'SOP': return 'bg-emerald-100 text-emerald-800';
     case 'Extra': return 'bg-orange-100 text-orange-800';
     default: return 'bg-gray-100 text-gray-700';
   }
@@ -470,7 +470,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
             )}
             <div className="flex items-center gap-1 mt-0.5">
               {inlineWhoMode === 'team' && (
-                <button type="button" className="text-[10px] text-green-600 hover:underline" onClick={saveInlineEdit}>Save</button>
+                <button type="button" className="text-[10px] text-emerald-600 hover:underline" onClick={saveInlineEdit}>Save</button>
               )}
               <button type="button" className="text-[10px] text-brand hover:underline" onClick={() => { setInlineWhoMode(inlineWhoMode === 'team' ? 'custom' : 'team'); setEditingValue(''); }}>
                 {inlineWhoMode === 'team' ? 'Manual' : 'Team'}
@@ -795,7 +795,7 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleInlineAdd} disabled={!inlineNew.work_type || !inlineNew.action.trim()}>
-                                <Check className="h-4 w-4 text-green-600" />
+                                <Check className="h-4 w-4 text-emerald-600" />
                               </Button>
                               <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setIsAddingInline(false); setInlineNew({ work_type: '', action: '', who: '', method: '', location: '', trigger: '', notes: '', logged_at: new Date().toISOString().split('T')[0] }); }}>
                                 <X className="h-4 w-4 text-gray-400" />

@@ -24,7 +24,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color:
   in_progress: { label: 'In Progress', icon: PlayCircle, color: 'text-blue-500' },
   paused: { label: 'Paused', icon: PauseCircle, color: 'text-amber-500' },
   ready_for_feedback: { label: 'Feedback', icon: MessageCircle, color: 'text-purple-500' },
-  complete: { label: 'Complete', icon: CheckCircle2, color: 'text-green-500' },
+  complete: { label: 'Complete', icon: CheckCircle2, color: 'text-emerald-500' },
 };
 
 export default function MyDashboardPage() {
@@ -158,7 +158,7 @@ export default function MyDashboardPage() {
               <StatCard icon={AlertTriangle} label="Overdue" value={stats.overdue} color="text-red-500" bg="bg-red-50" />
               <StatCard icon={Clock} label="Due This Week" value={stats.dueThisWeek} color="text-amber-500" bg="bg-amber-50" />
               <StatCard icon={PlayCircle} label="In Progress" value={stats.inProgress} color="text-blue-500" bg="bg-blue-50" />
-              <StatCard icon={CheckCircle2} label="Completed (7d)" value={stats.completedThisWeek} color="text-green-500" bg="bg-green-50" />
+              <StatCard icon={CheckCircle2} label="Completed (7d)" value={stats.completedThisWeek} color="text-emerald-500" bg="bg-emerald-50" />
             </div>
           )}
 
@@ -179,7 +179,7 @@ export default function MyDashboardPage() {
 
           {/* Recently Completed */}
           {recentlyCompleted.length > 0 && (
-            <TaskSection title="Recently Completed" icon={CheckCircle2} color="text-green-600" tasks={recentlyCompleted} getDueDateColor={getDueDateColor} clientMap={clientMap} />
+            <TaskSection title="Recently Completed" icon={CheckCircle2} color="text-emerald-600" tasks={recentlyCompleted} getDueDateColor={getDueDateColor} clientMap={clientMap} />
           )}
 
           {tasks.length === 0 && (

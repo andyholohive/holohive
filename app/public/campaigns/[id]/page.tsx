@@ -118,7 +118,7 @@ const getCreatorTypeColor = (creatorType: string) => {
     'Drama-Forward': 'bg-red-100 text-red-800',
     'Skeptic': 'bg-orange-100 text-orange-800',
     'Educator': 'bg-blue-100 text-blue-800',
-    'Bridge Builder': 'bg-green-100 text-green-800',
+    'Bridge Builder': 'bg-emerald-100 text-emerald-800',
     'Visionary': 'bg-indigo-100 text-indigo-800',
     'Onboarder': 'bg-teal-100 text-teal-800',
     'General': 'bg-gray-100 text-gray-800',
@@ -126,7 +126,7 @@ const getCreatorTypeColor = (creatorType: string) => {
     'Crypto': 'bg-yellow-100 text-yellow-800',
     'Memecoin': 'bg-orange-100 text-orange-800',
     'NFT': 'bg-purple-100 text-purple-800',
-    'Trading': 'bg-green-100 text-green-800',
+    'Trading': 'bg-emerald-100 text-emerald-800',
     'AI': 'bg-blue-100 text-blue-800',
   };
   return colorMap[creatorType] || 'bg-gray-100 text-gray-800';
@@ -169,7 +169,7 @@ const getContentTypeColor = (type: string) => {
   const colorMap: { [key: string]: string } = {
     Post: 'bg-blue-100 text-blue-800',
     Video: 'bg-red-100 text-red-800',
-    Article: 'bg-green-100 text-green-800',
+    Article: 'bg-emerald-100 text-emerald-800',
     AMA: 'bg-purple-100 text-purple-800',
     Ambassadorship: 'bg-orange-100 text-orange-800',
     Alpha: 'bg-yellow-100 text-yellow-800',
@@ -193,7 +193,7 @@ const getStatusColor = (status: string) => {
     case 'onboarded':
       return 'bg-orange-100 text-orange-800';
     case 'concluded':
-      return 'bg-green-100 text-green-800';
+      return 'bg-emerald-100 text-emerald-800';
     default:
       return 'bg-gray-100 text-gray-800';
   }
@@ -202,7 +202,7 @@ const getStatusColor = (status: string) => {
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'Active':
-      return 'bg-green-100 text-green-800';
+      return 'bg-emerald-100 text-emerald-800';
     case 'Planning':
       return 'bg-blue-100 text-blue-800';
     case 'Paused':
@@ -2353,7 +2353,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                     <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
                                       <span className={`px-2 py-1 rounded-md text-xs font-medium ${(() => {
                                         const s = (content.status || '').toLowerCase();
-                                        if (['published', 'active', 'live', 'posted'].includes(s)) return 'bg-green-100 text-green-800';
+                                        if (['published', 'active', 'live', 'posted'].includes(s)) return 'bg-emerald-100 text-emerald-800';
                                         if (['scheduled'].includes(s)) return 'bg-blue-100 text-blue-800';
                                         if (['draft', 'pending'].includes(s)) return 'bg-yellow-100 text-yellow-800';
                                         if (['failed', 'removed'].includes(s)) return 'bg-red-100 text-red-800';

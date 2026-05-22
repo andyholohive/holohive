@@ -35,9 +35,9 @@ export function AgentStatusIndicator({ status, currentStep, className }: AgentSt
     completed: {
       icon: CheckCircle2,
       label: 'Done!',
-      color: 'text-green-500',
-      bgColor: 'bg-green-50 dark:bg-green-950',
-      borderColor: 'border-green-200 dark:border-green-800',
+      color: 'text-emerald-500',
+      bgColor: 'bg-emerald-50 dark:bg-emerald-950',
+      borderColor: 'border-emerald-200 dark:border-emerald-800',
       animation: '',
     },
     error: {

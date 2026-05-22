@@ -25,7 +25,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color:
   in_progress: { label: 'In Progress', icon: PlayCircle, color: 'text-blue-500' },
   paused: { label: 'Paused', icon: PauseCircle, color: 'text-amber-500' },
   ready_for_feedback: { label: 'Feedback', icon: MessageCircle, color: 'text-purple-500' },
-  complete: { label: 'Complete', icon: CheckCircle2, color: 'text-green-500' },
+  complete: { label: 'Complete', icon: CheckCircle2, color: 'text-emerald-500' },
 };
 
 export default function ClientTasksPage() {
@@ -110,7 +110,7 @@ export default function ClientTasksPage() {
               <StatCard label="Total" value={stats.total} color="text-gray-600" bg="bg-gray-50" />
               <StatCard label="Overdue" value={stats.overdue} color="text-red-500" bg="bg-red-50" icon={AlertTriangle} />
               <StatCard label="In Progress" value={stats.inProgress} color="text-blue-500" bg="bg-blue-50" icon={PlayCircle} />
-              <StatCard label="Completed" value={stats.byStatus['complete'] || 0} color="text-green-500" bg="bg-green-50" icon={CheckCircle2} />
+              <StatCard label="Completed" value={stats.byStatus['complete'] || 0} color="text-emerald-500" bg="bg-emerald-50" icon={CheckCircle2} />
             </div>
           )}
 
@@ -149,14 +149,14 @@ export default function ClientTasksPage() {
           {completedTasks.length > 0 && (
             <div className="bg-white border border-gray-200 shadow-sm rounded-lg">
               <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                 <h3 className="font-semibold text-sm text-gray-900">Completed</h3>
                 <Badge variant="secondary" className="text-xs">{completedTasks.length}</Badge>
               </div>
               <div className="divide-y divide-gray-50">
                 {completedTasks.map((task) => (
                   <div key={task.id} className="px-4 py-2.5 flex items-center gap-3 hover:bg-gray-50">
-                    <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
                     <span className="flex-1 text-sm text-gray-400 line-through">{task.task_name}</span>
                     {task.completed_at && (
                       <span className="text-xs text-gray-400">

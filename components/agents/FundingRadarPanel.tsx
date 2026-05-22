@@ -86,7 +86,7 @@ const ROUND_STYLES: Record<string, { label: string; color: string; bg: string }>
   series_c: { label: 'Series C', color: 'text-cyan-700', bg: 'bg-cyan-50' },
   strategic: { label: 'Strategic', color: 'text-amber-700', bg: 'bg-amber-50' },
   private: { label: 'Private', color: 'text-orange-700', bg: 'bg-orange-50' },
-  public: { label: 'Public', color: 'text-green-700', bg: 'bg-green-50' },
+  public: { label: 'Public', color: 'text-emerald-700', bg: 'bg-emerald-50' },
   token_sale: { label: 'Token Sale', color: 'text-pink-700', bg: 'bg-pink-50' },
   grant: { label: 'Grant', color: 'text-indigo-700', bg: 'bg-indigo-50' },
   undisclosed: { label: 'Undisclosed', color: 'text-gray-600', bg: 'bg-gray-50' },

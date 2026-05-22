@@ -91,7 +91,7 @@ export default function AdminDashboardPage() {
               <StatCard label="Overdue" value={overall.overdue} color="text-red-500" bg="bg-red-50" icon={AlertTriangle} />
               <StatCard label="Due This Week" value={overall.dueThisWeek} color="text-amber-500" bg="bg-amber-50" icon={Clock} />
               <StatCard label="In Progress" value={overall.inProgress} color="text-blue-500" bg="bg-blue-50" icon={PlayCircle} />
-              <StatCard label="Completed (7d)" value={overall.completedThisWeek} color="text-green-500" bg="bg-green-50" icon={CheckCircle2} />
+              <StatCard label="Completed (7d)" value={overall.completedThisWeek} color="text-emerald-500" bg="bg-emerald-50" icon={CheckCircle2} />
             </div>
           )}
 
@@ -127,7 +127,7 @@ export default function AdminDashboardPage() {
                       </td>
                       <td className="py-2.5 px-3 text-center text-blue-600">{u.stats.inProgress}</td>
                       <td className="py-2.5 px-3 text-center text-amber-600">{u.stats.dueThisWeek}</td>
-                      <td className="py-2.5 px-3 text-center text-green-600">{u.stats.completedThisWeek}</td>
+                      <td className="py-2.5 px-3 text-center text-emerald-600">{u.stats.completedThisWeek}</td>
                     </tr>
                   ))}
                 </tbody>

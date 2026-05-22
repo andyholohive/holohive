@@ -33,7 +33,7 @@ export function AdvancedInsightsCard({ insights, onApplyInsight, onDismiss }: Ad
       case 'campaign_performance':
         return 'bg-blue-100 text-blue-800';
       case 'kol_recommendation':
-        return 'bg-green-100 text-green-800';
+        return 'bg-emerald-100 text-emerald-800';
       case 'budget_optimization':
         return 'bg-purple-100 text-purple-800';
       case 'timing_suggestion':
@@ -44,7 +44,7 @@ export function AdvancedInsightsCard({ insights, onApplyInsight, onDismiss }: Ad
   };
 
   const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'text-green-600';
+    if (confidence >= 0.8) return 'text-emerald-600';
     if (confidence >= 0.6) return 'text-yellow-600';
     return 'text-red-600';
   };

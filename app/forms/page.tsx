@@ -761,8 +761,8 @@ export default function FormsPage() {
                     {/* Subdomain Connection */}
                     {form.subdomain_enabled && form.subdomain_url && (
                       <div className="flex items-center gap-2 text-sm">
-                        <Globe className="h-4 w-4 text-green-600" />
-                        <span className="text-green-700 font-medium truncate max-w-[200px]" title={form.subdomain_url}>
+                        <Globe className="h-4 w-4 text-emerald-600" />
+                        <span className="text-emerald-700 font-medium truncate max-w-[200px]" title={form.subdomain_url}>
                           {form.subdomain_url.replace(/^https?:\/\//, '')}
                         </span>
                       </div>
@@ -1051,7 +1051,7 @@ export default function FormsPage() {
                       title="Copy link"
                     >
                       {copiedFormId === sharingForm.id ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                       ) : (
                         <Copy className="h-4 w-4" />
                       )}
@@ -1277,7 +1277,7 @@ export default function FormsPage() {
                                 <div>
                                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                                     value === 'Yes'
-                                      ? 'bg-green-100 text-green-800'
+                                      ? 'bg-emerald-100 text-emerald-800'
                                       : value === 'No'
                                       ? 'bg-red-100 text-red-800'
                                       : 'bg-gray-100 text-gray-800'

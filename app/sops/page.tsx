@@ -94,7 +94,7 @@ const CATEGORIES = [
 // the closest existing tone rather than adding new colors here.
 const STATUS_TONES: Record<string, BadgeTone> = {
   draft:    'warning',  // amber, was bg-yellow-100
-  active:   'success',  // emerald, was bg-green-100
+  active:   'success',  // emerald, was bg-emerald-100
   inactive: 'neutral',  // gray, unchanged
 };
 const STATUSES = [
@@ -778,7 +778,7 @@ export default function SOPsPage() {
                       </Badge>
                     )}
                     {sop.automation_review_completed && (
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 pointer-events-none">
+                      <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 pointer-events-none">
                         <CheckCircle className="h-3 w-3 mr-1" />
                         Reviewed
                       </Badge>
@@ -1131,9 +1131,9 @@ export default function SOPsPage() {
                 </div>
 
                 {viewingSOP.automation_notes && (
-                  <div className="bg-green-50 border border-green-200 p-3 rounded-lg">
-                    <h4 className="font-semibold text-sm text-green-800 mb-1">Automation Notes</h4>
-                    <p className="text-green-700 text-sm">{viewingSOP.automation_notes}</p>
+                  <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
+                    <h4 className="font-semibold text-sm text-emerald-800 mb-1">Automation Notes</h4>
+                    <p className="text-emerald-700 text-sm">{viewingSOP.automation_notes}</p>
                   </div>
                 )}
 

@@ -2107,11 +2107,11 @@ export default function FormBuilderPage() {
           {form.status === 'published' && (
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleCopyShareLink} className="hover:opacity-90">
-                {copiedLink ? <CheckCircle2 className="h-4 w-4 mr-2 text-green-600" /> : <Copy className="h-4 w-4 mr-2" />}
+                {copiedLink ? <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" /> : <Copy className="h-4 w-4 mr-2" />}
                 Copy Link
               </Button>
               <Button variant="outline" onClick={handleOpenConnectDialog} className="hover:opacity-90">
-                {form.subdomain_enabled ? <Globe className="h-4 w-4 mr-2 text-green-600" /> : <LinkIcon className="h-4 w-4 mr-2" />}
+                {form.subdomain_enabled ? <Globe className="h-4 w-4 mr-2 text-emerald-600" /> : <LinkIcon className="h-4 w-4 mr-2" />}
                 Connect
               </Button>
               <Button variant="outline" onClick={handleOpenShareLink} className="hover:opacity-90">
@@ -3049,7 +3049,7 @@ export default function FormBuilderPage() {
                                 <div>
                                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                                     value === 'Yes'
-                                      ? 'bg-green-100 text-green-800'
+                                      ? 'bg-emerald-100 text-emerald-800'
                                       : value === 'No'
                                       ? 'bg-red-100 text-red-800'
                                       : 'bg-gray-100 text-gray-800'

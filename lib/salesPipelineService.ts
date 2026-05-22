@@ -88,7 +88,7 @@ export const STAGE_COLORS: Record<SalesPipelineStage, { bg: string; text: string
 };
 
 export const BUCKET_COLORS: Record<Bucket, { bg: string; text: string }> = {
-  A: { bg: 'bg-green-100', text: 'text-green-800' },
+  A: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
   B: { bg: 'bg-amber-100', text: 'text-amber-800' },
   C: { bg: 'bg-gray-100', text: 'text-gray-600' },
 };

@@ -69,7 +69,7 @@ const formatFileSize = (bytes: number) => {
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'Active':
-      return 'bg-green-100 text-green-800';
+      return 'bg-emerald-100 text-emerald-800';
     case 'Planning':
       return 'bg-blue-100 text-blue-800';
     case 'Paused':
@@ -666,12 +666,12 @@ export default function PublicReportPage({ params }: { params: { id: string } })
               </div>
 
               {/* Engagement Card */}
-              <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl border border-green-200 shadow-sm">
+              <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-6 rounded-xl border border-emerald-200 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
-                  <BarChart3 className="h-5 w-5 text-green-600" />
+                  <BarChart3 className="h-5 w-5 text-emerald-600" />
                 </div>
-                <p className="text-sm font-medium text-green-700 mb-1">Total Engagement</p>
-                <p className="text-3xl font-bold text-green-900">{totalEngagement.toLocaleString()}</p>
+                <p className="text-sm font-medium text-emerald-700 mb-1">Total Engagement</p>
+                <p className="text-3xl font-bold text-emerald-900">{totalEngagement.toLocaleString()}</p>
               </div>
 
               {/* Engagement Rate Card */}

@@ -524,7 +524,7 @@ export default function DeliveryLogsPage() {
             )}
             <div className="flex items-center gap-1 mt-0.5">
               {inlineWhoMode === 'team' && (
-                <button type="button" className="text-[10px] text-green-600 hover:underline" onClick={saveInlineEdit}>Save</button>
+                <button type="button" className="text-[10px] text-emerald-600 hover:underline" onClick={saveInlineEdit}>Save</button>
               )}
               <button type="button" className="text-[10px] text-brand hover:underline" onClick={() => { setInlineWhoMode(inlineWhoMode === 'team' ? 'custom' : 'team'); setEditingValue(''); }}>
                 {inlineWhoMode === 'team' ? 'Manual' : 'Team'}
@@ -888,7 +888,7 @@ export default function DeliveryLogsPage() {
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-1">
                               <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleInlineAdd} disabled={!inlineNew.work_type || !inlineNew.action.trim()}>
-                                <Check className="h-4 w-4 text-green-600" />
+                                <Check className="h-4 w-4 text-emerald-600" />
                               </Button>
                               <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setIsAddingInline(false); setInlineNew({ work_type: '', action: '', who: '', method: '', location: '', trigger: '', notes: '', logged_at: toLocalDateStr(new Date()) }); }}>
                                 <X className="h-4 w-4 text-gray-400" />

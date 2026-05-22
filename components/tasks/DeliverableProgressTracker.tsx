@@ -28,7 +28,7 @@ const STATUS_ICON: Record<string, { icon: any; color: string }> = {
   in_progress: { icon: PlayCircle, color: 'text-blue-500' },
   paused: { icon: PauseCircle, color: 'text-amber-500' },
   ready_for_feedback: { icon: Clock, color: 'text-purple-500' },
-  complete: { icon: CheckCircle2, color: 'text-green-500' },
+  complete: { icon: CheckCircle2, color: 'text-emerald-500' },
 };
 
 export function DeliverableProgressTracker({ parentTaskId }: DeliverableProgressTrackerProps) {
@@ -123,7 +123,7 @@ export function DeliverableProgressTracker({ parentTaskId }: DeliverableProgress
                     <TooltipTrigger asChild>
                       <div className={`w-9 h-9 rounded-full border-2 flex items-center justify-center ${
                         status === 'complete'
-                          ? 'border-green-400 bg-green-50'
+                          ? 'border-emerald-400 bg-emerald-50'
                           : status === 'in_progress'
                           ? 'border-blue-400 bg-blue-50'
                           : 'border-gray-200 bg-white'
@@ -168,7 +168,7 @@ export function DeliverableProgressTracker({ parentTaskId }: DeliverableProgress
                 {!isLast && (
                   <div className="flex items-center h-9 px-0">
                     <div className={`w-4 h-0.5 mt-0 ${
-                      status === 'complete' ? 'bg-green-400' : 'bg-gray-200'
+                      status === 'complete' ? 'bg-emerald-400' : 'bg-gray-200'
                     }`} />
                   </div>
                 )}

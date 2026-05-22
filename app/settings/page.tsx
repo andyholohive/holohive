@@ -747,7 +747,7 @@ function SettingsContent() {
               <div className="flex items-center justify-between py-2 border-t">
                 <span className="text-sm text-gray-600">Status</span>
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  userProfile?.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  userProfile?.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
                 }`}>
                   {userProfile?.is_active ? 'Active' : 'Inactive'}
                 </span>
@@ -964,7 +964,7 @@ function SettingsContent() {
                 <>
                   <div className="flex items-center justify-between py-2">
                     <span className="text-sm text-gray-600">Status</span>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
                       <CheckCircle className="h-3 w-3" />
                       Connected
                     </span>
@@ -1067,7 +1067,7 @@ function SettingsContent() {
                     <div className="flex items-center justify-between py-2">
                       <span className="text-sm text-gray-600">Webhook Status</span>
                       {webhookStatus?.url ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
                           <CheckCircle className="h-3 w-3" />
                           Connected
                         </span>

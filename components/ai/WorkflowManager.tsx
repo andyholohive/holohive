@@ -197,7 +197,7 @@ export function WorkflowManager() {
   };
 
   const getSuccessRateColor = (rate: number) => {
-    if (rate >= 90) return 'text-green-600';
+    if (rate >= 90) return 'text-emerald-600';
     if (rate >= 70) return 'text-yellow-600';
     return 'text-red-600';
   };
@@ -467,7 +467,7 @@ export function WorkflowManager() {
               <div className="flex items-center justify-between pt-2 border-t">
                 <div className="flex items-center gap-4 text-sm">
                   <div className="flex items-center gap-1">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
                     <span className={getSuccessRateColor(workflow.successRate)}>
                       {workflow.successRate}%
                     </span>

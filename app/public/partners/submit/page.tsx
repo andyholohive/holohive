@@ -95,8 +95,8 @@ export default function PartnerSubmitPage() {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-100 p-8">
           <div className="text-center">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
-              <Check className="h-8 w-8 text-green-600" />
+            <div className="mx-auto w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
+              <Check className="h-8 w-8 text-emerald-600" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Application Submitted!</h2>
             <p className="text-gray-500 mb-8">Thank you for your interest in partnering with us. We'll review your application and get back to you soon.</p>

@@ -376,7 +376,7 @@ export default function DailyStandupPage() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {entry.completed_yesterday === 'Yes' ? (
-                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full">
                                       <Check className="h-3 w-3" /> Done
                                     </span>
                                   ) : (

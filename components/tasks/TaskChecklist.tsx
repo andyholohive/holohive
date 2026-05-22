@@ -115,7 +115,7 @@ export function TaskChecklist({ taskId }: TaskChecklistProps) {
               className="flex-shrink-0 hover:opacity-80"
             >
               {item.is_done ? (
-                <CheckSquare className="h-4 w-4 text-green-500" />
+                <CheckSquare className="h-4 w-4 text-emerald-500" />
               ) : (
                 <Square className="h-4 w-4 text-gray-300 hover:text-gray-500" />
               )}

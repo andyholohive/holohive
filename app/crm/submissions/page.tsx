@@ -268,7 +268,7 @@ export default function SubmissionsPage() {
   };
 
   const fundingColor = (funding: string) => {
-    if (funding?.includes('10M') || funding?.includes('50M') || funding?.includes('100M')) return 'bg-green-100 text-green-700 border-green-200';
+    if (funding?.includes('10M') || funding?.includes('50M') || funding?.includes('100M')) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
     if (funding?.includes('2M') || funding?.includes('5M')) return 'bg-teal-100 text-teal-700 border-teal-200';
     if (funding?.includes('500K') || funding?.includes('1M')) return 'bg-blue-100 text-blue-700 border-blue-200';
     return 'bg-gray-100 text-gray-700 border-gray-200';

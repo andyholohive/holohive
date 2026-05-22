@@ -1102,7 +1102,7 @@ export default function TelegramChatsPage() {
     const now = new Date();
     const diffHours = (now.getTime() - date.getTime()) / 3600000;
 
-    if (diffHours < 24) return { color: 'bg-green-500', label: 'Active' };
+    if (diffHours < 24) return { color: 'bg-emerald-500', label: 'Active' };
     if (diffHours < 72) return { color: 'bg-yellow-500', label: 'Recent' };
     if (diffHours < 168) return { color: 'bg-orange-500', label: 'Quiet' };
     return { color: 'bg-red-500', label: 'Inactive' };
@@ -1612,7 +1612,7 @@ export default function TelegramChatsPage() {
                           {/* Linked Opportunity */}
                           {chat.opportunity && (
                             <div className="mt-3 flex items-center gap-2">
-                              <CheckCircle className="h-4 w-4 text-green-500" />
+                              <CheckCircle className="h-4 w-4 text-emerald-500" />
                               <span className="text-sm text-gray-700">
                                 Linked to: <strong>{chat.opportunity.name}</strong>
                               </span>
@@ -1805,7 +1805,7 @@ export default function TelegramChatsPage() {
                       {/* Linked Opportunity */}
                       {chat.opportunity && (
                         <div className="mt-3 flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <CheckCircle className="h-4 w-4 text-emerald-500" />
                           <span className="text-sm text-gray-700">
                             Linked to: <strong>{chat.opportunity.name}</strong>
                           </span>
@@ -1994,7 +1994,7 @@ export default function TelegramChatsPage() {
                           {/* Linked KOL */}
                           {chat.master_kol && (
                             <div className="mt-3 flex items-center gap-2">
-                              <CheckCircle className="h-4 w-4 text-green-500" />
+                              <CheckCircle className="h-4 w-4 text-emerald-500" />
                               <span className="text-sm text-gray-700">
                                 Linked to KOL: <strong>{chat.master_kol.name}</strong>
                               </span>
@@ -2174,7 +2174,7 @@ export default function TelegramChatsPage() {
                           {/* Linked KOL */}
                           {chat.master_kol && (
                             <div className="mt-3 flex items-center gap-2">
-                              <CheckCircle className="h-4 w-4 text-green-500" />
+                              <CheckCircle className="h-4 w-4 text-emerald-500" />
                               <span className="text-sm text-gray-700">
                                 Linked to KOL: <strong>{chat.master_kol.name}</strong>
                               </span>
@@ -2357,7 +2357,7 @@ export default function TelegramChatsPage() {
                           title={command.is_active ? 'Disable command' : 'Enable command'}
                         >
                           {command.is_active ? (
-                            <ToggleRight className="h-5 w-5 text-green-600" />
+                            <ToggleRight className="h-5 w-5 text-emerald-600" />
                           ) : (
                             <ToggleLeft className="h-5 w-5 text-gray-400" />
                           )}

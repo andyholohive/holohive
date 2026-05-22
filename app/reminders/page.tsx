@@ -705,7 +705,7 @@ export default function RemindersPage() {
                         <span>
                           ({rule.last_run_result.items_found} items
                           {rule.last_run_result.message_sent ? (
-                            <CheckCircle className="h-3 w-3 inline ml-1 text-green-500" />
+                            <CheckCircle className="h-3 w-3 inline ml-1 text-emerald-500" />
                           ) : (
                             <XCircle className="h-3 w-3 inline ml-1 text-red-500" />
                           )})
@@ -732,7 +732,7 @@ export default function RemindersPage() {
                         {log.error ? (
                           <AlertTriangle className="h-3 w-3 text-red-500 shrink-0" />
                         ) : log.message_sent ? (
-                          <CheckCircle className="h-3 w-3 text-green-500 shrink-0" />
+                          <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0" />
                         ) : (
                           <span className="h-3 w-3 rounded-full bg-gray-300 inline-block shrink-0" />
                         )}

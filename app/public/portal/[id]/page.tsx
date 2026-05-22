@@ -245,7 +245,7 @@ const formatNumber = (num: number) => {
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'Active':
-      return 'bg-green-100 text-green-800';
+      return 'bg-emerald-100 text-emerald-800';
     case 'Planning':
       return 'bg-blue-100 text-blue-800';
     case 'Paused':
@@ -282,7 +282,7 @@ const kolStatusMap: Record<string, { label: string; color: string }> = {
   'Contacted': { label: 'Pitching', color: 'bg-blue-100 text-blue-700' },
   'Interested': { label: 'Negotiating', color: 'bg-yellow-100 text-yellow-700' },
   'Onboarded': { label: 'Content Creation', color: 'bg-purple-100 text-purple-700' },
-  'Concluded': { label: 'Completed', color: 'bg-green-100 text-green-700' },
+  'Concluded': { label: 'Completed', color: 'bg-emerald-100 text-emerald-700' },
 };
 
 export default function ClientPortalPage({ params }: { params: { id: string } }) {
@@ -2859,8 +2859,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                           rel="noopener noreferrer"
                           className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-brand/5 hover:border-brand/20 border border-gray-100 transition-all group"
                         >
-                          <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
-                            <FolderOpen className="h-5 w-5 text-green-600" />
+                          <div className="p-2 bg-emerald-100 rounded-lg group-hover:bg-emerald-200 transition-colors">
+                            <FolderOpen className="h-5 w-5 text-emerald-600" />
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">Brand Assets</p>
@@ -3090,7 +3090,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                           <div className="text-xs text-gray-500">{d.templateName}</div>
                         </div>
                         <Badge className={`border-0 text-[10px] ${
-                          d.status === 'complete' ? 'bg-green-50 text-green-600' :
+                          d.status === 'complete' ? 'bg-emerald-50 text-emerald-600' :
                           d.status === 'cancelled' ? 'bg-gray-50 text-gray-500' :
                           'bg-blue-50 text-blue-600'
                         }`}>
@@ -3232,7 +3232,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <TrendingUp className="h-4 w-4 text-green-500" />
+                                  <TrendingUp className="h-4 w-4 text-emerald-500" />
                                   <span className="text-gray-600">
                                     <span className="font-semibold text-gray-900">{formatNumber(campaign.total_engagement)}</span> engagement
                                   </span>
@@ -3652,7 +3652,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             : activity.activity_type === 'task_added' ? 'bg-amber-500'
                             : activity.activity_type === 'campaign_status' ? 'bg-blue-500'
                             : activity.activity_type === 'link_added' ? 'bg-purple-500'
-                            : activity.activity_type === 'resource_updated' ? 'bg-green-500'
+                            : activity.activity_type === 'resource_updated' ? 'bg-emerald-500'
                             : 'bg-gray-400';
 
                           // Client tasks live inside the milestones section

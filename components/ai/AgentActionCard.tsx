@@ -79,7 +79,7 @@ const toolLabels: Record<string, string> = {
 
 const toolColors: Record<string, string> = {
   search_kols: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-  create_campaign: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
+  create_campaign: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300',
   create_kol_list: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
   create_kol_list_from_ids: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
   add_kols_to_campaign: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
@@ -121,7 +121,7 @@ function ActionItem({ action, index, reversibleActions, onUndo }: {
                 Step {index + 1}: {label}
               </span>
               {action.result.success ? (
-                <CheckCircle2 className="w-4 h-4 text-green-500 flex-shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
               ) : (
                 <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
               )}

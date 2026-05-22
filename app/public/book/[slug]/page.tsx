@@ -261,8 +261,8 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
           <div className="flex justify-center mb-6">
             <Image src="/images/logo.png" alt="Logo" width={60} height={60} className="rounded-xl" />
           </div>
-          <div className="rounded-full bg-green-50 p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-            <CheckCircle2 className="h-10 w-10 text-green-600" />
+          <div className="rounded-full bg-emerald-50 p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+            <CheckCircle2 className="h-10 w-10 text-emerald-600" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Meeting Booked!</h2>
           <div className="bg-gray-50 rounded-xl p-6 text-left space-y-3 mb-6">

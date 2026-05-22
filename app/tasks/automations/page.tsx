@@ -263,7 +263,7 @@ export default function AutomationsPage() {
                   {log.action_taken === 'recurring_clone' ? (
                     <RefreshCw className="h-4 w-4 text-blue-500 flex-shrink-0" />
                   ) : (
-                    <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-900">

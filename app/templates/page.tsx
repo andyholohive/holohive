@@ -112,7 +112,7 @@ export default function TemplatesPage() {
     const colors: Record<string, string> = {
       initial_outreach: 'bg-blue-100 text-blue-800',
       nda_request: 'bg-purple-100 text-purple-800',
-      kol_list_access: 'bg-green-100 text-green-800',
+      kol_list_access: 'bg-emerald-100 text-emerald-800',
       kol_list_delivery: 'bg-teal-100 text-teal-800',
       final_kol_picks: 'bg-orange-100 text-orange-800',
       post_call_followup: 'bg-yellow-100 text-yellow-800',

@@ -633,7 +633,7 @@ export class FormService {
   static getStatusColor(status: FormStatus): string {
     const colors: Record<FormStatus, string> = {
       draft: 'bg-gray-100 text-gray-700',
-      published: 'bg-green-100 text-green-700',
+      published: 'bg-emerald-100 text-emerald-700',
       closed: 'bg-red-100 text-red-700'
     };
     return colors[status] || 'bg-gray-100 text-gray-700';

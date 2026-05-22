@@ -599,7 +599,7 @@ const CampaignDetailsPage = () => {
     const colorMap: { [key: string]: string } = {
       'Post': 'bg-blue-100 text-blue-800',
       'Video': 'bg-red-100 text-red-800',
-      'Article': 'bg-green-100 text-green-800',
+      'Article': 'bg-emerald-100 text-emerald-800',
       'AMA': 'bg-purple-100 text-purple-800',
       'Ambassadorship': 'bg-orange-100 text-orange-800',
       'Alpha': 'bg-yellow-100 text-yellow-800',
@@ -617,7 +617,7 @@ const CampaignDetailsPage = () => {
       'Drama-Forward': 'bg-red-100 text-red-800',
       'Skeptic': 'bg-orange-100 text-orange-800',
       'Educator': 'bg-blue-100 text-blue-800',
-      'Bridge Builder': 'bg-green-100 text-green-800',
+      'Bridge Builder': 'bg-emerald-100 text-emerald-800',
       'Visionary': 'bg-indigo-100 text-indigo-800',
       'Onboarder': 'bg-teal-100 text-teal-800',
       'General': 'bg-gray-100 text-gray-800',
@@ -625,7 +625,7 @@ const CampaignDetailsPage = () => {
       'Crypto': 'bg-yellow-100 text-yellow-800',
       'Memecoin': 'bg-orange-100 text-orange-800',
       'NFT': 'bg-purple-100 text-purple-800',
-      'Trading': 'bg-green-100 text-green-800',
+      'Trading': 'bg-emerald-100 text-emerald-800',
       'AI': 'bg-blue-100 text-blue-800',
       'Research': 'bg-indigo-100 text-indigo-800',
       'Airdrop': 'bg-teal-100 text-teal-800',
@@ -638,7 +638,7 @@ const CampaignDetailsPage = () => {
     const colorMap: { [key: string]: string } = {
       'Meme': 'bg-yellow-100 text-yellow-800',
       'News': 'bg-blue-100 text-blue-800',
-      'Trading': 'bg-green-100 text-green-800',
+      'Trading': 'bg-emerald-100 text-emerald-800',
       'Deep Dive': 'bg-purple-100 text-purple-800',
       'Meme/Cultural Narrative': 'bg-pink-100 text-pink-800',
       'Drama Queen': 'bg-red-100 text-red-800',
@@ -652,7 +652,7 @@ const CampaignDetailsPage = () => {
 
   const getPricingColor = (pricing: string) => {
     const colorMap: { [key: string]: string } = {
-      '<$200': 'bg-green-100 text-green-800',
+      '<$200': 'bg-emerald-100 text-emerald-800',
       '$200-500': 'bg-yellow-100 text-yellow-800',
       '$500-1K': 'bg-orange-100 text-orange-800',
       '$1K-2K': 'bg-red-100 text-red-800',
@@ -1637,7 +1637,7 @@ const CampaignDetailsPage = () => {
     switch (status) {
       case "Active":
         return (
-          <span className="inline-flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500"><CheckCircle className="h-3 w-3 text-white" strokeWidth={2} /></span>Active</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500"><CheckCircle className="h-3 w-3 text-white" strokeWidth={2} /></span>Active</span>
         );
       case "Planning":
         return (
@@ -2690,7 +2690,7 @@ const CampaignDetailsPage = () => {
       case 'Contacted': return 'bg-purple-100 text-purple-800';
       case 'Interested': return 'bg-yellow-100 text-yellow-800';
       case 'Onboarded': return 'bg-orange-100 text-orange-800';
-      case 'Concluded': return 'bg-green-100 text-green-800';
+      case 'Concluded': return 'bg-emerald-100 text-emerald-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -2699,7 +2699,7 @@ const CampaignDetailsPage = () => {
     switch (status) {
       case 'scheduled': return 'bg-blue-100 text-blue-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'posted': return 'bg-green-100 text-green-800';
+      case 'posted': return 'bg-emerald-100 text-emerald-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -2858,7 +2858,7 @@ const CampaignDetailsPage = () => {
     if (isCellSelected(table, rowId, field)) {
       return `${baseClass} ring-2 ring-blue-500 bg-blue-50`;
     } else if (isCellCopied(table, rowId, field)) {
-      return `${baseClass} ring-2 ring-dashed ring-green-500 bg-green-50`;
+      return `${baseClass} ring-2 ring-dashed ring-emerald-500 bg-emerald-50`;
     }
     return baseClass;
   };
@@ -4347,8 +4347,8 @@ const CampaignDetailsPage = () => {
                           <div className="flex items-center gap-2">
                             {campaign?.intro_call ? (
                               <>
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                <span className="text-base font-semibold text-green-600">Completed</span>
+                                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                <span className="text-base font-semibold text-emerald-600">Completed</span>
                               </>
                             ) : (
                               <>
@@ -4398,8 +4398,8 @@ const CampaignDetailsPage = () => {
                           <div className="flex items-center gap-2">
                             {campaign?.proposal_sent ? (
                               <>
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                <span className="text-base font-semibold text-green-600">Sent</span>
+                                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                <span className="text-base font-semibold text-emerald-600">Sent</span>
                               </>
                             ) : (
                               <>
@@ -4418,8 +4418,8 @@ const CampaignDetailsPage = () => {
                           <div className="flex items-center gap-2">
                             {campaign?.nda_signed ? (
                               <>
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                <span className="text-base font-semibold text-green-600">Signed</span>
+                                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                <span className="text-base font-semibold text-emerald-600">Signed</span>
                               </>
                             ) : (
                               <>
@@ -4491,8 +4491,8 @@ const CampaignDetailsPage = () => {
                           <div className="flex items-center gap-2">
                             {campaign?.call_support ? (
                               <>
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                <span className="text-base font-semibold text-green-600">Available</span>
+                                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                <span className="text-base font-semibold text-emerald-600">Available</span>
                               </>
                             ) : (
                               <>
@@ -4524,8 +4524,8 @@ const CampaignDetailsPage = () => {
                           <div className="flex items-center gap-2">
                             {campaign?.client_choosing_kols ? (
                               <>
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                <span className="text-base font-semibold text-green-600">Enabled</span>
+                                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                <span className="text-base font-semibold text-emerald-600">Enabled</span>
                               </>
                             ) : (
                               <>
@@ -4544,8 +4544,8 @@ const CampaignDetailsPage = () => {
                           <div className="flex items-center gap-2">
                             {campaign?.multi_activation ? (
                               <>
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                <span className="text-base font-semibold text-green-600">Enabled</span>
+                                <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                <span className="text-base font-semibold text-emerald-600">Enabled</span>
                               </>
                             ) : (
                               <>
@@ -6398,7 +6398,7 @@ const CampaignDetailsPage = () => {
                                         'Story': 'bg-purple-100 text-purple-800',
                                         'Reel': 'bg-pink-100 text-pink-800',
                                         'Video': 'bg-red-100 text-red-800',
-                                        'Article': 'bg-green-100 text-green-800',
+                                        'Article': 'bg-emerald-100 text-emerald-800',
                                         'Review': 'bg-yellow-100 text-yellow-800',
                                         'Thread': 'bg-indigo-100 text-indigo-800',
                                       };

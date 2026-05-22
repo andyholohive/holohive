@@ -312,11 +312,11 @@ export default function PipelinePage() {
   const stageColors: Record<OpportunityStage, { bg: string; text: string; border: string; solid: string }> = {
     new: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', solid: 'bg-blue-500' },
     contacted: { bg: 'bg-indigo-50', text: 'text-indigo-700', border: 'border-indigo-200', solid: 'bg-indigo-500' },
-    qualified: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', solid: 'bg-green-500' },
+    qualified: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', solid: 'bg-emerald-500' },
     unqualified: { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200', solid: 'bg-gray-400' },
     nurture: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', solid: 'bg-amber-500' },
     dead: { bg: 'bg-stone-100', text: 'text-stone-600', border: 'border-stone-300', solid: 'bg-stone-500' },
-    deal_qualified: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', solid: 'bg-green-500' },
+    deal_qualified: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', solid: 'bg-emerald-500' },
     proposal: { bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', solid: 'bg-purple-500' },
     negotiation: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', solid: 'bg-orange-500' },
     contract: { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', solid: 'bg-cyan-500' },

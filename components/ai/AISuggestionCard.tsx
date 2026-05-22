@@ -47,7 +47,7 @@ export default function AISuggestionCard({ type, suggestion, onApply, onDismiss 
         {isCampaign && (
           <div className="grid grid-cols-2 gap-3">
             <div className="flex items-center space-x-2">
-              <DollarSign className="h-4 w-4 text-green-600" />
+              <DollarSign className="h-4 w-4 text-emerald-600" />
               <div>
                 <p className="text-xs text-gray-500">Budget</p>
                 <p className="font-semibold">${campaignSuggestion.budget.toLocaleString()}</p>

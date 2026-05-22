@@ -59,7 +59,7 @@ function isTaskStale(task: Task): boolean {
 
 /** Compute priority automatically based on how close the due date is */
 function getComputedPriority(dueDate: string | null, status?: string): { level: string; label: string; color: string; bg: string } {
-  if (status === 'complete') return { level: 'complete', label: 'Done', color: 'text-green-600', bg: 'bg-green-50' };
+  if (status === 'complete') return { level: 'complete', label: 'Done', color: 'text-emerald-600', bg: 'bg-emerald-50' };
   if (!dueDate) return { level: 'low', label: 'Low', color: 'text-gray-400', bg: 'bg-gray-50' };
   const now = new Date();
   const due = new Date(dueDate + 'T23:59:59');
@@ -103,7 +103,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color:
   in_progress: { label: 'In Progress', icon: PlayCircle, color: 'text-blue-500', bg: 'hover:bg-blue-50' },
   paused: { label: 'Paused', icon: PauseCircle, color: 'text-amber-500', bg: 'hover:bg-amber-50' },
   ready_for_feedback: { label: 'Ready for Feedback', icon: MessageCircle, color: 'text-purple-500', bg: 'hover:bg-purple-50' },
-  complete: { label: 'Complete', icon: CheckCircle2, color: 'text-green-500', bg: 'hover:bg-green-50' },
+  complete: { label: 'Complete', icon: CheckCircle2, color: 'text-emerald-500', bg: 'hover:bg-emerald-50' },
 };
 
 // Map frequency / type values to badge tones from the centralized
@@ -1307,7 +1307,7 @@ export default function TasksPage() {
         return (
           <td key={col} className={`py-3 px-3 whitespace-nowrap ${COL.completedAt}`}>
             {task.completed_at ? (
-              <span className="text-green-700 text-xs font-medium">
+              <span className="text-emerald-700 text-xs font-medium">
                 {new Date(task.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
               </span>
             ) : (
@@ -1650,12 +1650,12 @@ export default function TasksPage() {
                 }}
                 className={`inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm border transition-colors ${
                   showCompleted
-                    ? 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
                     : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                 }`}
                 title={showCompleted ? 'Hide completed tasks' : 'Show completed tasks'}
               >
-                <CheckCircle2 className={`h-4 w-4 ${showCompleted ? 'text-green-600' : 'text-gray-400'}`} />
+                <CheckCircle2 className={`h-4 w-4 ${showCompleted ? 'text-emerald-600' : 'text-gray-400'}`} />
                 <span className="font-medium">
                   {showCompleted ? 'Showing completed' : 'Show completed'}
                 </span>

@@ -99,7 +99,7 @@ export default function MeetingsPage() {
     const isPast = booking.meeting_date < today;
     if (!isPast) {
       return (
-        <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100 text-xs">
+        <Badge variant="default" className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 text-xs">
           Confirmed
         </Badge>
       );
@@ -535,7 +535,7 @@ export default function MeetingsPage() {
                             key={m.id}
                             className={`text-[10px] leading-tight truncate rounded px-1 py-0.5 ${
                               m.status === 'confirmed'
-                                ? 'bg-green-100 text-green-800'
+                                ? 'bg-emerald-100 text-emerald-800'
                                 : 'bg-red-100 text-red-700'
                             }`}
                           >

@@ -74,7 +74,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color:
   in_progress: { label: 'In Progress', icon: PlayCircle, color: 'text-blue-500' },
   paused: { label: 'Paused', icon: PauseCircle, color: 'text-amber-500' },
   ready_for_feedback: { label: 'Ready for Feedback', icon: MessageCircle, color: 'text-purple-500' },
-  complete: { label: 'Complete', icon: CheckCircle2, color: 'text-green-500' },
+  complete: { label: 'Complete', icon: CheckCircle2, color: 'text-emerald-500' },
 };
 const PRIORITY_CONFIG: Record<string, { label: string; icon: typeof Minus; color: string; bg: string }> = {
   low: { label: 'Low', icon: ArrowDown, color: 'text-gray-400', bg: 'bg-gray-50' },
@@ -82,7 +82,7 @@ const PRIORITY_CONFIG: Record<string, { label: string; icon: typeof Minus; color
   high: { label: 'High', icon: ArrowUp, color: 'text-orange-600', bg: 'bg-orange-50' },
   urgent: { label: 'Urgent', icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
   overdue: { label: 'Overdue', icon: AlertCircle, color: 'text-red-700', bg: 'bg-red-50' },
-  complete: { label: 'Done', icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
+  complete: { label: 'Done', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
 };
 
 /** Compute priority automatically based on due date proximity */

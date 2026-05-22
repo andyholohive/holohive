@@ -188,9 +188,9 @@ export function ReportTabContent({
               <p className="text-sm text-blue-600 font-medium">Total Impressions</p>
               <p className="text-3xl font-bold text-blue-900 mt-2">{totalImpressions.toLocaleString()}</p>
             </div>
-            <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border border-green-200">
-              <p className="text-sm text-green-600 font-medium">Total Engagement</p>
-              <p className="text-3xl font-bold text-green-900 mt-2">{totalEngagement.toLocaleString()}</p>
+            <div className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl border border-emerald-200">
+              <p className="text-sm text-emerald-600 font-medium">Total Engagement</p>
+              <p className="text-3xl font-bold text-emerald-900 mt-2">{totalEngagement.toLocaleString()}</p>
             </div>
             <div className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border border-purple-200">
               <p className="text-sm text-purple-600 font-medium">Engagement Rate</p>
@@ -384,7 +384,7 @@ export function ReportTabContent({
                         size="sm"
                         onClick={() => onToggleFilePublic(file.id, !file.is_public)}
                         title={file.is_public ? 'Hide from public report' : 'Show in public report'}
-                        className={file.is_public ? 'text-green-600 hover:text-green-700' : 'text-gray-400 hover:text-gray-500'}
+                        className={file.is_public ? 'text-emerald-600 hover:text-emerald-700' : 'text-gray-400 hover:text-gray-500'}
                       >
                         {file.is_public ? (
                           <Eye className="h-4 w-4" />

@@ -2805,7 +2805,7 @@ export default function ClientsPage() {
                           {client.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                         {client.is_whitelisted && (
-                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800 hover:bg-green-100 hover:text-green-800 cursor-default pointer-events-none max-w-full">
+                          <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-800 hover:bg-emerald-100 hover:text-emerald-800 cursor-default pointer-events-none max-w-full">
                             <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
                             <span className="truncate">{client.whitelist_partner_name || 'Unknown Partner'}</span>
                           </Badge>
@@ -3018,7 +3018,7 @@ export default function ClientsPage() {
                           <Pencil className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" />
                           <span className="truncate">Edit Portal</span>
                           {clientContexts[client.id] && (
-                            <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-green-500 flex-shrink-0" title="Set up" />
+                            <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" title="Set up" />
                           )}
                         </Button>
                         <Button
@@ -3948,10 +3948,10 @@ export default function ClientsPage() {
                         const yoursItems = msItems.filter(i => i.court === 'yours').sort((a, b) => a.display_order - b.display_order);
                         const oursItems = msItems.filter(i => i.court === 'ours').sort((a, b) => a.display_order - b.display_order);
                         const isExpanded = activeMilestoneId === ms.id;
-                        const statusColor = ms.status === 'complete' ? 'border-green-200 bg-green-50/30' : ms.status === 'active' ? 'border-brand bg-brand/5' : 'border-gray-200 bg-gray-50/50';
+                        const statusColor = ms.status === 'complete' ? 'border-emerald-200 bg-emerald-50/30' : ms.status === 'active' ? 'border-brand bg-brand/5' : 'border-gray-200 bg-gray-50/50';
                         const StatusIcon = ms.status === 'complete' ? CheckCircle : ms.status === 'active' ? Circle : Lock;
-                        const statusIconColor = ms.status === 'complete' ? 'text-green-500' : ms.status === 'active' ? 'text-brand' : 'text-gray-300';
-                        const statusBadge = ms.status === 'complete' ? { label: 'Complete', bg: 'bg-green-100 text-green-700' } : ms.status === 'active' ? { label: 'Active', bg: 'bg-brand-light text-brand' } : { label: 'Upcoming', bg: 'bg-gray-100 text-gray-500' };
+                        const statusIconColor = ms.status === 'complete' ? 'text-emerald-500' : ms.status === 'active' ? 'text-brand' : 'text-gray-300';
+                        const statusBadge = ms.status === 'complete' ? { label: 'Complete', bg: 'bg-emerald-100 text-emerald-700' } : ms.status === 'active' ? { label: 'Active', bg: 'bg-brand-light text-brand' } : { label: 'Upcoming', bg: 'bg-gray-100 text-gray-500' };
 
                         return (
                           <div key={ms.id} className={`border rounded-lg overflow-hidden ${statusColor} ${!ms.is_visible ? 'opacity-50' : ''}`}>

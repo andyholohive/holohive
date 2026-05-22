@@ -103,7 +103,7 @@ export default async function TestPage() {
             <div className="flex items-center space-x-2">
               <span className="font-semibold">Database Status:</span>
               <span className={`px-2 py-1 rounded text-sm ${
-                dbStatus === 'Connected' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                dbStatus === 'Connected' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
               }`}>
                 {dbStatus}
               </span>
@@ -126,7 +126,7 @@ export default async function TestPage() {
             <div className="flex items-center space-x-2">
               <span className="font-semibold">Specific List Test:</span>
               <span className={`px-2 py-1 rounded text-sm ${
-                specificListStatus.includes('Found') ? 'bg-green-100 text-green-800' : 
+                specificListStatus.includes('Found') ? 'bg-emerald-100 text-emerald-800' : 
                 specificListStatus.includes('Error') ? 'bg-red-100 text-red-800' : 
                 'bg-yellow-100 text-yellow-800'
               }`}>
@@ -158,8 +158,8 @@ export default async function TestPage() {
           
           {/* Existing Lists */}
           {existingLists.length > 0 && (
-            <div className="mt-8 p-4 bg-green-50 rounded-lg border border-green-200">
-              <h3 className="font-semibold text-green-900 mb-3">Existing Lists (Click to Test):</h3>
+            <div className="mt-8 p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+              <h3 className="font-semibold text-emerald-900 mb-3">Existing Lists (Click to Test):</h3>
               <div className="space-y-2">
                 {existingLists.map((list) => (
                   <div key={list.id} className="flex items-center justify-between p-2 bg-white rounded border">

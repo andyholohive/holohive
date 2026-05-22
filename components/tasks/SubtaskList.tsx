@@ -34,7 +34,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color:
   in_progress: { label: 'In Progress', icon: PlayCircle, color: 'text-blue-500' },
   paused: { label: 'Paused', icon: PauseCircle, color: 'text-amber-500' },
   ready_for_feedback: { label: 'Feedback', icon: MessageCircle, color: 'text-purple-500' },
-  complete: { label: 'Complete', icon: CheckCircle2, color: 'text-green-500' },
+  complete: { label: 'Complete', icon: CheckCircle2, color: 'text-emerald-500' },
 };
 
 // Compact team-member shape used for the inline assignee picker. Loaded

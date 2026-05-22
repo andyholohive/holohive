@@ -915,7 +915,7 @@ export default function KOLsPage() {
     const colorMap: { [key: string]: string } = {
       'Meme': 'bg-yellow-100 text-yellow-800',
       'News': 'bg-blue-100 text-blue-800',
-      'Trading': 'bg-green-100 text-green-800',
+      'Trading': 'bg-emerald-100 text-emerald-800',
       'Deep Dive': 'bg-purple-100 text-purple-800',
       'Meme/Cultural Narrative': 'bg-pink-100 text-pink-800',
       'Drama Queen': 'bg-red-100 text-red-800',
@@ -945,7 +945,7 @@ export default function KOLsPage() {
 
   const getPricingColor = (pricing: string) => {
     const colorMap: { [key: string]: string } = {
-      '<$200': 'bg-green-100 text-green-800',
+      '<$200': 'bg-emerald-100 text-emerald-800',
       '$200-500': 'bg-yellow-100 text-yellow-800',
       '$500-1K': 'bg-orange-100 text-orange-800',
       '$1K-2K': 'bg-red-100 text-red-800',
@@ -961,7 +961,7 @@ export default function KOLsPage() {
       'Tier 1': 'bg-red-100 text-red-800',
       'Tier 2': 'bg-orange-100 text-orange-800',
       'Tier 3': 'bg-yellow-100 text-yellow-800',
-      'Tier 4': 'bg-green-100 text-green-800'
+      'Tier 4': 'bg-emerald-100 text-emerald-800'
     };
     return colorMap[tier] || 'bg-gray-100 text-gray-800';
   };
@@ -972,7 +972,7 @@ export default function KOLsPage() {
       'Drama-Forward': 'bg-red-100 text-red-800',
       'Skeptic': 'bg-orange-100 text-orange-800',
       'Educator': 'bg-blue-100 text-blue-800',
-      'Bridge Builder': 'bg-green-100 text-green-800',
+      'Bridge Builder': 'bg-emerald-100 text-emerald-800',
       'Visionary': 'bg-indigo-100 text-indigo-800',
       'Onboarder': 'bg-teal-100 text-teal-800',
       'General': 'bg-gray-100 text-gray-800',
@@ -980,7 +980,7 @@ export default function KOLsPage() {
       'Crypto': 'bg-yellow-100 text-yellow-800',
       'Memecoin': 'bg-orange-100 text-orange-800',
       'NFT': 'bg-purple-100 text-purple-800',
-      'Trading': 'bg-green-100 text-green-800',
+      'Trading': 'bg-emerald-100 text-emerald-800',
       'AI': 'bg-blue-100 text-blue-800',
       'Research': 'bg-indigo-100 text-indigo-800',
       'Airdrop': 'bg-teal-100 text-teal-800',
@@ -991,7 +991,7 @@ export default function KOLsPage() {
 
   const getInHouseColor = (inHouse: string) => {
     const colorMap: { [key: string]: string } = {
-      'Yes': 'bg-green-100 text-green-800',
+      'Yes': 'bg-emerald-100 text-emerald-800',
       'No': 'bg-red-100 text-red-800',
       'Contractor': 'bg-blue-100 text-blue-800',
       'Freelancer': 'bg-purple-100 text-purple-800'
@@ -1053,7 +1053,7 @@ export default function KOLsPage() {
               >
                 <SelectTrigger 
                   className={`border-none shadow-none bg-transparent w-auto ${
-                  value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  value ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
                   } px-2 py-1 rounded-md text-xs font-medium inline-flex items-center h-auto focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
                   style={{ outline: 'none', boxShadow: 'none' }}
                 >
@@ -1825,7 +1825,7 @@ export default function KOLsPage() {
             <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Community Founder</span>
             <Select value={bulkEdit.community === true ? 'yes' : bulkEdit.community === false ? 'no' : ''} onValueChange={v => setBulkEdit(prev => ({ ...prev, community: v === 'yes' }))}>
               <SelectTrigger
-                className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.community !== undefined ? (bulkEdit.community ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') : ''}`}
+                className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.community !== undefined ? (bulkEdit.community ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800') : ''}`}
                 style={{ outline: 'none', boxShadow: 'none' }}
               >
                 <span>{bulkEdit.community === true ? 'Yes' : bulkEdit.community === false ? 'No' : 'Select'}</span>
@@ -1841,7 +1841,7 @@ export default function KOLsPage() {
             <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Group Chat</span>
             <Select value={bulkEdit.group_chat === true ? 'yes' : bulkEdit.group_chat === false ? 'no' : ''} onValueChange={v => setBulkEdit(prev => ({ ...prev, group_chat: v === 'yes' }))}>
               <SelectTrigger
-                className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.group_chat !== undefined ? (bulkEdit.group_chat ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800') : ''}`}
+                className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.group_chat !== undefined ? (bulkEdit.group_chat ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800') : ''}`}
                 style={{ outline: 'none', boxShadow: 'none' }}
               >
                 <span>{bulkEdit.group_chat === true ? 'Yes' : bulkEdit.group_chat === false ? 'No' : 'Select'}</span>
@@ -2171,7 +2171,7 @@ export default function KOLsPage() {
               <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Community Founder</span>
               <Select value={filters.community} onValueChange={v => setFilters(prev => ({ ...prev, community: v }))}>
                 <SelectTrigger
-                  className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${filters.community === 'yes' ? 'bg-green-100 text-green-800' : filters.community === 'no' ? 'bg-red-100 text-red-800' : ''}`}
+                  className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${filters.community === 'yes' ? 'bg-emerald-100 text-emerald-800' : filters.community === 'no' ? 'bg-red-100 text-red-800' : ''}`}
                   style={{ outline: 'none', boxShadow: 'none' }}
                 >
                   <span>{filters.community === 'yes' ? 'Yes' : filters.community === 'no' ? 'No' : 'Select'}</span>
@@ -2187,7 +2187,7 @@ export default function KOLsPage() {
               <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Group Chat</span>
               <Select value={filters.group_chat} onValueChange={v => setFilters(prev => ({ ...prev, group_chat: v }))}>
                 <SelectTrigger
-                  className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${filters.group_chat === 'yes' ? 'bg-green-100 text-green-800' : filters.group_chat === 'no' ? 'bg-red-100 text-red-800' : ''}`}
+                  className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${filters.group_chat === 'yes' ? 'bg-emerald-100 text-emerald-800' : filters.group_chat === 'no' ? 'bg-red-100 text-red-800' : ''}`}
                   style={{ outline: 'none', boxShadow: 'none' }}
                 >
                   <span>{filters.group_chat === 'yes' ? 'Yes' : filters.group_chat === 'no' ? 'No' : 'Select'}</span>
