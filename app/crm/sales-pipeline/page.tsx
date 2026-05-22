@@ -3861,8 +3861,12 @@ export default function SalesPipelinePage() {
                 <TableHead className="w-[160px]">POC</TableHead>
                 <TableHead className="w-[140px]">Stage</TableHead>
                 <TableHead className="w-[70px]">Bucket</TableHead>
-                <TableHead className="w-[260px]">Next Action</TableHead>
-                <TableHead className="w-[120px]">Timing</TableHead>
+                {/* [Actions tab consolidation, May 2026] Merged "Next Action"
+                    and "Timing" into one column. They were answering the
+                    same question ("what / when next") and split made both
+                    columns narrow + harder to scan. Now stacked: action
+                    label on top, timing below (red when overdue). */}
+                <TableHead className="w-[280px]">Next Action</TableHead>
                 <TableHead className="w-[90px]">Temp</TableHead>
                 <TableHead className="w-[100px]">Owner</TableHead>
                 <TableHead className="w-[150px]"></TableHead>
@@ -3871,7 +3875,7 @@ export default function SalesPipelinePage() {
             <TableBody>
               {currentItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-12">
+                  <TableCell colSpan={8} className="text-center py-12">
                     <div className="flex flex-col items-center gap-2 text-gray-400">
                       <Zap className="h-8 w-8" />
                       <p className="text-sm font-medium">{emptyLabel}</p>
@@ -3934,6 +3938,9 @@ export default function SalesPipelinePage() {
                         </span>
                       )}
                     </TableCell>
+                    {/* [Actions tab consolidation, May 2026] Merged cell:
+                        action label on top + timing below (with hint
+                        suppressed since timing is now its own line). */}
                     <TableCell>
                       <div>
                         <div className="flex items-center gap-1.5">
@@ -3946,13 +3953,13 @@ export default function SalesPipelinePage() {
                             {action.label}
                           </span>
                         </div>
-                        {action.hint && (
-                          <p className="text-[11px] text-gray-400 mt-0.5 ml-5">{action.hint}</p>
-                        )}
+                        <div className="ml-5 mt-0.5 flex items-center gap-2">
+                          <span className={`text-[11px] ${timing.color}`}>{timing.text}</span>
+                          {action.hint && (
+                            <span className="text-[11px] text-gray-400">· {action.hint}</span>
+                          )}
+                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`text-xs ${timing.color}`}>{timing.text}</span>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
