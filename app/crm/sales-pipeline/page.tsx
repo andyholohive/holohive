@@ -383,7 +383,11 @@ export default function SalesPipelinePage() {
   const [actionGuidance, setActionGuidance] = useState<{ label: string; hint: string } | null>(null);
 
   // Overview tab collapsed state
-  const [overviewSections, setOverviewSections] = useState<{ outreach: boolean; pipeline: boolean; orbit: boolean; nurture: boolean }>({ outreach: false, pipeline: false, orbit: false, nurture: false });
+  // [Actions consolidation, May 2026] Added 'actions' as the topmost
+  // section in the Overall tab — defaults to OPEN since action items
+  // are the most time-sensitive content on the page. Other sections
+  // remain default-closed to keep first-paint compact.
+  const [overviewSections, setOverviewSections] = useState<{ actions: boolean; outreach: boolean; pipeline: boolean; orbit: boolean; nurture: boolean }>({ actions: true, outreach: false, pipeline: false, orbit: false, nurture: false });
 
   // Templates tab state
   const [templates, setTemplates] = useState<SalesDmTemplate[]>([]);
@@ -3974,73 +3978,84 @@ export default function SalesPipelinePage() {
                     </TableCell>
                     <TableCell>{renderOwnerCell(opp)}</TableCell>
                     <TableCell onClick={e => e.stopPropagation()}>
+                      {/* [Actions consolidation, May 2026] Replaced the
+                          prescriptive '[Primary Action] [Quick Alt] [▼]'
+                          three-button setup with a single 'Set outcome'
+                          dropdown. Per user feedback: in practice the
+                          work (DM sent, call held, etc.) has already
+                          happened elsewhere — they just want to record
+                          the outcome and let stage / bucket / timing
+                          update accordingly, rather than be told what
+                          to do. The dropdown is context-aware: it
+                          surfaces the action engine's primary suggestion
+                          at the top, then every alternative it already
+                          computed for this opp's stage. */}
                       {(() => {
-                        const quickAlt = action.alternatives.find(a => a.quick);
-                        const dropdownAlts = action.alternatives.filter(a => !a.quick);
+                        type Outcome = {
+                          label: string;
+                          actionType: typeof action.actionType;
+                          targetStage?: typeof action.targetStage;
+                          variant: 'default' | 'warn' | 'danger';
+                          isRecommended: boolean;
+                        };
+                        const outcomes: Outcome[] = [
+                          { label: action.label, actionType: action.actionType, targetStage: action.targetStage, variant: 'default', isRecommended: true },
+                          ...action.alternatives.map(alt => ({ label: alt.label, actionType: alt.actionType, targetStage: alt.targetStage, variant: alt.variant, isRecommended: false })),
+                        ];
+                        const isExecuting = executingAction === opp.id;
+                        const handlePick = async (o: Outcome) => {
+                          if (o.label === 'Interested') {
+                            await SalesPipelineService.update(opp.id, { warm_sub_state: 'interested' });
+                            setOpportunities(prev => prev.map(p => p.id === opp.id ? { ...p, warm_sub_state: 'interested' } : p));
+                            return;
+                          }
+                          if (o.isRecommended) {
+                            handleActionExecute(opp.id, action, opp);
+                            return;
+                          }
+                          if (o.actionType === 'stage_change' && o.targetStage) {
+                            handleStageChange(opp.id, o.targetStage, opp.stage);
+                          } else {
+                            openSlideOver(opp, ACTION_GUIDANCE[o.label]);
+                          }
+                        };
                         return (
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant={getButtonVariant(action.priority)}
-                              size="sm"
-                              className="h-7 text-xs"
-                              disabled={executingAction === opp.id}
-                              onClick={() => handleActionExecute(opp.id, action, opp)}
-                              style={action.priority === 'high' ? { backgroundColor: '#3e8692', color: 'white' } : undefined}
-                            >
-                              {executingAction === opp.id ? (
-                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                              ) : null}
-                              {action.label}
-                            </Button>
-                            {quickAlt && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-7 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                                onClick={async () => {
-                                  if (quickAlt.label === 'Interested') {
-                                    await SalesPipelineService.update(opp.id, { warm_sub_state: 'interested' });
-                                    setOpportunities(prev => prev.map(o => o.id === opp.id ? { ...o, warm_sub_state: 'interested' } : o));
-                                  } else if (quickAlt.actionType === 'stage_change' && quickAlt.targetStage) {
-                                    handleStageChange(opp.id, quickAlt.targetStage, opp.stage);
-                                  } else {
-                                    openSlideOver(opp, ACTION_GUIDANCE[quickAlt.label]);
-                                  }
-                                }}
+                                className="h-7 text-xs gap-1.5"
+                                disabled={isExecuting}
                               >
-                                {quickAlt.label}
+                                {isExecuting && <Loader2 className="h-3 w-3 animate-spin" />}
+                                Set outcome
+                                <ChevronDown className="h-3 w-3 opacity-60" />
                               </Button>
-                            )}
-                            {dropdownAlts.length > 0 && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                                    <ChevronDown className="h-3.5 w-3.5" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-44 z-[80]">
-                                  {dropdownAlts.map(alt => (
-                                    <DropdownMenuItem
-                                      key={alt.label}
-                                      className={alt.variant === 'danger' ? 'text-red-600' : alt.variant === 'warn' ? 'text-orange-600' : ''}
-                                      onClick={() => {
-                                        if (alt.actionType === 'stage_change' && alt.targetStage) {
-                                          handleStageChange(opp.id, alt.targetStage, opp.stage);
-                                        } else {
-                                          openSlideOver(opp, ACTION_GUIDANCE[alt.label]);
-                                        }
-                                      }}
-                                    >
-                                      {alt.variant === 'danger' ? <X className="h-3.5 w-3.5 mr-2" /> :
-                                       alt.variant === 'warn' ? <RotateCcw className="h-3.5 w-3.5 mr-2" /> :
-                                       <ArrowRight className="h-3.5 w-3.5 mr-2" />}
-                                      {alt.label}
-                                    </DropdownMenuItem>
-                                  ))}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            )}
-                          </div>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-60 z-[80]">
+                              {outcomes.map((o, idx) => (
+                                <DropdownMenuItem
+                                  key={`${o.label}-${idx}`}
+                                  className={
+                                    o.variant === 'danger' ? 'text-red-600' :
+                                    o.variant === 'warn' ? 'text-orange-600' :
+                                    o.isRecommended ? 'text-brand font-medium' : ''
+                                  }
+                                  onClick={() => handlePick(o)}
+                                >
+                                  {o.variant === 'danger' ? <X className="h-3.5 w-3.5 mr-2" /> :
+                                   o.variant === 'warn' ? <RotateCcw className="h-3.5 w-3.5 mr-2" /> :
+                                   o.isRecommended ? <Zap className="h-3.5 w-3.5 mr-2" /> :
+                                   <ArrowRight className="h-3.5 w-3.5 mr-2" />}
+                                  <span className="flex-1 truncate">{o.label}</span>
+                                  {o.isRecommended && (
+                                    <span className="ml-2 text-[10px] text-brand opacity-70">suggested</span>
+                                  )}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         );
                       })()}
                     </TableCell>
@@ -7253,7 +7268,7 @@ export default function SalesPipelinePage() {
             className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'booking_needed' ? 'ring-2 ring-red-400 shadow-md' : ''} ${alertMetrics.bamfamViolations > 0 ? 'border-l-red-500 bg-red-50' : 'border-l-gray-200 bg-white'}`}
             onClick={() => {
               if (alertCardFilter === 'booking_needed') { setAlertCardFilter('none'); return; }
-              setAlertCardFilter('booking_needed'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
+              setAlertCardFilter('booking_needed'); setActiveTab('overview'); setOverviewSections(prev => ({ ...prev, actions: true })); setActionFilter('all'); setActionPhaseFilter('all');
             }}
           >
             <CardContent className="pt-2.5 pb-2.5 px-3">
@@ -7271,7 +7286,7 @@ export default function SalesPipelinePage() {
             className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'overdue' ? 'ring-2 ring-orange-400 shadow-md' : ''} ${alertMetrics.overdueFollowups > 0 ? 'border-l-orange-500 bg-orange-50' : 'border-l-gray-200 bg-white'}`}
             onClick={() => {
               if (alertCardFilter === 'overdue') { setAlertCardFilter('none'); return; }
-              setAlertCardFilter('overdue'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
+              setAlertCardFilter('overdue'); setActiveTab('overview'); setOverviewSections(prev => ({ ...prev, actions: true })); setActionFilter('all'); setActionPhaseFilter('all');
             }}
           >
             <CardContent className="pt-2.5 pb-2.5 px-3">
@@ -7289,7 +7304,7 @@ export default function SalesPipelinePage() {
             className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'stale' ? 'ring-2 ring-amber-400 shadow-md' : ''} ${alertMetrics.staleDeals > 0 ? 'border-l-amber-500 bg-amber-50' : 'border-l-gray-200 bg-white'}`}
             onClick={() => {
               if (alertCardFilter === 'stale') { setAlertCardFilter('none'); return; }
-              setAlertCardFilter('stale'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
+              setAlertCardFilter('stale'); setActiveTab('overview'); setOverviewSections(prev => ({ ...prev, actions: true })); setActionFilter('all'); setActionPhaseFilter('all');
             }}
           >
             <CardContent className="pt-2.5 pb-2.5 px-3">
@@ -7307,7 +7322,7 @@ export default function SalesPipelinePage() {
             className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'at_risk' ? 'ring-2 ring-rose-400 shadow-md' : ''} ${alertMetrics.dealsAtRisk > 0 ? 'border-l-rose-500 bg-rose-50' : 'border-l-gray-200 bg-white'}`}
             onClick={() => {
               if (alertCardFilter === 'at_risk') { setAlertCardFilter('none'); return; }
-              setAlertCardFilter('at_risk'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
+              setAlertCardFilter('at_risk'); setActiveTab('overview'); setOverviewSections(prev => ({ ...prev, actions: true })); setActionFilter('all'); setActionPhaseFilter('all');
             }}
           >
             <CardContent className="pt-2.5 pb-2.5 px-3">
@@ -7325,7 +7340,7 @@ export default function SalesPipelinePage() {
             className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'meetings' ? 'ring-2 ring-blue-400 shadow-md' : ''} ${alertMetrics.meetingsToday > 0 ? 'border-l-blue-500 bg-blue-50' : 'border-l-gray-200 bg-white'}`}
             onClick={() => {
               if (alertCardFilter === 'meetings') { setAlertCardFilter('none'); return; }
-              setAlertCardFilter('meetings'); setActiveTab('actions'); setActionFilter('all'); setActionPhaseFilter('all');
+              setAlertCardFilter('meetings'); setActiveTab('overview'); setOverviewSections(prev => ({ ...prev, actions: true })); setActionFilter('all'); setActionPhaseFilter('all');
             }}
           >
             <CardContent className="pt-2.5 pb-2.5 px-3">
@@ -7777,13 +7792,12 @@ export default function SalesPipelinePage() {
                 {opportunities.filter(o => !['v2_closed_won', 'v2_closed_lost'].includes(o.stage)).length}
               </Badge>
             </TabsTrigger>
-            <TabsTrigger value="actions" className="flex items-center gap-2">
-              <Zap className="h-4 w-4" />
-              Actions
-              {allActionItems.length > 0 && (
-                <Badge variant="secondary" className="ml-1">{allActionItems.length}</Badge>
-              )}
-            </TabsTrigger>
+            {/* [Actions consolidation, May 2026] Standalone Actions tab
+                removed. Its content (the priority-sorted action queue)
+                now lives as a collapsible section inside the Overall
+                tab below, alongside Outreach / Pipeline / Orbit. The
+                tab strip stays cleaner and managers see actions in
+                context with everything else. */}
             <TabsTrigger value="outreach" className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
               Outreach
@@ -7855,9 +7869,9 @@ export default function SalesPipelinePage() {
           </div>
         </div>
 
-        <TabsContent value="actions" className="mt-0">
-          {renderActionsTab()}
-        </TabsContent>
+        {/* [Actions consolidation, May 2026] TabsContent for 'actions'
+            removed. Same call lives inside the Overall tab below as
+            the topmost collapsible section. */}
 
         <TabsContent value="outreach" className="mt-0">
           {renderOutreachTab()}
@@ -7928,6 +7942,32 @@ export default function SalesPipelinePage() {
                 <span className="text-xs text-gray-500">
                   Filtering all sections by &ldquo;{overallSearch}&rdquo;
                 </span>
+              )}
+            </div>
+
+            {/* Actions Section — [Actions consolidation, May 2026]
+                The former standalone 'Actions' tab is now the topmost
+                collapsible section of Overall. Default-open since
+                action items are time-sensitive. Phase + sort + search
+                filter controls live inside renderActionsTab. */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setOverviewSections(prev => ({ ...prev, actions: !prev.actions }))}
+                className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 hover:bg-amber-100 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4 text-amber-700" />
+                  <h4 className="font-semibold text-amber-700">Actions</h4>
+                  {allActionItems.length > 0 && (
+                    <Badge variant="secondary" className="text-xs font-medium">{allActionItems.length}</Badge>
+                  )}
+                </div>
+                {overviewSections.actions ? <ChevronUp className="h-4 w-4 text-amber-500" /> : <ChevronDown className="h-4 w-4 text-amber-500" />}
+              </button>
+              {overviewSections.actions && (
+                <div className="border-t border-gray-200">
+                  {renderActionsTab()}
+                </div>
               )}
             </div>
 
