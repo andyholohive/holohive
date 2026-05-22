@@ -7071,8 +7071,8 @@ export default function SalesPipelinePage() {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-6 gap-4">
+        {/* Stats Cards — [Responsive cleanup, May 2026] add fallbacks */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {[...Array(6)].map((_, i) => (
             <Skeleton key={i} className="h-24 rounded-lg" />
           ))}
@@ -7194,7 +7194,7 @@ export default function SalesPipelinePage() {
         </div>
 
         {!salesFunnel ? (
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-20 rounded-lg" />
             ))}
@@ -7563,10 +7563,12 @@ export default function SalesPipelinePage() {
         {showDashboard && (
           <CardContent className="pt-0 pb-6 px-5 space-y-6">
 
-            {/* Row 1: Pipeline Health — headline numbers */}
+            {/* Row 1: Pipeline Health — headline numbers
+                [Responsive cleanup, May 2026] Drops to 2/3 cols on
+                narrow screens. */}
             <div>
               <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Pipeline Health</p>
-              <div className="grid grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 {[
                   { label: 'Pipeline Value', value: `$${dashboardMetrics.pipelineValue >= 1000 ? `${(dashboardMetrics.pipelineValue / 1000).toFixed(1)}K` : dashboardMetrics.pipelineValue.toLocaleString()}`, accent: 'border-l-emerald-400', color: 'text-emerald-700' },
                   { label: 'Weighted', value: `$${dashboardMetrics.weightedPipeline >= 1000 ? `${(dashboardMetrics.weightedPipeline / 1000).toFixed(1)}K` : dashboardMetrics.weightedPipeline.toFixed(0)}`, accent: 'border-l-teal-400', color: 'text-teal-700' },

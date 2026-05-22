@@ -18,6 +18,13 @@ const buttonVariants = cva(
           'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost: 'hover:bg-accent hover:text-accent-foreground',
         link: 'text-primary underline-offset-4 hover:underline',
+        // [Design system, May 2026] HoloHive brand teal CTA. Replaces
+        // the 264 inline `style={{ backgroundColor: '#3e8692' }}` hex
+        // hacks scattered across the codebase. Use `<Button variant="brand">`
+        // for primary "Start Client", "Add Project", "Save Campaign"
+        // style actions — anywhere the brand color was previously
+        // applied via inline style.
+        brand: 'bg-brand text-white hover:bg-brand/90',
       },
       size: {
         default: 'h-10 px-4 py-2',

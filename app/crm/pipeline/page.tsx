@@ -2003,7 +2003,7 @@ export default function PipelinePage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {[...Array(5)].map((_, i) => (
             <Skeleton key={i} className="h-24 rounded-lg" />
           ))}
@@ -2092,8 +2092,10 @@ export default function PipelinePage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-5 gap-4">
+      {/* Stats Cards — [Responsive cleanup, May 2026] was bare grid-cols-5
+          which collapsed to unreadable widths below ~700px. Now 2 cols
+          on mobile, 3 on small tablets, 5 from lg upward. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-100">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between">

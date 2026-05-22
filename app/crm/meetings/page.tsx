@@ -490,6 +490,15 @@ export default function MeetingsPage() {
               </Button>
             </div>
 
+            {/* [Responsive cleanup, May 2026] A 7-column calendar can't
+                shrink below 7 columns. Wrap in overflow-x-auto with a
+                sensible min-width so the calendar stays usable on
+                mobile via horizontal scroll instead of becoming
+                unreadable squares. Days-of-week header sits in the
+                same scroll container so they stay aligned. */}
+            <div className="overflow-x-auto -mx-1 px-1">
+              <div className="min-w-[640px]">
+
             {/* Day-of-week headers */}
             <div className="grid grid-cols-7 text-center text-xs font-medium text-gray-500 mb-1">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
@@ -543,6 +552,8 @@ export default function MeetingsPage() {
                   </button>
                 );
               })}
+            </div>
+              </div>
             </div>
           </CardContent>
         </Card>

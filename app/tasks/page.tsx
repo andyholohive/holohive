@@ -1465,7 +1465,12 @@ export default function TasksPage() {
       rows.push({ task: s, isSubtask: true, showParentLink: true });
     }
     return (
-      <table className="w-full text-sm">
+      // [Responsive cleanup, May 2026] Wrap the wide tasks table in
+      // overflow-x-auto so it scrolls horizontally on narrow viewports
+      // instead of breaking the layout. min-w on the inner table keeps
+      // columns from squeezing.
+      <div className="overflow-x-auto -mx-2 px-2">
+      <table className="w-full text-sm min-w-[900px]">
         {tableHeader}
         <tbody>
           {rows.map(({ task, isSubtask, showParentLink }) => renderTaskRow(task, isSubtask, showParentLink))}
@@ -1491,6 +1496,7 @@ export default function TasksPage() {
           )}
         </tbody>
       </table>
+      </div>
     );
   };
 
