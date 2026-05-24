@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createServerClient } from '@/lib/supabase-server';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
@@ -40,13 +39,12 @@ export async function GET() {
   // to debug than Next's default HTML error page.
   let stage = 'init';
   try {
+    // Use the project-wide lib helper (getAll/setAll cookies API).
+    // The previous inline createServerClient was using the legacy
+    // get/set/remove API which @supabase/ssr 0.7+ now throws on,
+    // producing an HTML 500 from Next's default error page.
     stage = 'auth_cookies';
-    const cookieStore = cookies();
-    const sb = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { get(n: string) { return cookieStore.get(n)?.value; }, set() {}, remove() {} } },
-    );
+    const sb = await createServerClient();
 
     stage = 'auth_getUser';
     const { data: { user } } = await sb.auth.getUser();

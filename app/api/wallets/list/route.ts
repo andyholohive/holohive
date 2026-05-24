@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createServerClient } from '@/lib/supabase-server';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
@@ -36,13 +35,12 @@ export async function GET(request: Request) {
   // them inside the try so every error path returns JSON with `stage`.
   let stage = 'init';
   try {
+  // Use the project-wide lib helper (getAll/setAll cookies API).
+  // Previously this called createServerClient from @supabase/ssr with
+  // the legacy get/set/remove API, which 0.7+ now throws on,
+  // producing Next's HTML 500 instead of any handler response.
   stage = 'auth_cookies';
-  const cookieStore = cookies();
-  const sb = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get(n: string) { return cookieStore.get(n)?.value; }, set() {}, remove() {} } },
-  );
+  const sb = await createServerClient();
   stage = 'auth_getUser';
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
