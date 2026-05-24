@@ -30,7 +30,7 @@ import {
   Users, Megaphone, Crown, List, Building2, Shield, MessageSquare, Sparkles,
   FileText, ClipboardList, Sliders, TrendingUp, Handshake, UserPlus,
   Archive, Link2, BookOpen, CheckCircle, ListTodo, Target, Inbox,
-  Calendar, Bell, Radar, Bot, BarChart3, Settings, Compass,
+  Calendar, Bell, Radar, Bot, BarChart3, Settings, Compass, Wallet,
 } from 'lucide-react';
 
 export type NavItemDef = {
@@ -96,6 +96,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
 
   { href: '/delivery-logs', label: 'Delivery Logs', icon: ClipboardList, section: 'Documents', pageKey: '/delivery-logs' },
   { href: '/mindshare', label: 'Mindshare', icon: TrendingUp, section: 'Documents', requiredRole: 'admin' },
+  { href: '/wallets', label: 'Wallet Analytics', icon: Wallet, section: 'Documents', requiredRole: 'admin' },
   { href: '/forms', label: 'Forms', icon: ClipboardList, section: 'Documents', requiredRole: 'admin' },
   { href: '/links', label: 'Links', icon: Link2, section: 'Documents', pageKey: '/links' },
   // Templates + SOPs moved into the HQ sub-nav (under Workspace) so
