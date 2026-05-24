@@ -79,17 +79,28 @@ interface ListResponse {
 export default function WalletsPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
+  // [Visible-error UX] surface fetch failures so a 401 / 500 / network
+  // blip doesn't leave the user staring at a blank page wondering
+  // what happened. Same pattern used on the mindshare funnel fix.
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const r = await fetch('/api/wallets/summary');
-        if (!r.ok) throw new Error(`Summary fetch failed (${r.status})`);
+        if (!r.ok) {
+          const body = await r.text().catch(() => '');
+          throw new Error(`${r.status} ${r.statusText}${body ? ': ' + body.slice(0, 120) : ''}`);
+        }
         const data = await r.json();
-        if (!cancelled) setSummary(data);
-      } catch (err) {
+        if (!cancelled) {
+          setSummary(data);
+          setSummaryError(null);
+        }
+      } catch (err: any) {
         console.error('[wallets] summary fetch:', err);
+        if (!cancelled) setSummaryError(err?.message || 'Unknown error');
       } finally {
         if (!cancelled) setSummaryLoading(false);
       }
@@ -112,6 +123,15 @@ export default function WalletsPage() {
             <Skeleton key={i} className="h-24 rounded-lg" />
           ))}
         </div>
+      ) : summaryError ? (
+        // [Visible-error UX] Explicit error card with the failure
+        // message instead of silently rendering the empty fallback.
+        // Makes 401/network issues debuggable from the UI alone.
+        <Card className="border border-red-200 bg-red-50 p-4">
+          <p className="text-sm font-semibold text-red-900 mb-1">Couldn&apos;t load wallet summary</p>
+          <p className="text-xs text-red-700 font-mono break-all">{summaryError}</p>
+          <p className="text-xs text-red-600 mt-2">If this is a 401, try logging out and back in — your session may have expired.</p>
+        </Card>
       ) : summary ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <KpiCard icon={Wallet} label="Total wallets" value={summary.total.toLocaleString()} sub="Across all campaigns" />
