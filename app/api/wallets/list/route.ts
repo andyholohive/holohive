@@ -28,14 +28,21 @@ export const dynamic = 'force-dynamic';
  * Auth: admin / super_admin only.
  */
 export async function GET(request: Request) {
+  // [May 2026] Previously cookies() + createServerClient() lived OUTSIDE
+  // the try block. If either threw (e.g. Next 13 cookies() can throw if
+  // called outside a request scope, env vars missing), the catch never
+  // fired and the user got Next's default HTML 500 page — making the
+  // page show "500 Internal Server Error: <!DOCTYPE html>...". Pulling
+  // them inside the try so every error path returns JSON with `stage`.
+  let stage = 'init';
+  try {
+  stage = 'auth_cookies';
   const cookieStore = cookies();
   const sb = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { get(n: string) { return cookieStore.get(n)?.value; }, set() {}, remove() {} } },
   );
-  let stage = 'init';
-  try {
   stage = 'auth_getUser';
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
