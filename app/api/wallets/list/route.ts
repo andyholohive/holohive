@@ -34,13 +34,18 @@ export async function GET(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { get(n: string) { return cookieStore.get(n)?.value; }, set() {}, remove() {} } },
   );
+  let stage = 'init';
+  try {
+  stage = 'auth_getUser';
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  stage = 'auth_role_lookup';
   const { data: profile } = await (sb as any).from('users').select('role').eq('id', user.id).single();
   if (!['admin', 'super_admin'].includes(profile?.role)) {
     return NextResponse.json({ error: 'Admin only' }, { status: 403 });
   }
 
+  stage = 'parse_query';
   const url = new URL(request.url);
   const event = url.searchParams.get('event');
   const chain = url.searchParams.get('chain');
@@ -89,9 +94,10 @@ export async function GET(request: Request) {
   const to = from + pageSize - 1;
   query = query.range(from, to);
 
+  stage = 'wallet_select';
   const { data, error, count } = await query;
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message, stage }, { status: 500 });
   }
 
   return NextResponse.json({
@@ -101,4 +107,11 @@ export async function GET(request: Request) {
     page_size: pageSize,
     total_pages: count ? Math.ceil(count / pageSize) : 0,
   });
+  } catch (err: any) {
+    console.error('[wallets/list] crashed at stage:', stage, err);
+    return NextResponse.json({
+      error: err?.message || String(err) || 'Unknown error',
+      stage,
+    }, { status: 500 });
+  }
 }
