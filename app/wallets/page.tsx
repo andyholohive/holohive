@@ -88,10 +88,12 @@ export default function WalletsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const r = await fetch('/api/wallets/summary');
+        // cache: 'no-store' so neither browser nor Next dedupes a
+        // stale response while we're still debugging the HTML-500 issue.
+        const r = await fetch('/api/wallets/summary', { cache: 'no-store' });
         if (!r.ok) {
           const body = await r.text().catch(() => '');
-          throw new Error(`${r.status} ${r.statusText}${body ? ': ' + body.slice(0, 120) : ''}`);
+          throw new Error(`${r.status} ${r.statusText}${body ? ': ' + body.slice(0, 200) : ''}`);
         }
         const data = await r.json();
         if (!cancelled) {
@@ -393,7 +395,7 @@ function WalletsTable({ summary }: { summary: Summary | null }) {
     if (event !== 'all') params.set('event', event);
     if (minEvents !== '0') params.set('min_events', minEvents);
     if (search.trim()) params.set('search', search.trim().toLowerCase());
-    fetch(`/api/wallets/list?${params.toString()}`)
+    fetch(`/api/wallets/list?${params.toString()}`, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (!cancelled && d) setData(d); })
       .catch(err => console.error('[wallets] list fetch:', err))
