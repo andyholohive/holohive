@@ -245,6 +245,28 @@ export default function SalesPipelinePage() {
   const [metricsRangeDays, setMetricsRangeDays] = useState<7 | 30 | 90>(30);
   const [metricsUserId, setMetricsUserId] = useState<string>('');
 
+  // [Accuracy fix May 2026] Per user feedback: "My outreach last 30
+  // days doesnt look accurate" + "data dashboard isnt accurate ... need
+  // to figure out a better way to record it".
+  //
+  // The OLD computeOutreachMetrics inferred touch1s/replies from opp
+  // row proxies — `bump_number >= 1 && created_at in window` for
+  // touch1s, and `stage != cold_dm && (created_at OR updated_at) in
+  // window` for replies. The updated_at proxy is the killer: ANY edit
+  // (note, owner change, bucket change, etc.) bumps it, so every old
+  // opp re-counted as a "reply this window" every time someone touched
+  // its row. Reply counts were 5-10× inflated.
+  //
+  // crm_activities IS the source of truth (createActivity already
+  // auto-stamps last_reply_at, last_team_message_at, proposal_sent_at,
+  // discovery_call_at, etc.). We now fetch the activities once on the
+  // same trigger as bookings and count events directly.
+  //
+  // Activity volume note: the funnel API uses limit=10000 against an
+  // estimated ~3k outbound rows, so the same cap is safe here.
+  const [metricsActivities, setMetricsActivities] = useState<Array<{ id: string; opportunity_id: string | null; type: string; direction: 'inbound' | 'outbound' | null; created_at: string; owner_id: string | null }>>([]);
+  const [metricsActivitiesLoading, setMetricsActivitiesLoading] = useState(false);
+
   // Top sub-section tabs — Forecast + Metrics live in a separate Tabs
   // container above the main tab strip (between Weekly Activity Funnel
   // and Attention Cards). Independent of `activeTab` so users can keep
@@ -427,7 +449,11 @@ export default function SalesPipelinePage() {
   // section in the Overall tab — defaults to OPEN since action items
   // are the most time-sensitive content on the page. Other sections
   // remain default-closed to keep first-paint compact.
-  const [overviewSections, setOverviewSections] = useState<{ actions: boolean; outreach: boolean; pipeline: boolean; orbit: boolean; nurture: boolean }>({ actions: true, outreach: false, pipeline: false, orbit: false, nurture: false });
+  // [Tab merge May 2026] Outreach defaults OPEN now that the standalone
+  // Outreach tab has been removed — landing on Overall should show the
+  // primary work surfaces (Actions + Outreach) immediately. Pipeline,
+  // Orbit, Nurture stay default-closed to keep first-paint compact.
+  const [overviewSections, setOverviewSections] = useState<{ actions: boolean; outreach: boolean; pipeline: boolean; orbit: boolean; nurture: boolean }>({ actions: true, outreach: true, pipeline: false, orbit: false, nurture: false });
 
   // Templates tab state
   const [templates, setTemplates] = useState<SalesDmTemplate[]>([]);
@@ -855,6 +881,11 @@ export default function SalesPipelinePage() {
   }, [outreachPage, outreachFilters, user?.id]);
 
   useEffect(() => {
+    // [Tab merge May 2026] Standalone Outreach tab is gone; the only
+    // way to land on the outreach surface is via Overall's Outreach
+    // section. We keep the 'outreach' branch for any legacy redirect
+    // that hasn't been migrated yet (setActiveTab('outreach') is a
+    // no-op against the new tab strip but doesn't error).
     if (activeTab === 'outreach' || (activeTab === 'overview' && overviewSections.outreach)) {
       fetchOutreach();
     }
@@ -1108,24 +1139,53 @@ export default function SalesPipelinePage() {
     const inWindow = (iso: string | null | undefined) =>
       !!iso && new Date(iso).getTime() >= cutoffMs;
 
-    // Bumps don't change touch1s — bump_number being 1, 2, 3, or 4 all
-    // qualify the opp identically as "we've started outreach". Replies
-    // don't change touch1s either — once a prospect is touched, they
-    // stay in the denominator regardless of subsequent stage.
-    const touch1s = userOpps.filter(o =>
-      o.bump_number >= 1 && inWindow(o.created_at)
-    ).length;
+    // [Accuracy fix May 2026] touch1s + replies now come from
+    // crm_activities events (the source of truth) instead of opp row
+    // proxies. The old proxy version inflated replies 5-10× because
+    // updated_at flips on every minor edit.
 
-    // "Got a reply" proxy: opp moved past cold_dm and was either created
-    // in window (new fast-converters) or had its stage change in window
-    // (using updated_at as proxy for stage change).
-    const replies = userOpps.filter(o =>
-      o.stage !== 'cold_dm' && (inWindow(o.created_at) || inWindow(o.updated_at))
-    ).length;
+    // touch1s = distinct opps where THIS USER's first-ever outbound
+    // touch (message or bump) landed inside the window. First-touch
+    // semantics match the funnel API's definition so the per-user
+    // numbers reconcile with the team-level view.
+    const userOutbound = metricsActivities
+      .filter(a => a.owner_id === userId && a.direction === 'outbound' && (a.type === 'message' || a.type === 'bump') && a.opportunity_id)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const userFirstTouchPerOpp = new Map<string, string>();
+    for (const a of userOutbound) {
+      if (!userFirstTouchPerOpp.has(a.opportunity_id!)) {
+        userFirstTouchPerOpp.set(a.opportunity_id!, a.created_at);
+      }
+    }
+    let touch1s = 0;
+    for (const ts of Array.from(userFirstTouchPerOpp.values())) {
+      if (ts >= cutoff.toISOString()) touch1s++;
+    }
 
+    // replies = distinct opps with an inbound message attributed to
+    // THIS USER inside the window. owner_id on the activity = whoever
+    // logged it (which is the right semantic for per-user attribution;
+    // if the opp's owner was reassigned later, the reply still credits
+    // whoever was actually working it at reply-time).
+    const replies = new Set(
+      metricsActivities
+        .filter(a => a.owner_id === userId && a.direction === 'inbound' && a.type === 'message' && a.opportunity_id && a.created_at >= cutoff.toISOString())
+        .map(a => a.opportunity_id)
+    ).size;
+
+    // qualified — keep the 3+ qual-flag threshold but anchor the
+    // window check to qualified_at (auto-stamped by CRMService when
+    // an opp first reaches a deal-qualified stage) instead of
+    // updated_at. Legacy rows where qualified_at is null but the opp
+    // already has 3+ flags + was CREATED in window still count, so
+    // we don't lose pre-stamping history entirely.
     const qualified = userOpps.filter(o => {
       const checks = [o.qual_budget, o.qual_dm, o.qual_timeline, o.qual_scope, o.qual_fit].filter(Boolean).length;
-      return checks >= 3 && (inWindow(o.created_at) || inWindow(o.updated_at));
+      if (checks < 3) return false;
+      const qa = (o as any).qualified_at as string | null | undefined;
+      if (qa) return inWindow(qa);
+      // Fallback for legacy rows with no qualified_at stamp:
+      return inWindow(o.created_at);
     }).length;
 
     const userBookings = metricsBookings.filter(b =>
@@ -1149,27 +1209,55 @@ export default function SalesPipelinePage() {
       qualified, qualificationRate,
       callsBooked, callsHeld, noShows, callsPending, showRate,
     };
-  }, [opportunities, metricsBookings]);
+  }, [opportunities, metricsBookings, metricsActivities]);
 
-  // Load bookings the first time:
-  //   - the user lands on the Outreach tab (for the per-user strip), OR
+  // Load bookings + activities the first time:
+  //   - the user lands on Overall with the Outreach section open
+  //     (the "My outreach · last 30 days" strip lives inside
+  //      renderOutreachTab, which is rendered there), OR
   //   - the top sub-section is on Metrics (for the team scorecard).
-  // Pull 90 days once — covers all three range options without refetching.
+  // Pull 90 days of bookings + all-time activities (capped at 10k rows
+  // — matches the funnel API's heuristic) so both range toggles work
+  // without a refetch.
   useEffect(() => {
-    const wantsBookings = activeTab === 'outreach' || topSectionTab === 'metrics';
-    if (!wantsBookings) return;
-    if (metricsBookings.length > 0 || metricsBookingsLoading) return;
-    setMetricsBookingsLoading(true);
-    const to = new Date();
-    const from = new Date();
-    from.setDate(from.getDate() - 90);
-    BookingService.getBookingsForMetrics(from.toISOString(), to.toISOString())
-      .then(rows => setMetricsBookings(rows))
-      .catch(err => console.error('Error loading metrics bookings:', err))
-      .finally(() => setMetricsBookingsLoading(false));
+    const wantsMetrics = topSectionTab === 'metrics' ||
+      (activeTab === 'overview' && overviewSections.outreach) ||
+      activeTab === 'outreach'; // legacy redirect
+    if (!wantsMetrics) return;
+
+    if (metricsBookings.length === 0 && !metricsBookingsLoading) {
+      setMetricsBookingsLoading(true);
+      const to = new Date();
+      const from = new Date();
+      from.setDate(from.getDate() - 90);
+      BookingService.getBookingsForMetrics(from.toISOString(), to.toISOString())
+        .then(rows => setMetricsBookings(rows))
+        .catch(err => console.error('Error loading metrics bookings:', err))
+        .finally(() => setMetricsBookingsLoading(false));
+    }
+
+    if (metricsActivities.length === 0 && !metricsActivitiesLoading) {
+      setMetricsActivitiesLoading(true);
+      // Two parallel pulls:
+      //   - outbound: ALL-time so we can compute the per-user first-
+      //     touch per opp (matches funnel API semantic). Capped at 10k.
+      //   - inbound:  last 90 days only — replies older than 90d don't
+      //     show up in any current range option, so pulling more would
+      //     waste bandwidth. Capped at 5k.
+      Promise.all([
+        SalesPipelineService.getActivitiesForMetrics('outbound'),
+        SalesPipelineService.getActivitiesForMetrics('inbound', 90),
+      ])
+        .then(([outbound, inbound]) => {
+          setMetricsActivities([...outbound, ...inbound]);
+        })
+        .catch(err => console.error('Error loading metrics activities:', err))
+        .finally(() => setMetricsActivitiesLoading(false));
+    }
+
     if (!metricsUserId && user?.id) setMetricsUserId(user.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, topSectionTab]);
+  }, [activeTab, topSectionTab, overviewSections.outreach]);
 
   // KPI roll-up at top of Forecast tab.
   const forecastKpis = useMemo(() => {
@@ -8023,13 +8111,14 @@ export default function SalesPipelinePage() {
                 tab below, alongside Outreach / Pipeline / Orbit. The
                 tab strip stays cleaner and managers see actions in
                 context with everything else. */}
-            <TabsTrigger value="outreach" className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Outreach
-              {outreachAllTotal > 0 && (
-                <Badge variant="secondary" className="ml-1">{outreachAllTotal}</Badge>
-              )}
-            </TabsTrigger>
+            {/* [Tab merge May 2026] Standalone Outreach tab removed.
+                Per user feedback: "didnt want actions to replace
+                outreach/overall... wanted to combine them into 1".
+                The full outreach surface (My-outreach-30d strip,
+                owner sub-tabs, Cold-DM table) now lives inside the
+                Overall tab as a default-open collapsible section.
+                Outreach-count badge moved onto the Overall tab itself
+                so the headline number stays visible in the strip. */}
             <TabsTrigger value="pipeline" className="flex items-center gap-2">
               <Target className="h-4 w-4" />
               Pipeline
@@ -8107,9 +8196,11 @@ export default function SalesPipelinePage() {
             removed. Same call lives inside the Overall tab below as
             the topmost collapsible section. */}
 
-        <TabsContent value="outreach" className="mt-0">
-          {renderOutreachTab()}
-        </TabsContent>
+        {/* [Tab merge May 2026] Standalone Outreach TabsContent
+            removed. renderOutreachTab(true) is rendered inside the
+            Overall tab's Outreach section below. The `true` arg
+            suppresses the section-local search since the Overall
+            tab's unified search drives all subsection filters. */}
 
         <TabsContent value="pipeline" className="mt-0">
           <div className="relative mb-4">
@@ -8205,7 +8296,15 @@ export default function SalesPipelinePage() {
               )}
             </div>
 
-            {/* Outreach Section */}
+            {/* Outreach Section — [Tab merge May 2026] Now the only
+                home for the outreach surface (Cold DM table, per-
+                owner sub-tabs, "My outreach · last 30 days" strip).
+                Default-open since users coming to /crm/sales-pipeline
+                expect their outreach pipeline first thing. Cold DM
+                stays as its own clearly-labeled section header
+                INSIDE renderOutreachTab — per user feedback
+                "i like how cold dm is its own section, thats
+                important". */}
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               <button
                 onClick={() => setOverviewSections(prev => ({ ...prev, outreach: !prev.outreach }))}
@@ -8215,6 +8314,7 @@ export default function SalesPipelinePage() {
                   <MessageSquare className="h-4 w-4 text-blue-700" />
                   <h4 className="font-semibold text-blue-700">Outreach</h4>
                   <Badge variant="secondary" className="text-xs font-medium">{outreachAllTotal}</Badge>
+                  <span className="text-[11px] text-gray-500 font-normal">Cold DM pipeline</span>
                 </div>
                 {overviewSections.outreach ? <ChevronUp className="h-4 w-4 text-blue-500" /> : <ChevronDown className="h-4 w-4 text-blue-500" />}
               </button>

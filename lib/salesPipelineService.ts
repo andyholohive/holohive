@@ -474,6 +474,58 @@ export class SalesPipelineService {
   }
 
   /**
+   * Pulls a minimal slice of crm_activities for the per-user metrics
+   * computation in the sales-pipeline page (touch1s + replies).
+   *
+   * Two call modes:
+   *   getActivitiesForMetrics('outbound')           → ALL-time outbound
+   *     messages + bumps (capped at 10k rows). All-time is needed so
+   *     we can compute per-user FIRST-TOUCH per opp client-side,
+   *     matching the funnel API's semantic.
+   *
+   *   getActivitiesForMetrics('inbound', 90)        → inbound messages
+   *     in the last N days (capped at 5k rows). Older replies fall
+   *     outside any current range option, so pulling more is waste.
+   *
+   * Returns just the fields the metrics math needs — small payload.
+   */
+  static async getActivitiesForMetrics(
+    direction: 'inbound' | 'outbound',
+    days?: number,
+  ): Promise<Array<{
+    id: string;
+    opportunity_id: string | null;
+    type: string;
+    direction: 'inbound' | 'outbound' | null;
+    created_at: string;
+    owner_id: string | null;
+  }>> {
+    const cols = 'id, opportunity_id, type, direction, created_at, owner_id';
+    let query = (supabase as any)
+      .from('crm_activities')
+      .select(cols)
+      .eq('direction', direction);
+
+    if (direction === 'outbound') {
+      query = query.in('type', ['message', 'bump']).limit(10000);
+    } else {
+      query = query.eq('type', 'message').limit(5000);
+    }
+
+    if (days && days > 0) {
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      query = query.gte('created_at', since);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('[getActivitiesForMetrics]', direction, error);
+      return [];
+    }
+    return (data || []) as any[];
+  }
+
+  /**
    * Returns the set of opportunity IDs that have *ever* moved past
    * cold_dm — i.e. their crm_stage_history has at least one entry
    * whose to_stage is not cold_dm / orbit / v2_closed_lost.
