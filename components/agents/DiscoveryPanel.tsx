@@ -332,6 +332,17 @@ function formatMoney(n: number | null | undefined): string {
 export default function DiscoveryPanel() {
   const { toast } = useToast();
   const [prospects, setProspects] = useState<DiscoveryProspect[]>([]);
+  // [Discovery audit fix May 2026] Schedule state from the list
+  // endpoint. Banner renders when the cron is disabled OR the last
+  // successful run is > 48h old, so a silent disablement (which we
+  // had for ~2 weeks before the May 2026 audit) gets surfaced fast.
+  const [schedule, setSchedule] = useState<{
+    is_enabled: boolean;
+    last_run_at: string | null;
+    last_run_status: string | null;
+    cadence: string | null;
+    runs_per_day: number | null;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('needs_review');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -518,6 +529,11 @@ export default function DiscoveryPanel() {
       const res = await fetch(`/api/prospects/discovery?status=${statusFilter}`);
       const data = await res.json();
       if (data.prospects) setProspects(data.prospects);
+      // schedule may be null if the row is missing (treat as
+      // healthy — we don't have a signal either way). When present
+      // we always overwrite so a re-enable / new run timestamp shows
+      // up immediately on the next refresh.
+      if (data.schedule !== undefined) setSchedule(data.schedule);
     } catch (err) {
       toast({ title: 'Error', description: 'Failed to load discovered prospects', variant: 'destructive' });
     } finally {
@@ -1191,8 +1207,60 @@ export default function DiscoveryPanel() {
     p => (p.outreach_contacts || []).some(c => c.telegram_handle && c.telegram_handle.trim()),
   ).length;
 
+  // [Discovery audit fix May 2026] Schedule health derivation —
+  // 'disabled' is the loud case (red), 'stale' is the quieter case
+  // (amber, last successful run > 48h) and renders as a soft warning
+  // rather than an alert. 'healthy' means no banner.
+  const scheduleHealth: 'disabled' | 'stale' | 'healthy' | 'unknown' = (() => {
+    if (!schedule) return 'unknown';
+    if (!schedule.is_enabled) return 'disabled';
+    if (!schedule.last_run_at) return 'stale';
+    const ageMs = Date.now() - new Date(schedule.last_run_at).getTime();
+    // 'skipped_*' statuses mean the cron fired but didn't actually
+    // run a scan — treat as "no recent successful run" even if the
+    // timestamp is fresh, so the banner still warns.
+    const lastWasReal = schedule.last_run_status === 'completed';
+    if (!lastWasReal && ageMs > 24 * 3600 * 1000) return 'stale';
+    if (ageMs > 48 * 3600 * 1000) return 'stale';
+    return 'healthy';
+  })();
+
   return (
     <div className="pb-8 space-y-4">
+      {/* [Discovery audit fix May 2026] Schedule health banner.
+          Without this the daily prospect pipeline can be silently
+          disabled for weeks — exactly what happened pre-audit
+          (cron off May 12 → May 25, no UI signal). */}
+      {scheduleHealth === 'disabled' && (
+        <div className="flex items-start gap-3 p-3 rounded-md border border-red-200 bg-red-50">
+          <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-red-900">
+              Discovery cron is disabled — no new prospects are being scanned.
+            </p>
+            <p className="text-xs text-red-700 mt-0.5">
+              Last run: {schedule?.last_run_at ? new Date(schedule.last_run_at).toLocaleString() : 'never'} ({schedule?.last_run_status || 'unknown'}).
+              Open the schedule dialog (gear icon at the top of /intelligence) and re-enable, or run an on-demand scan with &ldquo;Run Discovery&rdquo;.
+            </p>
+          </div>
+        </div>
+      )}
+      {scheduleHealth === 'stale' && (
+        <div className="flex items-start gap-3 p-3 rounded-md border border-amber-200 bg-amber-50">
+          <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-amber-900">
+              No successful discovery scan in the last 48h.
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Cron is enabled but the last run was: {schedule?.last_run_at ? new Date(schedule.last_run_at).toLocaleString() : 'never'}
+              {schedule?.last_run_status ? ` (${schedule.last_run_status})` : ''}.
+              If this persists, check the scheduled_scans config or the cron logs.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Description + primary actions */}
       <div className="flex items-start justify-between gap-4">
         <p className="text-sm text-gray-600 max-w-2xl">

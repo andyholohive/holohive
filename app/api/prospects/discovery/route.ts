@@ -12,7 +12,12 @@ export const dynamic = 'force-dynamic';
  *
  * Query params:
  *   status=needs_review|reviewed|promoted|dismissed|all  (default: needs_review)
- *   limit=N  (default 50, max 200)
+ *   limit=N  (default 200, max 5000)
+ *
+ * Limit history: was capped at 200 which silently truncated the
+ * dropstab_discovery backlog if it ever grew past that point. Bumped
+ * to 5000 in May 2026 — payload is still small (~1KB/row) and the
+ * client already does its own pagination/sort in-memory.
  */
 
 export async function GET(request: Request) {
@@ -25,7 +30,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const statusParam = searchParams.get('status') || 'needs_review';
-  const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50', 10), 1), 200);
+  const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '200', 10), 1), 5000);
 
   let query = (supabase as any)
     .from('prospects')
@@ -172,9 +177,35 @@ export async function GET(request: Request) {
     };
   });
 
+  // [Discovery audit fix, May 2026] Pull schedule status so the UI
+  // can warn when the discovery cron is disabled or stale. Was a
+  // silent failure mode for ~2 weeks (cron disabled, no UI signal,
+  // backlog accumulated). Surfacing it inline keeps the round-trip
+  // to one fetch — UI doesn't need a separate /schedule call.
+  let schedule: {
+    is_enabled: boolean;
+    last_run_at: string | null;
+    last_run_status: string | null;
+    cadence: string | null;
+    runs_per_day: number | null;
+  } | null = null;
+  try {
+    const { data: sched } = await (supabase as any)
+      .from('scheduled_scans')
+      .select('is_enabled, last_run_at, last_run_status, cadence, runs_per_day')
+      .eq('schedule_key', 'discovery_default')
+      .maybeSingle();
+    if (sched) schedule = sched;
+  } catch (err) {
+    // Schedule row missing or query failed — not fatal, UI just
+    // won't show the banner. Logged so we still see it in Vercel.
+    console.error('[discovery/list] schedule lookup failed:', err);
+  }
+
   return NextResponse.json({
     count: enriched.length,
     prospects: enriched,
+    schedule,
   });
 }
 
