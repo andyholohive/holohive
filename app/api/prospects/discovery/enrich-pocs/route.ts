@@ -17,9 +17,21 @@ export const maxDuration = 300;
  *
  * Body:
  *   {
- *     prospect_ids?: string[]   // if omitted, enriches ALL discovery prospects
- *                                // with empty outreach_contacts
+ *     prospect_ids?: string[]   // if provided, enriches only these
+ *     all?: true                // required to enrich ALL discovery
+ *                               // prospects with empty contacts. Without
+ *                               // either of these the request 400s — see
+ *                               // the safety guard below.
  *   }
+ *
+ * Safety guard (May 2026 audit):
+ *   Previously `prospect_ids` was optional and an omitted body meant
+ *   "enrich every discovery prospect with no contacts." With ~4k
+ *   prospects in the table that's potentially 4k Claude web_search
+ *   calls per accidental POST. We now require either prospect_ids OR
+ *   explicit `all: true` so a missing parameter can't trigger a
+ *   runaway. The UI sends prospect_ids for the per-row + bulk paths
+ *   and `all: true` for the "Enrich all unenriched" admin button.
  *
  * Response:
  *   { enriched: number, failed: number, errors: string[], cost_usd: number }
@@ -180,6 +192,24 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
     const specificIds: string[] | null = Array.isArray(body.prospect_ids) ? body.prospect_ids : null;
+    const enrichAll: boolean = body.all === true;
+
+    // [Safety guard, May 2026] Refuse to sweep the entire prospects
+    // table by accident — caller must opt in with explicit `all: true`
+    // OR pass a specific id list. An empty array counts as "explicit
+    // empty" (no work to do) — return early rather than treating it
+    // as "missing field" and sweeping everything.
+    if (!specificIds && !enrichAll) {
+      return NextResponse.json({
+        error: 'Either prospect_ids (array of IDs) or all=true is required. Refusing to enrich every prospect by default — pass `all: true` to confirm.',
+      }, { status: 400 });
+    }
+    if (specificIds && specificIds.length === 0) {
+      return NextResponse.json({
+        enriched: 0, failed: 0, errors: [], cost_usd: 0,
+        message: 'Empty prospect_ids — nothing to enrich.',
+      });
+    }
 
     // Model selector — same rules as the main scan endpoint. Defaults to Opus
     // because POC accuracy > speed for BD outreach.

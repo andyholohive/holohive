@@ -245,6 +245,22 @@ export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
     const specificIds: string[] | null = Array.isArray(body.prospect_ids) ? body.prospect_ids : null;
+    const enrichAll: boolean = body.all === true;
+
+    // [Safety guard, May 2026] Same opt-in pattern as /enrich-pocs.
+    // Refuse to sweep every discovery prospect by accident — caller
+    // must explicitly pass `all: true` if that's the intent.
+    if (!specificIds && !enrichAll) {
+      return NextResponse.json({
+        error: 'Either prospect_ids (array of IDs) or all=true is required. Refusing to enrich every prospect by default — pass `all: true` to confirm.',
+      }, { status: 400 });
+    }
+    if (specificIds && specificIds.length === 0) {
+      return NextResponse.json({
+        enriched: 0, failed: 0, errors: [], cost_usd: 0,
+        message: 'Empty prospect_ids — nothing to enrich.',
+      });
+    }
 
     // Load target prospects. If specific IDs provided, just those. Otherwise,
     // all discovery-sourced prospects that currently have no outreach_contacts.

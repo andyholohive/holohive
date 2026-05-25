@@ -545,6 +545,28 @@ export default function DiscoveryPanel() {
     fetchProspects();
   }, [fetchProspects]);
 
+  // [Audit fix May 2026] Auto-refresh the prospects list when the
+  // tab regains focus or the document becomes visible. Previously
+  // the stat cards + table only refreshed on manual "Refresh"
+  // button click, so a background scan completing OR another user
+  // dismissing prospects left the local copy stale until a manual
+  // click. Common scenario: user switches tabs to run a scan, comes
+  // back, sees old counts, makes decisions on stale numbers.
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchProspects();
+      }
+    };
+    window.addEventListener('focus', fetchProspects);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', fetchProspects);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [fetchProspects]);
+
   const toggleExpand = (id: string) => {
     setExpanded(prev => {
       const next = new Set(prev);
@@ -660,10 +682,26 @@ export default function DiscoveryPanel() {
       if (!res.ok || data.error) {
         toast({ title: 'Scan failed', description: data.error || 'Unknown error', variant: 'destructive' });
       } else {
-        toast({
-          title: 'Discovery complete',
-          description: `Found ${data.projects_found} projects · ${data.inserted} new · ${data.signals_added} triggers · $${data.cost_usd?.toFixed(2) ?? '—'}`,
-        });
+        // [Audit fix May 2026] Per-source error surfacing.
+        // Stage-1 source errors (e.g. "rootdata: rate-limited")
+        // used to be buried in agent_runs and never shown to the
+        // user. Now if any source failed but others succeeded, the
+        // toast is destructive-variant with the per-source reason
+        // appended so the user knows the scan was partial.
+        const sourceErrors: string[] = Array.isArray(data.stage1_source_errors) ? data.stage1_source_errors : [];
+        const baseDesc = `Found ${data.projects_found} projects · ${data.inserted} new · ${data.signals_added} triggers · $${data.cost_usd?.toFixed(2) ?? '—'}`;
+        if (sourceErrors.length > 0) {
+          toast({
+            title: 'Discovery complete (partial)',
+            description: `${baseDesc} · Source failures: ${sourceErrors.join(' · ')}`,
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Discovery complete',
+            description: baseDesc,
+          });
+        }
         fetchProspects();
       }
     } catch (err: any) {

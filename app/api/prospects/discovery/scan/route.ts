@@ -1618,6 +1618,12 @@ export async function POST(request: Request) {
       batches_run: batches.length,
       batches_failed: batchErrors.length,
       errors: [...batchErrors, ...writeErrors],
+      // [Audit fix May 2026] Surface per-source Stage-1 failures so
+      // the caller (DiscoveryPanel toast) can flag "DropsTab: ok,
+      // RootData: rate-limited" instead of just showing the
+      // aggregate count. Previously these only landed in
+      // agent_runs.output_summary which the UI never reads.
+      stage1_source_errors: stage1.sourceErrors.length > 0 ? stage1.sourceErrors : undefined,
       cost_usd: Number(costUsd.toFixed(4)),
       duration_ms: Date.now() - startedAt.getTime(),
     });
