@@ -6,6 +6,32 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 180;
 
 /**
+ * ─────────────────────────────────────────────────────────────────────
+ *  DORMANT CRON — NOT REGISTERED IN vercel.json
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ *  Status as of 2026-05-25 audit:
+ *    This route is the cron entry point for the Korea Signals
+ *    surface (components/agents/KoreaSignalsPanel.tsx), which is
+ *    itself dormant — see the header comment in that file. Since
+ *    this route is NOT listed in vercel.json's `crons` array, it
+ *    never fires automatically. The cadence logic + score-decay
+ *    call below are correct but inert.
+ *
+ *  Side effects of the dormancy:
+ *    - `applyScoreDecay()` is never called, so signal scores never
+ *      age down. Moot for now because the panel that would consume
+ *      those scores is also unmounted.
+ *    - Bible v3 cadence (daily / weekly / monthly scanners) is
+ *      defined but unused.
+ *
+ *  Andy chose to leave this alone during the 2026-05-25 audit.
+ *  If you revive Korea Signals: add an entry to vercel.json:
+ *      { "path": "/api/cron/signals-scan", "schedule": "0 * * * *" }
+ *  If you tear it down: delete this file + KoreaSignalsPanel.tsx
+ *  + any lib/signals/scanners/* not reused elsewhere.
+ * ─────────────────────────────────────────────────────────────────────
+ *
  * GET /api/cron/signals-scan — Automated signal scan triggered by cron
  *
  * Bible v3 cadence-based scanning:

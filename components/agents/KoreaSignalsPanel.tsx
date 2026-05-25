@@ -1,5 +1,47 @@
 'use client';
 
+/**
+ * ─────────────────────────────────────────────────────────────────────
+ *  DORMANT FEATURE — DO NOT ASSUME THIS IS LIVE
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ *  Status as of 2026-05-25 audit:
+ *    - This component is **NOT IMPORTED ANYWHERE**. The Korea Signals
+ *      tab on /intelligence was intentionally hidden (see comment in
+ *      app/intelligence/page.tsx:15-18) while the team focuses on
+ *      Discovery + KR Exchanges.
+ *    - Its companion cron `/api/cron/signals-scan/route.ts` is NOT
+ *      registered in vercel.json, so the auto-scan + score-decay
+ *      logic never fires either.
+ *    - 3,059 prospect rows with status='new' (1,787 defillama +
+ *      1,271 coingecko + 1 funding_radar) are stale legacy data
+ *      from a one-time bulk import on 2026-04-08. They're not an
+ *      active pipeline — they're abandoned snapshots.
+ *
+ *  What that means:
+ *    - DO NOT add features to this file expecting them to be tested
+ *      or shipped. There's no render path.
+ *    - DO NOT delete this file blindly either — Andy chose to leave
+ *      it in place during the 2026-05-25 audit pending a decision
+ *      on whether to revive the surface.
+ *    - If you're reviving: see /api/cron/signals-scan + lib/signals/*
+ *      for the scanner orchestration, and add a TabsTrigger +
+ *      TabsContent in app/intelligence/page.tsx that re-imports this
+ *      component. You'll also want to triage the 3,059 stale rows
+ *      (DISMISSED or DELETE — they're a year out of date by then).
+ *    - If you're tearing it down: also remove /api/cron/signals-scan
+ *      and any lib/signals/scanners/* files no other surface depends
+ *      on. Check RecentSignalsPanel + ExchangeListingsPanel for
+ *      transitive imports first.
+ *
+ *  Related dead-letter: korean_exchange_scanner writes ~600
+ *  prospect_signals rows per month, but RecentSignalsPanel filters
+ *  source_name='grok_x_deep_scan' only (recent/route.ts:68). Those
+ *  rows are written and never read by any UI. Worth wiring or
+ *  stopping next time someone touches this surface.
+ * ─────────────────────────────────────────────────────────────────────
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
