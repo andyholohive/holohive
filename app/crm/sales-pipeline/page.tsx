@@ -749,15 +749,30 @@ export default function SalesPipelinePage() {
     }
   }, []);
 
+  // [Orbit split, May 2026] Fetch the set of opp IDs that ever moved
+  // past cold_dm. Cheap (one indexed table scan) and only refreshed
+  // alongside opportunities, so it's a once-per-page-load cost.
+  const fetchPreviouslyEngagedIds = useCallback(async () => {
+    try {
+      const ids = await SalesPipelineService.getPreviouslyEngagedIds();
+      setPreviouslyEngagedIds(ids);
+    } catch (err) {
+      console.error('Error fetching previously-engaged ids:', err);
+      // Leave the set as null so the UI keeps its fallback behavior
+      // rather than mis-categorizing every opp as cold-DM orbit.
+    }
+  }, []);
+
   const fetchData = useCallback(async () => {
     try {
-      const [opps, affs, usrs, met, outreachCount, tmpls] = await Promise.all([
+      const [opps, affs, usrs, met, outreachCount, tmpls, engagedIds] = await Promise.all([
         SalesPipelineService.getAll(),
         CRMService.getAllAffiliates(),
         UserService.getAllUsers(),
         SalesPipelineService.getMetrics(),
         SalesPipelineService.getColdDmsPaginated(1, 1, {}),
         SalesPipelineService.getTemplates(),
+        SalesPipelineService.getPreviouslyEngagedIds(),
       ]);
       setOpportunities(opps);
       setAffiliates(affs);
@@ -765,6 +780,7 @@ export default function SalesPipelinePage() {
       setMetrics(met);
       setOutreachAllTotal(outreachCount.count);
       setTemplates(tmpls);
+      setPreviouslyEngagedIds(engagedIds);
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -893,6 +909,33 @@ export default function SalesPipelinePage() {
   const visiblePipelineStages = (pathFilter === 'closer' ? PATH_A_STAGES : PIPELINE_STAGES).filter(s => s !== 'cold_dm');
 
   const allOrbitOpps = useMemo(() => opportunities.filter(o => o.stage === 'orbit'), [opportunities]);
+
+  // [Orbit split, May 2026] Per user feedback: cold-DM orbit (never
+  // responded) and engaged orbit (responded at some point, paused
+  // later) have very different follow-up profiles and shouldn't be
+  // counted together. We use crm_stage_history (already written by
+  // SalesPipelineService.update on every stage change) as the source
+  // of truth for "did this opp ever leave cold_dm?".
+  //
+  // As a backup for rows missing history (legacy), we OR-in explicit
+  // engagement signals: last_reply_at / qualified_at /
+  // discovery_call_at / proposal_sent_at / calendly_booked_date.
+  //
+  // Returns null until the engaged-ids fetch resolves — UI shows the
+  // single combined view in the meantime rather than guessing wrong.
+  const [previouslyEngagedIds, setPreviouslyEngagedIds] = useState<Set<string> | null>(null);
+  const isPreviouslyEngaged = useCallback((opp: SalesPipelineOpportunity): boolean => {
+    if (previouslyEngagedIds?.has(opp.id)) return true;
+    return !!(opp.last_reply_at || opp.qualified_at || opp.discovery_call_at || opp.proposal_sent_at || opp.calendly_booked_date);
+  }, [previouslyEngagedIds]);
+  const coldDmOrbitOpps = useMemo(
+    () => allOrbitOpps.filter(o => !isPreviouslyEngaged(o)),
+    [allOrbitOpps, isPreviouslyEngaged],
+  );
+  const engagedOrbitOpps = useMemo(
+    () => allOrbitOpps.filter(o => isPreviouslyEngaged(o)),
+    [allOrbitOpps, isPreviouslyEngaged],
+  );
   // Nurture opportunities — surfaced in the Overview tab. Without this they
   // were essentially invisible (hidden everywhere except 2 of 5 Action sub-tabs),
   // so a deal set to nurture would silently drop out of the daily view.
@@ -922,6 +965,35 @@ export default function SalesPipelinePage() {
   const orbitTotalValue = useMemo(
     () => orbitOpps.reduce((s, o) => s + (o.deal_value || 0), 0),
     [orbitOpps],
+  );
+
+  // [Orbit split, May 2026] Split + sorted versions for the two-bucket
+  // render. Search box (orbitSearch) applies to BOTH so the user can
+  // narrow across both sections at once — sortedColdDmOrbit and
+  // sortedEngagedOrbit are derived from the SAME search-filtered set.
+  const filteredColdDmOrbit = useMemo(
+    () => orbitSearch ? coldDmOrbitOpps.filter(o => matchesSearch(o, orbitSearch)) : coldDmOrbitOpps,
+    [coldDmOrbitOpps, orbitSearch],
+  );
+  const filteredEngagedOrbit = useMemo(
+    () => orbitSearch ? engagedOrbitOpps.filter(o => matchesSearch(o, orbitSearch)) : engagedOrbitOpps,
+    [engagedOrbitOpps, orbitSearch],
+  );
+  const sortedColdDmOrbit = useMemo(
+    () => [...filteredColdDmOrbit].sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+    [filteredColdDmOrbit],
+  );
+  const sortedEngagedOrbit = useMemo(
+    () => [...filteredEngagedOrbit].sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+    [filteredEngagedOrbit],
+  );
+  const coldDmOrbitTotalValue = useMemo(
+    () => filteredColdDmOrbit.reduce((s, o) => s + (o.deal_value || 0), 0),
+    [filteredColdDmOrbit],
+  );
+  const engagedOrbitTotalValue = useMemo(
+    () => filteredEngagedOrbit.reduce((s, o) => s + (o.deal_value || 0), 0),
+    [filteredEngagedOrbit],
   );
 
   // Memoized outreach grouping — sort by name and count POCs per project
@@ -1309,6 +1381,15 @@ export default function SalesPipelinePage() {
         if (opp) await autoLogColdOutreachReply(opp);
       }
       void fetchMetrics();
+      // [Orbit split, May 2026] Any transition out of cold_dm flips an
+      // opp into the "engaged" bucket — refresh the engaged-ids set so
+      // the orbit split is correct after the next orbit move without
+      // requiring a page reload. (The orbit / closed_lost paths return
+      // early above and never hit this code path, so newStage here is
+      // already guaranteed to be one of the engaged stages.)
+      if (currentStage === 'cold_dm' && newStage !== 'cold_dm') {
+        void fetchPreviouslyEngagedIds();
+      }
       if (activeTab === 'outreach') { void fetchOutreach(); void fetchOutreachCount(); }
     } catch (err) {
       console.error('Error changing stage:', err);
@@ -3144,11 +3225,28 @@ export default function SalesPipelinePage() {
               <span className="text-xs font-semibold text-sky-700 uppercase tracking-wide">My outreach · last 30 days</span>
               <button
                 onClick={() => {
+                  // [Fix May 2026] Setting topSectionTab='metrics' alone
+                  // did nothing visible when the analytics panel was
+                  // collapsed (the default) — the Metrics TabsContent
+                  // lives inside `{showAnalytics && (...)}` so the
+                  // whole panel was hidden. Now we also force the
+                  // panel open and persist the choice so it stays open
+                  // on subsequent visits (matching the toggle button's
+                  // localStorage behavior), then scroll the panel into
+                  // view rather than the page top — the analytics panel
+                  // sits between PageHeader and the tab strip and
+                  // scroll-to-top would land above it on tall headers.
                   setTopSectionTab('metrics');
-                  // Scroll to the top sub-section so the user actually
-                  // sees the Metrics view they just switched to.
+                  setShowAnalytics(true);
                   if (typeof window !== 'undefined') {
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    try { window.localStorage.setItem('sp_showAnalytics', '1'); } catch {}
+                    // requestAnimationFrame so the panel has rendered
+                    // before we try to scroll to it.
+                    requestAnimationFrame(() => {
+                      const el = document.getElementById('sp-analytics-panel');
+                      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      else window.scrollTo({ top: 0, behavior: 'smooth' });
+                    });
                   }
                 }}
                 className="text-xs text-sky-700 hover:underline"
@@ -4166,68 +4264,123 @@ export default function SalesPipelinePage() {
           </Button>
         </div>
       )}
-      {/* Flat orbit view — one table for every orbit opp regardless of
-          reason. Reason is shown as a badge column on each row instead
-          of being used as the layout dimension (the per-reason split
-          used to drop opps with no reason — see comment on sortedOrbit
-          above). The orange header band keeps the visual identity of
-          the section without partitioning the rows. */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between px-4 py-3 bg-orange-50 rounded-t-lg border border-orange-200 border-b-0">
-          <div className="flex items-center gap-2">
-            <RotateCcw className="h-4 w-4 text-orange-700" />
-            <h4 className="font-semibold text-orange-700">Orbit</h4>
-            <Badge variant="secondary" className="text-xs font-medium">{sortedOrbit.length}</Badge>
-          </div>
-          {orbitTotalValue > 0 && (
-            <span className="text-sm font-medium text-gray-600">
-              ${orbitTotalValue.toLocaleString()}
-            </span>
-          )}
-        </div>
-        <div className="bg-white rounded-b-lg border border-gray-200 border-t-0">
-          {sortedOrbit.length === 0 ? (
-            <div className="text-center text-sm text-gray-400 py-10">
+      {/* [Orbit split, May 2026] Two-section orbit view per user
+          feedback: cold-DM orbit (never got a response) and engaged
+          orbit (responded at some point, paused later) have totally
+          different follow-up profiles. Combining them was inflating
+          'engaged pipeline' counts with stale cold outreach. We
+          render Engaged first (higher value, deserves attention),
+          then Cold-DM below. Both share the bulk-action toolbar
+          (selectedOrbit) so the user can still multi-select across
+          sections.
+
+          NOTE: the row-rendering body is identical between sections —
+          we accept a `currentSorted` arg into the row map so the
+          project-name grouping (prev/next compare) stays correct
+          within each bucket independently. */}
+      {(() => {
+        const sections: Array<{
+          key: 'engaged' | 'cold_dm';
+          title: string;
+          subtitle: string;
+          opps: SalesPipelineOpportunity[];
+          totalValue: number;
+          headerBg: string;
+          headerBorder: string;
+          headerText: string;
+          iconColor: string;
+        }> = [
+          {
+            key: 'engaged',
+            title: 'Engaged orbit',
+            subtitle: 'Responded or qualified at some point — re-engage with context',
+            opps: sortedEngagedOrbit,
+            totalValue: engagedOrbitTotalValue,
+            headerBg: 'bg-emerald-50',
+            headerBorder: 'border-emerald-200',
+            headerText: 'text-emerald-800',
+            iconColor: 'text-emerald-700',
+          },
+          {
+            key: 'cold_dm',
+            title: 'Cold-DM orbit',
+            subtitle: 'Never responded — low-touch revisit pool',
+            opps: sortedColdDmOrbit,
+            totalValue: coldDmOrbitTotalValue,
+            headerBg: 'bg-sky-50',
+            headerBorder: 'border-sky-200',
+            headerText: 'text-sky-800',
+            iconColor: 'text-sky-700',
+          },
+        ];
+        // If we have neither bucket populated AND we're not still loading
+        // engaged-ids, show the standard empty state once.
+        if (sortedEngagedOrbit.length === 0 && sortedColdDmOrbit.length === 0) {
+          return (
+            <div className="mb-6 bg-white rounded-lg border border-gray-200 p-10 text-center text-sm text-gray-400">
               No opportunities in orbit.
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50/50">
-                  <TableHead className="w-10"></TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="w-[180px]">POC</TableHead>
-                  <TableHead className="w-[70px]">Bucket</TableHead>
-                  <TableHead className="w-[110px]">Value</TableHead>
-                  <TableHead className="w-[100px]">Owner</TableHead>
-                  <TableHead className="w-[100px]">Source</TableHead>
-                  {/* Reason tag — replaces the old per-reason table
-                      grouping. Always shown so unclassified orbit opps
-                      still surface (with "—"). */}
-                  <TableHead className="w-[140px]">Reason</TableHead>
-                  {/* Next check-in surfaces the Orbit Tracking section's
-                      next_action_at on the table so users can scan
-                      "what's due today/this week" without opening each
-                      slide-over. Overdue dates render in red. */}
-                  <TableHead className="w-[120px]">Next check-in</TableHead>
-                  <TableHead className="w-[120px]">Time in Orbit</TableHead>
-                  <TableHead className="w-[120px]">Last Contacted</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                    {sortedOrbit.map((opp, index) => {
+          );
+        }
+        return sections.map(section => {
+          const currentSorted = section.opps;
+          const nameCounts = (() => {
+            const counts = new Map<string, number>();
+            currentSorted.forEach(o => counts.set(o.name || '', (counts.get(o.name || '') || 0) + 1));
+            return counts;
+          })();
+          return (
+          <div key={section.key} className="mb-6">
+            <div className={`flex items-center justify-between px-4 py-3 ${section.headerBg} rounded-t-lg border ${section.headerBorder} border-b-0`}>
+              <div className="flex items-center gap-2">
+                <RotateCcw className={`h-4 w-4 ${section.iconColor}`} />
+                <div>
+                  <h4 className={`font-semibold ${section.headerText} leading-tight`}>{section.title}</h4>
+                  <p className="text-[11px] text-gray-500 leading-tight mt-0.5">{section.subtitle}</p>
+                </div>
+                <Badge variant="secondary" className="text-xs font-medium ml-2">{currentSorted.length}</Badge>
+              </div>
+              {section.totalValue > 0 && (
+                <span className="text-sm font-medium text-gray-600">
+                  ${section.totalValue.toLocaleString()}
+                </span>
+              )}
+            </div>
+            <div className="bg-white rounded-b-lg border border-gray-200 border-t-0">
+              {currentSorted.length === 0 ? (
+                <div className="text-center text-sm text-gray-400 py-8">
+                  {section.key === 'engaged'
+                    ? 'No engaged opps in orbit — every paused deal hasn\'t responded yet.'
+                    : 'No cold-DM opps in orbit.'}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50/50">
+                      <TableHead className="w-10"></TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="w-[180px]">POC</TableHead>
+                      <TableHead className="w-[70px]">Bucket</TableHead>
+                      <TableHead className="w-[110px]">Value</TableHead>
+                      <TableHead className="w-[100px]">Owner</TableHead>
+                      <TableHead className="w-[100px]">Source</TableHead>
+                      <TableHead className="w-[140px]">Reason</TableHead>
+                      <TableHead className="w-[120px]">Next check-in</TableHead>
+                      <TableHead className="w-[120px]">Time in Orbit</TableHead>
+                      <TableHead className="w-[120px]">Last Contacted</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {currentSorted.map((opp, index) => {
                       const isChecked = selectedOrbit.includes(opp.id);
-                      // Project-name grouping — mirrors the Outreach pattern.
-                      // First row in a same-named cluster shows the project
-                      // header + POC count + add-POC button; subsequent rows
-                      // hide the name cell so the visual hierarchy is
-                      // "project → POCs under it" instead of repeated names.
-                      const prevName = index > 0 ? sortedOrbit[index - 1].name : null;
-                      const nextName = index < sortedOrbit.length - 1 ? sortedOrbit[index + 1].name : null;
+                      const prevName = index > 0 ? currentSorted[index - 1].name : null;
+                      const nextName = index < currentSorted.length - 1 ? currentSorted[index + 1].name : null;
                       const isFirstInGroup = opp.name !== prevName;
                       const isLastInGroup = opp.name !== nextName;
-                      const groupCount = orbitNameCounts.get(opp.name || '') || 1;
+                      const groupCount = nameCounts.get(opp.name || '') || 1;
+                      // (per-section row rendering; structure unchanged
+                      //  from the previous single-table version)
                       return (
                       <TableRow
                         key={opp.id}
@@ -4362,7 +4515,10 @@ export default function SalesPipelinePage() {
               )}
             </div>
           </div>
-        </div>
+          );
+        });
+      })()}
+    </div>
   );
 
   // ============================================
@@ -7887,8 +8043,17 @@ export default function SalesPipelinePage() {
             <TabsTrigger value="orbit" className="flex items-center gap-2">
               <RotateCcw className="h-4 w-4" />
               Orbit
+              {/* [Orbit split, May 2026] Two-count badge so the
+                  inflation problem the team had with the old single
+                  N is visible at a glance: green = engaged (warm
+                  follow-ups), muted gray = cold-DM revisit pool. */}
               {orbitOpps.length > 0 && (
-                <Badge variant="secondary" className="ml-1">{allOrbitOpps.length}</Badge>
+                <span className="ml-1 inline-flex items-center gap-0.5" title={`${engagedOrbitOpps.length} engaged · ${coldDmOrbitOpps.length} cold-DM`}>
+                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{engagedOrbitOpps.length}</Badge>
+                  {coldDmOrbitOpps.length > 0 && (
+                    <span className="text-[10px] text-gray-400 font-medium">+{coldDmOrbitOpps.length}</span>
+                  )}
+                </span>
               )}
             </TabsTrigger>
             <TabsTrigger value="discovery" className="flex items-center gap-2">
@@ -8093,7 +8258,12 @@ export default function SalesPipelinePage() {
                 <div className="flex items-center gap-2">
                   <RotateCcw className="h-4 w-4 text-amber-700" />
                   <h4 className="font-semibold text-amber-700">Orbit</h4>
-                  <Badge variant="secondary" className="text-xs font-medium">{allOrbitOpps.length}</Badge>
+                  {/* [Orbit split, May 2026] Same engaged/cold split
+                      as the tab badge so the totals match. */}
+                  <Badge variant="secondary" className="text-xs font-medium bg-emerald-100 text-emerald-800 hover:bg-emerald-100">{engagedOrbitOpps.length}</Badge>
+                  {coldDmOrbitOpps.length > 0 && (
+                    <span className="text-[11px] text-gray-500 font-medium">+ {coldDmOrbitOpps.length} cold-DM</span>
+                  )}
                 </div>
                 {overviewSections.orbit ? <ChevronUp className="h-4 w-4 text-amber-500" /> : <ChevronDown className="h-4 w-4 text-amber-500" />}
               </button>

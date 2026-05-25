@@ -473,6 +473,51 @@ export class SalesPipelineService {
     if (error) throw error;
   }
 
+  /**
+   * Returns the set of opportunity IDs that have *ever* moved past
+   * cold_dm — i.e. their crm_stage_history has at least one entry
+   * whose to_stage is not cold_dm / orbit / v2_closed_lost.
+   *
+   * Used by the sales-pipeline UI to split Orbit into two buckets:
+   *   - Cold-DM orbit:  never got a response, just went stale
+   *   - Engaged orbit:  responded at some point, paused later
+   *
+   * The two have very different follow-up profiles, and counting them
+   * together inflates "engaged pipeline" metrics. Per user feedback
+   * 2026-05-25: "no data from outreach should get mixed into the
+   * number that go with people that have responded and taken action."
+   *
+   * Implementation note: returns a Set rather than an array because
+   * every call site checks membership for a specific opp.id.
+   */
+  static async getPreviouslyEngagedIds(): Promise<Set<string>> {
+    // Paginate — stage history grows ~ N opps * stage transitions, so
+    // it can exceed Supabase's default 1000-row cap once we pass a few
+    // hundred opps with multi-step journeys.
+    const pageSize = 1000;
+    const ids = new Set<string>();
+    let from = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('crm_stage_history')
+        .select('object_id')
+        .eq('object_type', 'opportunity')
+        .not('to_stage', 'in', '("cold_dm","orbit","v2_closed_lost")')
+        .range(from, from + pageSize - 1);
+      if (error) {
+        console.error('Error fetching previously-engaged ids:', error);
+        // Fail closed — return empty set, UI then falls back to the
+        // legacy single-bucket orbit view rather than crashing.
+        return ids;
+      }
+      (data || []).forEach((r: any) => ids.add(r.object_id as string));
+      hasMore = (data?.length || 0) === pageSize;
+      from += pageSize;
+    }
+    return ids;
+  }
+
   // ----------------------------------------
   // BUMPS
   // ----------------------------------------
