@@ -1046,6 +1046,13 @@ export default function DiscoveryPanel() {
     let firstError: string | null = null;
     let crmAdded = 0;
     let crmAlready = 0;
+    // [Audit fix May 2026] Track CRM-side failures in the bulk path.
+    // Previously only the single-row updateStatus surfaced crm_error;
+    // bulk silently dropped it, so bulk-promoting 30 prospects where
+    // 5 failed CRM-insert toasted "30 promoted · 25 added to CRM" —
+    // 5 ghosts. Now we count + report the first crm_error message.
+    let crmFailed = 0;
+    let firstCrmError: string | null = null;
     try {
       for (const id of ids) {
         try {
@@ -1063,6 +1070,10 @@ export default function DiscoveryPanel() {
           if (status === 'promoted') {
             if (data.crm_already_existed) crmAlready++;
             else if (data.crm_opportunity_id) crmAdded++;
+            else if (data.crm_error) {
+              crmFailed++;
+              if (!firstCrmError) firstCrmError = data.crm_error;
+            }
           }
         } catch (err: any) {
           if (!firstError) firstError = err?.message || 'unknown';
@@ -1077,12 +1088,16 @@ export default function DiscoveryPanel() {
       if (status === 'promoted') {
         parts.push(`${crmAdded} added to CRM`);
         if (crmAlready > 0) parts.push(`${crmAlready} already in CRM`);
+        if (crmFailed > 0) {
+          parts.push(`${crmFailed} CRM failed${firstCrmError ? ` (first: ${firstCrmError})` : ''}`);
+        }
       }
       if (firstError) parts.push(`first error: ${firstError}`);
+      const hasAnyFailure = !!firstError || crmFailed > 0;
       toast({
-        title: firstError ? `Bulk ${verb} partial` : `Bulk ${verb} complete`,
+        title: hasAnyFailure ? `Bulk ${verb} partial` : `Bulk ${verb} complete`,
         description: parts.join(' · '),
-        variant: firstError ? 'destructive' : 'default',
+        variant: hasAnyFailure ? 'destructive' : 'default',
       });
       fetchProspects();
     }

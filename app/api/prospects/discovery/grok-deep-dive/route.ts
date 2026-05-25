@@ -28,8 +28,18 @@ export const maxDuration = 300;
  *     shelf_life_days?: number,      // default 30
  *     max_tweets?: number,           // default 50 per POC
  *     max_pocs?: number,             // default 500 (safety cap), set lower to limit cost
+ *     force?: boolean,               // bypass the 24h server-side cooldown
  *   }
+ *
+ * Server-side 24h cooldown (May 2026 audit):
+ *   Each prospect can be deep-dived at most once per 24h. The UI
+ *   button is disabled for that window, but a double-click that beat
+ *   React render OR a direct API call could previously bypass it and
+ *   rack up Grok charges. We now check prospect_signals.detected_at
+ *   server-side and skip any prospect with a grok_x_deep_scan in the
+ *   last 24h. Pass `force: true` to override (admin escape hatch).
  */
+const COOLDOWN_HOURS = 24;
 
 // Tier priority — lower number = "hotter", scanned first when max_pocs caps
 // the work. Prospects with no tier fall to the bottom.
@@ -148,6 +158,7 @@ export async function POST(request: Request) {
     // Safety cap: refuse to scan more than `max_pocs` POCs in a single run.
     // Prospects are prioritized by action_tier so hot leads get the budget.
     const maxPocs = Math.max(1, Math.min(500, Number(body.max_pocs) || 500));
+    const force: boolean = body.force === true;
 
     // Load target prospects. Non-SKIP, with outreach_contacts that have x handles.
     let query = (supabase as any)
@@ -160,9 +171,53 @@ export async function POST(request: Request) {
     const { data: prospects, error: loadErr } = await query;
     if (loadErr) throw loadErr;
 
+    // [Cooldown enforcement, May 2026] Look up the most recent
+    // grok_x_deep_scan signal per loaded prospect and skip any that
+    // were scanned within COOLDOWN_HOURS. The UI button is already
+    // disabled for that window — this is the server-side belt for
+    // direct API calls, race conditions, or scripts. `force: true`
+    // bypasses (admin override). cooldownSkipped is reported in the
+    // response so callers know which prospects were dropped.
+    let cooldownSkipped: Array<{ id: string; name: string; last_scan_at: string }> = [];
+    let prospectsAfterCooldown = prospects || [];
+    if (!force && prospectsAfterCooldown.length > 0) {
+      const cooldownCutoff = new Date(Date.now() - COOLDOWN_HOURS * 3600 * 1000).toISOString();
+      const ids = prospectsAfterCooldown.map((p: any) => p.id);
+      const { data: recent } = await (supabase as any)
+        .from('prospect_signals')
+        .select('prospect_id, detected_at')
+        .in('prospect_id', ids)
+        .eq('source_name', 'grok_x_deep_scan')
+        .gte('detected_at', cooldownCutoff);
+      const lastScanByProspect = new Map<string, string>();
+      for (const r of recent || []) {
+        const cur = lastScanByProspect.get(r.prospect_id);
+        if (!cur || r.detected_at > cur) lastScanByProspect.set(r.prospect_id, r.detected_at);
+      }
+      const onCooldown = new Set(lastScanByProspect.keys());
+      cooldownSkipped = prospectsAfterCooldown
+        .filter((p: any) => onCooldown.has(p.id))
+        .map((p: any) => ({ id: p.id, name: p.name, last_scan_at: lastScanByProspect.get(p.id)! }));
+      prospectsAfterCooldown = prospectsAfterCooldown.filter((p: any) => !onCooldown.has(p.id));
+
+      if (prospectsAfterCooldown.length === 0) {
+        await finishRun('completed', {
+          pocs_scanned: 0,
+          cooldown_skipped: cooldownSkipped.length,
+          message: `All ${cooldownSkipped.length} requested prospect(s) are within the ${COOLDOWN_HOURS}h cooldown window. Pass force:true to override.`,
+        });
+        return NextResponse.json({
+          pocs_scanned: 0,
+          findings: 0,
+          cooldown_skipped: cooldownSkipped,
+          message: `All requested prospects are within the ${COOLDOWN_HOURS}h deep-dive cooldown. Pass force:true to override.`,
+        });
+      }
+    }
+
     // Sort prospects by tier priority so hot leads are first. That way, if
     // `max_pocs` caps the run, the highest-value POCs are the ones scanned.
-    const sortedProspects = [...(prospects || [])].sort((a: any, b: any) => {
+    const sortedProspects = [...prospectsAfterCooldown].sort((a: any, b: any) => {
       const aTier = a.discovery_snapshot?.action_tier ?? '';
       const bTier = b.discovery_snapshot?.action_tier ?? '';
       const aPri = TIER_PRIORITY[aTier] ?? 99;
@@ -446,6 +501,10 @@ Use the x_search tool to pull the POC's recent timeline. Return strict JSON per 
       pocs_scanned: pocsScanned,
       pocs_failed: pocsFailed,
       pocs_skipped_due_to_cap: skippedDueToCap,
+      // [Cooldown enforcement, May 2026] Prospects dropped by the
+      // 24h server cooldown. Empty when none — callers can show a
+      // toast like "5 scanned · 2 skipped (recent dive)" if non-zero.
+      cooldown_skipped: cooldownSkipped,
       targets_available: allTargets.length,
       signals_added: signalsAdded,
       per_poc: perPocResults,
