@@ -48,6 +48,7 @@ import {
   Award,
 } from 'lucide-react';
 import 'react-quill/dist/quill.snow.css';
+import TopPostEmbed from '@/components/portal/TopPostEmbed';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -2140,24 +2141,17 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 </p>
               )}
 
-              {/* Snippet / link preview — full-bleed clickable card */}
-              <a
-                href={topPost.contentLink}
-                target="_blank"
-                rel="noreferrer"
-                className="block bg-gray-50 border border-gray-200 rounded-lg p-4 my-5 hover:bg-gray-100 hover:border-gray-300 transition-all"
-              >
-                {topPost.notes ? (
-                  <p className="text-sm text-gray-700 italic leading-relaxed">
-                    "{topPost.notes.length > 120 ? topPost.notes.slice(0, 120).trim() + '…' : topPost.notes}"
-                  </p>
-                ) : (
-                  <p className="text-sm text-gray-500 truncate flex items-center gap-2">
-                    <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="truncate">{topPost.contentLink}</span>
-                  </p>
-                )}
-              </a>
+              {/* [2026-05-27] Replaced the static link / notes-quote card
+                  with the embedded post itself via TopPostEmbed —
+                  renders the real X/Twitter or Telegram post inline
+                  using each platform's official widget. Falls back
+                  gracefully to a clickable link card if the URL is
+                  unparseable, the platform isn't supported, or the
+                  embed script fails to load within 6s. Notes (if any)
+                  surface in the fallback card as secondary commentary
+                  rather than replacing the post link. Per audit:
+                  100% of valid content_link rows are X or Telegram. */}
+              <TopPostEmbed url={topPost.contentLink} notes={topPost.notes} />
 
               {/* 3 stats horizontal — spec is explicit about Views/Likes/Replies labels */}
               <div className="grid grid-cols-3 gap-6">
