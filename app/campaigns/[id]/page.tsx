@@ -428,7 +428,12 @@ const CampaignDetailsPage = () => {
 
   // Budget tab: column sort state. Click a sortable header to cycle
   // through: none → asc → desc → none.
-  type PaymentSortField = 'kol' | 'amount' | 'date' | null;
+  // [2026-05-28] Extended from 3 columns (kol/amount/date) to all 7
+  // data columns to match the click-to-sort behaviour on the KOLs
+  // tab. Wallet/Method/Notes are string compares; Content sorts by
+  // linked-content count so "has content" rises with desc, "no
+  // content" with asc — matches the existing has_content filter.
+  type PaymentSortField = 'kol' | 'wallet' | 'amount' | 'date' | 'method' | 'content' | 'notes' | null;
   const [paymentSort, setPaymentSort] = useState<{
     field: PaymentSortField;
     direction: 'asc' | 'desc';
@@ -533,6 +538,42 @@ const CampaignDetailsPage = () => {
           if (!a.payment_date) return 1;
           if (!b.payment_date) return -1;
           return (new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()) * dir;
+        case 'wallet':
+          // String compare; empty/null wallets sort to the end
+          av = (a.wallet || '').trim();
+          bv = (b.wallet || '').trim();
+          if (!av && !bv) return 0;
+          if (!av) return 1;
+          if (!bv) return -1;
+          return av.localeCompare(bv) * dir;
+        case 'method':
+          // String compare; null methods sort to the end
+          av = (a.payment_method || '').trim();
+          bv = (b.payment_method || '').trim();
+          if (!av && !bv) return 0;
+          if (!av) return 1;
+          if (!bv) return -1;
+          return av.localeCompare(bv) * dir;
+        case 'content': {
+          // Sort by linked-content count (desc shows "most linked"
+          // first, asc shows unlinked first). Matches the existing
+          // has_content filter's mental model.
+          const aCount = Array.isArray(a.content_id)
+            ? a.content_id.length
+            : (a.content_id ? 1 : 0);
+          const bCount = Array.isArray(b.content_id)
+            ? b.content_id.length
+            : (b.content_id ? 1 : 0);
+          return (aCount - bCount) * dir;
+        }
+        case 'notes':
+          // String compare; empty/null notes sort to the end
+          av = (a.notes || '').trim();
+          bv = (b.notes || '').trim();
+          if (!av && !bv) return 0;
+          if (!av) return 1;
+          if (!bv) return -1;
+          return av.localeCompare(bv) * dir;
       }
       return 0;
     });
@@ -9614,7 +9655,21 @@ const CampaignDetailsPage = () => {
                                 </div>
                               </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                                <span>Wallet</span>
+                                <button
+                                  type="button"
+                                  onClick={() => togglePaymentSort('wallet')}
+                                  className="flex items-center gap-1 group hover:text-gray-900"
+                                  title="Sort by wallet address"
+                                >
+                                  <span>Wallet</span>
+                                  {paymentSort.field === 'wallet' ? (
+                                    paymentSort.direction === 'asc'
+                                      ? <ArrowUp className="h-3 w-3" />
+                                      : <ArrowDown className="h-3 w-3" />
+                                  ) : (
+                                    <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />
+                                  )}
+                                </button>
                               </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
                                 <div className="flex items-center gap-1 group">
@@ -9702,8 +9757,22 @@ const CampaignDetailsPage = () => {
                                 </button>
                               </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                                <div className="flex items-center gap-1 cursor-pointer group">
-                                  <span>Method</span>
+                                <div className="flex items-center gap-1 group">
+                                  <button
+                                    type="button"
+                                    onClick={() => togglePaymentSort('method')}
+                                    className="flex items-center gap-1 hover:text-gray-900"
+                                    title="Sort by payment method"
+                                  >
+                                    <span>Method</span>
+                                    {paymentSort.field === 'method' ? (
+                                      paymentSort.direction === 'asc'
+                                        ? <ArrowUp className="h-3 w-3" />
+                                        : <ArrowDown className="h-3 w-3" />
+                                    ) : (
+                                      <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />
+                                    )}
+                                  </button>
                                   <Popover>
                                     <PopoverTrigger asChild>
                                       <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -9749,8 +9818,22 @@ const CampaignDetailsPage = () => {
                                 </div>
                               </TableHead>
                               <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
-                                <div className="flex items-center gap-1 cursor-pointer group">
-                                  <span>Content</span>
+                                <div className="flex items-center gap-1 group">
+                                  <button
+                                    type="button"
+                                    onClick={() => togglePaymentSort('content')}
+                                    className="flex items-center gap-1 hover:text-gray-900"
+                                    title="Sort by linked content count"
+                                  >
+                                    <span>Content</span>
+                                    {paymentSort.field === 'content' ? (
+                                      paymentSort.direction === 'asc'
+                                        ? <ArrowUp className="h-3 w-3" />
+                                        : <ArrowDown className="h-3 w-3" />
+                                    ) : (
+                                      <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />
+                                    )}
+                                  </button>
                                   <Popover>
                                     <PopoverTrigger asChild>
                                       <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -9804,7 +9887,23 @@ const CampaignDetailsPage = () => {
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Notes</TableHead>
+                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                                <button
+                                  type="button"
+                                  onClick={() => togglePaymentSort('notes')}
+                                  className="flex items-center gap-1 group hover:text-gray-900"
+                                  title="Sort by notes"
+                                >
+                                  <span>Notes</span>
+                                  {paymentSort.field === 'notes' ? (
+                                    paymentSort.direction === 'asc'
+                                      ? <ArrowUp className="h-3 w-3" />
+                                      : <ArrowDown className="h-3 w-3" />
+                                  ) : (
+                                    <ArrowUpDown className="h-3 w-3 opacity-30 group-hover:opacity-60" />
+                                  )}
+                                </button>
+                              </TableHead>
                               <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
