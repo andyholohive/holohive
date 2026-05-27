@@ -18,10 +18,24 @@ export const maxDuration = 300;
  *   HTML with view counts + reaction totals visible to anyone. We fetch
  *   that HTML, parse the counts, and UPDATE the contents row.
  *
- * Scope (audit 2026-05-27): 171 of 274 contents rows are Telegram URLs.
- * After filtering by status='posted' and a valid content_link, we expect
- * ~150 rows per run. At 200ms throttle between fetches, run time is
- * ~30s well within the 300s function limit.
+ * Scope (audit 2026-05-27):
+ *   - 274 total contents rows · 171 are Telegram URLs
+ *   - After status='posted' filter: 171
+ *   - After active-client filter (archived_at IS NULL AND is_active): 84
+ *   - After ≥48h age filter: 83
+ *
+ * Two narrowing filters (added per Andy 2026-05-27):
+ *   1. ACTIVE CLIENT ONLY — skip contents whose campaign belongs to an
+ *      archived or inactive client. No point paying to refresh metrics
+ *      for clients we're not actively servicing. Drops ~half the rows
+ *      (17 of 28 clients are archived, 5 more inactive).
+ *   2. ≥48h OLD ONLY — skip contents created in the last 48h. Telegram
+ *      view counts ramp over the first day or two; refreshing too early
+ *      gives a noisy, low-confidence number. Once a post is ~2 days
+ *      old, the count is meaningful and worth tracking.
+ *
+ * Net: ~83 rows per run at ~200ms throttle = ~17s. Well within
+ * maxDuration=300s.
  *
  * Monotonic guard:
  *   We only UPDATE if the newly-fetched value is HIGHER than the stored
@@ -172,15 +186,55 @@ export async function GET(request: Request) {
   };
 
   try {
+    // ─── Pre-filter: active client campaigns ───────────────────────
+    // Done as a separate query because Supabase JS chained-filter
+    // syntax for nested embedded filters (campaigns!inner →
+    // clients!inner) is unreliable across versions. Two queries is
+    // simpler + the campaign list is small (~30 rows).
+    const { data: activeCampaignRows, error: campErr } = await (supabase as any)
+      .from('campaigns')
+      .select('id, clients!inner(id, is_active, archived_at)')
+      .is('archived_at', null)
+      .eq('clients.is_active', true)
+      .is('clients.archived_at', null);
+
+    if (campErr) {
+      await finishRun('failed', { error: campErr.message }, campErr.message);
+      return NextResponse.json({ error: campErr.message }, { status: 500 });
+    }
+    const activeCampaignIds = (activeCampaignRows || []).map((c: any) => c.id);
+
+    if (activeCampaignIds.length === 0) {
+      // No active clients = nothing to refresh. Not an error.
+      await finishRun('completed', {
+        rows_considered: 0,
+        updated: 0, unchanged: 0, skipped: 0, failed: 0,
+        message: 'No active client campaigns — nothing to refresh.',
+      });
+      return NextResponse.json({
+        success: true,
+        rows_considered: 0,
+        message: 'No active client campaigns.',
+      });
+    }
+
     // ─── Load target rows ──────────────────────────────────────────
-    // Filter aggressively at query time so we don't iterate non-Telegram
-    // rows in JS. `ilike` on content_link is reliable; `platform` column
-    // is unreliable (3 mismatches in the audit) so we don't rely on it.
+    // Filter chain:
+    //   - status = 'posted'                  → exclude pending/scheduled
+    //   - content_link ILIKE '%t.me/%'       → Telegram URLs only
+    //   - campaign_id IN (active campaigns)  → active clients only
+    //   - created_at <= now - 48h            → give post time to ramp
+    //
+    // We don't trust the platform column (audit: 3 of 274 rows
+    // mismatch the URL). URL parse is the source of truth.
+    const cutoff48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     const { data: rows, error: loadErr } = await (supabase as any)
       .from('contents')
       .select('id, content_link, impressions, likes')
       .eq('status', 'posted')
-      .ilike('content_link', '%t.me/%');
+      .ilike('content_link', '%t.me/%')
+      .in('campaign_id', activeCampaignIds)
+      .lte('created_at', cutoff48h);
 
     if (loadErr) {
       await finishRun('failed', { error: loadErr.message }, loadErr.message);
@@ -246,6 +300,8 @@ export async function GET(request: Request) {
       skipped,
       failed,
       first_failures: firstFailures,
+      active_client_campaigns: activeCampaignIds.length,
+      cutoff_48h: cutoff48h,
     };
 
     // Treat as failed if MORE than half the fetches failed — likely a
