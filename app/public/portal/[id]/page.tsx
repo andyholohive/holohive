@@ -683,6 +683,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           share_report_publicly,
           campaign_kols(id, hidden),
           contents(
+            campaign_kols_id,
             impressions,
             likes,
             comments,
@@ -698,24 +699,42 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
       if (campaignsError) throw campaignsError;
 
       const processedCampaigns = campaignsData?.map(campaign => {
-        const contents = (campaign as any).contents || [];
-        const totalImpressions = contents.reduce((sum: number, c: any) => sum + (c.impressions || 0), 0);
-        const totalEngagement = contents.reduce((sum: number, c: any) =>
-          sum + (c.likes || 0) + (c.comments || 0) + (c.retweets || 0) + (c.bookmarks || 0), 0);
-
-        // [2026-05-27] Count only NON-HIDDEN campaign_kols. Previously
-        // used `campaign_kols(count)` which counted every row including
-        // hidden ones, so the tracker would show "12 KOLs" while the
-        // KOL list below (which filters hidden=null|false at line ~1121)
-        // would only render 10. Matching the list's visibility logic
-        // keeps the headline number honest.
+        // [2026-05-27] Visibility-aware aggregation.
+        //
+        // 1) Build the set of NON-HIDDEN campaign_kol IDs for this
+        //    campaign (matches the visibility logic in the KOL list
+        //    at ~line 1121 which filters hidden=null|false).
+        // 2) Filter contents to those either (a) not tied to any
+        //    KOL (campaign-level content), or (b) tied to a visible
+        //    KOL. Hidden-KOL content is excluded from kol_count,
+        //    content_count, total_impressions, and total_engagement
+        //    so the tracker headline numbers match what the client
+        //    sees rendered below.
         const allKols = (campaign as any).campaign_kols || [];
-        const visibleKolCount = allKols.filter((k: any) => !k.hidden).length;
+        const visibleKolIds = new Set(
+          allKols.filter((k: any) => !k.hidden).map((k: any) => k.id),
+        );
+        const visibleKolCount = visibleKolIds.size;
+
+        const allContents = (campaign as any).contents || [];
+        const visibleContents = allContents.filter((c: any) =>
+          !c.campaign_kols_id || visibleKolIds.has(c.campaign_kols_id),
+        );
+
+        const totalImpressions = visibleContents.reduce(
+          (sum: number, c: any) => sum + (c.impressions || 0),
+          0,
+        );
+        const totalEngagement = visibleContents.reduce(
+          (sum: number, c: any) =>
+            sum + (c.likes || 0) + (c.comments || 0) + (c.retweets || 0) + (c.bookmarks || 0),
+          0,
+        );
 
         return {
           ...campaign,
           kol_count: visibleKolCount,
-          content_count: contents.length,
+          content_count: visibleContents.length,
           total_impressions: totalImpressions,
           total_engagement: totalEngagement,
         };
@@ -2883,8 +2902,8 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             <Globe className="h-5 w-5 text-purple-600" />
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">GTM Plan</p>
-                            <p className="text-xs text-gray-500">Open tracker</p>
+                            <p className="text-sm font-semibold text-gray-900 group-hover:text-brand">GTM Overview</p>
+                            <p className="text-xs text-gray-500">View plan</p>
                           </div>
                           <ExternalLink className="h-4 w-4 text-gray-400 ml-auto group-hover:text-brand" />
                         </a>
