@@ -681,7 +681,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
           region,
           description,
           share_report_publicly,
-          campaign_kols(count),
+          campaign_kols(id, hidden),
           contents(
             impressions,
             likes,
@@ -703,9 +703,18 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
         const totalEngagement = contents.reduce((sum: number, c: any) =>
           sum + (c.likes || 0) + (c.comments || 0) + (c.retweets || 0) + (c.bookmarks || 0), 0);
 
+        // [2026-05-27] Count only NON-HIDDEN campaign_kols. Previously
+        // used `campaign_kols(count)` which counted every row including
+        // hidden ones, so the tracker would show "12 KOLs" while the
+        // KOL list below (which filters hidden=null|false at line ~1121)
+        // would only render 10. Matching the list's visibility logic
+        // keeps the headline number honest.
+        const allKols = (campaign as any).campaign_kols || [];
+        const visibleKolCount = allKols.filter((k: any) => !k.hidden).length;
+
         return {
           ...campaign,
-          kol_count: (campaign as any).campaign_kols?.[0]?.count || 0,
+          kol_count: visibleKolCount,
           content_count: contents.length,
           total_impressions: totalImpressions,
           total_engagement: totalEngagement,
