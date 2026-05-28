@@ -89,6 +89,24 @@ export async function middleware(request: NextRequest) {
   // Mid-path dynamic public routes (handler enforces auth itself).
   if (isPublicMidPath(pathname)) return NextResponse.next();
 
+  // ── Internal CRON_SECRET bypass ──
+  // Cron handlers (under /api/cron/*) sometimes call other internal
+  // endpoints server-to-server (e.g. /api/cron/discovery-scheduled
+  // POSTs to /api/prospects/discovery/scan to reuse the manual-scan
+  // codepath). Those calls don't carry a Supabase session cookie, so
+  // without this bypass middleware would 401 them — silently breaking
+  // the cron. We accept `Authorization: Bearer ${CRON_SECRET}` from
+  // any /api/* path as a server-to-server auth signal. The receiving
+  // handler still does its own admin/role check; this only gets the
+  // request past middleware.
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const authHeader = request.headers.get('authorization') || '';
+    if (authHeader === `Bearer ${cronSecret}`) {
+      return NextResponse.next({ request });
+    }
+  }
+
   // ── Authenticated path ──
   // Wrap a Supabase server client around the request cookies so we can
   // resolve the current user without making the route handlers do it.

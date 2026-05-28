@@ -200,9 +200,20 @@ export async function GET(request: Request) {
   let scanResult: any = null;
   let status: 'completed' | 'failed' = 'completed';
   try {
+    // [2026-05-28] Pass CRON_SECRET as Bearer so the middleware lets
+    // this server-to-server POST through. Without it middleware 401s
+    // (no Supabase session cookie on a server fetch) and the cron
+    // silently fails — exactly what bit us on 2026-05-28 00:00 UTC.
+    // The scan endpoint still does its own admin auth on top.
+    const cronAuthHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (process.env.CRON_SECRET) {
+      cronAuthHeaders['Authorization'] = `Bearer ${process.env.CRON_SECRET}`;
+    }
     const res = await fetch(`${baseUrl}/api/prospects/discovery/scan`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: cronAuthHeaders,
       body: JSON.stringify(scanBody),
       // Vercel's overall function timeout still bounds this; we just don't
       // want fetch's default to be the bottleneck.
