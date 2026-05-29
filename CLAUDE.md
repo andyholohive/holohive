@@ -14,24 +14,69 @@ If you're tempted to write `className="bg-brand text-white"` or
 
 ## The standard page shell
 
+Copy-paste this as the starting point for any new admin page. It
+covers loading, empty, and loaded branches with the canonical
+primitives:
+
 ```tsx
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Skeleton } from '@/components/ui/skeleton';
+import { KpiCard } from '@/components/ui/kpi-card';
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
+import { Plus, Download, Handshake } from 'lucide-react';
 
 export default function MyPage() {
+  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<Item[]>([]);
+
+  // ... fetch ...
+
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={SomeIcon}
+        icon={Handshake}
         title="My Page"
-        subtitle="One-line description"
+        subtitle="One-line description of what the user does here"
         actions={(
           <>
-            <Button variant="outline" size="sm"><Download />Export</Button>
-            <Button variant="brand" size="sm"><Plus />New</Button>
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />Export
+            </Button>
+            <Button variant="brand" size="sm">
+              <Plus className="h-4 w-4 mr-2" />New
+            </Button>
           </>
         )}
       />
-      {/* … */}
+
+      {loading ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 rounded-xl" />
+            ))}
+          </div>
+          <Skeleton className="h-64 rounded-lg" />
+        </>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={Handshake}
+          title="No items yet"
+          description="Add your first item to get started."
+        >
+          <Button variant="brand">
+            <Plus className="h-4 w-4 mr-2" />Add First Item
+          </Button>
+        </EmptyState>
+      ) : (
+        // ... actual content ...
+        null
+      )}
     </div>
   );
 }
@@ -40,9 +85,62 @@ export default function MyPage() {
 **Never** wrap pages in `p-6 max-w-7xl mx-auto` — the layout already
 provides that. Use `space-y-6` as the outer.
 
+**Never** wrap pages in `min-h-[calc(100vh-64px)] bg-gray-50` +
+white-Card outer. The workspace section (`/tasks`, `/reminders`, etc.)
+used to do this; it was migrated out in the May 2026 audit. The
+sidebar layout already provides the gray background and full height.
+
 **Never** roll your own h1/h2 + flex header — use `PageHeader`. It
 locks h2 + text-2xl + font-bold + icon position + action-slot
 responsive wrap.
+
+### Loading branch — render `PageHeader` immediately
+
+The loading branch of a page should render the same `PageHeader` as
+the loaded branch so the title doesn't shift when data arrives.
+Only the data sections below get skeletoned:
+
+```tsx
+if (loading) {
+  return (
+    <div className="space-y-6">
+      <PageHeader icon={SomeIcon} title="..." subtitle="..." actions={skeletons} />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 rounded-xl" />
+        ))}
+      </div>
+      <Skeleton className="h-64 rounded-lg" />
+    </div>
+  );
+}
+```
+
+### Sub-route back-buttons
+
+When a page is a sub-route (e.g. `/clients/[id]/delivery-log`,
+`/dashboard/check-in`), put the back link **above** the PageHeader, not
+inside it. Use a text Link for lightweight back-affordances:
+
+```tsx
+<Link href="/dashboard" className="inline-flex items-center text-xs text-gray-500 hover:text-brand transition-colors w-fit">
+  <ArrowLeft className="h-3 w-3 mr-1" />
+  Back to Dashboard
+</Link>
+<PageHeader icon={...} title="..." subtitle="..." />
+```
+
+For prominent back-affordances (e.g. a profile sub-page where the
+back action is part of the task), use a ghost Button:
+
+```tsx
+<Button asChild variant="ghost" size="sm" className="-ml-2 h-8 w-fit">
+  <Link href="/clients">
+    <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
+    Back to Clients
+  </Link>
+</Button>
+```
 
 ---
 
@@ -55,9 +153,125 @@ responsive wrap.
 | Destructive ("Delete", "Archive") | `<Button variant="destructive">` |
 | Inline icon button | `<Button variant="ghost" size="sm" className="h-7 w-7 p-0">` |
 
-**Forbidden:**
+**Forbidden on Buttons:**
 - `className="bg-brand text-white hover:opacity-90"` — use `variant="brand"`. The variant uses `hover:bg-brand/90` which darkens cleanly; the opacity hack washes out.
-- `style={{ backgroundColor: '#3e8692' }}` — same. There are 264 of these to migrate; don't add more.
+- `style={{ backgroundColor: '#3e8692' }}` — same. The May 2026 audit converted 264 of these; don't add more.
+- `hover:opacity-90` on ANY `variant="brand"` Button — the variant handles hover internally. This was the most common audit violation.
+
+**Allowed on non-Button decorative elements** (AvatarFallback, count
+pills inside Tabs, tab-count badges in dropdowns):
+- `bg-brand text-white` for solid brand-tinted decoration — these
+  aren't buttons, so `variant="brand"` doesn't apply.
+
+For tab-count badges specifically, prefer the lighter chip:
+`bg-brand-light text-brand` (matches `/clients`, `/kols`, `/lists`).
+
+### Inline icon buttons (× chip remove, micro affordances)
+
+Two patterns, depending on context:
+
+**Action-affordance icon button** (toolbar X, row delete, etc.):
+```tsx
+<Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+  <X className="h-4 w-4" />
+</Button>
+```
+
+**Column-header filter chevron** (h-3 w-3 inside a TableHead,
+shows on hover via `group-hover`): a bare `<button>` is fine.
+PopoverTrigger's `asChild` works on either, and converting these
+micro-affordances to a ghost Button changes their pixel size + adds
+an unwanted hover background on the column header. Leave them as
+`<button>` with an explicit `type="button"`.
+
+---
+
+## Status badges — use `<StatusBadge>`, not inline pills
+
+Every status pill in the app draws from one centralized 9-tone palette
+via `<StatusBadge>`. **Never** roll a `<Badge className="bg-X-100 text-X-800">`
+or `<span className="inline-flex … rounded-full bg-X-100 text-X-800">`
+inline — those were converted en masse in the May 2026 audit.
+
+```tsx
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
+
+<StatusBadge tone="success">Complete</StatusBadge>
+<StatusBadge tone="warning" size="sm">Pending</StatusBadge>
+```
+
+**Tone palette:**
+
+| Tone | Meaning | Use for |
+|---|---|---|
+| `'neutral'` | gray | Default / unspecified / "draft" |
+| `'brand'` | teal | The featured / operationally-important status (Active, Linked) |
+| `'success'` | emerald | Complete, paid, delivered, healthy |
+| `'warning'` | amber | Paused, needs attention, awaiting reply |
+| `'danger'` | rose | Failed, overdue, blocked |
+| `'info'` | sky | In-progress, informational, "Curated" |
+| `'purple'` | purple | Ready-for-feedback, special-category |
+| `'pink'` | pink | Promotional / marketing |
+| `'slate'` | slate | Admin / ops |
+
+For free-text status strings, map through a `BadgeTone` lookup:
+
+```tsx
+const STATUS_TONES: Record<string, BadgeTone> = {
+  active: 'brand',
+  completed: 'success',
+  paused: 'warning',
+  failed: 'danger',
+};
+<StatusBadge tone={STATUS_TONES[status] ?? 'neutral'}>{status}</StatusBadge>
+```
+
+For SelectTrigger className needs (where you want the tone color but
+can't render a full component), use `toneClassName(tone)` which returns
+just the bg+text class pair.
+
+**Adding a new tone:** add it to `components/ui/status-badge.tsx`'s
+`TONE_CLASSES` map, not inline. The whole point of the palette is
+that changing teal in one place updates every page.
+
+**Known exception:** `/kols` has 10+ category color systems (Tier S/1/2/3/4,
+Niche, Pricing, etc.) that use yellow/orange/indigo/teal/cyan/violet/lime
+— colors outside the 9-tone palette. Those local `colorMap` helpers
+are documented as an exception (tracked follow-up). Don't replicate
+that pattern elsewhere.
+
+---
+
+## Tables — use `<Table>` primitives, not raw `<table>`
+
+```tsx
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
+<Table>
+  <TableHeader>
+    <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
+      <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">When</TableHead>
+      <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Status</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    {rows.map(r => (
+      <TableRow key={r.id} className="border-gray-100">
+        <TableCell className="py-3">{r.when}</TableCell>
+        <TableCell className="py-3"><StatusBadge tone={...}>{r.status}</StatusBadge></TableCell>
+      </TableRow>
+    ))}
+  </TableBody>
+</Table>
+```
+
+**Standard column-header classes:** `h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500`. Don't drift.
+
+**Standard row body padding:** `py-3` on TableCell. The default `p-4`
+makes rows too tall for data-dense admin tables.
+
+**Forbidden:** raw `<table><thead><tr>…</tr></thead><tbody>…</tbody></table>`.
+The May 2026 audit converted 3 inline tables; don't add new ones.
 
 ---
 
@@ -210,6 +424,85 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 **Never** write inline `<div className="p-10 text-center text-sm text-gray-400">No items</div>` or `"Loading…"` text — both have wrappers that look better and match other pages.
 
+### Skeleton conventions
+
+- **`rounded-xl` for KpiCard skeletons** (matches the actual KpiCard's
+  `rounded-xl`):
+  ```tsx
+  <Skeleton className="h-24 rounded-xl" />
+  ```
+- **`rounded-lg` for Card-shaped content blocks** (charts, tables,
+  list cards):
+  ```tsx
+  <Skeleton className="h-64 rounded-lg" />
+  ```
+- **Default `rounded-md` (no override) for small inline things**
+  (row cells, chip placeholders).
+- **Match the actual content's responsive grid** — if the loaded
+  content is `grid-cols-1 md:grid-cols-4`, the skeleton grid should
+  be the same, not `grid-cols-3`. Otherwise the layout shifts when
+  data loads.
+- **Iterate with `Array.from({ length: N }).map((_, i) => …)`**, not
+  `[1, 2, 3, 4].map(i => …)`. The audit standardized on the former.
+
+---
+
+## Destructive intent — use `rose-*`, not `red-*`
+
+For destructive text, borders, and backgrounds, use the `rose-*` color
+family, not `red-*`. The May 2026 audit converted ~250 instances; the
+`StatusBadge` `'danger'` tone is rose, and the workspace section is
+rose throughout. Mixing the two looks subtly off — `red-500` and
+`rose-500` are visibly different.
+
+```tsx
+<p className="text-rose-600">…</p>             // ✅
+<Button variant="outline" className="border-rose-300 text-rose-600 hover:bg-rose-50">
+  Remove
+</Button>
+```
+
+For "I really mean it, this is a destructive primary action" (Confirm
+Remove inside a confirmation flow), use `variant="destructive"`:
+```tsx
+<Button variant="destructive">Confirm Remove</Button>
+```
+
+**Forbidden:** `text-red-*`, `border-red-*`, `bg-red-*`. The repo
+audit forbids them.
+
+---
+
+## Initials avatars — local helper, don't shadow shared
+
+When you need a circular avatar with initials (team member cards,
+chat sender bubbles), define a local `InitialsAvatar` helper — NOT
+a `function Avatar()`. The shared `@/components/ui/avatar` exports
+the Radix-based `Avatar` primitive; shadowing it confuses imports
+and future grep-replace.
+
+```tsx
+function InitialsAvatar({ name, src }: { name: string; src?: string | null }) {
+  const initials = (name || '?').split(' ').map(w => w.charAt(0).toUpperCase()).join('').slice(0, 2);
+  if (src) {
+    return (
+      <div className="w-10 h-10 rounded-full overflow-hidden">
+        <img src={src} alt={`${name} avatar`} className="w-full h-full object-cover" />
+      </div>
+    );
+  }
+  return (
+    <div className="w-10 h-10 bg-brand text-white rounded-full flex items-center justify-center font-bold">
+      {initials}
+    </div>
+  );
+}
+```
+
+Promote to `@/components/ui/initials-avatar` once a second page needs
+the same shape. `/dashboard` and `/team` both have local copies right
+now — fair candidate for promotion.
+
 ---
 
 ## Filter bars
@@ -333,12 +626,15 @@ and `.is('deleted_at', null)` in Supabase JS.
 
 ## File sizes — don't make giant page files
 
-There are 3 monstrous files in this codebase:
-- `app/crm/sales-pipeline/page.tsx` (8,700 lines)
-- `app/campaigns/[id]/page.tsx` (11,000+ lines)
-- `app/public/portal/[id]/page.tsx` (2,800 lines)
-
-These are bug magnets — every change has unbounded blast radius.
+These are the bug magnets in this codebase:
+- `app/campaigns/[id]/page.tsx` (~11,000 lines) — the biggest. Cosmetic-
+  only conformance applied in the May 2026 audit; structural refactor
+  is a tracked follow-up.
+- `app/crm/sales-pipeline/page.tsx` (~9,000 lines)
+- `app/public/portal/[id]/page.tsx` (~2,800 lines)
+- `app/crm/network/page.tsx` (~3,400 lines)
+- `app/forms/[id]/page.tsx` (~3,200 lines)
+- `app/crm/telegram/page.tsx` (~3,000 lines)
 
 When adding new pages, **target <1,500 lines**. Extract:
 - Component-level pieces (dialogs, slide-overs, table cells) into separate functions in the same file
@@ -363,7 +659,22 @@ Project memory lives at:
 
 ## Recently shipped (for the next session — replace as we ship)
 
-- `2026-05-29` — Expense tracking (super-admin only, recurrence cron, attachments). New `lib/requireSuperAdmin.ts` guard, new `KpiCard` + `DateField` patterns documented above.
+- `2026-05-30` — Repo-wide UI consistency audit. 54 pages aligned to
+  the standards in this doc. Specifically:
+  - Every `hover:opacity-90` stripped (was 50+ occurrences); every
+    `text-red-*` → `text-rose-*` (250+).
+  - Two divergent `KpiCard` implementations (`accent` vs `tone` props)
+    reconciled to the shared `@/components/ui/kpi-card`.
+  - ~50 inline status pills (`<Badge className="bg-X-100 text-X-800">`)
+    converted to `<StatusBadge tone={...}>`.
+  - Workspace card-shell pattern (`min-h-[calc(100vh-64px)] bg-gray-50`
+    + white-Card outer) migrated to standard `space-y-6 + PageHeader`
+    across all 10 workspace pages + `/delivery-logs`.
+  - `/crm/sales-pipeline` header fixed (sidebar said "Sales", page said
+    "Sales Pipeline"; subtitle described implementation philosophy
+    instead of user task).
+  - This CLAUDE.md updated with all newly-codified patterns.
+- `2026-05-29` — Expense tracking (super-admin only, recurrence cron, attachments). New `lib/requireSuperAdmin.ts` guard, `DateField` pattern documented above.
 - `2026-05-29` — Cron-health-check sweep (`/api/cron/cron-health-check`) — DMs Andy via TG on cron failures or runaway frequency.
 - `2026-05-28` — Discovery cron 401 bug fixed (middleware now accepts `Bearer CRON_SECRET` for server-to-server).
 - `2026-05-27` — Daily Telegram metrics cron, active-clients + 48h-old filter.
@@ -371,4 +682,24 @@ Project memory lives at:
 
 ---
 
-**TL;DR:** if you're about to write a `<div>` that lays out a page, a `<button>` that's brand-colored, or a `<Input type="date">` — stop and check if there's already a wrapper in `@/components/ui/*` or in this doc.
+**TL;DR for new pages:**
+
+If you're about to write any of these, **stop and use the primitive instead**:
+
+| Tempted to write | Use |
+|---|---|
+| `<div className="space-y-6"><h2>Title</h2><p>Sub</p>…</div>` | `<PageHeader title="…" subtitle="…" />` |
+| `className="bg-brand text-white hover:opacity-90"` on a Button | `variant="brand"` |
+| `<Badge className="bg-emerald-100 text-emerald-800">Active</Badge>` | `<StatusBadge tone="success">Active</StatusBadge>` |
+| `text-red-600`, `bg-red-50`, `border-red-300` | `text-rose-600`, `bg-rose-50`, `border-rose-300` |
+| `<Input type="date">` | Popover + Calendar (see DateField above) |
+| `<table><thead>…</thead><tbody>…</tbody></table>` | `<Table><TableHeader>…<TableBody>…` |
+| `<div className="p-10 text-center">No items</div>` | `<EmptyState icon={…} title="…" />` |
+| `[1, 2, 3, 4].map(i => <Skeleton />)` | `Array.from({ length: 4 }).map((_, i) => <Skeleton />)` |
+| Local `function KpiCard({ tone })` | Import the shared `@/components/ui/kpi-card` |
+| Local `function Avatar()` | `InitialsAvatar` (don't shadow `@/components/ui/avatar`) |
+| `<div className="min-h-[calc(100vh-64px)] bg-gray-50">…<div className="bg-white border…">` | Drop both wrappers, use `<div className="space-y-6">` directly |
+
+A new page that uses these primitives correctly will visually match
+the rest of the app on the first try. That's the goal — Andy
+shouldn't have to flag the same drift twice.
