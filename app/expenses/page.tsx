@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
@@ -730,7 +731,7 @@ function AddExpenseDialog({
 
         <div className="space-y-3 py-2">
           <div>
-            <Label className="text-xs">User *</Label>
+            <Label className="text-xs">User <RequiredAsterisk /></Label>
             <Select value={userId} onValueChange={setUserId}>
               <SelectTrigger className="h-9 focus-brand"><SelectValue placeholder="Select user…" /></SelectTrigger>
               <SelectContent>
@@ -741,7 +742,7 @@ function AddExpenseDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Amount (USD) *</Label>
+              <Label className="text-xs">Amount (USD) <RequiredAsterisk /></Label>
               <Input
                 type="number" step="0.01" min="0"
                 value={amount} onChange={e => setAmount(e.target.value)}
@@ -750,7 +751,7 @@ function AddExpenseDialog({
               />
             </div>
             <div>
-              <Label className="text-xs">Frequency *</Label>
+              <Label className="text-xs">Frequency <RequiredAsterisk /></Label>
               <Select value={frequency} onValueChange={(v) => setFrequency(v as Frequency)}>
                 <SelectTrigger className="h-9 focus-brand"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -763,7 +764,7 @@ function AddExpenseDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label className="text-xs">Type *</Label>
+              <Label className="text-xs">Type <RequiredAsterisk /></Label>
               <Select value={expenseType} onValueChange={(v) => setExpenseType(v as ExpenseType)}>
                 <SelectTrigger className="h-9 focus-brand"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -774,12 +775,12 @@ function AddExpenseDialog({
             </div>
             {frequency === 'one_time' ? (
               <div>
-                <Label className="text-xs">Date *</Label>
+                <Label className="text-xs">Date <RequiredAsterisk /></Label>
                 <DateField value={expenseDate} onChange={setExpenseDate} placeholder="Select date" />
               </div>
             ) : (
               <div>
-                <Label className="text-xs">Start date *</Label>
+                <Label className="text-xs">Start date <RequiredAsterisk /></Label>
                 <DateField value={recurrenceStart} onChange={setRecurrenceStart} placeholder="Select start date" />
               </div>
             )}
@@ -794,7 +795,7 @@ function AddExpenseDialog({
           )}
 
           <div>
-            <Label className="text-xs">Description *</Label>
+            <Label className="text-xs">Description <RequiredAsterisk /></Label>
             <Input
               value={description} onChange={e => setDescription(e.target.value)}
               placeholder="What was this for?"

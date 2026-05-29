@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -2342,7 +2343,7 @@ export default function NetworkPage() {
           <form onSubmit={(e) => { e.preventDefault(); handleCreatePartner(); }} className="flex flex-col min-h-0 flex-1">
             <div className="grid gap-4 py-4 overflow-y-auto flex-1 pr-2">
               <div className="grid gap-2">
-                <Label htmlFor="partner-name">Name *</Label>
+                <Label htmlFor="partner-name">Name <RequiredAsterisk /></Label>
                 <Input
                   id="partner-name"
                   value={partnerForm.name}
@@ -2653,7 +2654,7 @@ export default function NetworkPage() {
           <form onSubmit={(e) => { e.preventDefault(); handleCreateAffiliate(); }}>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="affiliate-name">Name *</Label>
+                <Label htmlFor="affiliate-name">Name <RequiredAsterisk /></Label>
                 <Input
                   id="affiliate-name"
                   value={affiliateForm.name}

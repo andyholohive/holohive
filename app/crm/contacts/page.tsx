@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -796,7 +797,7 @@ export default function ContactsPage() {
           <form onSubmit={(e) => { e.preventDefault(); handleCreateContact(); }}>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="contact-name">Name *</Label>
+                <Label htmlFor="contact-name">Name <RequiredAsterisk /></Label>
                 <Input
                   id="contact-name"
                   value={contactForm.name}

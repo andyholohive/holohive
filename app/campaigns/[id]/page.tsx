@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 // import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
+import { RequiredAsterisk } from "@/components/ui/required-asterisk";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -9096,7 +9097,7 @@ const CampaignDetailsPage = () => {
 
                                       <div className="grid grid-cols-2 gap-4">
                                         <div className="grid gap-2">
-                                          <Label>Amount (USD) *</Label>
+                                          <Label>Amount (USD) <RequiredAsterisk /></Label>
                                       <div className="relative w-full">
                                         <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
                                         <Input
@@ -9274,7 +9275,7 @@ const CampaignDetailsPage = () => {
                         /* Non-KOL Payment Form */
                         <div className="space-y-4">
                           <div className="grid gap-2">
-                            <Label>Recipient Name *</Label>
+                            <Label>Recipient Name <RequiredAsterisk /></Label>
                             <Input
                               placeholder="e.g., Venue Rental, Equipment, Agency Fee"
                               value={nonKOLPayment.recipient_name}
@@ -9285,7 +9286,7 @@ const CampaignDetailsPage = () => {
 
                           <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                              <Label>Amount (USD) *</Label>
+                              <Label>Amount (USD) <RequiredAsterisk /></Label>
                               <div className="relative w-full">
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
                                 <Input
@@ -11637,7 +11638,7 @@ const CampaignDetailsPage = () => {
           <div className="grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="mk-name">Name *</Label>
+                <Label htmlFor="mk-name">Name <RequiredAsterisk /></Label>
                 <Input
                   id="mk-name"
                   value={masterKolForm.name || ''}

@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -1459,7 +1460,7 @@ export default function MindsharePage() {
               <div className="space-y-3 py-2">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2 space-y-1.5">
-                    <Label>Name *</Label>
+                    <Label>Name <RequiredAsterisk /></Label>
                     <Input value={projectForm.name || ''} onChange={(e) => setProjectForm(f => ({ ...f, name: e.target.value }))} className="focus-brand" />
                   </div>
                   <div className="space-y-1.5">

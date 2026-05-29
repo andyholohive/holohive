@@ -61,6 +61,30 @@ responsive wrap.
 
 ---
 
+## Required-field labels
+
+When a field is required, the asterisk goes in a **red** wrapper, not
+plain text inside the label. There's a tiny shared component for it:
+
+```tsx
+import { Label } from '@/components/ui/label';
+import { RequiredAsterisk } from '@/components/ui/required-asterisk';
+
+<Label>Name <RequiredAsterisk /></Label>
+<Label htmlFor="email">Your Email <RequiredAsterisk /></Label>
+```
+
+**Forbidden:** writing `<Label>Name *</Label>` — the asterisk
+inherits the label's gray/black color which fails the "required
+marker should be visually distinct" UX convention. Andy will flag it.
+
+For placeholder asterisks (e.g. `placeholder="Type *"`), there's no
+clean way to color part of a placeholder. Either convert to a proper
+Label + Input pair, or drop the asterisk from the placeholder and add
+a `<RequiredAsterisk />` sibling next to the field.
+
+---
+
 ## Inputs / Selects / Textareas
 
 **Always add `focus-brand`** (the project's brand-teal focus ring utility):

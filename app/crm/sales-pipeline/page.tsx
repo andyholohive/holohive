@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -5107,7 +5108,7 @@ export default function SalesPipelinePage() {
             <form onSubmit={e => { e.preventDefault(); handleUpdate(); }} className="p-6">
               <div className="grid gap-4">
                 <div className="grid gap-2">
-                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Name *</Label>
+                  <Label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Name <RequiredAsterisk /></Label>
                   <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Company or contact name" className="focus-brand" />
                 </div>
                 {/* Path (dm_account) field removed 2026-05-13 — kept the
@@ -6423,7 +6424,7 @@ export default function SalesPipelinePage() {
             <div className="grid gap-4 py-4">
               {/* Basic Info */}
               <div className="grid gap-2">
-                <Label>Name *</Label>
+                <Label>Name <RequiredAsterisk /></Label>
                 <Input
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}

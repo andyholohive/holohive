@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -2540,7 +2541,7 @@ export default function PipelinePage() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="opp-name">Name *</Label>
+                <Label htmlFor="opp-name">Name <RequiredAsterisk /></Label>
                 <Input
                   id="opp-name"
                   value={opportunityForm.name}

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -392,7 +393,7 @@ export default function PartnersPage() {
             <form onSubmit={handleCreatePartner}>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="name">Partner Name *</Label>
+                  <Label htmlFor="name">Partner Name <RequiredAsterisk /></Label>
                   <Input 
                     id="name" 
                     value={newPartner.name} 

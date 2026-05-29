@@ -7,6 +7,7 @@ import { BookingService, BookingPage, TimeSlot } from '@/lib/bookingService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CheckCircle2, Loader, ChevronLeft, ChevronRight, Clock, Calendar, User, Mail, MessageSquare, Globe } from 'lucide-react';
@@ -544,7 +545,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Your Name *</Label>
+                  <Label htmlFor="name">Your Name <RequiredAsterisk /></Label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
@@ -559,7 +560,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Your Email *</Label>
+                  <Label htmlFor="email">Your Email <RequiredAsterisk /></Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
