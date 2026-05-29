@@ -9,6 +9,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -337,17 +339,17 @@ export default function ContactsPage() {
   if (loading) {
     return (
       <div className="flex flex-col gap-6">
-        {/* Header — real title/subtitle render immediately. */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Contacts</h2>
-            <p className="text-gray-600">Manage your contact directory</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-10 w-64" />
-            <Skeleton className="h-10 w-32" />
-          </div>
-        </div>
+        <PageHeader
+          icon={UserPlus}
+          title="Contacts"
+          subtitle="Manage your contact directory"
+          actions={(
+            <>
+              <Skeleton className="h-10 w-64" />
+              <Skeleton className="h-10 w-32" />
+            </>
+          )}
+        />
         {/* Stats cards skeleton */}
         <div className="grid grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
@@ -376,28 +378,28 @@ export default function ContactsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Contacts</h2>
-          <p className="text-gray-600">Manage your contact directory</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search contacts..."
-              className="pl-10 w-64 focus-brand"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Button onClick={() => { setEditingContact(null); setContactForm({ name: '' }); resetLinkState(); setIsNewContactOpen(true); }} className="hover:opacity-90 bg-brand text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Contact
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        icon={UserPlus}
+        title="Contacts"
+        subtitle="Manage your contact directory"
+        actions={(
+          <>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search contacts..."
+                className="pl-10 w-64 focus-brand"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button variant="brand" onClick={() => { setEditingContact(null); setContactForm({ name: '' }); resetLinkState(); setIsNewContactOpen(true); }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Contact
+            </Button>
+          </>
+        )}
+      />
 
       {/* Stats Cards — flat KpiCard baseline (was gradient cards before
           2026-05-06; replaced for visual consistency with /analytics and
@@ -526,21 +528,18 @@ export default function ContactsPage() {
 
       {/* Contacts Display */}
       {filteredContacts.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-          <UserPlus className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-gray-600 font-medium">
-            {searchTerm ? 'No contacts found matching your search.' : 'No contacts yet'}
-          </p>
-          <p className="text-gray-400 text-sm mt-1">
-            {searchTerm ? 'Try adjusting your search or filters.' : 'Add your first contact to get started.'}
-          </p>
+        <EmptyState
+          icon={UserPlus}
+          title={searchTerm ? 'No contacts found matching your search.' : 'No contacts yet'}
+          description={searchTerm ? 'Try adjusting your search or filters.' : 'Add your first contact to get started.'}
+        >
           {!searchTerm && (
-            <Button className="mt-4 bg-brand text-white" onClick={() => { setEditingContact(null); setContactForm({ name: '' }); resetLinkState(); setIsNewContactOpen(true); }}>
+            <Button variant="brand" onClick={() => { setEditingContact(null); setContactForm({ name: '' }); resetLinkState(); setIsNewContactOpen(true); }}>
               <Plus className="h-4 w-4 mr-2" />
               Add Your First Contact
             </Button>
           )}
-        </div>
+        </EmptyState>
       ) : viewMode === 'table' ? (
         /* Table View */
         <div className="rounded-lg border bg-white overflow-x-auto">
@@ -641,7 +640,7 @@ export default function ContactsPage() {
                             Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            className="text-red-600"
+                            className="text-rose-600"
                             onClick={() => handleDeleteContact(contact)}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
@@ -693,7 +692,7 @@ export default function ContactsPage() {
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          className="text-red-600"
+                          className="text-rose-600"
                           onClick={() => handleDeleteContact(contact)}
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
@@ -1025,7 +1024,7 @@ export default function ContactsPage() {
               <Button type="button" variant="outline" onClick={() => setIsNewContactOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="brand" type="submit" disabled={isSubmitting || !contactForm.name.trim()} className="hover:opacity-90">
+              <Button variant="brand" type="submit" disabled={isSubmitting || !contactForm.name.trim()}>
                 {isSubmitting ? 'Saving...' : editingContact ? 'Save Changes' : 'Create Contact'}
               </Button>
             </DialogFooter>
