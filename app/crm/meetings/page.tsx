@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageHeader } from '@/components/ui/page-header';
 import { Calendar, Video, MoreHorizontal, XCircle, Copy, ExternalLink, List, CalendarDays, ChevronLeft, ChevronRight, ArrowLeft, CheckCircle2, UserX, User } from 'lucide-react';
 import { BookingService, Booking } from '@/lib/bookingService';
 import { UserService } from '@/lib/userService';
@@ -262,61 +263,53 @@ export default function MeetingsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        {/* Header — real title/subtitle render immediately. */}
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-brand" />
-            Meetings
-          </h2>
-          <p className="text-gray-600 mt-1">View and manage your booked meetings.</p>
-        </div>
+        <PageHeader
+          icon={Calendar}
+          title="Meetings"
+          subtitle="View and manage your booked meetings."
+        />
         <div className="flex gap-2">
-          <Skeleton className="h-9 w-28" />
-          <Skeleton className="h-9 w-28" />
-          <Skeleton className="h-9 w-28" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-28" />
+          ))}
         </div>
-        <Skeleton className="h-96 w-full" />
+        <Skeleton className="h-96 w-full rounded-lg" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-brand" />
-            Meetings
-          </h2>
-          <p className="text-gray-600 mt-1">
-            {viewUserId === 'me'
-              ? 'View and manage your booked meetings.'
-              : `Viewing ${(users.find(u => u.id === viewUserId)?.name || 'teammate')}'s booked meetings.`}
-          </p>
-        </div>
-        {/* Admin-only viewer-as picker. Shown only when there's
-            something to switch to (more than just the current user). */}
-        {isAdmin && users.length > 1 && (
-          <Select value={viewUserId} onValueChange={setViewUserId}>
-            <SelectTrigger className="h-9 w-56 text-sm focus-brand">
-              <User className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="me">My meetings</SelectItem>
-              {users
-                .filter(u => u.id !== userProfile?.id)
-                .sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email))
-                .map(u => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.name || u.email}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+      <PageHeader
+        icon={Calendar}
+        title="Meetings"
+        subtitle={viewUserId === 'me'
+          ? 'View and manage your booked meetings.'
+          : `Viewing ${(users.find(u => u.id === viewUserId)?.name || 'teammate')}'s booked meetings.`}
+        actions={(
+          /* Admin-only viewer-as picker. Shown only when there's
+             something to switch to (more than just the current user). */
+          isAdmin && users.length > 1 ? (
+            <Select value={viewUserId} onValueChange={setViewUserId}>
+              <SelectTrigger className="h-9 w-56 text-sm focus-brand">
+                <User className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="me">My meetings</SelectItem>
+                {users
+                  .filter(u => u.id !== userProfile?.id)
+                  .sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email))
+                  .map(u => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name || u.email}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          ) : undefined
         )}
-      </div>
+      />
 
       {/* Tab Filters + View Toggle. Tabs use the shadcn <Tabs> component
           for consistency with /intelligence and /crm/sales-pipeline (was
@@ -342,21 +335,19 @@ export default function MeetingsPage() {
         </Tabs>
         <div className="flex gap-1 border rounded-md p-0.5">
           <Button
-            variant={viewMode === 'table' ? 'default' : 'ghost'}
+            variant={viewMode === 'table' ? 'brand' : 'ghost'}
             size="sm"
             className="h-7 w-7 p-0"
             onClick={() => { setViewMode('table'); setSelectedDate(null); }}
-            style={viewMode === 'table' ? { backgroundColor: '#3e8692', color: 'white' } : {}}
             title="Table view"
           >
             <List className="h-4 w-4" />
           </Button>
           <Button
-            variant={viewMode === 'calendar' ? 'default' : 'ghost'}
+            variant={viewMode === 'calendar' ? 'brand' : 'ghost'}
             size="sm"
             className="h-7 w-7 p-0"
             onClick={() => setViewMode('calendar')}
-            style={viewMode === 'calendar' ? { backgroundColor: '#3e8692', color: 'white' } : {}}
             title="Calendar view"
           >
             <CalendarDays className="h-4 w-4" />
@@ -457,7 +448,7 @@ export default function MeetingsPage() {
                             {booking.status === 'confirmed' && (
                               <DropdownMenuItem
                                 onClick={() => setCancelTarget(booking)}
-                                className="text-red-600 focus:text-red-600"
+                                className="text-rose-600 focus:text-rose-600"
                               >
                                 <XCircle className="h-4 w-4 mr-2" />
                                 Cancel Meeting
@@ -536,7 +527,7 @@ export default function MeetingsPage() {
                             className={`text-[10px] leading-tight truncate rounded px-1 py-0.5 ${
                               m.status === 'confirmed'
                                 ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-red-100 text-red-700'
+                                : 'bg-rose-100 text-rose-700'
                             }`}
                           >
                             {formatTime(m.start_time)} {m.booker_name.split(' ')[0]}
@@ -618,7 +609,7 @@ export default function MeetingsPage() {
                           {booking.status === 'confirmed' && (
                             <DropdownMenuItem
                               onClick={() => setCancelTarget(booking)}
-                              className="text-red-600 focus:text-red-600"
+                              className="text-rose-600 focus:text-rose-600"
                             >
                               <XCircle className="h-4 w-4 mr-2" />
                               Cancel Meeting
