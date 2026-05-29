@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/ui/page-header';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -175,28 +176,21 @@ export default function DeliverablesPage() {
   });
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-        <div className="pb-5 border-b border-gray-100 flex flex-row items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-gray-100 p-2 rounded-lg">
-              <Package className="h-6 w-6 text-gray-600" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Deliverables</h2>
-              <p className="text-sm text-gray-500">Structured workflows from templates</p>
-            </div>
-          </div>
-          <Button variant="brand" onClick={() => setWizardOpen(true)}
-          >
+    <div className="space-y-6">
+      <PageHeader
+        icon={Package}
+        title="Deliverables"
+        subtitle="Structured workflows from templates"
+        actions={(
+          <Button variant="brand" onClick={() => setWizardOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Deliverable
           </Button>
-        </div>
+        )}
+      />
 
-        {/* Filters */}
-        <div className="pt-4 flex flex-wrap gap-3">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="w-[140px] h-9 text-sm">
               <SelectValue placeholder="Status" />
@@ -233,7 +227,6 @@ export default function DeliverablesPage() {
             </SelectContent>
           </Select>
         </div>
-      </div>
 
       {/* Content — grouped by client */}
       {loading ? (

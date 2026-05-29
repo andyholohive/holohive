@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { TaskService, DashboardStats } from '@/lib/taskService';
@@ -68,23 +69,14 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-      <div className="w-full">
-        <div className="space-y-4">
-          {/* Header */}
-          <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-            <div className="flex items-center gap-3">
-              <div className="bg-gray-100 p-2 rounded-lg">
-                <ShieldCheck className="h-6 w-6 text-gray-600" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Admin Overview</h2>
-                <p className="text-sm text-gray-500">Team task overview and workload distribution</p>
-              </div>
-            </div>
-          </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={ShieldCheck}
+        title="Admin Overview"
+        subtitle="Team task overview and workload distribution"
+      />
 
-          {/* Overall Stats */}
+      {/* Overall Stats */}
           {overall && (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <StatCard label="Total Tasks" value={overall.total} color="text-gray-600" bg="bg-gray-50" />
@@ -156,8 +148,6 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           )}
-        </div>
-      </div>
     </div>
   );
 }

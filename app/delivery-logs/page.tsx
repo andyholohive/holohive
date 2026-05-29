@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
+import { PageHeader } from '@/components/ui/page-header';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
@@ -599,38 +600,28 @@ export default function DeliveryLogsPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
-      <div className="w-full">
-        <div className="space-y-4">
-          {/* Header */}
-          <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-            <div className="pb-5 border-b border-gray-100 flex flex-row items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="bg-gray-100 p-2 rounded-lg">
-                  <ClipboardList className="h-6 w-6 text-gray-600" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Delivery Logs</h2>
-                  <p className="text-sm text-gray-500">Track work delivered for each client</p>
-                </div>
-              </div>
-              {selectedClientId && (
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => { setIsAddingInline(true); }}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Inline
-                  </Button>
-                  <Button variant="brand" onClick={() => openForm()}>
-                    <Expand className="h-4 w-4 mr-2" />
-                    Add via Form
-                  </Button>
-                </div>
-              )}
-            </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={ClipboardList}
+        title="Delivery Logs"
+        subtitle="Track work delivered for each client"
+        actions={(selectedClientId ? (
+          <>
+            <Button variant="outline" size="sm" onClick={() => { setIsAddingInline(true); }}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add Inline
+            </Button>
+            <Button variant="brand" onClick={() => openForm()}>
+              <Expand className="h-4 w-4 mr-2" />
+              Add via Form
+            </Button>
+          </>
+        ) : undefined)}
+      />
 
-            {/* Active / Archived view toggle. Sits above the per-client
-                tabs so the client list reloads when you switch. */}
-            <div className="pt-4">
+      {/* Active / Archived view toggle. Sits above the per-client
+          tabs so the client list reloads when you switch. */}
+      <div>
               <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'active' | 'archived')}>
                 <TabsList className="bg-gray-100 p-1 h-auto">
                   <TabsTrigger
@@ -982,9 +973,6 @@ export default function DeliveryLogsPage() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      </div>
 
       {/* Add/Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) { setIsFormOpen(false); setEditingId(null); } }}>

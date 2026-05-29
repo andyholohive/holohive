@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PageHeader } from '@/components/ui/page-header';
 import { TaskService, Task, DashboardStats } from '@/lib/taskService';
 import { ClientService } from '@/lib/clientService';
 import {
@@ -68,12 +69,10 @@ export default function ClientTasksPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[calc(100vh-64px)] bg-gray-50 p-6">
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-64" />
-          <div className="grid grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-lg" />)}
-          </div>
+      <div className="space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <div className="grid grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
         </div>
       </div>
     );
@@ -83,28 +82,18 @@ export default function ClientTasksPage() {
   const completedTasks = tasks.filter(t => t.status === 'complete');
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-      <div className="w-full">
-        <div className="space-y-4">
-          {/* Header */}
-          <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-            <div className="flex items-center gap-3">
-              <Link href="/tasks/admin">
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-              </Link>
-              <div className="bg-gray-100 p-2 rounded-lg">
-                <Building2 className="h-6 w-6 text-gray-600" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">{clientName}</h2>
-                <p className="text-sm text-gray-500">Client task overview and deliverables</p>
-              </div>
-            </div>
-          </div>
+    <div className="space-y-6">
+      <Link href="/tasks/admin" className="inline-flex items-center text-xs text-gray-500 hover:text-brand transition-colors w-fit">
+        <ArrowLeft className="h-3 w-3 mr-1" />
+        Back to Admin Overview
+      </Link>
+      <PageHeader
+        icon={Building2}
+        title={clientName}
+        subtitle="Client task overview and deliverables"
+      />
 
-          {/* Stats */}
+      {/* Stats */}
           {stats && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard label="Total" value={stats.total} color="text-gray-600" bg="bg-gray-50" />
@@ -169,14 +158,12 @@ export default function ClientTasksPage() {
             </div>
           )}
 
-          {tasks.length === 0 && (
-            <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-12 text-center">
-              <Building2 className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">No tasks linked to this client yet.</p>
-            </div>
-          )}
+      {tasks.length === 0 && (
+        <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-12 text-center">
+          <Building2 className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500">No tasks linked to this client yet.</p>
         </div>
-      </div>
+      )}
     </div>
   );
 }

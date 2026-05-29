@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/ui/page-header';
 import { Textarea } from '@/components/ui/textarea';
 import { Bell, Plus, Pencil, Trash2, Clock, MessageSquare, Play, Loader2, CheckCircle, XCircle, AlertTriangle, Send, Eye } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -530,41 +531,38 @@ export default function RemindersPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
-        <div className="w-full">
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Reminders</h2>
-                <p className="text-gray-600">Automated Telegram reminders for your team</p>
-              </div>
-              <Button variant="brand" disabled>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Reminder
-              </Button>
-            </div>
-            <div className="grid gap-4">
-              {[1, 2, 3, 4].map((i) => (
-                <Card key={i} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-7 w-7 rounded-lg" />
-                      <Skeleton className="h-5 w-48" />
-                      <Skeleton className="h-5 w-16 rounded-full" />
-                    </div>
-                    <div className="flex gap-2 mt-2">
-                      <Skeleton className="h-5 w-24 rounded-full" />
-                      <Skeleton className="h-5 w-16 rounded-full" />
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <Skeleton className="h-4 w-72 mb-2" />
-                    <Skeleton className="h-3 w-56" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </div>
+      <div className="space-y-6">
+        <PageHeader
+          icon={Bell}
+          title="Reminders"
+          subtitle="Automated Telegram reminders for your team"
+          actions={(
+            <Button variant="brand" disabled>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Reminder
+            </Button>
+          )}
+        />
+        <div className="grid gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-7 w-7 rounded-lg" />
+                  <Skeleton className="h-5 w-48" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <Skeleton className="h-5 w-24 rounded-full" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <Skeleton className="h-4 w-72 mb-2" />
+                <Skeleton className="h-3 w-56" />
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     );
@@ -572,17 +570,17 @@ export default function RemindersPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Reminders</h2>
-          <p className="text-gray-600">Automated Telegram reminders for your team</p>
-        </div>
-        <Button variant="brand" onClick={openCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Reminder
-        </Button>
-      </div>
+      <PageHeader
+        icon={Bell}
+        title="Reminders"
+        subtitle="Automated Telegram reminders for your team"
+        actions={(
+          <Button variant="brand" onClick={openCreate}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Reminder
+          </Button>
+        )}
+      />
 
       {/* Unconfigured-rules banner — rules with PLACEHOLDER_CHAT_ID are
           silently skipped by the cron engine (lib/reminderService.ts:231),

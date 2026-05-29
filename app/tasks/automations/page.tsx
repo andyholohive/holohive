@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHeader } from '@/components/ui/page-header';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -165,32 +166,23 @@ export default function AutomationsPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-      <div className="w-full space-y-4">
-        {/* Header */}
-        <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link href="/tasks">
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-              </Link>
-              <div className="bg-amber-50 p-2 rounded-lg">
-                <Zap className="h-6 w-6 text-amber-600" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">Task Automations</h2>
-                <p className="text-sm text-gray-500">Manage automation rules and view execution history</p>
-              </div>
-            </div>
-            <Button variant="brand" onClick={() => setShowCreateDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" /> New Rule
-            </Button>
-          </div>
-        </div>
+    <div className="space-y-6">
+      <Link href="/tasks" className="inline-flex items-center text-xs text-gray-500 hover:text-brand transition-colors w-fit">
+        <ArrowLeft className="h-3 w-3 mr-1" />
+        Back to Tasks
+      </Link>
+      <PageHeader
+        icon={Zap}
+        title="Task Automations"
+        subtitle="Manage automation rules and view execution history"
+        actions={(
+          <Button variant="brand" onClick={() => setShowCreateDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" /> New Rule
+          </Button>
+        )}
+      />
 
-        {/* Automation Rules */}
+      {/* Automation Rules */}
         <div className="bg-white border border-gray-200 shadow-sm rounded-lg">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
             <Zap className="h-4 w-4 text-amber-600" />
@@ -278,7 +270,6 @@ export default function AutomationsPage() {
             </div>
           )}
         </div>
-      </div>
 
       {/* Create Rule Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>

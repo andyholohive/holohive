@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
@@ -267,26 +268,18 @@ export default function DeliverableTemplatesPage() {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-        <div className="flex flex-row items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-gray-100 p-2 rounded-lg">
-              <Settings className="h-6 w-6 text-gray-600" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Deliverable Templates</h2>
-              <p className="text-sm text-gray-500">Manage workflow templates and their steps</p>
-            </div>
-          </div>
-          <Button variant="brand" onClick={() => openEditTemplate()}
-          >
+    <div className="space-y-6">
+      <PageHeader
+        icon={Settings}
+        title="Deliverable Templates"
+        subtitle="Manage workflow templates and their steps"
+        actions={(
+          <Button variant="brand" onClick={() => openEditTemplate()}>
             <Plus className="h-4 w-4 mr-2" />
             New Template
           </Button>
-        </div>
-      </div>
+        )}
+      />
 
       {/* Templates list */}
       {loading ? (

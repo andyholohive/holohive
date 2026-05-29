@@ -555,48 +555,47 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
-      <div className="w-full">
-        <div className="space-y-4">
-          {/* Back button */}
-          <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              className="py-2 px-3 rounded-md text-gray-600 hover:text-brand transition-colors mb-1 text-sm"
-              onClick={() => router.push('/clients')}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />Back to Clients
-            </Button>
+    <div className="space-y-6">
+      <Button
+        variant="ghost"
+        className="py-2 px-3 rounded-md text-gray-600 hover:text-brand transition-colors text-sm w-fit"
+        onClick={() => router.push('/clients')}
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />Back to Clients
+      </Button>
+
+      {/* Header — custom block (not PageHeader) because the icon slot
+          shows the client logo when set, falling back to a Building2
+          square. PageHeader's icon prop only accepts a component, not
+          an img URL, so this stays inline. */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
+          {client?.logo_url ? (
+            <img src={client.logo_url} alt={client.name} className="h-10 w-10 object-contain rounded-lg flex-shrink-0" />
+          ) : (
+            <Building2 className="h-5 w-5 text-gray-700 flex-shrink-0" />
+          )}
+          <div className="min-w-0">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <span className="truncate">Delivery Log</span>
+            </h2>
+            <p className="text-sm text-gray-600 mt-0.5">{client?.name || 'Loading...'}</p>
           </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Button variant="outline" size="sm" onClick={() => { setIsAddingInline(true); }}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Inline
+          </Button>
+          <Button variant="brand" onClick={() => openForm()}>
+            <Expand className="h-4 w-4 mr-2" />
+            Add via Form
+          </Button>
+        </div>
+      </div>
 
-          {/* Header card */}
-          <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-            <div className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
-              <div className="flex items-center gap-3">
-                {client?.logo_url ? (
-                  <img src={client.logo_url} alt={client.name} className="h-10 w-10 object-contain rounded-lg" />
-                ) : (
-                  <div className="bg-gray-100 p-2 rounded-lg"><Building2 className="h-6 w-6 text-gray-600" /></div>
-                )}
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Delivery Log</h2>
-                  <p className="text-sm text-gray-500">{client?.name || 'Loading...'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => { setIsAddingInline(true); }}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Inline
-                </Button>
-                <Button variant="brand" onClick={() => openForm()}>
-                  <Expand className="h-4 w-4 mr-2" />
-                  Add via Form
-                </Button>
-              </div>
-            </div>
-
-            {/* Filters */}
-            <div className="flex flex-wrap items-center gap-3 pt-5">
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
               <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -900,9 +899,6 @@ export default function DeliveryLogPage({ params }: { params: { id: string } }) 
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      </div>
 
       {/* Add/Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) { setIsFormOpen(false); setEditingId(null); } }}>

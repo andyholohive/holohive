@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHeader } from '@/components/ui/page-header';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -231,41 +232,30 @@ export default function DailyStandupPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
-      <div className="w-full">
-        <div className="space-y-4">
-          {/* Header */}
-          <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-            <div className="pb-5 border-b border-gray-100 flex flex-row items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="bg-gray-100 p-2 rounded-lg">
-                  <CheckCircle className="h-6 w-6 text-gray-600" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Daily Stand-Up</h2>
-                  <p className="text-sm text-gray-500">Track daily priorities and progress across the team</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={() => window.open('/public/standup/submit', '_blank')}
-               
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Submission Form
-              </Button>
-              <Button variant="brand" onClick={() => openForm()}
-                disabled={hasSubmittedToday && !editingId}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                {hasSubmittedToday ? 'Already Submitted Today' : 'Submit Stand-Up'}
-              </Button>
-              </div>
-            </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={CheckCircle}
+        title="Daily Stand-Up"
+        subtitle="Track daily priorities and progress across the team"
+        actions={(
+          <>
+            <Button
+              variant="outline"
+              onClick={() => window.open('/public/standup/submit', '_blank')}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Submission Form
+            </Button>
+            <Button variant="brand" onClick={() => openForm()} disabled={hasSubmittedToday && !editingId}>
+              <Plus className="h-4 w-4 mr-2" />
+              {hasSubmittedToday ? 'Already Submitted Today' : 'Submit Stand-Up'}
+            </Button>
+          </>
+        )}
+      />
 
-            {/* User Tabs */}
-            <div className="pt-4">
+      {/* User Tabs */}
+      <div>
               {loading ? (
                 <div className="flex gap-2">
                   {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-9 w-24 rounded" />)}
@@ -428,9 +418,6 @@ export default function DailyStandupPage() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      </div>
 
       {/* Submit / Edit Dialog */}
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) { setIsFormOpen(false); setEditingId(null); } }}>
