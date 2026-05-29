@@ -99,10 +99,15 @@ export async function GET(request: Request) {
     }
 
     // ─── 3. Runaway frequency detection ───────────────────────────
+    // Pull up to 50k rows for the count (Supabase default cap is
+    // 1000 — a runaway loop can produce far more than that). 50k
+    // covers ~3 runs/minute for 24h which is the practical ceiling
+    // before Vercel itself would rate-limit us.
     const { data: allRuns, error: countErr } = await (supabase as any)
       .from('agent_runs')
       .select('agent_name')
-      .gte('started_at', since.toISOString());
+      .gte('started_at', since.toISOString())
+      .range(0, 49999);
 
     if (countErr) {
       console.error('[cron-health-check] count query failed:', countErr);
