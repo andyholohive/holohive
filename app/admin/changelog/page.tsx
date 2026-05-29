@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/ui/page-header';
 import { ChangelogService, Changelog, CreateChangelogData } from '@/lib/changelogService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -245,7 +246,7 @@ export default function ChangelogAdminPage() {
       <div className="space-y-6">
         <Card>
           <CardContent className="py-12 text-center">
-            <ShieldAlert className="h-12 w-12 text-red-400 mx-auto mb-4" />
+            <ShieldAlert className="h-12 w-12 text-rose-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">Access Denied</h3>
             <p className="text-gray-500 max-w-md mx-auto">
               Only super admins can access the changelog management page.
@@ -259,18 +260,16 @@ export default function ChangelogAdminPage() {
   if (loading || !userProfile) {
     return (
       <div className="space-y-6">
-        {/* Header — real title/subtitle render immediately. */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Changelog Management</h2>
-            <p className="text-gray-600">Create and manage portal update announcements</p>
-          </div>
-          <Skeleton className="h-10 w-32" />
-        </div>
+        <PageHeader
+          icon={Sparkles}
+          title="Changelog Management"
+          subtitle="Create and manage portal update announcements"
+          actions={<Skeleton className="h-10 w-32" />}
+        />
         <div className="space-y-4">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-32 w-full" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-32 w-full rounded-lg" />
+          ))}
         </div>
       </div>
     );
@@ -278,16 +277,17 @@ export default function ChangelogAdminPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Changelog Management</h2>
-          <p className="text-gray-600">Create and manage portal update announcements</p>
-        </div>
-        <Button variant="brand" onClick={openCreateDialog} className="hover:opacity-90">
-          <Plus className="h-4 w-4 mr-2" />
-          New Changelog
-        </Button>
-      </div>
+      <PageHeader
+        icon={Sparkles}
+        title="Changelog Management"
+        subtitle="Create and manage portal update announcements"
+        actions={(
+          <Button variant="brand" onClick={openCreateDialog}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Changelog
+          </Button>
+        )}
+      />
 
       {error && (
         <Alert variant="destructive">
@@ -303,7 +303,7 @@ export default function ChangelogAdminPage() {
             <p className="text-gray-500 max-w-md mx-auto mb-4">
               Create your first changelog to announce updates to your users.
             </p>
-            <Button variant="brand" onClick={openCreateDialog} className="hover:opacity-90">
+            <Button variant="brand" onClick={openCreateDialog}>
               <Plus className="h-4 w-4 mr-2" />
               Create First Changelog
             </Button>
@@ -325,7 +325,7 @@ export default function ChangelogAdminPage() {
                       </Badge>
                       <Badge
                         variant={changelog.is_published ? 'default' : 'secondary'}
-                        style={changelog.is_published ? { backgroundColor: '#3e8692' } : {}}
+                        className={changelog.is_published ? 'bg-brand hover:bg-brand/90' : ''}
                       >
                         {changelog.is_published ? 'Published' : 'Draft'}
                       </Badge>
@@ -368,7 +368,7 @@ export default function ChangelogAdminPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleDelete(changelog.id)}
-                      className="hover:bg-red-50 hover:text-red-700"
+                      className="hover:bg-rose-50 hover:text-rose-700"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -457,7 +457,7 @@ Use markdown-like formatting:
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            <Button variant="brand" onClick={handleSave} disabled={saving} className="hover:opacity-90">
+            <Button variant="brand" onClick={handleSave} disabled={saving}>
               {saving ? 'Saving...' : (editingChangelog ? 'Update' : 'Create')}
             </Button>
           </DialogFooter>
