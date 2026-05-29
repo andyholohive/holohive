@@ -4,7 +4,6 @@ import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
 import {
   RefreshCw, Loader2, Compass, AlertTriangle, ArrowRight, CheckCircle2,
   Users, Target, MessageCircleQuestion, Settings, Circle, Clock,
@@ -15,7 +14,11 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { EmptyState } from '@/components/ui/empty-state';
 import { KpiCard } from '@/components/ui/kpi-card';
+import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
+import {
+  Table, TableBody, TableHead, TableHeader, TableRow, TableCell,
+} from '@/components/ui/table';
 
 /**
  * /dashboard — Priority Dashboard
@@ -220,69 +223,64 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header — always renders immediately. */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Compass className="h-6 w-6 text-brand" />
-            Priority Dashboard
-          </h2>
-          <p className="text-gray-600 text-sm mt-0.5">
-            Weekly view of where the team is spending time, what's moving, and what needs attention.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Week selector — only renders when there's history to browse.
-              Selecting a historical week disables Refresh (refresh always
-              targets the current week). */}
-          {data && data.available_weeks.length > 0 && (
-            <Select
-              value={selectedWeek ?? currentWeek}
-              onValueChange={(v) => setSelectedWeek(v)}
+      <PageHeader
+        icon={Compass}
+        title="Priority Dashboard"
+        subtitle="Weekly view of where the team is spending time, what's moving, and what needs attention."
+        actions={(
+          <>
+            {/* Week selector — only renders when there's history to browse.
+                Selecting a historical week disables Refresh (refresh always
+                targets the current week). */}
+            {data && data.available_weeks.length > 0 && (
+              <Select
+                value={selectedWeek ?? currentWeek}
+                onValueChange={(v) => setSelectedWeek(v)}
+              >
+                <SelectTrigger className="h-9 w-44 text-xs focus-brand">
+                  <Clock className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* Always offer the current week even if no snapshot
+                      exists for it yet (so user can navigate back to "now"). */}
+                  {!data.available_weeks.includes(currentWeek) && (
+                    <SelectItem value={currentWeek}>
+                      {fmtWeekLabel(currentWeek)} (this week — no snapshot)
+                    </SelectItem>
+                  )}
+                  {data.available_weeks.map(w => (
+                    <SelectItem key={w} value={w}>
+                      {fmtWeekLabel(w)}{w === currentWeek ? ' (this week)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            <Button asChild variant="outline" size="sm" className="h-9">
+              <Link href="/dashboard/check-in">
+                <MessageCircleQuestion className="h-4 w-4 mr-1.5" />
+                My check-in
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="sm" className="h-9 px-2" title="Tag chats that feed the analyzer">
+              <Link href="/dashboard/settings">
+                <Settings className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={handleRefresh}
+              disabled={refreshing || !viewingCurrent}
+              title={viewingCurrent ? 'Regenerate this week\'s snapshot' : 'Refresh only works for the current week'}
             >
-              <SelectTrigger className="h-9 w-44 text-xs focus-brand">
-                <Clock className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {/* Always offer the current week even if no snapshot
-                    exists for it yet (so user can navigate back to "now"). */}
-                {!data.available_weeks.includes(currentWeek) && (
-                  <SelectItem value={currentWeek}>
-                    {fmtWeekLabel(currentWeek)} (this week — no snapshot)
-                  </SelectItem>
-                )}
-                {data.available_weeks.map(w => (
-                  <SelectItem key={w} value={w}>
-                    {fmtWeekLabel(w)}{w === currentWeek ? ' (this week)' : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <Button asChild variant="outline" size="sm" className="h-9">
-            <Link href="/dashboard/check-in">
-              <MessageCircleQuestion className="h-4 w-4 mr-1.5" />
-              My check-in
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm" className="h-9 px-2" title="Tag chats that feed the analyzer">
-            <Link href="/dashboard/settings">
-              <Settings className="h-4 w-4" />
-            </Link>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9"
-            onClick={handleRefresh}
-            disabled={refreshing || !viewingCurrent}
-            title={viewingCurrent ? 'Regenerate this week\'s snapshot' : 'Refresh only works for the current week'}
-          >
-            {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          </Button>
-        </div>
-      </div>
+              {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            </Button>
+          </>
+        )}
+      />
 
       {/* Snapshot meta strip — when was this generated, who checked in,
           and what data the analyzer had to work with. The source-summary
@@ -316,12 +314,10 @@ export default function DashboardPage() {
             </>
           )}
           {data.is_fallback && (
-            <Badge variant="secondary" className="text-[10px]">showing previous week</Badge>
+            <StatusBadge tone="neutral" size="sm">showing previous week</StatusBadge>
           )}
           {isStub && (
-            <Badge variant="secondary" className="bg-amber-50 text-amber-700 text-[10px]">
-              stub data
-            </Badge>
+            <StatusBadge tone="warning" size="sm">stub data</StatusBadge>
           )}
         </div>
       )}
@@ -358,13 +354,14 @@ export default function DashboardPage() {
             </SelectContent>
           </Select>
           {focusUserId && (
-            <button
-              type="button"
-              className="text-[11px] text-brand hover:underline ml-1"
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto px-1 py-0 text-[11px] text-brand"
               onClick={() => setFocusUserId(null)}
             >
               Clear filter
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -384,7 +381,7 @@ export default function DashboardPage() {
           title="No dashboard snapshot yet."
           description="Click Refresh to generate the first snapshot, or wait for Monday morning's automatic refresh."
         >
-          <Button variant="brand" onClick={handleRefresh} disabled={refreshing} className="hover:opacity-90">
+          <Button variant="brand" onClick={handleRefresh} disabled={refreshing}>
             {refreshing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Generate first snapshot
           </Button>
@@ -463,10 +460,10 @@ export default function DashboardPage() {
                 {allocs.map(([userId, alloc]) => (
                   <div key={userId} className="rounded-lg border border-gray-200 bg-white p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <Avatar name={userMap.get(userId) || userId} />
+                      <InitialsAvatar name={userMap.get(userId) || userId} />
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-gray-900 truncate">{userMap.get(userId) || 'Unknown'}</p>
-                        {alloc.role && <p className="text-[10px] text-gray-500 truncate">{alloc.role}</p>}
+                        {alloc.role && <p className="text-[11px] text-gray-500 truncate">{alloc.role}</p>}
                       </div>
                     </div>
                     <div className="space-y-1.5">
@@ -475,7 +472,7 @@ export default function DashboardPage() {
                       ))}
                     </div>
                     {alloc.callout && (
-                      <div className="mt-3 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+                      <div className="mt-3 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
                         {alloc.callout}
                       </div>
                     )}
@@ -524,26 +521,26 @@ export default function DashboardPage() {
           {(payload?.client_health?.length ?? 0) > 0 && (
             <Section title="Client Health" icon={Users}>
               <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50/80 text-xs text-gray-500 uppercase tracking-wider">
-                      <th className="text-left py-2 px-4 font-semibold">Client</th>
-                      <th className="text-left py-2 px-4 font-semibold">Phase</th>
-                      <th className="text-left py-2 px-4 font-semibold">Lead</th>
-                      <th className="text-left py-2 px-4 font-semibold">This week</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50/80 hover:bg-gray-50/80">
+                      <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Client</TableHead>
+                      <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Phase</TableHead>
+                      <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">Lead</TableHead>
+                      <TableHead className="h-9 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">This week</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {payload!.client_health!.map((c, i) => (
-                      <tr key={i} className="border-b border-gray-100 last:border-0">
-                        <td className="py-3 px-4 font-medium text-gray-900">{c.client}</td>
-                        <td className="py-3 px-4">{c.phase ? <Badge variant="secondary" className="text-xs">{c.phase}</Badge> : '—'}</td>
-                        <td className="py-3 px-4 text-gray-700">{c.lead || '—'}</td>
-                        <td className="py-3 px-4 text-gray-600 max-w-md">{c.this_week || '—'}</td>
-                      </tr>
+                      <TableRow key={i} className="border-gray-100">
+                        <TableCell className="py-3 font-medium text-gray-900">{c.client}</TableCell>
+                        <TableCell className="py-3">{c.phase ? <StatusBadge tone="neutral" size="md">{c.phase}</StatusBadge> : '—'}</TableCell>
+                        <TableCell className="py-3 text-gray-700">{c.lead || '—'}</TableCell>
+                        <TableCell className="py-3 text-gray-600 max-w-md">{c.this_week || '—'}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </Section>
           )}
@@ -562,23 +559,23 @@ export default function DashboardPage() {
             return (
             <Section title="Initiative Health" icon={CheckCircle2}>
               <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-                <table className="w-full text-sm">
-                  <tbody>
+                <Table>
+                  <TableBody>
                     {inits.map((init, i) => (
-                      <tr key={i} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50">
-                        <td className="py-3 px-4 font-medium text-gray-900">{init.name}</td>
-                        <td className="py-3 px-4 w-32 text-right">
-                          <Badge variant="secondary" className={`text-xs ${initiativeStatusClass(init.status)}`}>
+                      <TableRow key={i} className="border-gray-100 hover:bg-gray-50/50">
+                        <TableCell className="py-3 font-medium text-gray-900">{init.name}</TableCell>
+                        <TableCell className="py-3 w-32 text-right">
+                          <StatusBadge tone={initiativeStatusTone(init.status)} size="md">
                             {init.status}
-                          </Badge>
-                        </td>
-                        <td className="py-3 px-4 w-40 text-right text-xs text-gray-500">
+                          </StatusBadge>
+                        </TableCell>
+                        <TableCell className="py-3 w-40 text-right text-xs text-gray-500">
                           {init.owners && init.owners.length > 0 ? init.owners.map(id => userMap.get(id) || id).join(' + ') : '—'}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             </Section>
             );
@@ -614,7 +611,11 @@ function Section({
   );
 }
 
-function Avatar({ name }: { name: string }) {
+// Local initials-avatar — purposefully NOT named `Avatar` so it doesn't
+// shadow the shared Radix-based `@/components/ui/avatar` primitive if
+// future edits import it. Promote to a shared component once a second
+// caller (e.g. /team or /crm/network) needs the same pattern.
+function InitialsAvatar({ name }: { name: string }) {
   const initials = name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
   return (
     <div className="h-7 w-7 rounded-full bg-brand-light text-brand text-xs font-semibold flex items-center justify-center shrink-0">
@@ -724,11 +725,15 @@ function CheckInRoster({
   );
 }
 
-function initiativeStatusClass(status: string): string {
+// Map a free-text initiative status to a centralized BadgeTone so all
+// status pills draw from the same palette as the rest of the app
+// (StatusBadge). Replaces the previous one-off color map that hard-coded
+// bg-X-100 / text-X-700 pairs.
+function initiativeStatusTone(status: string): BadgeTone {
   const s = status.toLowerCase();
-  if (s.includes('blocked')) return 'bg-rose-100 text-rose-700';
-  if (s.includes('stale')) return 'bg-amber-100 text-amber-700';
-  if (s.includes('active') || s.includes('on track')) return 'bg-sky-100 text-sky-700';
-  if (s.includes('done') || s.includes('complete')) return 'bg-emerald-100 text-emerald-700';
-  return 'bg-gray-100 text-gray-700';
+  if (s.includes('blocked')) return 'danger';
+  if (s.includes('stale')) return 'warning';
+  if (s.includes('active') || s.includes('on track')) return 'info';
+  if (s.includes('done') || s.includes('complete')) return 'success';
+  return 'neutral';
 }
