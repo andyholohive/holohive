@@ -4,6 +4,8 @@ import { useState, useEffect, Fragment, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
@@ -53,15 +55,25 @@ interface ListItem {
   }[];
 }
 
-// Utility functions (matching campaigns details page)
+// Utility functions (matching campaigns details page).
+// Maps a KOL status to a centralized BadgeTone, then resolves to the
+// bg+text className via toneClassName so the visual matches StatusBadge
+// pills elsewhere. Source palette: status-badge.tsx.
+const KOL_STATUS_TONES: Record<string, BadgeTone> = {
+  curated: 'info',
+  interested: 'warning',
+  onboarded: 'success',
+  concluded: 'neutral',
+};
 const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'curated': return 'bg-blue-100 text-blue-800';
-    case 'interested': return 'bg-yellow-100 text-yellow-800';
-    case 'onboarded': return 'bg-emerald-100 text-emerald-800';
-    case 'concluded': return 'bg-gray-100 text-gray-800';
-    default: return 'bg-gray-100 text-gray-800';
-  }
+  const tone = KOL_STATUS_TONES[status] ?? 'neutral';
+  // Inline the StatusBadge palette so this helper stays a pure
+  // className string (used inside a SelectTrigger's className, where
+  // a full StatusBadge component would be awkward).
+  return tone === 'info'    ? 'bg-sky-100 text-sky-800'
+       : tone === 'warning' ? 'bg-amber-100 text-amber-800'
+       : tone === 'success' ? 'bg-emerald-100 text-emerald-800'
+       :                      'bg-gray-100 text-gray-700';
 };
 
 const getRegionIcon = (region: string) => {
@@ -90,7 +102,7 @@ const getPlatformIcon = (platform: string) => {
       );
     case 'YouTube':
       return (
-        <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+        <svg className="h-4 w-4 text-rose-500" viewBox="0 0 24 24" fill="currentColor">
           <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
         </svg>
       );
@@ -114,7 +126,7 @@ const getPlatformIcon = (platform: string) => {
 const getCreatorTypeColor = (type: string) => {
   const colorMap: { [key: string]: string } = {
     'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
-    'Drama-Forward': 'bg-red-100 text-red-800',
+    'Drama-Forward': 'bg-rose-100 text-rose-800',
     'Skeptic': 'bg-orange-100 text-orange-800',
     'Educator': 'bg-blue-100 text-blue-800',
     'Bridge Builder': 'bg-emerald-100 text-emerald-800',
@@ -142,7 +154,7 @@ const getListStatusColor = (status: string) => {
     case 'approved':
       return 'bg-emerald-100 text-emerald-800';
     case 'denied':
-      return 'bg-red-100 text-red-800';
+      return 'bg-rose-100 text-rose-800';
     default:
       return 'bg-gray-100 text-gray-800';
   }
@@ -1289,27 +1301,25 @@ export default function ListsPage() {
     return (
       <ProtectedRoute>
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Lists</h2>
-              <p className="text-gray-600">Manage your KOL lists and notes</p>
-            </div>
-            <div className="flex space-x-3">
-              <Button variant="brand" className="hover:opacity-90" disabled>
-                <List className="h-4 w-4 mr-2" />
-                Combine Lists
-              </Button>
-              <Button variant="brand" className="hover:opacity-90" disabled>
-                <Plus className="h-4 w-4 mr-2" />
-                Add List
-              </Button>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input placeholder="Search lists by name, notes, or KOLs..." className="pl-10 focus-brand" disabled />
-            </div>
+          <PageHeader
+            title="Lists"
+            subtitle="Manage your KOL lists and notes"
+            actions={(
+              <>
+                <Button variant="brand" disabled>
+                  <List className="h-4 w-4 mr-2" />
+                  Combine Lists
+                </Button>
+                <Button variant="brand" disabled>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add List
+                </Button>
+              </>
+            )}
+          />
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input placeholder="Search lists by name, notes, or KOLs..." className="pl-10 focus-brand" disabled />
           </div>
           <div className="flex items-center justify-between">
             <div className="flex space-x-1">
@@ -1333,15 +1343,10 @@ export default function ListsPage() {
     return (
       <ProtectedRoute>
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Lists</h2>
-              <p className="text-gray-600">Manage your KOL lists and notes</p>
-            </div>
-          </div>
+          <PageHeader title="Lists" subtitle="Manage your KOL lists and notes" />
           <div className="text-center py-8">
-            <p className="text-red-600">{error}</p>
-            <Button variant="brand" onClick={fetchLists} className="mt-4 hover:opacity-90">
+            <p className="text-rose-600">{error}</p>
+            <Button variant="brand" onClick={fetchLists} className="mt-4">
               Retry
             </Button>
           </div>
@@ -1353,13 +1358,12 @@ export default function ListsPage() {
   return (
     <ProtectedRoute>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Lists</h2>
-            <p className="text-gray-600">Manage your KOL lists and notes</p>
-          </div>
-          <div className="flex space-x-3">
-            <Button variant="brand" className="hover:opacity-90" onClick={() => setIsCombineListsDialogOpen(true)}
+        <PageHeader
+          title="Lists"
+          subtitle="Manage your KOL lists and notes"
+          actions={(
+            <>
+              <Button variant="brand" onClick={() => setIsCombineListsDialogOpen(true)}
               disabled={lists.length < 2}
               title={lists.length < 2 ? "Need at least 2 lists to combine" : "Combine multiple lists into one"}
             >
@@ -1374,7 +1378,7 @@ export default function ListsPage() {
               }
             }}>
               <DialogTrigger asChild>
-                <Button variant="brand" className="hover:opacity-90">
+                <Button variant="brand">
                   <Plus className="h-4 w-4 mr-2" />
                   Add List
                 </Button>
@@ -1559,7 +1563,7 @@ export default function ListsPage() {
                                     </PopoverContent>
                                   </Popover>
                                   {(followersOperator && followersValue) && (
-                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       1
                                     </span>
                                   )}
@@ -1616,7 +1620,7 @@ export default function ListsPage() {
                                     </PopoverContent>
                                   </Popover>
                                   {(ratingOperator && ratingValue) && (
-                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       1
                                     </span>
                                   )}
@@ -1666,7 +1670,7 @@ export default function ListsPage() {
                                     </PopoverContent>
                                   </Popover>
                                   {regionFilter.length > 0 && (
-                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       {regionFilter.length}
                                     </span>
                                   )}
@@ -1715,7 +1719,7 @@ export default function ListsPage() {
                                     </PopoverContent>
                                   </Popover>
                                   {platformFilter.length > 0 && (
-                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       {platformFilter.length}
                                     </span>
                                   )}
@@ -1762,7 +1766,7 @@ export default function ListsPage() {
                                     </PopoverContent>
                                   </Popover>
                                   {creatorTypeFilter.length > 0 && (
-                                    <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                    <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                                       {creatorTypeFilter.length}
                                     </span>
                                   )}
@@ -1871,15 +1875,16 @@ export default function ListsPage() {
                     <Button type="button" variant="outline" onClick={handleCloseListModal}>
                       Cancel
                     </Button>
-                    <Button variant="brand" type="submit" disabled={isSubmitting || !newList.name.trim()} className="hover:opacity-90">
+                    <Button variant="brand" type="submit" disabled={isSubmitting || !newList.name.trim()}>
                       {isSubmitting ? (isEditMode ? 'Saving...' : 'Creating...') : (isEditMode ? 'Save List' : 'Create List')}
                     </Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
             </Dialog>
-          </div>
-        </div>
+            </>
+          )}
+        />
 
         {/* Archive List Confirmation Dialog */}
         <Dialog open={isDeleteListDialogOpen} onOpenChange={setIsDeleteListDialogOpen}>
@@ -2431,7 +2436,7 @@ export default function ListsPage() {
                 >
                   Cancel
                 </Button>
-                <Button variant="brand" type="submit" disabled={isCombining || !combinedListName.trim() || selectedListsToCombine.length === 0} className="hover:opacity-90">
+                <Button variant="brand" type="submit" disabled={isCombining || !combinedListName.trim() || selectedListsToCombine.length === 0}>
                   {isCombining ? 'Combining...' : 'Combine Lists'}
                 </Button>
               </DialogFooter>
@@ -2467,7 +2472,7 @@ export default function ListsPage() {
               </TabsTrigger>
               <TabsTrigger value="denied">
                 Denied
-                <Badge variant="secondary" className="ml-2 bg-red-100 text-red-800 pointer-events-none">{statusCounts.denied}</Badge>
+                <Badge variant="secondary" className="ml-2 bg-rose-100 text-rose-800 pointer-events-none">{statusCounts.denied}</Badge>
               </TabsTrigger>
               {/* [Access tab v1] Switches the page from the list grid to
                   a per-list access + visits overview. Same visual
@@ -2578,13 +2583,14 @@ export default function ListsPage() {
                       );
                     })}
                     {accessStatusFilter.length > 0 && (
-                      <button
-                        type="button"
-                        className="w-full text-left text-xs text-gray-500 hover:text-gray-700 px-2 py-1.5 mt-1 border-t border-gray-100"
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start h-auto px-2 py-1.5 mt-1 text-xs text-gray-500 hover:text-gray-700 border-t border-gray-100 rounded-none"
                         onClick={() => setAccessStatusFilter([])}
                       >
                         Clear filter
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </PopoverContent>
@@ -2650,7 +2656,7 @@ export default function ListsPage() {
                             <TableCell>
                               <Badge variant="secondary" className={`text-xs capitalize ${
                                 bucket.list.status === 'approved' ? 'bg-emerald-100 text-emerald-800' :
-                                bucket.list.status === 'denied' ? 'bg-red-100 text-red-800' :
+                                bucket.list.status === 'denied' ? 'bg-rose-100 text-rose-800' :
                                 'bg-blue-100 text-blue-800'
                               }`}>
                                 {bucket.list.status || 'curated'}
@@ -2744,7 +2750,7 @@ export default function ListsPage() {
               : 'No lists yet.'}
           >
             {!searchTerm && statusFilter === 'all' && (
-              <Button variant="brand" className="hover:opacity-90" onClick={() => { setIsEditMode(false); setIsNewListOpen(true); }}
+              <Button variant="brand" onClick={() => { setIsEditMode(false); setIsNewListOpen(true); }}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Your First List
@@ -2781,7 +2787,7 @@ export default function ListsPage() {
                           className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2"
                           title="Delete list"
                         >
-                          <Trash2 className="h-4 w-4 text-red-600" />
+                          <Trash2 className="h-4 w-4 text-rose-600" />
                         </Button>
                       </div>
                     </div>
@@ -2939,7 +2945,7 @@ export default function ListsPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="h-8 w-8 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50"
                           onClick={() => handleDeleteList(list.id)}
                           title="Delete list"
                         >
