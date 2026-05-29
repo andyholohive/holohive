@@ -188,7 +188,7 @@ export default function DeliverablesPage() {
               <p className="text-sm text-gray-500">Structured workflows from templates</p>
             </div>
           </div>
-          <Button variant="brand" className="hover:opacity-90" onClick={() => setWizardOpen(true)}
+          <Button variant="brand" onClick={() => setWizardOpen(true)}
           >
             <Plus className="h-4 w-4 mr-2" />
             New Deliverable
@@ -246,7 +246,7 @@ export default function DeliverablesPage() {
         <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
           <Package className="h-12 w-12 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500">No deliverables found</p>
-          <Button variant="brand" className="mt-4 hover:opacity-90" onClick={() => setWizardOpen(true)}
+          <Button variant="brand" className="mt-4" onClick={() => setWizardOpen(true)}
           >
             <Plus className="h-4 w-4 mr-2" />
             Create your first deliverable
@@ -452,7 +452,7 @@ export default function DeliverablesPage() {
                                         {sub.due_date && (
                                           <span className={`text-[10px] shrink-0 ${
                                             new Date(sub.due_date + 'T23:59:59') < new Date() && sub.status !== 'complete'
-                                              ? 'text-red-500 font-semibold'
+                                              ? 'text-rose-500 font-semibold'
                                               : 'text-gray-400'
                                           }`}>
                                             {new Date(sub.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}

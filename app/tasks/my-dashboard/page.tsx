@@ -86,7 +86,7 @@ export default function MyDashboardPage() {
 
   const getDueDateColor = (dueDate: string | null) => {
     if (!dueDate) return 'text-gray-500';
-    if (dueDate < today) return 'text-red-600 font-semibold';
+    if (dueDate < today) return 'text-rose-600 font-semibold';
     const diffDays = Math.ceil((new Date(dueDate + 'T00:00:00').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays <= 3) return 'text-amber-600 font-semibold';
     return 'text-gray-500';
@@ -155,7 +155,7 @@ export default function MyDashboardPage() {
           {/* Stat Cards */}
           {stats && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-0">
-              <StatCard icon={AlertTriangle} label="Overdue" value={stats.overdue} color="text-red-500" bg="bg-red-50" />
+              <StatCard icon={AlertTriangle} label="Overdue" value={stats.overdue} color="text-rose-500" bg="bg-rose-50" />
               <StatCard icon={Clock} label="Due This Week" value={stats.dueThisWeek} color="text-amber-500" bg="bg-amber-50" />
               <StatCard icon={PlayCircle} label="In Progress" value={stats.inProgress} color="text-blue-500" bg="bg-blue-50" />
               <StatCard icon={CheckCircle2} label="Completed (7d)" value={stats.completedThisWeek} color="text-emerald-500" bg="bg-emerald-50" />
@@ -164,7 +164,7 @@ export default function MyDashboardPage() {
 
           {/* Overdue Tasks */}
           {overdueTasks.length > 0 && (
-            <TaskSection title="Overdue" icon={AlertTriangle} color="text-red-600" tasks={overdueTasks} getDueDateColor={getDueDateColor} clientMap={clientMap} />
+            <TaskSection title="Overdue" icon={AlertTriangle} color="text-rose-600" tasks={overdueTasks} getDueDateColor={getDueDateColor} clientMap={clientMap} />
           )}
 
           {/* Due This Week */}

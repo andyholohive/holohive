@@ -163,7 +163,7 @@ export default function TemplatesPage() {
                 <p className="text-sm text-gray-500">Reusable task presets for quick creation</p>
               </div>
             </div>
-            <Button onClick={() => setShowCreateDialog(true)} className="hover:opacity-90 bg-brand text-white">
+            <Button onClick={() => setShowCreateDialog(true)} className="bg-brand text-white">
               <Plus className="h-4 w-4 mr-2" /> New Template
             </Button>
           </div>
@@ -209,7 +209,7 @@ export default function TemplatesPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 w-7 p-0 text-gray-400 hover:text-red-500"
+                    className="h-7 w-7 p-0 text-gray-400 hover:text-rose-500"
                     onClick={() => handleDelete(tmpl.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -296,7 +296,7 @@ export default function TemplatesPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
-            <Button variant="brand" onClick={handleCreate} disabled={!form.name || !form.task_name_template || creating} className="hover:opacity-90">
+            <Button variant="brand" onClick={handleCreate} disabled={!form.name || !form.task_name_template || creating}>
               {creating ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> : 'Create Template'}
             </Button>
           </DialogFooter>

@@ -64,8 +64,8 @@ function getComputedPriority(dueDate: string | null, status?: string): { level: 
   const now = new Date();
   const due = new Date(dueDate + 'T23:59:59');
   const hoursLeft = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
-  if (hoursLeft < 0) return { level: 'overdue', label: 'Overdue', color: 'text-red-700', bg: 'bg-red-50' };
-  if (hoursLeft <= 24) return { level: 'urgent', label: 'Urgent', color: 'text-red-600', bg: 'bg-red-50' };
+  if (hoursLeft < 0) return { level: 'overdue', label: 'Overdue', color: 'text-rose-700', bg: 'bg-rose-50' };
+  if (hoursLeft <= 24) return { level: 'urgent', label: 'Urgent', color: 'text-rose-600', bg: 'bg-rose-50' };
   if (hoursLeft <= 48) return { level: 'high', label: 'High', color: 'text-orange-600', bg: 'bg-orange-50' };
   if (hoursLeft <= 72) return { level: 'medium', label: 'Medium', color: 'text-blue-600', bg: 'bg-blue-50' };
   return { level: 'low', label: 'Low', color: 'text-gray-400', bg: 'bg-gray-50' };
@@ -139,7 +139,7 @@ const getDueDateColor = (dueDate: string | null) => {
   today.setHours(0, 0, 0, 0);
   const due = new Date(dueDate + 'T00:00:00');
   const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return 'text-red-600 font-semibold';
+  if (diffDays < 0) return 'text-rose-600 font-semibold';
   if (diffDays <= 3) return 'text-amber-600 font-semibold';
   return 'text-gray-600';
 };
@@ -1403,8 +1403,8 @@ export default function TasksPage() {
             <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-gray-200" onClick={() => openForm(task)} title="Edit in popup">
               <Expand className="h-3.5 w-3.5 text-gray-500" />
             </Button>
-            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-red-50" onClick={() => setDeletingId(task.id)}>
-              <Trash2 className="h-3.5 w-3.5 text-red-500" />
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-rose-50" onClick={() => setDeletingId(task.id)}>
+              <Trash2 className="h-3.5 w-3.5 text-rose-500" />
             </Button>
           </div>
         </td>
@@ -1518,7 +1518,7 @@ export default function TasksPage() {
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="brand" className="hover:opacity-90">
+                  <Button variant="brand">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Task
                     <ChevronDown className="h-3 w-3 ml-1.5 opacity-70" />
@@ -1681,7 +1681,7 @@ export default function TasksPage() {
                   {tasks.length === 0 ? 'No tasks yet.' : 'No tasks match your filters.'}
                 </p>
                 {tasks.length === 0 && (
-                  <Button variant="brand" className="mt-4 hover:opacity-90" onClick={() => openForm()}
+                  <Button variant="brand" className="mt-4" onClick={() => openForm()}
                   >
                     <Plus className="h-4 w-4 mr-2" /> Create Your First Task
                   </Button>

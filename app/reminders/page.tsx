@@ -538,7 +538,7 @@ export default function RemindersPage() {
                 <h2 className="text-2xl font-bold text-gray-900">Reminders</h2>
                 <p className="text-gray-600">Automated Telegram reminders for your team</p>
               </div>
-              <Button variant="brand" disabled className="hover:opacity-90">
+              <Button variant="brand" disabled>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Reminder
               </Button>
@@ -578,7 +578,7 @@ export default function RemindersPage() {
           <h2 className="text-2xl font-bold text-gray-900">Reminders</h2>
           <p className="text-gray-600">Automated Telegram reminders for your team</p>
         </div>
-        <Button variant="brand" onClick={openCreate} className="hover:opacity-90">
+        <Button variant="brand" onClick={openCreate}>
           <Plus className="h-4 w-4 mr-2" />
           Add Reminder
         </Button>
@@ -626,7 +626,7 @@ export default function RemindersPage() {
               <div className="text-center py-12">
                 <Bell className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600 mb-4">No reminders configured. Create your first reminder to get started.</p>
-                <Button variant="brand" onClick={openCreate} className="hover:opacity-90">
+                <Button variant="brand" onClick={openCreate}>
                   <Plus className="h-4 w-4 mr-2" />
                   Create Your First Reminder
                 </Button>
@@ -707,7 +707,7 @@ export default function RemindersPage() {
                           {rule.last_run_result.message_sent ? (
                             <CheckCircle className="h-3 w-3 inline ml-1 text-emerald-500" />
                           ) : (
-                            <XCircle className="h-3 w-3 inline ml-1 text-red-500" />
+                            <XCircle className="h-3 w-3 inline ml-1 text-rose-500" />
                           )})
                         </span>
                       )}
@@ -730,7 +730,7 @@ export default function RemindersPage() {
                     {rule.recent_logs.slice(0, 3).map((log) => (
                       <div key={log.id} className="text-xs text-gray-500 flex items-center gap-2">
                         {log.error ? (
-                          <AlertTriangle className="h-3 w-3 text-red-500 shrink-0" />
+                          <AlertTriangle className="h-3 w-3 text-rose-500 shrink-0" />
                         ) : log.message_sent ? (
                           <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0" />
                         ) : (
@@ -739,7 +739,7 @@ export default function RemindersPage() {
                         <span>{new Date(log.run_at).toLocaleString()}</span>
                         <span>{log.items_found} items</span>
                         {log.duration_ms && <span>{log.duration_ms}ms</span>}
-                        {log.error && <span className="text-red-500 truncate max-w-[200px]">{log.error}</span>}
+                        {log.error && <span className="text-rose-500 truncate max-w-[200px]">{log.error}</span>}
                       </div>
                     ))}
                   </div>
@@ -1004,7 +1004,7 @@ export default function RemindersPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialog(false)}>Cancel</Button>
-            <Button variant="brand" onClick={handleSave} disabled={saving} className="hover:opacity-90">
+            <Button variant="brand" onClick={handleSave} disabled={saving}>
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {editingRule ? 'Save Changes' : 'Create Reminder'}
             </Button>

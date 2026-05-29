@@ -58,7 +58,7 @@ function SortableStepRow({ step, onEdit, onDelete }: { step: DeliverableTemplate
         <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onEdit}>
           <Pencil className="h-3 w-3" />
         </Button>
-        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500" onClick={onDelete}>
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-rose-500" onClick={onDelete}>
           <Trash2 className="h-3 w-3" />
         </Button>
       </div>
@@ -280,7 +280,7 @@ export default function DeliverableTemplatesPage() {
               <p className="text-sm text-gray-500">Manage workflow templates and their steps</p>
             </div>
           </div>
-          <Button variant="brand" className="hover:opacity-90" onClick={() => openEditTemplate()}
+          <Button variant="brand" onClick={() => openEditTemplate()}
           >
             <Plus className="h-4 w-4 mr-2" />
             New Template
@@ -320,7 +320,7 @@ export default function DeliverableTemplatesPage() {
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditTemplate(t)}>
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-700" onClick={() => handleDeleteTemplate(t.id)}>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-rose-500 hover:text-rose-700" onClick={() => handleDeleteTemplate(t.id)}>
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>

@@ -184,7 +184,7 @@ export default function AutomationsPage() {
                 <p className="text-sm text-gray-500">Manage automation rules and view execution history</p>
               </div>
             </div>
-            <Button onClick={() => setShowCreateDialog(true)} className="hover:opacity-90 bg-brand text-white">
+            <Button onClick={() => setShowCreateDialog(true)} className="bg-brand text-white">
               <Plus className="h-4 w-4 mr-2" /> New Rule
             </Button>
           </div>
@@ -228,7 +228,7 @@ export default function AutomationsPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 w-7 p-0 text-gray-400 hover:text-red-500"
+                    className="h-7 w-7 p-0 text-gray-400 hover:text-rose-500"
                     onClick={() => handleDelete(auto.id)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -340,7 +340,7 @@ export default function AutomationsPage() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
-            <Button variant="brand" onClick={handleCreate} disabled={!newRule.name || !newRule.trigger_type || !newRule.action_type || creating} className="hover:opacity-90">
+            <Button variant="brand" onClick={handleCreate} disabled={!newRule.name || !newRule.trigger_type || !newRule.action_type || creating}>
               {creating ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> : 'Create Rule'}
             </Button>
           </DialogFooter>

@@ -88,7 +88,7 @@ export default function AdminDashboardPage() {
           {overall && (
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <StatCard label="Total Tasks" value={overall.total} color="text-gray-600" bg="bg-gray-50" />
-              <StatCard label="Overdue" value={overall.overdue} color="text-red-500" bg="bg-red-50" icon={AlertTriangle} />
+              <StatCard label="Overdue" value={overall.overdue} color="text-rose-500" bg="bg-rose-50" icon={AlertTriangle} />
               <StatCard label="Due This Week" value={overall.dueThisWeek} color="text-amber-500" bg="bg-amber-50" icon={Clock} />
               <StatCard label="In Progress" value={overall.inProgress} color="text-blue-500" bg="bg-blue-50" icon={PlayCircle} />
               <StatCard label="Completed (7d)" value={overall.completedThisWeek} color="text-emerald-500" bg="bg-emerald-50" icon={CheckCircle2} />
