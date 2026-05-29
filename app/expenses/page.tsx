@@ -34,11 +34,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import {
   DollarSign, Plus, Trash2, Upload, X, FileText, Image as ImageIcon,
-  Check, Download, Filter as FilterIcon, AlertCircle, Calendar,
+  Check, Download, Filter as FilterIcon, AlertCircle, Calendar as CalendarIcon,
   CreditCard, RefreshCw, Eye, TrendingUp,
 } from 'lucide-react';
 
@@ -347,7 +349,7 @@ export default function ExpensesPage() {
             <Button variant="outline" size="sm" onClick={exportCsv}>
               <Download className="h-4 w-4 mr-1.5" /> Export CSV
             </Button>
-            <Button size="sm" onClick={() => setAddOpen(true)} className="bg-brand text-white hover:opacity-90">
+            <Button variant="brand" size="sm" onClick={() => setAddOpen(true)}>
               <Plus className="h-4 w-4 mr-1.5" /> Add Expense
             </Button>
           </>
@@ -555,6 +557,63 @@ export default function ExpensesPage() {
   );
 }
 
+// ─── DateField (matches /clients date-picker pattern: Popover + Button
+//     trigger + Calendar widget with brand-teal selection). Wraps the
+//     project-standard pattern so the form code stays compact. Value is
+//     stored as 'YYYY-MM-DD' string for direct API submission. ───
+function DateField({
+  value, onChange, placeholder, allowClear,
+}: {
+  value: string;                             // 'YYYY-MM-DD' or empty
+  onChange: (v: string) => void;
+  placeholder?: string;
+  allowClear?: boolean;
+}) {
+  const selectedDate = value ? new Date(value + 'T00:00:00') : undefined;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className="h-9 w-full justify-start font-normal focus-brand"
+          style={{ color: value ? '#111827' : '#9ca3af' }}
+        >
+          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+          {value
+            ? selectedDate!.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : (placeholder || 'Select date')}
+          {allowClear && value && (
+            <span
+              role="button"
+              onClick={(e) => { e.stopPropagation(); e.preventDefault(); onChange(''); }}
+              className="ml-auto opacity-50 hover:opacity-100"
+              aria-label="Clear date"
+            >
+              <X className="h-3.5 w-3.5" />
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-[80]" align="start">
+        <CalendarPicker
+          mode="single"
+          selected={selectedDate}
+          onSelect={(date) => {
+            if (!date) { onChange(''); return; }
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            onChange(`${y}-${m}-${d}`);
+          }}
+          initialFocus
+          classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+          modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // ─── KpiCard (mirrors the pattern from /wallets and other admin pages) ───
 function KpiCard({
   icon: Icon, label, value, sub, tone,
@@ -673,7 +732,7 @@ function AddExpenseDialog({
           <div>
             <Label className="text-xs">User *</Label>
             <Select value={userId} onValueChange={setUserId}>
-              <SelectTrigger className="h-9"><SelectValue placeholder="Select user…" /></SelectTrigger>
+              <SelectTrigger className="h-9 focus-brand"><SelectValue placeholder="Select user…" /></SelectTrigger>
               <SelectContent>
                 {users.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
               </SelectContent>
@@ -683,12 +742,17 @@ function AddExpenseDialog({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Amount (USD) *</Label>
-              <Input type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="h-9" />
+              <Input
+                type="number" step="0.01" min="0"
+                value={amount} onChange={e => setAmount(e.target.value)}
+                placeholder="0.00"
+                className="h-9 focus-brand"
+              />
             </div>
             <div>
               <Label className="text-xs">Frequency *</Label>
               <Select value={frequency} onValueChange={(v) => setFrequency(v as Frequency)}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 focus-brand"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {(['one_time','daily','weekly','monthly'] as Frequency[]).map(f =>
                     <SelectItem key={f} value={f}>{FREQ_LABEL[f]}</SelectItem>)}
@@ -701,7 +765,7 @@ function AddExpenseDialog({
             <div>
               <Label className="text-xs">Type *</Label>
               <Select value={expenseType} onValueChange={(v) => setExpenseType(v as ExpenseType)}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 focus-brand"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {(['travel','software','meals_drinks','others'] as ExpenseType[]).map(t =>
                     <SelectItem key={t} value={t}>{TYPE_LABEL[t]}</SelectItem>)}
@@ -711,12 +775,12 @@ function AddExpenseDialog({
             {frequency === 'one_time' ? (
               <div>
                 <Label className="text-xs">Date *</Label>
-                <Input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} className="h-9" />
+                <DateField value={expenseDate} onChange={setExpenseDate} placeholder="Select date" />
               </div>
             ) : (
               <div>
                 <Label className="text-xs">Start date *</Label>
-                <Input type="date" value={recurrenceStart} onChange={e => setRecurrenceStart(e.target.value)} className="h-9" />
+                <DateField value={recurrenceStart} onChange={setRecurrenceStart} placeholder="Select start date" />
               </div>
             )}
           </div>
@@ -724,19 +788,27 @@ function AddExpenseDialog({
           {frequency !== 'one_time' && (
             <div>
               <Label className="text-xs">End date (optional)</Label>
-              <Input type="date" value={recurrenceEnd} onChange={e => setRecurrenceEnd(e.target.value)} className="h-9" />
+              <DateField value={recurrenceEnd} onChange={setRecurrenceEnd} placeholder="No end date" allowClear />
               <p className="text-[11px] text-gray-500 mt-1">Leave empty for indefinite. Cron stops generating after this date.</p>
             </div>
           )}
 
           <div>
             <Label className="text-xs">Description *</Label>
-            <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="What was this for?" className="h-9" />
+            <Input
+              value={description} onChange={e => setDescription(e.target.value)}
+              placeholder="What was this for?"
+              className="h-9 focus-brand"
+            />
           </div>
 
           <div>
             <Label className="text-xs">Notes (optional)</Label>
-            <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Anything else worth knowing" />
+            <Textarea
+              value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+              placeholder="Anything else worth knowing"
+              className="focus-brand"
+            />
           </div>
 
           <p className="text-[11px] text-gray-500">
@@ -746,7 +818,7 @@ function AddExpenseDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
-          <Button onClick={submit} disabled={submitting} className="bg-brand text-white hover:opacity-90">
+          <Button variant="brand" onClick={submit} disabled={submitting}>
             {submitting ? 'Creating…' : 'Create expense'}
           </Button>
         </DialogFooter>
@@ -899,7 +971,7 @@ function DetailDialog({
             <div>
               <p className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Date</p>
               <p className="text-gray-900 flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-gray-400" />
+                <CalendarIcon className="h-3.5 w-3.5 text-gray-400" />
                 {formatDate(expense.expense_date)}
               </p>
             </div>
