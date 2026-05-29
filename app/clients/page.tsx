@@ -6,6 +6,11 @@ import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -22,7 +27,7 @@ import { FormService, FormWithStats } from '@/lib/formService';
 import { UserService } from '@/lib/userService';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff, ChevronDown, ChevronUp, Lock, Circle, ListTodo, MoreHorizontal, Bell, Settings, Info } from 'lucide-react';
+import { Plus, Search, Edit, Building2, Mail, MapPin, Calendar as CalendarIcon, Trash2, CheckCircle, FileText, PauseCircle, BadgeCheck, Link as LinkIcon, ExternalLink, Copy, Share2, Upload, X, Image as ImageIcon, Pencil, StickyNote, Briefcase, ClipboardList, Activity, MessageSquare, Globe, Eye, EyeOff, ChevronDown, ChevronUp, Lock, Circle, ListTodo, MoreHorizontal, Bell, Settings, Info, Users } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Link from 'next/link';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -1859,7 +1864,7 @@ export default function ClientsPage() {
         <div className="space-y-6">
           <PageHeader title="Clients" subtitle="Manage your client relationships" />
           <div className="text-center py-8">
-            <p className="text-red-600">{error}</p>
+            <p className="text-rose-600">{error}</p>
             <Button variant="brand" onClick={fetchClients} className="mt-4">
               Retry
             </Button>
@@ -1871,36 +1876,21 @@ export default function ClientsPage() {
   return (
     <ProtectedRoute>
       <div className="space-y-6">
-        {/* [Design system, May 2026] Loaded-state header stays inline
-            (not PageHeader) because the 800+ lines of admin-action
-            Dialog content nested inside makes a clean swap risky.
-            The flex-wrap + min-w-0 + responsive classes here already
-            match what PageHeader does internally — just not centralized.
-            Migrate to PageHeader in a follow-up pass with focused
-            visual QA. Loading + error states above were swapped since
-            they're simple. */}
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <h2 className="text-2xl font-bold text-gray-900">
-              {filteredPartnerName ? `Clients - ${filteredPartnerName}` : 'Clients'}
-            </h2>
-            <p className="text-gray-600">Manage your client relationships</p>
-            {filteredPartnerName && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => router.push('/clients')}
-                className="text-sm mt-2"
-              >
-                Clear Filter
-              </Button>
-            )}
-          </div>
-          {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
-            <div className="flex gap-2 flex-wrap">
+        {/* [Design system, May 2026] Loaded-state header migrated to
+            PageHeader so the loading + loaded states share one source
+            of truth for the page title block. The 800-line action
+            Dialog tree (Start Client / Templates / Add Client) lives
+            in PageHeader's actions slot — PageHeader internally wraps
+            it in `flex items-center gap-2 flex-wrap`, matching the
+            original hand-rolled wrapper. */}
+        <PageHeader
+          title={filteredPartnerName ? `Clients - ${filteredPartnerName}` : 'Clients'}
+          subtitle="Manage your client relationships"
+          actions={(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') ? (
+            <>
               <Dialog open={isStartClientOpen} onOpenChange={setIsStartClientOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="brand" className="hover:opacity-90">
+                  <Button variant="brand">
                     <Plus className="h-4 w-4 mr-2" />
                     Start Client
                   </Button>
@@ -1926,7 +1916,7 @@ export default function ClientsPage() {
                         <div className="grid gap-4">
                           <div className="grid gap-2">
                             <Label htmlFor="companyName">
-                              Company Name {!startClientForm.isRenewingClient && <span className="text-red-500">*</span>}
+                              Company Name {!startClientForm.isRenewingClient && <span className="text-rose-500">*</span>}
                             </Label>
                             <Input
                               id="companyName"
@@ -1957,7 +1947,7 @@ export default function ClientsPage() {
                           {startClientForm.isRenewingClient && (
                             <div className="grid gap-2">
                               <Label htmlFor="existingClient">
-                                Select Existing Client <span className="text-red-500">*</span>
+                                Select Existing Client <span className="text-rose-500">*</span>
                               </Label>
                               <Select value={startClientForm.selectedExistingClient} onValueChange={(value) => {
                                 const selectedClient = clients.find(c => c.id === value);
@@ -1987,7 +1977,7 @@ export default function ClientsPage() {
                           )}
                           <div className="grid gap-2">
                             <Label htmlFor="email">
-                              Email {!startClientForm.isRenewingClient && <span className="text-red-500">*</span>}
+                              Email {!startClientForm.isRenewingClient && <span className="text-rose-500">*</span>}
                             </Label>
                             <Input
                               id="email"
@@ -2000,7 +1990,7 @@ export default function ClientsPage() {
                             />
                             {/* Email format error message */}
                             {startClientForm.email && !isValidEmail(startClientForm.email) && (
-                              <span className="text-xs text-red-600">Please enter a valid email address.</span>
+                              <span className="text-xs text-rose-600">Please enter a valid email address.</span>
                             )}
                           </div>
                           {/* Location field hidden per May 2026 audit —
@@ -2033,7 +2023,7 @@ export default function ClientsPage() {
                           {startClientForm.callHeld && (
                             <div className="grid gap-2">
                               <Label htmlFor="callDate">
-                                Call Date <span className="text-red-500">*</span>
+                                Call Date <span className="text-rose-500">*</span>
                               </Label>
                               <Popover>
                                 <PopoverTrigger asChild>
@@ -2076,7 +2066,7 @@ export default function ClientsPage() {
                         <div className="grid gap-4">
                           <div className="grid gap-2">
                             <Label htmlFor="campaignName">
-                              Campaign Name <span className="text-red-500">*</span>
+                              Campaign Name <span className="text-rose-500">*</span>
                             </Label>
                             <Input
                               id="campaignName"
@@ -2088,7 +2078,7 @@ export default function ClientsPage() {
                           </div>
                           <div className="grid gap-2">
                             <Label htmlFor="campaignManager">
-                              Campaign Manager <span className="text-red-500">*</span>
+                              Campaign Manager <span className="text-rose-500">*</span>
                             </Label>
                             <Select value={startClientForm.campaignManager} onValueChange={(value) => setStartClientForm({ ...startClientForm, campaignManager: value })}>
                               <SelectTrigger className="focus-brand">
@@ -2106,7 +2096,7 @@ export default function ClientsPage() {
                           <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                               <Label htmlFor="startDate">
-                                Start Date <span className="text-red-500">*</span>
+                                Start Date <span className="text-rose-500">*</span>
                               </Label>
                               <Popover>
                                 <PopoverTrigger asChild>
@@ -2177,7 +2167,7 @@ export default function ClientsPage() {
                           {/* Moved from old Section 5: Campaign Details 2 */}
                           <div className="grid gap-2">
                             <Label htmlFor="region">
-                              Region <span className="text-red-500">*</span>
+                              Region <span className="text-rose-500">*</span>
                             </Label>
                             <Select value={startClientForm.region} onValueChange={(value) => {
                               setStartClientForm({
@@ -2256,7 +2246,7 @@ export default function ClientsPage() {
                           )}
                           <div className="grid gap-2">
                             <Label htmlFor="totalBudget">
-                              Budget <span className="text-red-500">*</span>
+                              Budget <span className="text-rose-500">*</span>
                             </Label>
                             <Input
                               id="totalBudget"
@@ -2327,7 +2317,7 @@ export default function ClientsPage() {
                                      type="button"
                                      variant="ghost"
                                      size="icon"
-                                     className="text-red-500 hover:text-red-700"
+                                     className="text-rose-500 hover:text-rose-700"
                                      onClick={() => {
                                        setStartClientForm({
                                          ...startClientForm,
@@ -2468,7 +2458,7 @@ export default function ClientsPage() {
                           </Button>
                         )}
                         {startClientStep < startClientSections.length - 1 ? (
-                          <Button variant="brand" type="button" className="hover:opacity-90" onClick={() => {
+                          <Button variant="brand" type="button" onClick={() => {
                               if (isStepValid()) {
                                 setStartClientStep(startClientStep + 1);
                               }
@@ -2478,14 +2468,14 @@ export default function ClientsPage() {
                             Next
                           </Button>
                         ) : (
-                          <Button variant="brand" type="button" className="hover:opacity-90" onClick={handleStartClientSubmit} disabled={!isStepValid() || isStartClientSubmitting}>
+                          <Button variant="brand" type="button" onClick={handleStartClientSubmit} disabled={!isStepValid() || isStartClientSubmitting}>
                             {isStartClientSubmitting ? 'Starting...' : 'Start Client'}
                           </Button>
                         )}
                       </div>
                     </DialogFooter>
                   {startClientError && (
-                    <div className="text-red-600 text-sm mt-2">{startClientError}</div>
+                    <div className="text-rose-600 text-sm mt-2">{startClientError}</div>
                   )}
                 </DialogContent>
               </Dialog>
@@ -2538,7 +2528,7 @@ export default function ClientsPage() {
                               <button
                                 type="button"
                                 onClick={removeLogo}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1 hover:bg-rose-600"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -2635,7 +2625,7 @@ export default function ClientsPage() {
                             className="focus-brand min-h-[60px] flex-1"
                           />
                         </div>
-                        <Button type="button" onClick={() => { const entries = domainInput .split(/[\n,]+/) .map(entry => entry.trim().toLowerCase().replace(/^@/, '')) .filter(entry => entry.length> 0 && /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(entry)); const current = newClient.approved_domains; const newDomains = entries.filter(d => !current.includes(d)); if (newDomains.length> 0) { setNewClient({ ...newClient, approved_domains: [...current, ...newDomains] }); setDomainInput(''); } }} disabled={!domainInput.trim()} className="hover:opacity-90 w-fit bg-brand text-white">
+                        <Button type="button" variant="brand" onClick={() => { const entries = domainInput .split(/[\n,]+/) .map(entry => entry.trim().toLowerCase().replace(/^@/, '')) .filter(entry => entry.length> 0 && /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(entry)); const current = newClient.approved_domains; const newDomains = entries.filter(d => !current.includes(d)); if (newDomains.length> 0) { setNewClient({ ...newClient, approved_domains: [...current, ...newDomains] }); setDomainInput(''); } }} disabled={!domainInput.trim()} className="w-fit">
                           Add Domains
                         </Button>
                         {newClient.approved_domains.length > 0 && (
@@ -2669,16 +2659,27 @@ export default function ClientsPage() {
                       <Button type="button" variant="outline" onClick={handleCloseClientModal}>
                         Cancel
                       </Button>
-                      <Button variant="brand" type="submit" disabled={isSubmitting || !newClient.name.trim() || !newClient.email.trim()} className="hover:opacity-90">
+                      <Button variant="brand" type="submit" disabled={isSubmitting || !newClient.name.trim() || !newClient.email.trim()}>
                         {isSubmitting ? (isEditMode ? 'Saving...' : 'Creating...') : (isEditMode ? 'Save Client' : 'Create Client')}
                       </Button>
                     </DialogFooter>
                   </form>
                 </DialogContent>
               </Dialog>
-            </div>
+            </>
+          ) : undefined}
+        >
+          {filteredPartnerName && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push('/clients')}
+              className="text-sm mt-2"
+            >
+              Clear Filter
+            </Button>
           )}
-        </div>
+        </PageHeader>
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -2713,19 +2714,23 @@ export default function ClientsPage() {
         </Tabs>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredClients.length === 0 ? (
-            <div className="col-span-full text-center py-8">
-              <p className="text-gray-600">
-                {searchTerm || filteredPartnerName || statusFilter !== 'all'
+            <div className="col-span-full">
+              <EmptyState
+                icon={Users}
+                title={searchTerm || filteredPartnerName || statusFilter !== 'all'
                   ? 'No clients found matching your filters.'
-                  : 'No clients found.'
-                }
-              </p>
-              {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && !searchTerm && !filteredPartnerName && statusFilter === 'all' && (
-                <Button variant="brand" className="mt-4 hover:opacity-90" onClick={() => { setIsEditMode(false); setIsNewClientOpen(true); }}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Your First Client
-                </Button>
-              )}
+                  : 'No clients yet.'}
+                description={searchTerm || filteredPartnerName || statusFilter !== 'all'
+                  ? 'Try widening your search or clearing filters.'
+                  : 'Add your first client to get started.'}
+              >
+                {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && !searchTerm && !filteredPartnerName && statusFilter === 'all' && (
+                  <Button variant="brand" onClick={() => { setIsEditMode(false); setIsNewClientOpen(true); }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Your First Client
+                  </Button>
+                )}
+              </EmptyState>
             </div>
           ) : (
             filteredClients.map((client) => {
@@ -2775,8 +2780,8 @@ export default function ClientsPage() {
                             <Button variant="ghost" size="sm" onClick={() => handleEditClient(client)} className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2" title="Edit client">
                               <Edit className="h-4 w-4 text-gray-600" />
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDeleteClient(client)} className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-50 w-auto px-2" title="Delete client">
-                              <Trash2 className="h-4 w-4 text-red-600" />
+                            <Button variant="ghost" size="sm" onClick={() => handleDeleteClient(client)} className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-rose-50 w-auto px-2" title="Delete client">
+                              <Trash2 className="h-4 w-4 text-rose-600" />
                             </Button>
                           </div>
                         )}
@@ -2787,14 +2792,14 @@ export default function ClientsPage() {
                           badge keeps a single very-long partner name
                           inside the card. */}
                       <div className="flex gap-2 flex-wrap">
-                        <Badge variant={client.is_active ? 'default' : 'secondary'} className="text-xs flex-shrink-0" style={client.is_active ? { backgroundColor: '#3e8692', color: 'white', borderColor: '#3e8692' } : {}}>
+                        <StatusBadge tone={client.is_active ? 'brand' : 'neutral'} className="flex-shrink-0">
                           {client.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
+                        </StatusBadge>
                         {client.is_whitelisted && (
-                          <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-800 hover:bg-emerald-100 hover:text-emerald-800 cursor-default pointer-events-none max-w-full">
+                          <StatusBadge tone="success" className="cursor-default pointer-events-none max-w-full">
                             <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
                             <span className="truncate">{client.whitelist_partner_name || 'Unknown Partner'}</span>
-                          </Badge>
+                          </StatusBadge>
                         )}
                       </div>
                     </div>
@@ -3083,16 +3088,16 @@ export default function ClientsPage() {
               </div>
             ) : (
               <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-medium">When</th>
-                      <th className="px-3 py-2 text-left font-medium">Email</th>
-                      <th className="px-3 py-2 text-left font-medium">Via</th>
-                      <th className="px-3 py-2 text-left font-medium">IP</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50 hover:bg-gray-50">
+                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">When</TableHead>
+                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">Email</TableHead>
+                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">Via</TableHead>
+                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">IP</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {accessLogRows.map(row => {
                       // Pretty labels for the authorization-rule enum.
                       // 'cache' = returning visitor on a still-valid
@@ -3105,29 +3110,27 @@ export default function ClientsPage() {
                         : row.authorized_via === 'approved_domain' ? 'Approved domain'
                         : row.authorized_via === 'cache' ? 'Returning'
                         : row.authorized_via;
-                      const viaColor =
-                        row.authorized_via === 'exact' ? 'bg-emerald-50 text-emerald-700'
-                        : row.authorized_via === 'cache' ? 'bg-gray-50 text-gray-600'
-                        : 'bg-blue-50 text-blue-700';
+                      const viaTone: BadgeTone =
+                        row.authorized_via === 'exact' ? 'success'
+                        : row.authorized_via === 'cache' ? 'neutral'
+                        : 'info';
                       return (
-                        <tr key={row.id} className="hover:bg-gray-50">
-                          <td className="px-3 py-2 text-xs text-gray-600 whitespace-nowrap">
+                        <TableRow key={row.id} className="border-gray-100">
+                          <TableCell className="px-3 py-2 text-xs text-gray-600 whitespace-nowrap">
                             {new Date(row.accessed_at).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2 text-xs text-gray-900">{row.email}</td>
-                          <td className="px-3 py-2">
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${viaColor}`}>
-                              {viaLabel}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-xs text-gray-400 font-mono">
+                          </TableCell>
+                          <TableCell className="px-3 py-2 text-xs text-gray-900">{row.email}</TableCell>
+                          <TableCell className="px-3 py-2">
+                            <StatusBadge tone={viaTone} size="sm">{viaLabel}</StatusBadge>
+                          </TableCell>
+                          <TableCell className="px-3 py-2 text-xs text-gray-400 font-mono">
                             {row.ip_address || '—'}
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
             <DialogFooter>
@@ -3192,7 +3195,7 @@ export default function ClientsPage() {
                   <div key={formSlugOrId} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label>{form.name}</Label>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-gray-400 hover:text-red-500" onClick={() => setShareExtraForms(prev => prev.filter(s => s !== formSlugOrId))}>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-gray-400 hover:text-rose-500" onClick={() => setShareExtraForms(prev => prev.filter(s => s !== formSlugOrId))}>
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
@@ -3254,14 +3257,14 @@ export default function ClientsPage() {
               </TabsList>
               <TabsContent value="decisions" className="space-y-4 max-h-[55vh] overflow-y-auto px-1 pb-4">
                 {!isDecisionFormOpen && (
-                  <Button variant="brand" size="sm" className="hover:opacity-90" onClick={() => { setIsDecisionFormOpen(true); setEditingDecisionId(null); setDecisionForm({ decision_date: new Date(), summary: '' }); }}>
+                  <Button variant="brand" size="sm" onClick={() => { setIsDecisionFormOpen(true); setEditingDecisionId(null); setDecisionForm({ decision_date: new Date(), summary: '' }); }}>
                     <Plus className="h-4 w-4 mr-1" /> Add Decision
                   </Button>
                 )}
                 {isDecisionFormOpen && (
                   <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
                     <div className="grid gap-2">
-                      <Label>Date <span className="text-red-500">*</span></Label>
+                      <Label>Date <span className="text-rose-500">*</span></Label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: decisionForm.decision_date ? '#111827' : '#9ca3af' }}>
@@ -3275,11 +3278,11 @@ export default function ClientsPage() {
                       </Popover>
                     </div>
                     <div className="grid gap-2">
-                      <Label>Decision Summary <span className="text-red-500">*</span></Label>
+                      <Label>Decision Summary <span className="text-rose-500">*</span></Label>
                       <Input value={decisionForm.summary} onChange={(e) => setDecisionForm({ ...decisionForm, summary: e.target.value })} placeholder="1-2 line decision summary" className="focus-brand" />
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="brand" size="sm" className="hover:opacity-90" onClick={handleDecisionSubmit} disabled={!decisionForm.summary.trim() || !decisionForm.decision_date}>
+                      <Button variant="brand" size="sm" onClick={handleDecisionSubmit} disabled={!decisionForm.summary.trim() || !decisionForm.decision_date}>
                         {editingDecisionId ? 'Save' : 'Add'}
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => { setIsDecisionFormOpen(false); setEditingDecisionId(null); }}>Cancel</Button>
@@ -3304,7 +3307,7 @@ export default function ClientsPage() {
                         </div>
                         <div className="flex gap-1">
                           <Button type="button" variant="ghost" size="sm" className="hover:bg-gray-100 w-auto px-2" onClick={() => { setEditingDecisionId(dec.id); setDecisionForm({ decision_date: new Date(dec.decision_date + 'T00:00:00'), summary: dec.summary }); setIsDecisionFormOpen(true); }}><Edit className="h-4 w-4 text-gray-600" /></Button>
-                          <Button type="button" variant="ghost" size="sm" className="hover:bg-red-50 w-auto px-2" onClick={() => setDeletingDecisionId(dec.id)}><Trash2 className="h-4 w-4 text-red-600" /></Button>
+                          <Button type="button" variant="ghost" size="sm" className="hover:bg-rose-50 w-auto px-2" onClick={() => setDeletingDecisionId(dec.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
                         </div>
                       </div>
                     )}
@@ -3317,7 +3320,7 @@ export default function ClientsPage() {
               <TabsContent value="notes" className="space-y-4 max-h-[55vh] overflow-y-auto px-1 pb-4">
               {!isNoteFormOpen && (
                 <div className="flex items-center gap-2">
-                  <Button variant="brand" size="sm" className="hover:opacity-90" onClick={() => openNoteForm()}>
+                  <Button variant="brand" size="sm" onClick={() => openNoteForm()}>
                     <Plus className="h-4 w-4 mr-1" /> Add Note
                   </Button>
                   <Button
@@ -3366,11 +3369,11 @@ export default function ClientsPage() {
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label>Title <span className="text-red-500">*</span></Label>
+                    <Label>Title <span className="text-rose-500">*</span></Label>
                     <Input value={meetingNoteForm.title} onChange={(e) => setMeetingNoteForm({ ...meetingNoteForm, title: e.target.value })} placeholder="Meeting title" className="focus-brand" />
                   </div>
                   <div className="grid gap-2">
-                    <Label>Meeting Date <span className="text-red-500">*</span></Label>
+                    <Label>Meeting Date <span className="text-rose-500">*</span></Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: meetingNoteForm.meeting_date ? '#111827' : '#9ca3af' }}>
@@ -3438,7 +3441,7 @@ export default function ClientsPage() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="brand" size="sm" className="hover:opacity-90" onClick={handleNoteFormSubmit} disabled={!meetingNoteForm.title.trim() || !meetingNoteForm.meeting_date}>
+                    <Button variant="brand" size="sm" onClick={handleNoteFormSubmit} disabled={!meetingNoteForm.title.trim() || !meetingNoteForm.meeting_date}>
                       {editingNoteId ? 'Save' : 'Add'}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => { setIsNoteFormOpen(false); setEditingNoteId(null); }}>Cancel</Button>
@@ -3464,7 +3467,7 @@ export default function ClientsPage() {
                         </div>
                         <div className="flex gap-1">
                           <Button type="button" variant="ghost" size="sm" className="hover:bg-gray-100 w-auto px-2" onClick={() => openNoteForm(note)} title="Edit note"><Edit className="h-4 w-4 text-gray-600" /></Button>
-                          <Button type="button" variant="ghost" size="sm" className="hover:bg-red-50 w-auto px-2" onClick={() => setDeletingNoteId(note.id)} title="Delete note"><Trash2 className="h-4 w-4 text-red-600" /></Button>
+                          <Button type="button" variant="ghost" size="sm" className="hover:bg-rose-50 w-auto px-2" onClick={() => setDeletingNoteId(note.id)} title="Delete note"><Trash2 className="h-4 w-4 text-rose-600" /></Button>
                         </div>
                       </div>
                       {note.attendees && <p className="text-xs text-gray-500 mt-1"><span className="font-medium">Attendees:</span> {note.attendees}</p>}
@@ -3769,7 +3772,7 @@ export default function ClientsPage() {
                 </div>
                 <DialogFooter className="mt-4">
                   <Button variant="outline" onClick={() => setContextModalClient(null)}>Cancel</Button>
-                  <Button variant="brand" className="hover:opacity-90" onClick={handleContextSubmit}>Save Context</Button>
+                  <Button variant="brand" onClick={handleContextSubmit}>Save Context</Button>
                 </DialogFooter>
               </TabsContent>
               <TabsContent value="actionboard">
@@ -3823,8 +3826,8 @@ export default function ClientsPage() {
                             }}>
                               <Pencil className="h-3.5 w-3.5 text-gray-400" />
                             </Button>
-                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-red-50" onClick={() => setDeletingActionItemId(item.id)}>
-                              <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-rose-50" onClick={() => setDeletingActionItemId(item.id)}>
+                              <Trash2 className="h-3.5 w-3.5 text-rose-400" />
                             </Button>
                           </div>
                           {item.attachment_url && (
@@ -3892,7 +3895,7 @@ export default function ClientsPage() {
                           <p className="text-xs font-medium text-gray-700">Save current milestones as a reusable template</p>
                           <Input value={saveTemplateName} onChange={(e) => setSaveTemplateName(e.target.value)} placeholder="Template name..." className="focus-brand" autoFocus />
                           <div className="flex items-center gap-2">
-                            <Button variant="brand" size="sm" className="hover:opacity-90" disabled={!saveTemplateName.trim()} onClick={async () => {
+                            <Button variant="brand" size="sm" disabled={!saveTemplateName.trim()} onClick={async () => {
                               if (contextModalClient) {
                                 const ok = await saveAsTemplate(contextModalClient.id, saveTemplateName.trim());
                                 if (ok) {
@@ -3909,7 +3912,7 @@ export default function ClientsPage() {
                       {/* Progress bar */}
                       {milestones.length > 0 && (
                         <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all duration-300" style={{ width: `${(completedCount / milestones.length) * 100}%`, backgroundColor: '#3e8692' }} />
+                          <div className="h-full bg-brand rounded-full transition-all duration-300" style={{ width: `${(completedCount / milestones.length) * 100}%` }} />
                         </div>
                       )}
 
@@ -3920,7 +3923,7 @@ export default function ClientsPage() {
                           <Input value={milestoneForm.subtitle} onChange={(e) => setMilestoneForm({ ...milestoneForm, subtitle: e.target.value })} placeholder="Subtitle (optional)" className="focus-brand" />
                           <Input value={milestoneForm.status_message} onChange={(e) => setMilestoneForm({ ...milestoneForm, status_message: e.target.value })} placeholder="Status message for client (optional)" className="focus-brand" />
                           <div className="flex items-center gap-2">
-                            <Button variant="brand" size="sm" className="hover:opacity-90" onClick={handleMilestoneSubmit} disabled={!milestoneForm.name.trim()}>
+                            <Button variant="brand" size="sm" onClick={handleMilestoneSubmit} disabled={!milestoneForm.name.trim()}>
                               {editingMilestoneId ? 'Save' : 'Add'}
                             </Button>
                             <Button size="sm" variant="outline" onClick={() => { setIsMilestoneFormOpen(false); setEditingMilestoneId(null); }}>Cancel</Button>
@@ -3937,7 +3940,11 @@ export default function ClientsPage() {
                         const statusColor = ms.status === 'complete' ? 'border-emerald-200 bg-emerald-50/30' : ms.status === 'active' ? 'border-brand bg-brand/5' : 'border-gray-200 bg-gray-50/50';
                         const StatusIcon = ms.status === 'complete' ? CheckCircle : ms.status === 'active' ? Circle : Lock;
                         const statusIconColor = ms.status === 'complete' ? 'text-emerald-500' : ms.status === 'active' ? 'text-brand' : 'text-gray-300';
-                        const statusBadge = ms.status === 'complete' ? { label: 'Complete', bg: 'bg-emerald-100 text-emerald-700' } : ms.status === 'active' ? { label: 'Active', bg: 'bg-brand-light text-brand' } : { label: 'Upcoming', bg: 'bg-gray-100 text-gray-500' };
+                        const statusBadge: { label: string; tone: BadgeTone } = ms.status === 'complete'
+                          ? { label: 'Complete', tone: 'success' }
+                          : ms.status === 'active'
+                            ? { label: 'Active', tone: 'brand' }
+                            : { label: 'Upcoming', tone: 'neutral' };
 
                         return (
                           <div key={ms.id} className={`border rounded-lg overflow-hidden ${statusColor} ${!ms.is_visible ? 'opacity-50' : ''}`}>
@@ -3954,7 +3961,7 @@ export default function ClientsPage() {
                                 </div>
                                 {ms.subtitle && <p className={`text-xs ${ms.status === 'upcoming' ? 'text-gray-300' : 'text-gray-500'}`}>{ms.subtitle}</p>}
                               </div>
-                              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${statusBadge.bg}`}>{statusBadge.label}</span>
+                              <StatusBadge tone={statusBadge.tone} size="sm">{statusBadge.label}</StatusBadge>
                               {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
                             </div>
 
@@ -3965,8 +3972,11 @@ export default function ClientsPage() {
                                 <div className="flex items-center gap-1.5 pt-2">
                                   <span className="text-[10px] text-gray-500 mr-1">Status:</span>
                                   {(['complete', 'active', 'upcoming'] as const).map(s => (
-                                    <Button key={s} size="sm" variant={ms.status === s ? 'default' : 'outline'} className="h-6 text-[10px] px-2"
-                                      style={ms.status === s ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                                    <Button
+                                      key={s}
+                                      size="sm"
+                                      variant={ms.status === s ? 'brand' : 'outline'}
+                                      className="h-6 text-[10px] px-2"
                                       onClick={() => setMilestoneStatus(ms.id, s)}
                                     >
                                       {s.charAt(0).toUpperCase() + s.slice(1)}
@@ -3983,8 +3993,8 @@ export default function ClientsPage() {
                                     }}>
                                       <Pencil className="h-3 w-3 text-gray-400" />
                                     </Button>
-                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-red-50" onClick={() => deleteMilestone(ms.id)}>
-                                      <Trash2 className="h-3 w-3 text-red-400" />
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-rose-50" onClick={() => deleteMilestone(ms.id)}>
+                                      <Trash2 className="h-3 w-3 text-rose-400" />
                                     </Button>
                                   </div>
                                 </div>
@@ -4026,7 +4036,7 @@ export default function ClientsPage() {
                                           <SelectItem value="ours">Holo Hive</SelectItem>
                                         </SelectContent>
                                       </Select>
-                                      <Button variant="brand" size="sm" className="hover:opacity-90" onClick={handleActionItemSubmit} disabled={!actionItemForm.text.trim()}>
+                                      <Button variant="brand" size="sm" onClick={handleActionItemSubmit} disabled={!actionItemForm.text.trim()}>
                                         {editingActionItemId ? 'Save' : 'Add'}
                                       </Button>
                                       <Button size="sm" variant="outline" onClick={() => { setIsActionItemFormOpen(false); setEditingActionItemId(null); setActionItemForm({ text: '', court: 'yours', attachment_url: '', attachment_label: '' }); }}>Cancel</Button>
@@ -4063,7 +4073,7 @@ export default function ClientsPage() {
             </DialogHeader>
             <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1 pb-4">
               {!isWeeklyFormOpen && (
-                <Button variant="brand" size="sm" className="hover:opacity-90" onClick={() => openWeeklyForm()}>
+                <Button variant="brand" size="sm" onClick={() => openWeeklyForm()}>
                   <Plus className="h-4 w-4 mr-1" /> Add Update
                 </Button>
               )}
@@ -4071,7 +4081,7 @@ export default function ClientsPage() {
                 <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label>Week Of <span className="text-red-500">*</span></Label>
+                      <Label>Week Of <span className="text-rose-500">*</span></Label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: weeklyForm.week_of ? '#111827' : '#9ca3af' }}>
@@ -4100,7 +4110,7 @@ export default function ClientsPage() {
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label>Current Focus <span className="text-red-500">*</span></Label>
+                    <Label>Current Focus <span className="text-rose-500">*</span></Label>
                     <Input value={weeklyForm.current_focus} onChange={(e) => setWeeklyForm({ ...weeklyForm, current_focus: e.target.value })} placeholder="1 sentence current focus" className="focus-brand" />
                   </div>
                   <div className="grid gap-2">
@@ -4112,7 +4122,7 @@ export default function ClientsPage() {
                     <Textarea value={weeklyForm.open_questions} onChange={(e) => setWeeklyForm({ ...weeklyForm, open_questions: e.target.value })} placeholder="Blockers or open items..." className="focus-brand" rows={2} />
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="brand" size="sm" className="hover:opacity-90" onClick={handleWeeklySubmit} disabled={!weeklyForm.current_focus.trim() || !weeklyForm.week_of}>
+                    <Button variant="brand" size="sm" onClick={handleWeeklySubmit} disabled={!weeklyForm.current_focus.trim() || !weeklyForm.week_of}>
                       {editingWeeklyId ? 'Save' : 'Add'}
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => { setIsWeeklyFormOpen(false); setEditingWeeklyId(null); }}>Cancel</Button>
@@ -4151,7 +4161,7 @@ export default function ClientsPage() {
                         </div>
                         <div className="flex gap-1 flex-shrink-0">
                           <Button type="button" variant="ghost" size="sm" className="hover:bg-gray-100 w-auto px-2" onClick={() => openWeeklyForm(update)}><Edit className="h-4 w-4 text-gray-600" /></Button>
-                          <Button type="button" variant="ghost" size="sm" className="hover:bg-red-50 w-auto px-2" onClick={() => setDeletingWeeklyId(update.id)}><Trash2 className="h-4 w-4 text-red-600" /></Button>
+                          <Button type="button" variant="ghost" size="sm" className="hover:bg-rose-50 w-auto px-2" onClick={() => setDeletingWeeklyId(update.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
                         </div>
                       </div>
                     </>
