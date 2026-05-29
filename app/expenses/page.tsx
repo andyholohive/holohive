@@ -428,7 +428,7 @@ export default function ExpensesPage() {
           <Select value={filterFrequency} onValueChange={setFilterFrequency}>
             <SelectTrigger className="w-[140px] h-9 text-sm focus-brand"><SelectValue placeholder="Frequency" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All frequencies</SelectItem>
+              <SelectItem value="all">All</SelectItem>
               {(['one_time','daily','weekly','monthly'] as Frequency[]).map(f =>
                 <SelectItem key={f} value={f}>{FREQ_LABEL[f]}</SelectItem>)}
             </SelectContent>
