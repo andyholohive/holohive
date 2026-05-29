@@ -359,7 +359,7 @@ export default function KOLsPage() {
       );
     } catch (error) {
       console.error('MultiSelect render error:', error);
-      return <div className="text-red-500">Error rendering multiselect</div>;
+      return <div className="text-rose-500">Error rendering multiselect</div>;
     }
   };
 
@@ -890,7 +890,7 @@ export default function KOLsPage() {
         );
       case 'YouTube':
         return (
-          <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="h-4 w-4 text-rose-500" viewBox="0 0 24 24" fill="currentColor">
             <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
           </svg>
         );
@@ -918,7 +918,7 @@ export default function KOLsPage() {
       'Trading': 'bg-emerald-100 text-emerald-800',
       'Deep Dive': 'bg-purple-100 text-purple-800',
       'Meme/Cultural Narrative': 'bg-pink-100 text-pink-800',
-      'Drama Queen': 'bg-red-100 text-red-800',
+      'Drama Queen': 'bg-rose-100 text-rose-800',
       'Sceptics': 'bg-orange-100 text-orange-800',
       'Technical Educator': 'bg-indigo-100 text-indigo-800',
       'Bridge Builders': 'bg-teal-100 text-teal-800',
@@ -948,7 +948,7 @@ export default function KOLsPage() {
       '<$200': 'bg-emerald-100 text-emerald-800',
       '$200-500': 'bg-yellow-100 text-yellow-800',
       '$500-1K': 'bg-orange-100 text-orange-800',
-      '$1K-2K': 'bg-red-100 text-red-800',
+      '$1K-2K': 'bg-rose-100 text-rose-800',
       '$2K-3K': 'bg-purple-100 text-purple-800',
       '>$3K': 'bg-pink-100 text-pink-800'
     };
@@ -958,7 +958,7 @@ export default function KOLsPage() {
   const getTierColor = (tier: string) => {
     const colorMap: { [key: string]: string } = {
       'Tier S': 'bg-purple-100 text-purple-800',
-      'Tier 1': 'bg-red-100 text-red-800',
+      'Tier 1': 'bg-rose-100 text-rose-800',
       'Tier 2': 'bg-orange-100 text-orange-800',
       'Tier 3': 'bg-yellow-100 text-yellow-800',
       'Tier 4': 'bg-emerald-100 text-emerald-800'
@@ -969,7 +969,7 @@ export default function KOLsPage() {
   const getCreatorTypeColor = (creatorType: string) => {
     const colorMap: { [key: string]: string } = {
       'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
-      'Drama-Forward': 'bg-red-100 text-red-800',
+      'Drama-Forward': 'bg-rose-100 text-rose-800',
       'Skeptic': 'bg-orange-100 text-orange-800',
       'Educator': 'bg-blue-100 text-blue-800',
       'Bridge Builder': 'bg-emerald-100 text-emerald-800',
@@ -992,7 +992,7 @@ export default function KOLsPage() {
   const getInHouseColor = (inHouse: string) => {
     const colorMap: { [key: string]: string } = {
       'Yes': 'bg-emerald-100 text-emerald-800',
-      'No': 'bg-red-100 text-red-800',
+      'No': 'bg-rose-100 text-rose-800',
       'Contractor': 'bg-blue-100 text-blue-800',
       'Freelancer': 'bg-purple-100 text-purple-800'
     };
@@ -1053,7 +1053,7 @@ export default function KOLsPage() {
               >
                 <SelectTrigger 
                   className={`border-none shadow-none bg-transparent w-auto ${
-                  value ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                  value ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                   } px-2 py-1 rounded-md text-xs font-medium inline-flex items-center h-auto focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
                   style={{ outline: 'none', boxShadow: 'none' }}
                 >
@@ -1173,7 +1173,7 @@ export default function KOLsPage() {
                         >
                           Cancel
                         </Button>
-                        <Button size="sm" onClick={() => handleAddNewOption('in_house', newOptionValue, false)} disabled={!newOptionValue.trim()} className="h-6 px-2 text-xs hover:opacity-90 bg-brand text-white">
+                        <Button variant="brand" size="sm" onClick={() => handleAddNewOption('in_house', newOptionValue, false)} disabled={!newOptionValue.trim()} className="h-6 px-2 text-xs">
                           Add
                         </Button>
                       </div>
@@ -1522,7 +1522,7 @@ export default function KOLsPage() {
             Column Visibility
           </Button>
           <p className="text-xs text-gray-500 mt-2">
-            <span className="text-red-500 font-bold">!</span> indicates KOL not updated in 90+ days
+            <span className="text-rose-500 font-bold">!</span> indicates KOL not updated in 90+ days
           </p>
         </div>
 
@@ -1554,7 +1554,7 @@ export default function KOLsPage() {
       <div className="space-y-6">
         <PageHeader title="KOLs" subtitle="Manage your Key Opinion Leaders" />
         <div className="text-center py-8">
-          <p className="text-red-600">{error}</p>
+          <p className="text-rose-600">{error}</p>
           <Button onClick={fetchKOLs} className="mt-4">Retry</Button>
         </div>
       </div>
@@ -1819,7 +1819,7 @@ export default function KOLsPage() {
             <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Community Founder</span>
             <Select value={bulkEdit.community === true ? 'yes' : bulkEdit.community === false ? 'no' : ''} onValueChange={v => setBulkEdit(prev => ({ ...prev, community: v === 'yes' }))}>
               <SelectTrigger
-                className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.community !== undefined ? (bulkEdit.community ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800') : ''}`}
+                className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.community !== undefined ? (bulkEdit.community ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800') : ''}`}
                 style={{ outline: 'none', boxShadow: 'none' }}
               >
                 <span>{bulkEdit.community === true ? 'Yes' : bulkEdit.community === false ? 'No' : 'Select'}</span>
@@ -1835,7 +1835,7 @@ export default function KOLsPage() {
             <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Group Chat</span>
             <Select value={bulkEdit.group_chat === true ? 'yes' : bulkEdit.group_chat === false ? 'no' : ''} onValueChange={v => setBulkEdit(prev => ({ ...prev, group_chat: v === 'yes' }))}>
               <SelectTrigger
-                className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.group_chat !== undefined ? (bulkEdit.group_chat ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800') : ''}`}
+                className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.group_chat !== undefined ? (bulkEdit.group_chat ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800') : ''}`}
                 style={{ outline: 'none', boxShadow: 'none' }}
               >
                 <span>{bulkEdit.group_chat === true ? 'Yes' : bulkEdit.group_chat === false ? 'No' : 'Select'}</span>
@@ -1910,7 +1910,7 @@ export default function KOLsPage() {
                         >
                           Cancel
                         </Button>
-                        <Button onClick={() => handleAddNewOption('in_house', newOptionValueBulk, true)} disabled={!newOptionValueBulk.trim()} className="text-xs hover:opacity-90 bg-brand text-white">
+                        <Button variant="brand" onClick={() => handleAddNewOption('in_house', newOptionValueBulk, true)} disabled={!newOptionValueBulk.trim()} className="text-xs">
                           Add Option
                         </Button>
                       </div>
@@ -1925,8 +1925,9 @@ export default function KOLsPage() {
           <div className="flex items-center justify-between">
             <div className="flex gap-3">
               <Button
+                variant="brand"
                 size="sm"
-                className="bg-brand hover:bg-[#2d6b75] text-white border-0 shadow-sm"
+                className="shadow-sm"
                 disabled={selectedKOLs.length === 0}
                 onClick={async () => {
                   if (selectedKOLs.length === 0) return;
@@ -1944,7 +1945,7 @@ export default function KOLsPage() {
               </Button>
               <Button
                 size="sm"
-                className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm"
+                className="bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm"
                 disabled={selectedKOLs.length === 0 || isBulkDeleting}
                 onClick={() => setShowBulkDeleteDialog(true)}
               >
@@ -2160,7 +2161,7 @@ export default function KOLsPage() {
               <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Community Founder</span>
               <Select value={filters.community} onValueChange={v => setFilters(prev => ({ ...prev, community: v }))}>
                 <SelectTrigger
-                  className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${filters.community === 'yes' ? 'bg-emerald-100 text-emerald-800' : filters.community === 'no' ? 'bg-red-100 text-red-800' : ''}`}
+                  className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${filters.community === 'yes' ? 'bg-emerald-100 text-emerald-800' : filters.community === 'no' ? 'bg-rose-100 text-rose-800' : ''}`}
                   style={{ outline: 'none', boxShadow: 'none' }}
                 >
                   <span>{filters.community === 'yes' ? 'Yes' : filters.community === 'no' ? 'No' : 'Select'}</span>
@@ -2176,7 +2177,7 @@ export default function KOLsPage() {
               <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Group Chat</span>
               <Select value={filters.group_chat} onValueChange={v => setFilters(prev => ({ ...prev, group_chat: v }))}>
                 <SelectTrigger
-                  className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${filters.group_chat === 'yes' ? 'bg-emerald-100 text-emerald-800' : filters.group_chat === 'no' ? 'bg-red-100 text-red-800' : ''}`}
+                  className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${filters.group_chat === 'yes' ? 'bg-emerald-100 text-emerald-800' : filters.group_chat === 'no' ? 'bg-rose-100 text-rose-800' : ''}`}
                   style={{ outline: 'none', boxShadow: 'none' }}
                 >
                   <span>{filters.group_chat === 'yes' ? 'Yes' : filters.group_chat === 'no' ? 'No' : 'Select'}</span>
@@ -2325,7 +2326,7 @@ export default function KOLsPage() {
           </PopoverContent>
         </Popover>
         <p className="text-xs text-gray-500 mt-2">
-          <span className="text-red-500 font-bold">!</span> indicates KOL not updated in 90+ days
+          <span className="text-rose-500 font-bold">!</span> indicates KOL not updated in 90+ days
         </p>
       </div>
 
@@ -2356,8 +2357,8 @@ export default function KOLsPage() {
             value="need_update"
             className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-1.5"
           >
-            <span className="text-red-500 font-bold mr-1">!</span> Need Update
-            <span className="ml-2 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">{needUpdateCount}</span>
+            <span className="text-rose-500 font-bold mr-1">!</span> Need Update
+            <span className="ml-2 text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full">{needUpdateCount}</span>
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -2420,7 +2421,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.platform.length > 0 && (
-                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         {filters.platform.length}
                       </span>
                     )}
@@ -2476,7 +2477,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {(filters.followersOperator && filters.followers) && (
-                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         1
                       </span>
                     )}
@@ -2530,7 +2531,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.region.length > 0 && (
-                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         {filters.region.length}
                       </span>
                     )}
@@ -2581,7 +2582,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.creator_type.length > 0 && (
-                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         {filters.creator_type.length}
                       </span>
                     )}
@@ -2632,7 +2633,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.content_type.length > 0 && (
-                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         {filters.content_type.length}
                       </span>
                     )}
@@ -2683,7 +2684,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.deliverables.length > 0 && (
-                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         {filters.deliverables.length}
                       </span>
                     )}
@@ -2734,7 +2735,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.pricing.length > 0 && (
-                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         {filters.pricing.length}
                       </span>
                     )}
@@ -2786,7 +2787,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.projects && (
-                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         1
                       </span>
                     )}
@@ -2834,7 +2835,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.community && (
-                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         1
                       </span>
                     )}
@@ -2882,7 +2883,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.group_chat && (
-                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         1
                       </span>
                     )}
@@ -2933,7 +2934,7 @@ export default function KOLsPage() {
                       </PopoverContent>
                     </Popover>
                     {filters.in_house.length > 0 && (
-                      <span className="ml-1 bg-brand text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
                         {filters.in_house.length}
                       </span>
                     )}
@@ -2996,7 +2997,7 @@ export default function KOLsPage() {
                           return (
                             <>
                               {isStale && (
-                                <span className="text-red-500 font-bold" title="Not updated in 90+ days">!</span>
+                                <span className="text-rose-500 font-bold" title="Not updated in 90+ days">!</span>
                               )}
                               {renderEditableCell(kol.name, 'name', kol.id, 'text')}
                               {/* Expand icon — opens the profile modal
@@ -3242,11 +3243,10 @@ export default function KOLsPage() {
                 return (
                   <Button
                     key={pageNum}
-                    variant={currentPage === pageNum ? 'default' : 'outline'}
+                    variant={currentPage === pageNum ? 'brand' : 'outline'}
                     size="sm"
                     onClick={() => setCurrentPage(pageNum)}
-                    className={`w-8 h-8 p-0 ${currentPage === pageNum ? 'hover:opacity-90' : ''}`}
-                    style={currentPage === pageNum ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    className="w-8 h-8 p-0"
                   >
                     {pageNum}
                   </Button>
