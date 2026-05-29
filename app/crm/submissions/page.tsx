@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { EmptyState } from '@/components/ui/empty-state';
 import { KpiCard } from '@/components/ui/kpi-card';
+import { PageHeader } from '@/components/ui/page-header';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useRouter } from 'next/navigation';
 
@@ -261,7 +262,7 @@ export default function SubmissionsPage() {
   };
 
   const timelineColor = (timeline: string) => {
-    if (timeline?.toLowerCase().includes('asap') || timeline?.toLowerCase().includes('immediately')) return 'bg-red-100 text-red-700 border-red-200';
+    if (timeline?.toLowerCase().includes('asap') || timeline?.toLowerCase().includes('immediately')) return 'bg-rose-100 text-rose-700 border-rose-200';
     if (timeline?.toLowerCase().includes('soon') || timeline?.toLowerCase().includes('1-2')) return 'bg-amber-100 text-amber-700 border-amber-200';
     if (timeline?.toLowerCase().includes('3-6') || timeline?.toLowerCase().includes('quarter')) return 'bg-blue-100 text-blue-700 border-blue-200';
     return 'bg-gray-100 text-gray-700 border-gray-200';
@@ -286,37 +287,30 @@ export default function SubmissionsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        {/* Header — real title/subtitle render immediately. */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Contact Submissions</h2>
-            <p className="text-gray-600">Inbound inquiries from the contact form</p>
-          </div>
-        </div>
+        <PageHeader
+          icon={Inbox}
+          title="Contact Submissions"
+          subtitle="Inbound inquiries from the contact form"
+        />
         <div className="grid grid-cols-3 gap-4">
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
         </div>
         <Skeleton className="h-10 w-80" />
-        <Skeleton className="h-96" />
+        <Skeleton className="h-96 rounded-lg" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header — title left, search + refresh on the right.
-          Standardized 2026-05-06: previously there were no actions in
-          the header and the search lived in its own row below the stat
-          cards. Now matches /network and /crm/contacts which keep
-          search inline with the page title. */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Contact Submissions</h2>
-          <p className="text-gray-600">Inbound inquiries from the contact form</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+      <PageHeader
+        icon={Inbox}
+        title="Contact Submissions"
+        subtitle="Inbound inquiries from the contact form"
+        actions={(
+          <>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
@@ -327,7 +321,7 @@ export default function SubmissionsPage() {
             />
           </div>
           <Select value={fundingFilter} onValueChange={(v) => setFundingFilter(v as FundingBucket)}>
-            <SelectTrigger className="h-9 w-32 text-sm"><SelectValue placeholder="Funding" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-32 text-sm focus-brand"><SelectValue placeholder="Funding" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All funding</SelectItem>
               <SelectItem value="<500K">&lt; $500K</SelectItem>
@@ -338,7 +332,7 @@ export default function SubmissionsPage() {
             </SelectContent>
           </Select>
           <Select value={timelineFilter} onValueChange={(v) => setTimelineFilter(v as TimelineBucket)}>
-            <SelectTrigger className="h-9 w-32 text-sm"><SelectValue placeholder="Timeline" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-32 text-sm focus-brand"><SelectValue placeholder="Timeline" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All timelines</SelectItem>
               <SelectItem value="asap">ASAP</SelectItem>
@@ -349,7 +343,7 @@ export default function SubmissionsPage() {
             </SelectContent>
           </Select>
           <Select value={convertedFilter} onValueChange={(v) => setConvertedFilter(v as any)}>
-            <SelectTrigger className="h-9 w-36 text-sm"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-36 text-sm focus-brand"><SelectValue placeholder="Status" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
@@ -387,8 +381,9 @@ export default function SubmissionsPage() {
               ? <Loader2 className="h-4 w-4 animate-spin" />
               : <RefreshCw className="h-4 w-4" />}
           </Button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       {/* Stats — flat KpiCard baseline (was 3 ad-hoc Cards before
           2026-05-06). Total uses brand teal as the primary metric;
@@ -599,7 +594,7 @@ export default function SubmissionsPage() {
                     <ArrowRight className="h-4 w-4 mr-1.5" /> Open in pipeline
                   </Button>
                 ) : (
-                  <Button onClick={() => convertToOpportunity(selectedSubmission)} disabled={converting} className="hover:opacity-90 bg-brand text-white">
+                  <Button onClick={() => convertToOpportunity(selectedSubmission)} disabled={converting} className="bg-brand text-white">
                     {converting ? (
                       <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Converting…</>
                     ) : (
