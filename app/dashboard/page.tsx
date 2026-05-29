@@ -368,12 +368,17 @@ export default function DashboardPage() {
 
       {/* Content. */}
       {loading ? (
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            {[1, 2, 3].map(i => <Skeleton key={i} className="h-24" />)}
+        <div className="space-y-6">
+          {/* KPI strip skeletons — must match the actual `grid-cols-1
+              md:grid-cols-3 gap-3` shape so the layout doesn't shift
+              under the user when data loads. */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 rounded-xl" />
+            ))}
           </div>
-          <Skeleton className="h-64" />
-          <Skeleton className="h-48" />
+          <Skeleton className="h-64 rounded-lg" />
+          <Skeleton className="h-48 rounded-lg" />
         </div>
       ) : !data?.snapshot ? (
         <EmptyState
