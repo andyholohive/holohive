@@ -4,9 +4,10 @@ import React, { useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import {
   Search, Copy, Check, Sparkles, Target, Building2, Megaphone, Users,
-  GitBranch, AlertCircle, ListTodo, FileText, BarChart3,
+  GitBranch, AlertCircle, ListTodo, FileText, BarChart3, Bot,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { PageHeader } from '@/components/ui/page-header';
 
 /**
  * /mcp — HoloHive MCP Connector cookbook.
@@ -559,28 +560,21 @@ export default function McpGuidePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header — matches Field Options / Archive tab styling for
-          consistency inside the combined /admin tabbed view. The
-          richer hero (large icon + 3xl heading) was right when this
-          was a standalone page; inside a tab it just adds visual noise
-          on top of the parent TabsList. */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Claude MCP</h2>
-          <p className="text-gray-600">
-            HoloHive&rsquo;s connector for Claude.ai — example prompts for every tool.
-            <span className="text-gray-500"> {totalTools} read-only tools across 8 surfaces.</span>
-          </p>
-        </div>
-        <a
-          href="/analytics"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:underline shrink-0 px-3 py-1.5 border border-brand/30 rounded-md hover:bg-brand/5"
-          title="One-page snapshot instead of asking Claude"
-        >
-          <BarChart3 className="h-3.5 w-3.5" />
-          Open Analytics
-        </a>
-      </div>
+      <PageHeader
+        icon={Bot}
+        title="Claude MCP"
+        subtitle={`HoloHive's connector for Claude.ai — example prompts for every tool. ${totalTools} read-only tools across 8 surfaces.`}
+        actions={(
+          <a
+            href="/analytics"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:underline shrink-0 px-3 py-1.5 border border-brand/30 rounded-md hover:bg-brand/5"
+            title="One-page snapshot instead of asking Claude"
+          >
+            <BarChart3 className="h-3.5 w-3.5" />
+            Open Analytics
+          </a>
+        )}
+      />
 
       {/* ── Setup card ─────────────────────────────────────────────── */}
       <div className="rounded-2xl bg-gradient-to-br from-brand/8 to-brand/3 border border-brand/20 p-6">

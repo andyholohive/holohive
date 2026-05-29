@@ -8,13 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
+import { PageHeader } from '@/components/ui/page-header';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Building2, Mail, Globe, Trash2, CheckCircle, PauseCircle, Calendar } from 'lucide-react';
+import { Plus, Search, Edit, Building2, Mail, Globe, Trash2, CheckCircle, PauseCircle, Calendar, Handshake } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface Partner {
@@ -218,23 +219,20 @@ export default function PartnersPage() {
     return (
       <ProtectedRoute>
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Channel Partners</h2>
-              <p className="text-gray-600">Manage your channel partner relationships</p>
-            </div>
-            <div className="flex space-x-3">
+          <PageHeader
+            icon={Handshake}
+            title="Channel Partners"
+            subtitle="Manage your channel partner relationships"
+            actions={(
               <Button variant="brand" disabled>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Partner
               </Button>
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input placeholder="Search partners by name, email, or website..." className="pl-10 focus-brand" disabled />
-            </div>
+            )}
+          />
+          <div className="relative max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input placeholder="Search partners by name, email, or website..." className="pl-10 focus-brand" disabled />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -249,21 +247,17 @@ export default function PartnersPage() {
   return (
     <ProtectedRoute>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Channel Partners</h2>
-            <p className="text-gray-600">Manage your channel partner relationships</p>
-          </div>
-          {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
-            <div>
-              <Button variant="brand" onClick={() => { setIsEditMode(false); setIsNewPartnerOpen(true); }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Partner
-              </Button>
-            </div>
-          )}
-        </div>
+        <PageHeader
+          icon={Handshake}
+          title="Channel Partners"
+          subtitle="Manage your channel partner relationships"
+          actions={((userProfile?.role === 'admin' || userProfile?.role === 'super_admin') ? (
+            <Button variant="brand" onClick={() => { setIsEditMode(false); setIsNewPartnerOpen(true); }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Partner
+            </Button>
+          ) : undefined)}
+        />
 
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">

@@ -40,8 +40,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import {
-  ArrowLeft, Plus, Settings, Trash2, Copy, Star, StarOff, Pencil, ChevronUp, ChevronDown, Search, X, Lock,
+  ArrowLeft, Plus, Settings, Trash2, Copy, Star, StarOff, Pencil, ChevronUp, ChevronDown, Search, X, Lock, ListChecks,
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -324,20 +325,21 @@ export default function ActionBoardTemplatesPage() {
       {/* Header — matches the standard admin page pattern
           (h2 + subtitle on the left, action buttons on the right).
           Outer padding comes from Sidebar's <main className="p-6">. */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <Link href="/clients" className="inline-flex items-center text-xs text-gray-500 hover:text-brand mb-1 transition-colors">
-            <ArrowLeft className="h-3 w-3 mr-1" />
-            Back to Clients
-          </Link>
-          <h2 className="text-2xl font-bold text-gray-900">Action Board Templates</h2>
-          <p className="text-gray-600">Reusable milestone sets you can apply to any client's Action Board.</p>
-        </div>
-        <Button variant="brand" className="flex-shrink-0" onClick={openNew}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Template
-        </Button>
-      </div>
+      <Link href="/clients" className="inline-flex items-center text-xs text-gray-500 hover:text-brand transition-colors w-fit">
+        <ArrowLeft className="h-3 w-3 mr-1" />
+        Back to Clients
+      </Link>
+      <PageHeader
+        icon={ListChecks}
+        title="Action Board Templates"
+        subtitle="Reusable milestone sets you can apply to any client's Action Board."
+        actions={(
+          <Button variant="brand" onClick={openNew}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Template
+          </Button>
+        )}
+      />
 
       {/* Search bar */}
       <div className="relative max-w-sm">

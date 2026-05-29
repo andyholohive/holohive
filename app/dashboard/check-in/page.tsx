@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHeader } from '@/components/ui/page-header';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Loader2, MessageCircleQuestion, ArrowLeft, CheckCircle2, X, Plus } from 'lucide-react';
@@ -114,27 +115,24 @@ function CheckInForm() {
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
-      <div>
-        <Button asChild variant="ghost" size="sm" className="mb-2 -ml-2 h-8">
-          <Link href="/dashboard">
-            <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
-            Back to dashboard
-          </Link>
-        </Button>
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <MessageCircleQuestion className="h-6 w-6 text-brand" />
-          Weekly Check-In
-        </h2>
-        <p className="text-gray-600 text-sm mt-0.5">
-          For the week of <span className="font-semibold">{weekOf}</span>.
-          {submittedAt && (
-            <span className="ml-2 inline-flex items-center gap-1 text-emerald-700">
-              <CheckCircle2 className="h-3.5 w-3.5" />
-              Submitted {new Date(submittedAt).toLocaleString()} — re-submit to update.
-            </span>
-          )}
-        </p>
-      </div>
+      <Button asChild variant="ghost" size="sm" className="-ml-2 h-8 w-fit">
+        <Link href="/dashboard">
+          <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
+          Back to dashboard
+        </Link>
+      </Button>
+      <PageHeader
+        icon={MessageCircleQuestion}
+        title="Weekly Check-In"
+        subtitle={`For the week of ${weekOf}.`}
+      >
+        {submittedAt && (
+          <p className="text-sm inline-flex items-center gap-1 text-emerald-700">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Submitted {new Date(submittedAt).toLocaleString()} — re-submit to update.
+          </p>
+        )}
+      </PageHeader>
 
       {loading ? (
         <div className="space-y-4">

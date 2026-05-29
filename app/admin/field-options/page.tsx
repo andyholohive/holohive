@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
 import { FieldOptionsService, FieldOption, CreateFieldOptionData } from '@/lib/fieldOptionsService';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, GripVertical, Sliders } from 'lucide-react';
@@ -268,25 +269,24 @@ export default function FieldOptionsPage() {
     // The Sidebar layout already provides bg-gray-50 + min-h.
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Field Options</h2>
-            <p className="text-gray-600">Manage dynamic dropdown options for KOL fields</p>
-          </div>
-        </div>
-        <Skeleton className="h-64" />
+        <PageHeader
+          icon={Sliders}
+          title="Field Options"
+          subtitle="Manage dynamic dropdown options for KOL fields"
+        />
+        <Skeleton className="h-64 rounded-lg" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Field Options</h2>
-              <p className="text-gray-600">Manage dynamic dropdown options for KOL fields</p>
-            </div>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <PageHeader
+            icon={Sliders}
+            title="Field Options"
+            subtitle="Manage dynamic dropdown options for KOL fields"
+            actions={(
+              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
                 <Button variant="brand">
                   <Plus className="h-4 w-4 mr-2" />
@@ -342,7 +342,8 @@ export default function FieldOptionsPage() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </div>
+            )}
+          />
 
           {error && (
             <Alert variant="destructive">

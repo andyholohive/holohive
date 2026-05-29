@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/ui/page-header';
+import { Bot } from 'lucide-react';
 import { AIService } from '@/lib/aiService';
 
 export default function TestAIPage() {
@@ -88,9 +90,12 @@ export default function TestAIPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-6">AI Assistant Test Page</h1>
-      
+    <div className="space-y-6">
+      <PageHeader
+        icon={Bot}
+        title="AI Assistant Test Page"
+        subtitle="Developer test surface for the AI route"
+      />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Test Controls */}
         <Card>

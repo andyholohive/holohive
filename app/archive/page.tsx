@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, RotateCcw, Trash2, Building2, Mail, MapPin, Calendar, List, Megaphone, ClipboardList, Users, AlertTriangle, Crown, Globe } from 'lucide-react';
+import { Search, RotateCcw, Trash2, Building2, Mail, MapPin, Calendar, List, Megaphone, ClipboardList, Users, AlertTriangle, Crown, Globe, Archive as ArchiveIcon } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { EmptyState } from '@/components/ui/empty-state';
 
 // Local row types. Field nullability mirrors the Supabase schema
@@ -306,10 +307,11 @@ export default function ArchivePage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Archive</h2>
-          <p className="text-gray-600">Manage archived items - restore or permanently delete</p>
-        </div>
+        <PageHeader
+          icon={ArchiveIcon}
+          title="Archive"
+          subtitle="Manage archived items - restore or permanently delete"
+        />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, index) => (
             <CardSkeleton key={index} />
@@ -321,10 +323,11 @@ export default function ArchivePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Archive</h2>
-        <p className="text-gray-600">Manage archived items - restore or permanently delete</p>
-      </div>
+      <PageHeader
+        icon={ArchiveIcon}
+        title="Archive"
+        subtitle="Manage archived items - restore or permanently delete"
+      />
 
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded">

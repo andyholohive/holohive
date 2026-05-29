@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/ui/page-header';
+import { Sparkles } from 'lucide-react';
 import { AdvancedInsightsCard } from '@/components/ai/AdvancedInsightsCard';
 import { WorkflowManager } from '@/components/ai/WorkflowManager';
 import { AdvancedAIService, PredictiveInsight } from '@/lib/advancedAIService';
@@ -76,12 +78,11 @@ export default function AIInsightsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">AI Insights & Analytics</h2>
-            <p className="text-gray-600">Advanced AI-powered insights, predictive analytics, and automated workflows to optimize your campaigns.</p>
-          </div>
-        </div>
+        <PageHeader
+          icon={Sparkles}
+          title="AI Insights & Analytics"
+          subtitle="Advanced AI-powered insights, predictive analytics, and automated workflows to optimize your campaigns."
+        />
         <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
             <Skeleton className="h-10 w-full rounded-md" />
@@ -119,12 +120,11 @@ export default function AIInsightsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">AI Insights & Analytics</h2>
-          <p className="text-gray-600">Advanced AI-powered insights, predictive analytics, and automated workflows to optimize your campaigns.</p>
-        </div>
-      </div>
+      <PageHeader
+        icon={Sparkles}
+        title="AI Insights & Analytics"
+        subtitle="Advanced AI-powered insights, predictive analytics, and automated workflows to optimize your campaigns."
+      />
 
       <Tabs defaultValue="insights" className="w-full">
         <TabsList className="grid w-full grid-cols-3">

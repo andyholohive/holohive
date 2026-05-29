@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
 import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -115,22 +116,17 @@ export default function DashboardSettingsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <Button asChild variant="ghost" size="sm" className="mb-2 -ml-2 h-8">
-          <Link href="/dashboard">
-            <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
-            Back to dashboard
-          </Link>
-        </Button>
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <SettingsIcon className="h-6 w-6 text-brand" />
-          Dashboard Settings
-        </h2>
-        <p className="text-gray-600 text-sm mt-0.5">
-          Tag which Telegram chats feed the weekly LLM analyzer. Untagged chats are ignored.
-        </p>
-      </div>
+      <Button asChild variant="ghost" size="sm" className="-ml-2 h-8 w-fit">
+        <Link href="/dashboard">
+          <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
+          Back to dashboard
+        </Link>
+      </Button>
+      <PageHeader
+        icon={SettingsIcon}
+        title="Dashboard Settings"
+        subtitle="Tag which Telegram chats feed the weekly LLM analyzer. Untagged chats are ignored."
+      />
 
       {/* Counts */}
       {counts && (

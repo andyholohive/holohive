@@ -24,6 +24,7 @@ import {
   Building2, ChevronRight, ChevronDown, LayoutGrid, TableIcon, GripVertical,
   Mail, MessageSquare, Filter, Phone, ArrowUpDown, Handshake
 } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
@@ -2044,23 +2045,22 @@ export default function PipelinePage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Pipeline</h2>
-          <p className="text-gray-600">Manage your leads and deals</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search opportunities..."
-              className="pl-10 w-64 focus-brand"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Button
+      <PageHeader
+        icon={Target}
+        title="Pipeline"
+        subtitle="Manage your leads and deals"
+        actions={(
+          <>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search opportunities..."
+                className="pl-10 w-64 focus-brand"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Button
             onClick={() => {
               setEditingOpportunity(null);
               // Set opportunity type and default stage based on active tab
@@ -2086,8 +2086,9 @@ export default function PipelinePage() {
             <Plus className="h-4 w-4 mr-2" />
             Add Opportunity
           </Button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       {/* Stats Cards — [Responsive cleanup, May 2026] was bare grid-cols-5
           which collapsed to unreadable widths below ~700px. Now 2 cols
