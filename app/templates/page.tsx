@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/ui/page-header';
 import { MessageSquare, Copy, TrendingUp, Calendar, Info, Star, Sparkles, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -123,7 +124,7 @@ export default function TemplatesPage() {
       finalizing_kols: 'bg-amber-100 text-amber-800',
       creator_brief: 'bg-fuchsia-100 text-fuchsia-800',
       final_checklist: 'bg-rose-100 text-rose-800',
-      activation_day: 'bg-red-100 text-red-800',
+      activation_day: 'bg-rose-100 text-rose-800',
       mid_campaign_update: 'bg-violet-100 text-violet-800',
       initial_results: 'bg-sky-100 text-sky-800',
       final_report: 'bg-indigo-100 text-indigo-800',
@@ -163,17 +164,17 @@ export default function TemplatesPage() {
     // animation between pages on slow loads.
     return (
       <div className="space-y-6">
-        {/* Header — real title/subtitle render immediately. */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Client Message Templates</h2>
-            <p className="text-gray-600 mt-1">Pre-built templates and AI learning examples</p>
-          </div>
-          <div className="flex gap-2">
-            <Skeleton className="h-7 w-24" />
-            <Skeleton className="h-7 w-24" />
-          </div>
-        </div>
+        <PageHeader
+          icon={MessageSquare}
+          title="Client Message Templates"
+          subtitle="Pre-built templates and AI learning examples"
+          actions={(
+            <>
+              <Skeleton className="h-7 w-24" />
+              <Skeleton className="h-7 w-24" />
+            </>
+          )}
+        />
 
         {/* Tabs */}
         <div className="flex gap-2 border-b">
@@ -248,23 +249,21 @@ export default function TemplatesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Client Message Templates</h2>
-          <p className="text-gray-600 mt-1">
-            Pre-built templates and AI learning examples
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Badge variant="secondary" className="text-sm px-3 py-1">
-            {templates.length} Templates
-          </Badge>
-          <Badge variant="outline" className="text-sm px-3 py-1">
-            {learningExamples.length} Examples
-          </Badge>
-        </div>
-      </div>
+      <PageHeader
+        icon={MessageSquare}
+        title="Client Message Templates"
+        subtitle="Pre-built templates and AI learning examples"
+        actions={(
+          <>
+            <Badge variant="secondary" className="text-sm px-3 py-1">
+              {templates.length} Templates
+            </Badge>
+            <Badge variant="outline" className="text-sm px-3 py-1">
+              {learningExamples.length} Examples
+            </Badge>
+          </>
+        )}
+      />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'templates' | 'examples')}>

@@ -10,6 +10,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHeader } from '@/components/ui/page-header';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -578,16 +579,17 @@ export default function SOPsPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">SOPs</h2>
-              <p className="text-gray-600">Standard Operating Procedures</p>
-            </div>
-            <Button variant="brand" disabled>
-              <Plus className="h-4 w-4 mr-2" />
-              Create SOP
-            </Button>
-          </div>
+          <PageHeader
+            icon={BookOpen}
+            title="SOPs"
+            subtitle="Standard Operating Procedures"
+            actions={(
+              <Button variant="brand" disabled>
+                <Plus className="h-4 w-4 mr-2" />
+                Create SOP
+              </Button>
+            )}
+          />
           <div className="flex items-center space-x-4">
             <div className="relative flex-1 max-w-sm">
               <Skeleton className="h-10 w-full" />
@@ -613,17 +615,17 @@ export default function SOPsPage() {
 
   return (
     <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">SOPs</h2>
-            <p className="text-gray-600">Standard Operating Procedures</p>
-          </div>
-          <Button variant="brand" onClick={handleCreateNew} className="hover:opacity-90">
-            <Plus className="h-4 w-4 mr-2" />
-            Create SOP
-          </Button>
-        </div>
+        <PageHeader
+          icon={BookOpen}
+          title="SOPs"
+          subtitle="Standard Operating Procedures"
+          actions={(
+            <Button variant="brand" onClick={handleCreateNew}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create SOP
+            </Button>
+          )}
+        />
 
         {/* Automation Review Queue Alert */}
         {automationReviewCount > 0 && (
@@ -740,7 +742,7 @@ export default function SOPsPage() {
                 : 'No SOPs yet. Create your first SOP to get started.'}
             </p>
             {!searchTerm && statusFilter === 'all' && categoryFilter === 'all' && ownerFilter === 'all' && (
-              <Button variant="brand" onClick={handleCreateNew} className="hover:opacity-90">
+              <Button variant="brand" onClick={handleCreateNew}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Your First SOP
               </Button>
@@ -1044,7 +1046,7 @@ export default function SOPsPage() {
                 <Button type="button" variant="outline" onClick={() => setIsCreateEditOpen(false)}>
                   Cancel
                 </Button>
-                <Button variant="brand" type="submit" disabled={isSubmitting} className="hover:opacity-90">
+                <Button variant="brand" type="submit" disabled={isSubmitting}>
                   {isSubmitting ? 'Saving...' : (editingSOP ? 'Update SOP' : 'Create SOP')}
                 </Button>
               </DialogFooter>
@@ -1148,7 +1150,7 @@ export default function SOPsPage() {
                         DeliverableWizard pre-loaded with the template +
                         SOP name as the initial deliverable title. */}
                     {viewingSOP.deliverable_template_id && (
-                      <Button variant="brand" size="sm" className="hover:opacity-90" onClick={() => {
+                      <Button variant="brand" size="sm" onClick={() => {
                           setWizardTemplateId(viewingSOP.deliverable_template_id);
                           setWizardInitialTitle(viewingSOP.name);
                           setIsViewOpen(false);
