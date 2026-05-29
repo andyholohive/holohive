@@ -411,7 +411,7 @@ export default function ExpensesPage() {
             </SelectContent>
           </Select>
           <Select value={filterUserId} onValueChange={setFilterUserId}>
-            <SelectTrigger className="w-[160px] h-9 text-sm focus-brand"><SelectValue placeholder="User" /></SelectTrigger>
+            <SelectTrigger className="w-auto min-w-[160px] h-9 text-sm focus-brand gap-2"><SelectValue placeholder="User" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All users</SelectItem>
               {users.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
