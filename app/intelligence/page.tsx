@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Sparkles, Building2, DollarSign, Activity, Bell, Clock } from 'lucide-react';
+import { PageHeader } from '@/components/ui/page-header';
+import { Radar, Sparkles, Building2, DollarSign, Activity, Bell, Clock } from 'lucide-react';
 import {
   HoverCard, HoverCardTrigger, HoverCardContent,
 } from '@/components/ui/hover-card';
@@ -78,13 +79,12 @@ export default function IntelligencePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Intelligence</h2>
-          <p className="text-gray-600">Prospect discovery and Korean exchange listings</p>
-        </div>
-
-        <div className="flex items-center gap-2">
+      <PageHeader
+        icon={Radar}
+        title="Intelligence"
+        subtitle="Prospect discovery and Korean exchange listings"
+        actions={(
+          <>
         {/* Schedule indicator — paired with Alerts + Cost as info chips. */}
         <button
           type="button"
@@ -165,8 +165,9 @@ export default function IntelligencePage() {
             </HoverCardContent>
           </HoverCard>
         )}
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
