@@ -31,6 +31,7 @@ import {
   FileText, ClipboardList, Sliders, TrendingUp, Handshake, UserPlus,
   Archive, Link2, BookOpen, CheckCircle, ListTodo, Target, Inbox,
   Calendar, Bell, Radar, Bot, BarChart3, Settings, Compass, Wallet,
+  DollarSign,
 } from 'lucide-react';
 
 export type NavItemDef = {
@@ -98,6 +99,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
   { href: '/mindshare', label: 'Mindshare', icon: TrendingUp, section: 'Documents', requiredRole: 'admin' },
   { href: '/wallets', label: 'Wallet Analytics', icon: Wallet, section: 'Documents', requiredRole: 'admin' },
   { href: '/forms', label: 'Forms', icon: ClipboardList, section: 'Documents', requiredRole: 'admin' },
+  { href: '/expenses', label: 'Expenses', icon: DollarSign, section: 'Documents', requiredRole: 'super_admin' },
   { href: '/links', label: 'Links', icon: Link2, section: 'Documents', pageKey: '/links' },
   // Templates + SOPs moved into the HQ sub-nav (under Workspace) so
   // all task-adjacent surfaces sit under one parent. Customize/bookmark

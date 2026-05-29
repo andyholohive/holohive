@@ -51,6 +51,10 @@
     {
       "path": "/api/cron/cron-health-check",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/generate-expense-instances",
+      "schedule": "30 0 * * *"
     }
   ]
 }

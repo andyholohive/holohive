@@ -46,6 +46,7 @@ const EXPECTED_DAILY_MAX: Record<string, number> = {
   GOOGLE_MEETING_REMINDERS: 288, // every 5 min
   DISCOVERY: 2,                // daily (sometimes 2x if runs_per_day=2)
   TELEGRAM_METRICS: 1,         // daily
+  EXPENSE_RECURRENCE: 1,       // daily
   // Anything else defaults to 5 (daily-or-less crons)
 };
 const DEFAULT_DAILY_MAX = 5;

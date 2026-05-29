@@ -623,6 +623,11 @@ export default function Sidebar({ children }: SidebarProps) {
                       Mindshare since both are audience-insight tools. */}
                   {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/wallets" icon={Wallet} label="Wallet Analytics" />}
                   {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && <NavItem href="/forms" icon={ClipboardList} label="Forms" />}
+                  {/* [Expenses v1, 2026-05-29] Super-admin only. Reimbursable
+                      spend tracking with recurrence (daily/weekly/monthly
+                      instance generation via cron) + per-instance paid
+                      tracking + receipt attachments. */}
+                  {userProfile?.role === 'super_admin' && <NavItem href="/expenses" icon={DollarSign} label="Expenses" />}
                   {!guestHide('/links') && <NavItem href="/links" icon={Link2} label="Links" />}
                   {/* Templates + SOPs moved to HQ sub-nav. Their old
                       registry entries in SidebarCustomize stay in the
