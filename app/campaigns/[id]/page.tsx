@@ -616,7 +616,7 @@ const CampaignDetailsPage = () => {
         );
       case 'YouTube':
         return (
-          <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="h-4 w-4 text-rose-500" viewBox="0 0 24 24" fill="currentColor">
             <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
           </svg>
         );
@@ -640,7 +640,7 @@ const CampaignDetailsPage = () => {
   const getContentTypeColor = (type: string) => {
     const colorMap: { [key: string]: string } = {
       'Post': 'bg-blue-100 text-blue-800',
-      'Video': 'bg-red-100 text-red-800',
+      'Video': 'bg-rose-100 text-rose-800',
       'Article': 'bg-emerald-100 text-emerald-800',
       'AMA': 'bg-purple-100 text-purple-800',
       'Ambassadorship': 'bg-orange-100 text-orange-800',
@@ -656,7 +656,7 @@ const CampaignDetailsPage = () => {
   const getCreatorTypeColor = (creatorType: string) => {
     const colorMap: { [key: string]: string } = {
       'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
-      'Drama-Forward': 'bg-red-100 text-red-800',
+      'Drama-Forward': 'bg-rose-100 text-rose-800',
       'Skeptic': 'bg-orange-100 text-orange-800',
       'Educator': 'bg-blue-100 text-blue-800',
       'Bridge Builder': 'bg-emerald-100 text-emerald-800',
@@ -683,7 +683,7 @@ const CampaignDetailsPage = () => {
       'Trading': 'bg-emerald-100 text-emerald-800',
       'Deep Dive': 'bg-purple-100 text-purple-800',
       'Meme/Cultural Narrative': 'bg-pink-100 text-pink-800',
-      'Drama Queen': 'bg-red-100 text-red-800',
+      'Drama Queen': 'bg-rose-100 text-rose-800',
       'Sceptics': 'bg-orange-100 text-orange-800',
       'Technical Educator': 'bg-indigo-100 text-indigo-800',
       'Bridge Builders': 'bg-teal-100 text-teal-800',
@@ -697,7 +697,7 @@ const CampaignDetailsPage = () => {
       '<$200': 'bg-emerald-100 text-emerald-800',
       '$200-500': 'bg-yellow-100 text-yellow-800',
       '$500-1K': 'bg-orange-100 text-orange-800',
-      '$1K-2K': 'bg-red-100 text-red-800',
+      '$1K-2K': 'bg-rose-100 text-rose-800',
       '$2K-3K': 'bg-purple-100 text-purple-800',
       '>$3K': 'bg-pink-100 text-pink-800'
     };
@@ -1374,7 +1374,7 @@ const CampaignDetailsPage = () => {
       );
     } catch (error) {
       console.error('MultiSelect render error:', error);
-      return <div className="text-red-500">Error rendering multiselect</div>;
+      return <div className="text-rose-500">Error rendering multiselect</div>;
     }
   };
 
@@ -3755,7 +3755,7 @@ const CampaignDetailsPage = () => {
   }
 
   if (error || !campaign) {
-    return <div className="text-center py-8 text-red-500">{error || "Campaign not found"}</div>;
+    return <div className="text-center py-8 text-rose-500">{error || "Campaign not found"}</div>;
   }
 
   return (
@@ -3938,7 +3938,7 @@ const CampaignDetailsPage = () => {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="absolute bottom-2 right-2 h-6 w-6 p-0 text-gray-400 hover:text-red-500 hover:bg-red-50"
+                                    className="absolute bottom-2 right-2 h-6 w-6 p-0 text-gray-400 hover:text-rose-500 hover:bg-rose-50"
                                   >
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
@@ -4033,7 +4033,7 @@ const CampaignDetailsPage = () => {
                     <div className="flex-shrink-0">
                       <Dialog open={isAddUpdateDialogOpen} onOpenChange={setIsAddUpdateDialogOpen}>
                         <DialogTrigger asChild>
-                          <Button variant="brand" size="sm" className="hover:opacity-90">
+                          <Button variant="brand" size="sm">
                             <Plus className="h-4 w-4 mr-2" />
                             Add Update
                           </Button>
@@ -4813,7 +4813,7 @@ const CampaignDetailsPage = () => {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="text-red-500 hover:text-red-700"
+                            className="text-rose-500 hover:text-rose-700"
                             onClick={() => {
                               if (alloc.id) setDeletedAllocIds(ids => [...ids, alloc.id]);
                               setAllocations(allocations.filter((_, i) => i !== idx));
@@ -4874,7 +4874,7 @@ const CampaignDetailsPage = () => {
                   
                   <Dialog open={isAddKOLsDialogOpen} onOpenChange={setIsAddKOLsDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button variant="brand" size="sm" className="hover:opacity-90">
+                      <Button variant="brand" size="sm">
                         <Plus className="h-4 w-4 mr-2" />
                         Add KOLs
                       </Button>
@@ -5666,7 +5666,7 @@ const CampaignDetailsPage = () => {
                         <div className="h-5"></div>
                         <Button
                           size="sm"
-                          className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm whitespace-nowrap"
+                          className="bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm whitespace-nowrap"
                           disabled={selectedKOLs.length === 0}
                           onClick={() => {
                             setKolsToDelete(selectedKOLs);
@@ -6439,7 +6439,7 @@ const CampaignDetailsPage = () => {
                                         'Tweet': 'bg-cyan-100 text-cyan-800',
                                         'Story': 'bg-purple-100 text-purple-800',
                                         'Reel': 'bg-pink-100 text-pink-800',
-                                        'Video': 'bg-red-100 text-red-800',
+                                        'Video': 'bg-rose-100 text-rose-800',
                                         'Article': 'bg-emerald-100 text-emerald-800',
                                         'Review': 'bg-yellow-100 text-yellow-800',
                                         'Thread': 'bg-indigo-100 text-indigo-800',
@@ -7063,7 +7063,7 @@ const CampaignDetailsPage = () => {
                 <div className="flex items-center">
                   <Dialog open={false} onOpenChange={setIsAddContentsDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button variant="brand" size="sm" className="hover:opacity-90" onClick={async (e) => {
+                      <Button variant="brand" size="sm" onClick={async (e) => {
                           e.preventDefault();
                           const newId = `new-${Date.now()}`;
                           const newContent: any = {
@@ -7984,7 +7984,7 @@ const CampaignDetailsPage = () => {
                           <div className="h-5"></div>
                           <Button
                             size="sm"
-                            className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm whitespace-nowrap"
+                            className="bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm whitespace-nowrap"
                             disabled={selectedContents.length === 0}
                             onClick={() => setShowBulkDeleteDialog(true)}
                           >
@@ -8935,7 +8935,7 @@ const CampaignDetailsPage = () => {
                   </Button>
                   <Dialog open={isAddingPayment} onOpenChange={setIsAddingPayment}>
                     <DialogTrigger asChild>
-                      <Button variant="brand" size="sm" className="hover:opacity-90">
+                      <Button variant="brand" size="sm">
                         <Plus className="h-4 w-4 mr-2" />
                         Record Payment
                       </Button>
@@ -8952,19 +8952,17 @@ const CampaignDetailsPage = () => {
                       <div className="flex gap-2 mb-2">
                         <Button
                           type="button"
-                          variant={paymentType === 'kol' ? 'default' : 'outline'}
+                          variant={paymentType === 'kol' ? 'brand' : 'outline'}
                           size="sm"
                           onClick={() => setPaymentType('kol')}
-                          style={paymentType === 'kol' ? { backgroundColor: '#3e8692', color: 'white' } : {}}
                         >
                           KOL Payment
                         </Button>
                         <Button
                           type="button"
-                          variant={paymentType === 'other' ? 'default' : 'outline'}
+                          variant={paymentType === 'other' ? 'brand' : 'outline'}
                           size="sm"
                           onClick={() => setPaymentType('other')}
-                          style={paymentType === 'other' ? { backgroundColor: '#3e8692', color: 'white' } : {}}
                         >
                           Other Expense
                         </Button>
@@ -9412,7 +9410,7 @@ const CampaignDetailsPage = () => {
                         }}>
                           Cancel
                         </Button>
-                        <Button variant="brand" onClick={paymentType === 'kol' ? handleAddMultiKOLPayments : handleAddNonKOLPayment} disabled={paymentType === 'kol' ? selectedKOLsForPayment.length === 0 : !nonKOLPayment.recipient_name.trim() || !nonKOLPayment.amount} className="hover:opacity-90">
+                        <Button variant="brand" onClick={paymentType === 'kol' ? handleAddMultiKOLPayments : handleAddNonKOLPayment} disabled={paymentType === 'kol' ? selectedKOLsForPayment.length === 0 : !nonKOLPayment.recipient_name.trim() || !nonKOLPayment.amount}>
                           {paymentType === 'kol'
                             ? `Record ${selectedKOLsForPayment.length > 0 ? `${selectedKOLsForPayment.length} Payment${selectedKOLsForPayment.length > 1 ? 's' : ''}` : 'Payment'}`
                             : 'Record Expense'
@@ -9462,7 +9460,7 @@ const CampaignDetailsPage = () => {
                         variant={showOverdueOnly ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setShowOverdueOnly(v => !v)}
-                        className={showOverdueOnly ? 'bg-red-600 hover:bg-red-700 text-white border-0' : 'text-red-600 border-red-200 hover:bg-red-50'}
+                        className={showOverdueOnly ? 'bg-rose-600 hover:bg-rose-700 text-white border-0' : 'text-rose-600 border-rose-200 hover:bg-rose-50'}
                         title={showOverdueOnly ? 'Showing overdue only — click to clear' : 'Show only payments where content is posted but payment is missing'}
                       >
                         <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
@@ -9542,7 +9540,7 @@ const CampaignDetailsPage = () => {
                         <div className="h-5"></div>
                         <Button
                           size="sm"
-                          className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-sm whitespace-nowrap"
+                          className="bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm whitespace-nowrap"
                           disabled={selectedPayments.length === 0}
                           onClick={() => setShowBulkDeletePaymentsDialog(true)}
                         >
@@ -9963,7 +9961,7 @@ const CampaignDetailsPage = () => {
                                       if (status === 'overdue') {
                                         return (
                                           <span
-                                            className="inline-flex items-center gap-1 text-[10px] font-semibold bg-red-100 text-red-700 px-1.5 py-0.5 rounded pointer-events-none"
+                                            className="inline-flex items-center gap-1 text-[10px] font-semibold bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded pointer-events-none"
                                             title="Content is posted but payment hasn't been recorded"
                                           >
                                             <AlertTriangle className="h-2.5 w-2.5" />
@@ -11167,7 +11165,7 @@ const CampaignDetailsPage = () => {
             <Button variant="outline" onClick={() => setIsEditingPayment(false)}>
               Cancel
             </Button>
-            <Button variant="brand" onClick={handleUpdatePayment} disabled={!newPaymentData.campaign_kol_id || newPaymentData.amount <= 0} className="hover:opacity-90">
+            <Button variant="brand" onClick={handleUpdatePayment} disabled={!newPaymentData.campaign_kol_id || newPaymentData.amount <= 0}>
               Update Payment
             </Button>
           </DialogFooter>
@@ -11487,7 +11485,7 @@ const CampaignDetailsPage = () => {
                 Done Editing
               </Button>
             )}
-            <Button variant="brand" onClick={sendPaymentNotification} disabled={sendingPaymentNotification || !paymentNotificationMessage.trim()} className="hover:opacity-90">
+            <Button variant="brand" onClick={sendPaymentNotification} disabled={sendingPaymentNotification || !paymentNotificationMessage.trim()}>
               {sendingPaymentNotification ? 'Sending...' : 'Send Notification'}
             </Button>
           </DialogFooter>
@@ -11516,6 +11514,7 @@ const CampaignDetailsPage = () => {
               No, Enter Manually
             </Button>
             <Button
+              variant="brand"
               onClick={async () => {
                 if (pricingSuggestionDialog) {
                   const { kolId, latestCost, paymentIndex, paymentIds, mode } = pricingSuggestionDialog;
@@ -11574,8 +11573,6 @@ const CampaignDetailsPage = () => {
                   setPricingSuggestionDialog(null);
                 }
               }}
-              style={{ backgroundColor: '#3e8692', color: 'white' }}
-              className="hover:opacity-90"
             >
               Yes, Use ${pricingSuggestionDialog?.latestCost?.toLocaleString()}
             </Button>
@@ -11803,7 +11800,7 @@ const CampaignDetailsPage = () => {
             <Button variant="outline" onClick={() => { setEditingMasterKol(null); setMasterKolForm({}); }}>
               Cancel
             </Button>
-            <Button variant="brand" onClick={handleSaveMasterKol} disabled={savingMasterKol} className="hover:opacity-90">
+            <Button variant="brand" onClick={handleSaveMasterKol} disabled={savingMasterKol}>
               {savingMasterKol ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>
