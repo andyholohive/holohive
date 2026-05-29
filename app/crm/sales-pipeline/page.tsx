@@ -2568,7 +2568,7 @@ export default function SalesPipelinePage() {
 
     return (
       <Card
-        className={`group hover:shadow-md transition-all duration-200 border-l-4 ${colors.border} ${isDragging ? 'shadow-lg ring-2 ring-brand opacity-90' : ''} ${bamfam ? 'bg-red-50/30' : ''}`}
+        className={`group hover:shadow-md transition-all duration-200 border-l-4 ${colors.border} ${isDragging ? 'shadow-lg ring-2 ring-brand opacity-90' : ''} ${bamfam ? 'bg-rose-50/30' : ''}`}
         onClick={() => openSlideOver(opp)}
       >
         <CardContent className="p-4">
@@ -2637,7 +2637,7 @@ export default function SalesPipelinePage() {
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-emerald-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-red-400'}`}
+                      className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-emerald-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-rose-400'}`}
                       style={{ width: `${opp.temperature_score}%` }}
                     />
                   </div>
@@ -2646,7 +2646,7 @@ export default function SalesPipelinePage() {
 
                 {/* BAMFAM warning */}
                 {bamfam && (
-                  <div className="flex items-center gap-1.5 text-red-600">
+                  <div className="flex items-center gap-1.5 text-rose-600">
                     <AlertTriangle className="h-3 w-3" />
                     <span className="font-medium">BAMFAM</span>
                   </div>
@@ -2686,7 +2686,7 @@ export default function SalesPipelinePage() {
                   <DropdownMenuItem onClick={e => { e.stopPropagation(); handleStageChange(opp.id, 'orbit', opp.stage); }} className="text-orange-600">
                     <RotateCcw className="h-4 w-4 mr-2" /> Move to Orbit
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDelete(opp.id); }} className="text-red-600">
+                  <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDelete(opp.id); }} className="text-rose-600">
                     <Trash2 className="h-4 w-4 mr-2" /> Delete
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -2788,10 +2788,10 @@ export default function SalesPipelinePage() {
 
         {/* Closed Lost drop zone */}
         <div className="w-12 flex flex-col h-full transition-all duration-200">
-          <DroppableColumn id="v2_closed_lost" className="rounded-lg px-4 py-3 bg-red-50 border border-red-200 flex-shrink-0 cursor-pointer select-none">
+          <DroppableColumn id="v2_closed_lost" className="rounded-lg px-4 py-3 bg-rose-50 border border-rose-200 flex-shrink-0 cursor-pointer select-none">
             <div className="flex flex-col items-center gap-1">
-              <X className="w-4 h-4 text-red-700" />
-              <span className="font-semibold text-red-700 mt-2" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
+              <X className="w-4 h-4 text-rose-700" />
+              <span className="font-semibold text-rose-700 mt-2" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
                 Lost
               </span>
               <Badge variant="secondary" className="text-xs font-medium mt-1">
@@ -3041,7 +3041,7 @@ export default function SalesPipelinePage() {
                                     <DropdownMenuItem onClick={e => { e.stopPropagation(); handleStageChange(opp.id, 'orbit', opp.stage); }} className="text-orange-600">
                                       <RotateCcw className="h-4 w-4 mr-2" /> Move to Orbit
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDelete(opp.id); }} className="text-red-600">
+                                    <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDelete(opp.id); }} className="text-rose-600">
                                       <Trash2 className="h-4 w-4 mr-2" /> Delete
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
@@ -3533,7 +3533,7 @@ export default function SalesPipelinePage() {
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
+            className="h-7 text-xs text-rose-600 border-rose-200 hover:bg-rose-50"
             onClick={handleBulkDelete}
           >
             <Trash2 className="h-3 w-3 mr-1" /> Delete
@@ -3704,7 +3704,7 @@ export default function SalesPipelinePage() {
                           : null;
                         const stale = daysSinceLast !== null && daysSinceLast >= 3;
                         const priorityColor =
-                          action.priority === 'urgent' ? 'text-red-600'
+                          action.priority === 'urgent' ? 'text-rose-600'
                           : action.priority === 'high' ? 'text-amber-600'
                           : action.priority === 'medium' ? 'text-sky-700'
                           : 'text-gray-500';
@@ -3763,7 +3763,7 @@ export default function SalesPipelinePage() {
                           <DropdownMenuItem onClick={e => { e.stopPropagation(); openEditDialog(opp); }}>
                             <Edit className="h-4 w-4 mr-2" /> Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDelete(opp.id); }} className="text-red-600">
+                          <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDelete(opp.id); }} className="text-rose-600">
                             <Trash2 className="h-4 w-4 mr-2" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -3809,11 +3809,10 @@ export default function SalesPipelinePage() {
                 return (
                   <Button
                     key={pageNum}
-                    variant={outreachPage === pageNum ? 'default' : 'outline'}
+                    variant={outreachPage === pageNum ? 'brand' : 'outline'}
                     size="sm"
                     onClick={() => { setOutreachPage(pageNum); setSelectedOutreach([]); }}
-                    className={`w-8 h-8 p-0 ${outreachPage === pageNum ? 'hover:opacity-90' : ''}`}
-                    style={outreachPage === pageNum ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                    className="w-8 h-8 p-0"
                   >
                     {pageNum}
                   </Button>
@@ -3843,7 +3842,7 @@ export default function SalesPipelinePage() {
   const renderActionsTab = () => {
     const getPriorityIcon = (priority: ActionPriority) => {
       switch (priority) {
-        case 'urgent': return <AlertTriangle className="h-3.5 w-3.5 text-red-500" />;
+        case 'urgent': return <AlertTriangle className="h-3.5 w-3.5 text-rose-500" />;
         case 'high': return <Zap className="h-3.5 w-3.5 text-amber-500" />;
         case 'medium': return <Clock className="h-3.5 w-3.5 text-blue-500" />;
         case 'low': return <Clock className="h-3.5 w-3.5 text-gray-400" />;
@@ -3882,7 +3881,7 @@ export default function SalesPipelinePage() {
       if (opp.next_meeting_at) {
         const d = daysUntil(opp.next_meeting_at);
         if (d !== null) {
-          if (d < 0) return { text: `Meeting ${Math.abs(d)}d ago`, color: 'text-red-500 font-medium' };
+          if (d < 0) return { text: `Meeting ${Math.abs(d)}d ago`, color: 'text-rose-500 font-medium' };
           if (d === 0) return { text: 'Meeting today', color: 'text-blue-600 font-medium' };
           return { text: `Meeting in ${d}d`, color: d <= 2 ? 'text-blue-600 font-medium' : 'text-gray-500' };
         }
@@ -3914,7 +3913,7 @@ export default function SalesPipelinePage() {
       if (d === null) return { text: '—', color: 'text-gray-400' };
       return {
         text: `${d}d silent`,
-        color: d >= 7 ? 'text-red-500 font-medium' : d >= 3 ? 'text-amber-500' : 'text-gray-500',
+        color: d >= 7 ? 'text-rose-500 font-medium' : d >= 3 ? 'text-amber-500' : 'text-gray-500',
       };
     };
 
@@ -3998,20 +3997,20 @@ export default function SalesPipelinePage() {
         {/* Alert Card Filter Banner */}
         {alertCardFilter !== 'none' && (
           <div className={`flex items-center justify-between px-4 py-2.5 rounded-lg mb-3 ${
-            alertCardFilter === 'booking_needed' ? 'bg-red-50 border border-red-200' :
+            alertCardFilter === 'booking_needed' ? 'bg-rose-50 border border-rose-200' :
             alertCardFilter === 'overdue' ? 'bg-orange-50 border border-orange-200' :
             alertCardFilter === 'stale' ? 'bg-amber-50 border border-amber-200' :
             alertCardFilter === 'at_risk' ? 'bg-rose-50 border border-rose-200' :
             'bg-blue-50 border border-blue-200'
           }`}>
             <div className="flex items-center gap-2">
-              {alertCardFilter === 'booking_needed' && <Calendar className="h-4 w-4 text-red-500" />}
+              {alertCardFilter === 'booking_needed' && <Calendar className="h-4 w-4 text-rose-500" />}
               {alertCardFilter === 'overdue' && <Clock className="h-4 w-4 text-orange-500" />}
               {alertCardFilter === 'stale' && <RotateCcw className="h-4 w-4 text-amber-500" />}
               {alertCardFilter === 'at_risk' && <TrendingUp className="h-4 w-4 text-rose-500" />}
               {alertCardFilter === 'meetings' && <Calendar className="h-4 w-4 text-blue-500" />}
               <span className={`text-sm font-medium ${
-                alertCardFilter === 'booking_needed' ? 'text-red-700' :
+                alertCardFilter === 'booking_needed' ? 'text-rose-700' :
                 alertCardFilter === 'overdue' ? 'text-orange-700' :
                 alertCardFilter === 'stale' ? 'text-amber-700' :
                 alertCardFilter === 'at_risk' ? 'text-rose-700' :
@@ -4030,7 +4029,7 @@ export default function SalesPipelinePage() {
             <button
               onClick={() => setAlertCardFilter('none')}
               className={`p-1 rounded-md transition-colors ${
-                alertCardFilter === 'booking_needed' ? 'hover:bg-red-100 text-red-400' :
+                alertCardFilter === 'booking_needed' ? 'hover:bg-rose-100 text-rose-400' :
                 alertCardFilter === 'overdue' ? 'hover:bg-orange-100 text-orange-400' :
                 alertCardFilter === 'stale' ? 'hover:bg-amber-100 text-amber-400' :
                 alertCardFilter === 'at_risk' ? 'hover:bg-rose-100 text-rose-400' :
@@ -4141,7 +4140,7 @@ export default function SalesPipelinePage() {
                 return (
                   <TableRow
                     key={opp.id}
-                    className={`group hover:bg-gray-50 cursor-pointer ${action.priority === 'urgent' ? 'bg-red-50/40' : ''} ${!isFirstInGroup ? 'border-t-0' : ''} ${isLastInGroup && groupCount > 1 ? 'border-b-2 border-b-gray-200' : ''}`}
+                    className={`group hover:bg-gray-50 cursor-pointer ${action.priority === 'urgent' ? 'bg-rose-50/40' : ''} ${!isFirstInGroup ? 'border-t-0' : ''} ${isLastInGroup && groupCount > 1 ? 'border-b-2 border-b-gray-200' : ''}`}
                     onClick={() => openSlideOver(opp)}
                   >
                     <TableCell className={!isFirstInGroup ? 'pt-0' : ''}>
@@ -4187,7 +4186,7 @@ export default function SalesPipelinePage() {
                         <div className="flex items-center gap-1.5">
                           {getPriorityIcon(action.priority)}
                           <span className={`text-sm font-medium ${
-                            action.priority === 'urgent' ? 'text-red-700' :
+                            action.priority === 'urgent' ? 'text-rose-700' :
                             action.priority === 'high' ? 'text-amber-700' :
                             'text-gray-600'
                           }`}>
@@ -4206,7 +4205,7 @@ export default function SalesPipelinePage() {
                       <div className="flex items-center gap-1">
                         <div className="w-12 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                           <div
-                            className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-emerald-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-red-400'}`}
+                            className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-emerald-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-rose-400'}`}
                             style={{ width: `${opp.temperature_score}%` }}
                           />
                         </div>
@@ -4275,7 +4274,7 @@ export default function SalesPipelinePage() {
                                 <DropdownMenuItem
                                   key={`${o.label}-${idx}`}
                                   className={
-                                    o.variant === 'danger' ? 'text-red-600' :
+                                    o.variant === 'danger' ? 'text-rose-600' :
                                     o.variant === 'warn' ? 'text-orange-600' :
                                     o.isRecommended ? 'text-brand font-medium' : ''
                                   }
@@ -4346,7 +4345,7 @@ export default function SalesPipelinePage() {
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
+            className="h-7 text-xs text-rose-600 border-rose-200 hover:bg-rose-50"
             onClick={handleOrbitBulkDelete}
           >
             <Trash2 className="h-3 w-3 mr-1" /> Delete
@@ -4565,7 +4564,7 @@ export default function SalesPipelinePage() {
                             const overdue = checkin < today;
                             const isToday = checkin.getTime() === today.getTime();
                             return (
-                              <span className={`text-xs ${overdue ? 'text-red-600 font-medium' : isToday ? 'text-amber-600 font-medium' : 'text-gray-700'}`}>
+                              <span className={`text-xs ${overdue ? 'text-rose-600 font-medium' : isToday ? 'text-amber-600 font-medium' : 'text-gray-700'}`}>
                                 {format(checkin, 'MMM d')}
                                 {overdue && ' · overdue'}
                                 {isToday && ' · today'}
@@ -4590,7 +4589,7 @@ export default function SalesPipelinePage() {
                               <DropdownMenuItem onClick={e => { e.stopPropagation(); handleResurrect(opp); }} className="text-blue-600">
                                 <ArrowRight className="h-4 w-4 mr-2" /> Resurrect
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDelete(opp.id); }} className="text-red-600">
+                              <DropdownMenuItem onClick={e => { e.stopPropagation(); handleDelete(opp.id); }} className="text-rose-600">
                                 <Trash2 className="h-4 w-4 mr-2" /> Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -4650,9 +4649,9 @@ export default function SalesPipelinePage() {
             <div className="text-2xl font-bold text-sky-700 mt-1">${forecastKpis.thisMonthValue.toLocaleString()}</div>
             <div className="text-xs text-gray-500 mt-1">Expected to close</div>
           </div>
-          <div className={`border rounded-lg p-3 ${forecastKpis.atRiskCount > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
-            <div className={`text-xs uppercase tracking-wide ${forecastKpis.atRiskCount > 0 ? 'text-red-700' : 'text-gray-500'}`}>At risk</div>
-            <div className={`text-2xl font-bold mt-1 ${forecastKpis.atRiskCount > 0 ? 'text-red-700' : 'text-gray-400'}`}>
+          <div className={`border rounded-lg p-3 ${forecastKpis.atRiskCount > 0 ? 'bg-rose-50 border-rose-200' : 'bg-white border-gray-200'}`}>
+            <div className={`text-xs uppercase tracking-wide ${forecastKpis.atRiskCount > 0 ? 'text-rose-700' : 'text-gray-500'}`}>At risk</div>
+            <div className={`text-2xl font-bold mt-1 ${forecastKpis.atRiskCount > 0 ? 'text-rose-700' : 'text-gray-400'}`}>
               {forecastKpis.atRiskCount}
             </div>
             <div className="text-xs text-gray-500 mt-1">${forecastKpis.atRiskValue.toLocaleString()} stalled</div>
@@ -4686,7 +4685,7 @@ export default function SalesPipelinePage() {
                   <span className="text-xs opacity-70">· {period.description}</span>
                   <Badge variant="secondary" className="text-xs">{opps.length}</Badge>
                   {periodAtRisk > 0 && (
-                    <Badge variant="secondary" className="text-xs bg-red-100 text-red-700 hover:bg-red-100">
+                    <Badge variant="secondary" className="text-xs bg-rose-100 text-rose-700 hover:bg-rose-100">
                       {periodAtRisk} at-risk
                     </Badge>
                   )}
@@ -4708,7 +4707,7 @@ export default function SalesPipelinePage() {
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       : proposalAge < 21
                         ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                        : 'bg-red-50 text-red-700 border border-red-200';
+                        : 'bg-rose-50 text-rose-700 border border-rose-200';
                   const stageColor = STAGE_COLORS[opp.stage as SalesPipelineStage] || STAGE_COLORS.cold_dm;
                   const owner = users.find(u => u.id === opp.owner_id);
                   const winProb = STAGE_WIN_PROB[opp.stage] || 0;
@@ -4717,7 +4716,7 @@ export default function SalesPipelinePage() {
                     <div
                       key={opp.id}
                       onClick={() => openSlideOver(opp)}
-                      className={`group bg-white border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow ${atRisk ? 'border-red-300 bg-red-50/30' : 'border-gray-200'}`}
+                      className={`group bg-white border rounded-lg p-4 cursor-pointer hover:shadow-md transition-shadow ${atRisk ? 'border-rose-300 bg-rose-50/30' : 'border-gray-200'}`}
                     >
                       {/* Header row: name + at-risk flag */}
                       <div className="flex items-start justify-between gap-2 mb-2">
@@ -4727,7 +4726,7 @@ export default function SalesPipelinePage() {
                           {renderProjectNameSuffix(opp.twitter_handle, () => openEditDialog(opp))}
                         </div>
                         {atRisk && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700 shrink-0">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-rose-100 text-rose-700 shrink-0">
                             <AlertTriangle className="h-3 w-3" /> At risk
                           </span>
                         )}
@@ -4814,7 +4813,7 @@ export default function SalesPipelinePage() {
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleStageChange(opp.id, 'v2_closed_lost', opp.stage)}
-                                className="text-red-600"
+                                className="text-rose-600"
                               >
                                 <X className="h-4 w-4 mr-2" /> Mark Closed Lost
                               </DropdownMenuItem>
@@ -5200,7 +5199,7 @@ export default function SalesPipelinePage() {
                       return (
                         <span key={id} className="inline-flex items-center gap-1 bg-brand/10 text-brand text-xs px-2 py-0.5 rounded-full">
                           {u?.name || u?.email || id}
-                          <button type="button" onClick={() => setForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-red-500 ml-0.5">&times;</button>
+                          <button type="button" onClick={() => setForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-rose-500 ml-0.5">&times;</button>
                         </span>
                       );
                     })}
@@ -5247,7 +5246,7 @@ export default function SalesPipelinePage() {
                 <Button type="button" variant="outline" onClick={() => { setSlideOverMode('view'); setEditingOpp(null); setForm({ name: '' }); }}>
                   Cancel
                 </Button>
-                <Button variant="brand" type="submit" disabled={isSubmitting || !form.name.trim()} className="hover:opacity-90">
+                <Button variant="brand" type="submit" disabled={isSubmitting || !form.name.trim()}>
                   {isSubmitting ? 'Saving...' : 'Update'}
                 </Button>
               </div>
@@ -5257,7 +5256,7 @@ export default function SalesPipelinePage() {
 
         {/* View mode */}
         {slideOverMode === 'view' && bamfam && (
-          <div className="px-6 py-2.5 bg-red-50 border-b border-red-200 flex items-center gap-2 text-red-700 text-sm">
+          <div className="px-6 py-2.5 bg-rose-50 border-b border-rose-200 flex items-center gap-2 text-rose-700 text-sm">
             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
             <span className="font-medium">BAMFAM: No upcoming meeting scheduled</span>
           </div>
@@ -5295,7 +5294,7 @@ export default function SalesPipelinePage() {
                   <div className="flex items-center gap-2 mt-1">
                     <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-emerald-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-red-400'}`}
+                        className={`h-full rounded-full ${opp.temperature_score >= 70 ? 'bg-emerald-500' : opp.temperature_score >= 40 ? 'bg-amber-500' : 'bg-rose-400'}`}
                         style={{ width: `${opp.temperature_score}%` }}
                       />
                     </div>
@@ -5441,7 +5440,7 @@ export default function SalesPipelinePage() {
                 <RotateCcw className="h-3.5 w-3.5 mr-1" /> Move to Orbit
               </Button>
               <Button
-                variant="outline" size="sm" className="text-xs text-red-600 border-red-300 hover:bg-red-50"
+                variant="outline" size="sm" className="text-xs text-rose-600 border-rose-300 hover:bg-rose-50"
                 onClick={() => handleDelete(opp.id)}
               >
                 <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
@@ -5647,9 +5646,8 @@ export default function SalesPipelinePage() {
                               return (
                                 <Button
                                   key={h}
-                                  variant="ghost"
-                                  className={`w-full justify-center font-normal text-xs h-7 px-1 ${isSelected ? 'text-white hover:text-white' : ''}`}
-                                  style={isSelected ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                                  variant={isSelected ? 'brand' : 'ghost'}
+                                  className="w-full justify-center font-normal text-xs h-7 px-1"
                                   onClick={async () => {
                                     const d = opp.next_meeting_at ? new Date(opp.next_meeting_at) : new Date();
                                     d.setHours(h, d.getMinutes(), 0, 0);
@@ -5673,9 +5671,8 @@ export default function SalesPipelinePage() {
                               return (
                                 <Button
                                   key={m}
-                                  variant="ghost"
-                                  className={`w-full justify-center font-normal text-xs h-7 px-1 ${isSelected ? 'text-white hover:text-white' : ''}`}
-                                  style={isSelected ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                                  variant={isSelected ? 'brand' : 'ghost'}
+                                  className="w-full justify-center font-normal text-xs h-7 px-1"
                                   onClick={async () => {
                                     const d = opp.next_meeting_at ? new Date(opp.next_meeting_at) : new Date();
                                     d.setMinutes(m, 0, 0);
@@ -6139,9 +6136,8 @@ export default function SalesPipelinePage() {
                                 return (
                                   <Button
                                     key={h}
-                                    variant="ghost"
-                                    className={`w-full justify-center font-normal text-xs h-7 px-1 ${isSelected ? 'text-white hover:text-white' : ''}`}
-                                    style={isSelected ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                                    variant={isSelected ? 'brand' : 'ghost'}
+                                    className="w-full justify-center font-normal text-xs h-7 px-1"
                                     onClick={() => {
                                       const currentMin = activityMeetingTime ? activityMeetingTime.split(':')[1] : '00';
                                       setActivityMeetingTime(`${String(h).padStart(2, '0')}:${currentMin}`);
@@ -6160,9 +6156,8 @@ export default function SalesPipelinePage() {
                                 return (
                                   <Button
                                     key={m}
-                                    variant="ghost"
-                                    className={`w-full justify-center font-normal text-xs h-7 px-1 ${isSelected ? 'text-white hover:text-white' : ''}`}
-                                    style={isSelected ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                                    variant={isSelected ? 'brand' : 'ghost'}
+                                    className="w-full justify-center font-normal text-xs h-7 px-1"
                                     onClick={() => {
                                       const currentHour = activityMeetingTime ? activityMeetingTime.split(':')[0] : '09';
                                       setActivityMeetingTime(`${currentHour}:${String(m).padStart(2, '0')}`);
@@ -6212,7 +6207,7 @@ export default function SalesPipelinePage() {
                       />
                     </PopoverContent>
                   </Popover>
-                  <Button variant="brand" size="sm" className="h-9 text-sm hover:opacity-90" onClick={handleAddActivity} disabled={isActivitySubmitting || !activityForm.title.trim()}>
+                  <Button variant="brand" size="sm" className="h-9 text-sm" onClick={handleAddActivity} disabled={isActivitySubmitting || !activityForm.title.trim()}>
                     {isActivitySubmitting ? '...' : 'Add'}
                   </Button>
                 </div>
@@ -6506,7 +6501,7 @@ export default function SalesPipelinePage() {
                     return (
                       <span key={id} className="inline-flex items-center gap-1 bg-brand/10 text-brand text-xs px-2 py-0.5 rounded-full">
                         {u?.name || u?.email || id}
-                        <button type="button" onClick={() => setForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-red-500 ml-0.5">&times;</button>
+                        <button type="button" onClick={() => setForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-rose-500 ml-0.5">&times;</button>
                       </span>
                     );
                   })}
@@ -6540,10 +6535,9 @@ export default function SalesPipelinePage() {
                       onClick={() => setForm(f => ({ ...f, source: f.source === opt.value ? undefined : opt.value }))}
                       className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
                         form.source === opt.value
-                          ? 'text-white border-transparent'
+                          ? 'bg-brand text-white border-transparent'
                           : 'text-gray-600 border-gray-200 hover:bg-gray-50'
                       }`}
-                      style={form.source === opt.value ? { backgroundColor: '#3e8692' } : {}}
                     >
                       {opt.label}
                     </button>
@@ -6775,7 +6769,7 @@ export default function SalesPipelinePage() {
               <Button type="button" variant="outline" onClick={() => { setIsCreateOpen(false); setEditingOpp(null); setForm({ name: '' }); }}>
                 Cancel
               </Button>
-              <Button variant="brand" type="submit" disabled={isSubmitting || !form.name.trim()} className="hover:opacity-90">
+              <Button variant="brand" type="submit" disabled={isSubmitting || !form.name.trim()}>
                 {isSubmitting ? 'Saving...' : isEdit ? 'Update' : 'Create'}
               </Button>
             </DialogFooter>
@@ -7005,9 +6999,8 @@ export default function SalesPipelinePage() {
                               return (
                                 <Button
                                   key={h}
-                                  variant="ghost"
-                                  className={`w-full justify-center font-normal text-xs h-7 px-1 ${isSelected ? 'text-white hover:text-white' : ''}`}
-                                  style={isSelected ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                                  variant={isSelected ? 'brand' : 'ghost'}
+                                  className="w-full justify-center font-normal text-xs h-7 px-1"
                                   onClick={() => {
                                     const currentMin = activityLogForm.meeting_time ? activityLogForm.meeting_time.split(':')[1] : '00';
                                     setActivityLogForm(f => ({ ...f, meeting_time: `${String(h).padStart(2, '0')}:${currentMin}` }));
@@ -7026,9 +7019,8 @@ export default function SalesPipelinePage() {
                               return (
                                 <Button
                                   key={m}
-                                  variant="ghost"
-                                  className={`w-full justify-center font-normal text-xs h-7 px-1 ${isSelected ? 'text-white hover:text-white' : ''}`}
-                                  style={isSelected ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+                                  variant={isSelected ? 'brand' : 'ghost'}
+                                  className="w-full justify-center font-normal text-xs h-7 px-1"
                                   onClick={() => {
                                     const currentHour = activityLogForm.meeting_time ? activityLogForm.meeting_time.split(':')[0] : '09';
                                     setActivityLogForm(f => ({ ...f, meeting_time: `${currentHour}:${String(m).padStart(2, '0')}` }));
@@ -7057,7 +7049,7 @@ export default function SalesPipelinePage() {
                     return (
                       <span key={id} className="inline-flex items-center gap-1 bg-brand/10 text-brand text-xs px-2 py-0.5 rounded-full">
                         {u?.name || u?.email || id}
-                        <button type="button" onClick={() => setActivityLogForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-red-500 ml-0.5">&times;</button>
+                        <button type="button" onClick={() => setActivityLogForm(f => ({ ...f, co_owner_ids: (f.co_owner_ids || []).filter(i => i !== id) }))} className="hover:text-rose-500 ml-0.5">&times;</button>
                       </span>
                     );
                   })}
@@ -7159,7 +7151,7 @@ export default function SalesPipelinePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setActivityLogPrompt(null); setActivityLogForm({ title: '', description: '', outcome: '', next_step: '', meeting_date: undefined, meeting_time: undefined, next_step_date: undefined, co_owner_ids: undefined }); }}>Cancel</Button>
-            <Button variant="brand" onClick={confirmActivityLog} disabled={isActivityLogSubmitting} className="hover:opacity-90">
+            <Button variant="brand" onClick={confirmActivityLog} disabled={isActivityLogSubmitting}>
               {isActivityLogSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Log Activity
             </Button>
@@ -7335,7 +7327,7 @@ export default function SalesPipelinePage() {
         />
         <DialogFooter>
           <Button variant="outline" onClick={() => setTgHandlePrompt(null)}>Cancel</Button>
-          <Button variant="brand" onClick={confirmTgHandle} disabled={!tgHandleValue.trim()} className="text-white hover:opacity-90">Confirm</Button>
+          <Button variant="brand" onClick={confirmTgHandle} disabled={!tgHandleValue.trim()} className="text-white">Confirm</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -7370,7 +7362,7 @@ export default function SalesPipelinePage() {
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setBucketPrompt(null)}>Cancel</Button>
-          <Button variant="brand" onClick={confirmBucket} className="text-white hover:opacity-90">Confirm</Button>
+          <Button variant="brand" onClick={confirmBucket} className="text-white">Confirm</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -7465,7 +7457,7 @@ export default function SalesPipelinePage() {
           >
             <Download className="h-4 w-4 mr-1" /> Export CSV
           </Button>
-          <Button onClick={() => { setForm({ name: '', owner_id: user?.id || undefined }); setIsCreateOpen(true); }} className="hover:opacity-90 bg-brand text-white">
+          <Button onClick={() => { setForm({ name: '', owner_id: user?.id || undefined }); setIsCreateOpen(true); }} className="bg-brand text-white">
             <Plus className="h-4 w-4 mr-2" />
             New Opportunity
           </Button>
@@ -7579,7 +7571,7 @@ export default function SalesPipelinePage() {
         <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
           {/* Booking Needed */}
           <Card
-            className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'booking_needed' ? 'ring-2 ring-red-400 shadow-md' : ''} ${alertMetrics.bamfamViolations > 0 ? 'border-l-red-500 bg-red-50' : 'border-l-gray-200 bg-white'}`}
+            className={`border-l-4 cursor-pointer transition-all hover:shadow-md ${alertCardFilter === 'booking_needed' ? 'ring-2 ring-red-400 shadow-md' : ''} ${alertMetrics.bamfamViolations > 0 ? 'border-l-red-500 bg-rose-50' : 'border-l-gray-200 bg-white'}`}
             onClick={() => {
               if (alertCardFilter === 'booking_needed') { setAlertCardFilter('none'); return; }
               setAlertCardFilter('booking_needed'); setActiveTab('overview'); setOverviewSections(prev => ({ ...prev, actions: true })); setActionFilter('all'); setActionPhaseFilter('all');
@@ -7587,10 +7579,10 @@ export default function SalesPipelinePage() {
           >
             <CardContent className="pt-2.5 pb-2.5 px-3">
               <div className="flex items-center gap-1.5 mb-0.5">
-                <Calendar className={`h-3.5 w-3.5 ${alertMetrics.bamfamViolations > 0 ? 'text-red-500' : 'text-gray-400'}`} />
-                <p className={`text-[10px] font-semibold uppercase tracking-wider ${alertMetrics.bamfamViolations > 0 ? 'text-red-500' : 'text-gray-400'}`}>Booking Needed</p>
+                <Calendar className={`h-3.5 w-3.5 ${alertMetrics.bamfamViolations > 0 ? 'text-rose-500' : 'text-gray-400'}`} />
+                <p className={`text-[10px] font-semibold uppercase tracking-wider ${alertMetrics.bamfamViolations > 0 ? 'text-rose-500' : 'text-gray-400'}`}>Booking Needed</p>
               </div>
-              <p className={`text-xl font-bold leading-none ${alertMetrics.bamfamViolations > 0 ? 'text-red-700' : 'text-gray-900'}`}>{alertMetrics.bamfamViolations}</p>
+              <p className={`text-xl font-bold leading-none ${alertMetrics.bamfamViolations > 0 ? 'text-rose-700' : 'text-gray-900'}`}>{alertMetrics.bamfamViolations}</p>
               <p className="text-[10px] text-gray-400 mt-0.5">No future meeting</p>
             </CardContent>
           </Card>
@@ -7717,7 +7709,7 @@ export default function SalesPipelinePage() {
                   <span className="font-semibold text-sky-700">${forecastKpis.thisMonthValue.toLocaleString()}</span>
                 </span>
                 {forecastKpis.atRiskCount > 0 && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-semibold">
                     {forecastKpis.atRiskCount} at risk
                   </span>
                 )}
@@ -7743,7 +7735,7 @@ export default function SalesPipelinePage() {
                       <Badge variant="secondary" className="ml-1 text-[10px]">{forecastOpps.length}</Badge>
                     )}
                     {forecastKpis.atRiskCount > 0 && (
-                      <Badge variant="secondary" className="ml-1 bg-red-100 text-red-700 hover:bg-red-100 text-[10px]" title={`${forecastKpis.atRiskCount} at-risk`}>
+                      <Badge variant="secondary" className="ml-1 bg-rose-100 text-rose-700 hover:bg-rose-100 text-[10px]" title={`${forecastKpis.atRiskCount} at-risk`}>
                         {forecastKpis.atRiskCount} at-risk
                       </Badge>
                     )}
@@ -7973,10 +7965,10 @@ export default function SalesPipelinePage() {
               {(dashboardMetrics.worstConversion || dashboardMetrics.slowestStage) && (
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   {dashboardMetrics.worstConversion && (
-                    <div className="border-l-[3px] border-l-red-400 bg-red-50/60 rounded-r-lg px-3 py-2.5">
+                    <div className="border-l-[3px] border-l-red-400 bg-rose-50/60 rounded-r-lg px-3 py-2.5">
                       <div className="flex items-center gap-1.5 mb-0.5">
-                        <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
-                        <p className="text-[11px] font-semibold text-red-600">Biggest Drop-off</p>
+                        <AlertTriangle className="h-3.5 w-3.5 text-rose-400" />
+                        <p className="text-[11px] font-semibold text-rose-600">Biggest Drop-off</p>
                       </div>
                       <p className="text-sm font-bold text-gray-800">
                         {STAGE_LABELS[dashboardMetrics.worstConversion.stage as SalesPipelineStage]} → {STAGE_LABELS[dashboardMetrics.worstConversion.nextStage as SalesPipelineStage]}
@@ -8023,33 +8015,33 @@ export default function SalesPipelinePage() {
                       const isWorst = dashboardMetrics.worstConversion?.stage === conv.stage;
                       const isSlowest = dashboardMetrics.slowestStage?.stage === conv.stage;
                       const barWidth = Math.max(conv.rate, 3);
-                      const barColor = conv.rate >= 60 ? 'bg-emerald-400' : conv.rate >= 30 ? 'bg-amber-400' : 'bg-red-400';
+                      const barColor = conv.rate >= 60 ? 'bg-emerald-400' : conv.rate >= 30 ? 'bg-amber-400' : 'bg-rose-400';
                       return (
-                        <tr key={conv.stage} className={`border-t border-gray-100 ${isWorst ? 'bg-red-50/40' : isSlowest ? 'bg-amber-50/30' : ''}`}>
+                        <tr key={conv.stage} className={`border-t border-gray-100 ${isWorst ? 'bg-rose-50/40' : isSlowest ? 'bg-amber-50/30' : ''}`}>
                           <td className="py-1.5 px-3 font-medium text-gray-700">
                             <div className="flex items-center gap-1.5">
                               {STAGE_LABELS[conv.stage as SalesPipelineStage]}
-                              {isWorst && <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-400" />}
+                              {isWorst && <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-400" />}
                               {isSlowest && <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400" />}
                             </div>
                           </td>
                           <td className="py-1.5 px-3 text-center text-gray-500">{conv.from}</td>
                           <td className="py-1.5 px-3 text-center text-gray-500">{conv.to}</td>
                           <td className="py-1.5 px-3 text-center">
-                            <span className={`font-semibold ${conv.rate >= 60 ? 'text-emerald-600' : conv.rate >= 30 ? 'text-amber-600' : 'text-red-500'}`}>
+                            <span className={`font-semibold ${conv.rate >= 60 ? 'text-emerald-600' : conv.rate >= 30 ? 'text-amber-600' : 'text-rose-500'}`}>
                               {conv.from > 0 ? `${conv.rate.toFixed(0)}%` : '—'}
                             </span>
                           </td>
                           <td className="py-1.5 px-3 text-center">
                             {conv.dropoff > 0 ? (
-                              <span className="text-red-400 font-medium">-{conv.dropoff}</span>
+                              <span className="text-rose-400 font-medium">-{conv.dropoff}</span>
                             ) : (
                               <span className="text-gray-300">0</span>
                             )}
                           </td>
                           <td className="py-1.5 px-3 text-center">
                             {timeData.count > 0 ? (
-                              <span className={`font-medium ${timeData.avgDays >= 14 ? 'text-red-500' : timeData.avgDays >= 7 ? 'text-amber-500' : 'text-gray-500'}`}>
+                              <span className={`font-medium ${timeData.avgDays >= 14 ? 'text-rose-500' : timeData.avgDays >= 7 ? 'text-amber-500' : 'text-gray-500'}`}>
                                 {timeData.avgDays}d
                               </span>
                             ) : (
@@ -8597,7 +8589,7 @@ export default function SalesPipelinePage() {
                       </button>
                     ))}
                   </div>
-                  <Button variant="brand" size="sm" onClick={openCreateDialog} className="text-white hover:opacity-90">
+                  <Button variant="brand" size="sm" onClick={openCreateDialog} className="text-white">
                     <Plus className="h-4 w-4 mr-1" />
                     New Template
                   </Button>
@@ -8679,7 +8671,7 @@ export default function SalesPipelinePage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                                  className="h-7 w-7 p-0 text-rose-500 hover:text-rose-700"
                                   onClick={() => handleDeleteTemplate(t.id)}
                                   title="Delete"
                                 >
@@ -8795,7 +8787,7 @@ export default function SalesPipelinePage() {
                                   <button
                                     type="button"
                                     onClick={() => setTemplateForm(prev => ({ ...prev, tags: (prev.tags || []).filter(t => t !== tag) }))}
-                                    className="hover:text-red-500"
+                                    className="hover:text-rose-500"
                                   >
                                     <X className="h-3 w-3" />
                                   </button>
@@ -8840,7 +8832,7 @@ export default function SalesPipelinePage() {
                                   <button
                                     type="button"
                                     onClick={() => setTemplateForm(prev => ({ ...prev, attachments: (prev.attachments || []).filter((_, i) => i !== idx) }))}
-                                    className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                                   >
                                     <X className="h-3 w-3" />
                                   </button>
@@ -8879,7 +8871,7 @@ export default function SalesPipelinePage() {
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setIsTemplateDialogOpen(false)}>Cancel</Button>
-                      <Button variant="brand" onClick={editingTemplate ? handleUpdateTemplate : handleCreateTemplate} disabled={isTemplateSubmitting || !templateForm.name || !templateForm.content} className="text-white hover:opacity-90">
+                      <Button variant="brand" onClick={editingTemplate ? handleUpdateTemplate : handleCreateTemplate} disabled={isTemplateSubmitting || !templateForm.name || !templateForm.content} className="text-white">
                         {isTemplateSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                         {editingTemplate ? 'Save Changes' : 'Create Template'}
                       </Button>
@@ -8928,7 +8920,7 @@ export default function SalesPipelinePage() {
                             <div className="grid grid-cols-2 gap-2">
                               {previewTemplate.attachments.map((att, idx) => (
                                 <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="block">
-                                  <img src={att.url} alt={att.name} className="w-full rounded border hover:opacity-90 transition-opacity" />
+                                  <img src={att.url} alt={att.name} className="w-full rounded border transition-opacity" />
                                   <p className="text-[10px] text-gray-500 mt-1 truncate">{att.name}</p>
                                 </a>
                               ))}
@@ -8987,7 +8979,7 @@ export default function SalesPipelinePage() {
             <AlertDialogCancel disabled={confirmRunning}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               disabled={confirmRunning}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-rose-600 hover:bg-rose-700 text-white"
               onClick={async (e) => {
                 e.preventDefault();
                 if (!confirmDialog) return;
