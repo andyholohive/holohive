@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   Dialog,
   DialogContent,
@@ -343,7 +344,7 @@ export default function TelegramChatsPage() {
         );
       case 'YouTube':
         return (
-          <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="h-4 w-4 text-rose-500" viewBox="0 0 24 24" fill="currentColor">
             <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
           </svg>
         );
@@ -623,7 +624,7 @@ export default function TelegramChatsPage() {
           {chat.is_hidden ? 'Unhide' : 'Hide from all tabs'}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => handleDeleteChat(chat)} className="text-red-600 focus:text-red-600">
+        <DropdownMenuItem onClick={() => handleDeleteChat(chat)} className="text-rose-600 focus:text-rose-600">
           <Trash2 className="h-4 w-4 mr-2" />
           Delete
         </DropdownMenuItem>
@@ -1105,7 +1106,7 @@ export default function TelegramChatsPage() {
     if (diffHours < 24) return { color: 'bg-emerald-500', label: 'Active' };
     if (diffHours < 72) return { color: 'bg-yellow-500', label: 'Recent' };
     if (diffHours < 168) return { color: 'bg-orange-500', label: 'Quiet' };
-    return { color: 'bg-red-500', label: 'Inactive' };
+    return { color: 'bg-rose-500', label: 'Inactive' };
   };
 
   // Use demo data if showDemo is true, otherwise use real data
@@ -1241,17 +1242,15 @@ export default function TelegramChatsPage() {
   if (loading) {
     return (
       <div className="flex flex-col h-full gap-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <Skeleton className="h-8 w-48 mb-2" />
-            <Skeleton className="h-5 w-64" />
-          </div>
-          <Skeleton className="h-10 w-24" />
-        </div>
+        <PageHeader
+          icon={MessageSquare}
+          title="Telegram"
+          subtitle="Manage Telegram chats and bot commands"
+        />
         <Skeleton className="h-10 w-80" />
         <div className="grid gap-4">
-          {[1, 2, 3].map(i => (
-            <Skeleton key={i} className="h-32 w-full" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-32 w-full rounded-lg" />
           ))}
         </div>
       </div>
@@ -1260,15 +1259,11 @@ export default function TelegramChatsPage() {
 
   return (
     <div className="flex flex-col h-full gap-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Telegram</h2>
-          <p className="text-gray-600">
-            Manage Telegram chats and bot commands
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={MessageSquare}
+        title="Telegram"
+        subtitle="Manage Telegram chats and bot commands"
+      />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
@@ -1280,7 +1275,7 @@ export default function TelegramChatsPage() {
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{unassignedChats.length}</Badge>
             )}
             {unassignedNeedsReply > 0 && (
-              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-red-500 text-white border-0 hover:bg-red-500" title={`${unassignedNeedsReply} chat${unassignedNeedsReply === 1 ? '' : 's'} awaiting reply`}>{unassignedNeedsReply}</Badge>
+              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-rose-500 text-white border-0 hover:bg-rose-500" title={`${unassignedNeedsReply} chat${unassignedNeedsReply === 1 ? '' : 's'} awaiting reply`}>{unassignedNeedsReply}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="leads" className="flex items-center gap-2">
@@ -1290,7 +1285,7 @@ export default function TelegramChatsPage() {
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{leadsChats.length}</Badge>
             )}
             {leadsNeedsReply > 0 && (
-              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-red-500 text-white border-0 hover:bg-red-500" title={`${leadsNeedsReply} chat${leadsNeedsReply === 1 ? '' : 's'} awaiting reply`}>{leadsNeedsReply}</Badge>
+              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-rose-500 text-white border-0 hover:bg-rose-500" title={`${leadsNeedsReply} chat${leadsNeedsReply === 1 ? '' : 's'} awaiting reply`}>{leadsNeedsReply}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="internal" className="flex items-center gap-2">
@@ -1307,7 +1302,7 @@ export default function TelegramChatsPage() {
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{clientChats.length}</Badge>
             )}
             {clientNeedsReply > 0 && (
-              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-red-500 text-white border-0 hover:bg-red-500" title={`${clientNeedsReply} chat${clientNeedsReply === 1 ? '' : 's'} awaiting reply`}>{clientNeedsReply}</Badge>
+              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-rose-500 text-white border-0 hover:bg-rose-500" title={`${clientNeedsReply} chat${clientNeedsReply === 1 ? '' : 's'} awaiting reply`}>{clientNeedsReply}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="chats" className="flex items-center gap-2">
@@ -1317,7 +1312,7 @@ export default function TelegramChatsPage() {
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{groupChats.length}</Badge>
             )}
             {groupNeedsReply > 0 && (
-              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-red-500 text-white border-0 hover:bg-red-500" title={`${groupNeedsReply} chat${groupNeedsReply === 1 ? '' : 's'} awaiting reply`}>{groupNeedsReply}</Badge>
+              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-rose-500 text-white border-0 hover:bg-rose-500" title={`${groupNeedsReply} chat${groupNeedsReply === 1 ? '' : 's'} awaiting reply`}>{groupNeedsReply}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="dms" className="flex items-center gap-2">
@@ -1327,7 +1322,7 @@ export default function TelegramChatsPage() {
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{dmChats.length}</Badge>
             )}
             {dmNeedsReply > 0 && (
-              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-red-500 text-white border-0 hover:bg-red-500" title={`${dmNeedsReply} chat${dmNeedsReply === 1 ? '' : 's'} awaiting reply`}>{dmNeedsReply}</Badge>
+              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-rose-500 text-white border-0 hover:bg-rose-500" title={`${dmNeedsReply} chat${dmNeedsReply === 1 ? '' : 's'} awaiting reply`}>{dmNeedsReply}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="kols" className="flex items-center gap-2">
@@ -1337,7 +1332,7 @@ export default function TelegramChatsPage() {
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">{kolChats.length}</Badge>
             )}
             {kolNeedsReply > 0 && (
-              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-red-500 text-white border-0 hover:bg-red-500" title={`${kolNeedsReply} chat${kolNeedsReply === 1 ? '' : 's'} awaiting reply`}>{kolNeedsReply}</Badge>
+              <Badge className="ml-0.5 h-5 px-1.5 text-xs bg-rose-500 text-white border-0 hover:bg-rose-500" title={`${kolNeedsReply} chat${kolNeedsReply === 1 ? '' : 's'} awaiting reply`}>{kolNeedsReply}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="commands" className="flex items-center gap-2">
@@ -1663,7 +1658,7 @@ export default function TelegramChatsPage() {
 
                         {/* Right: Actions */}
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <Button size="sm" onClick={() => openMessageDialog(chat)} className="hover:opacity-90 bg-brand text-white">
+                          <Button size="sm" onClick={() => openMessageDialog(chat)} className="bg-brand text-white">
                             <MessageSquare className="h-4 w-4 mr-1.5" />
                             Send Message
                           </Button>
@@ -1671,7 +1666,7 @@ export default function TelegramChatsPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleUnlink(chat)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
                           >
                             <Unlink className="h-4 w-4 mr-1.5" />
                             Unlink
@@ -1839,7 +1834,7 @@ export default function TelegramChatsPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handleUnlink(chat)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                          className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
                         >
                           <Unlink className="h-4 w-4 mr-1.5" />
                           Unlink
@@ -2042,7 +2037,7 @@ export default function TelegramChatsPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => handleUnlinkKol(chat)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                              className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
                             >
                               <Unlink className="h-4 w-4 mr-1.5" />
                               Unlink
@@ -2224,7 +2219,7 @@ export default function TelegramChatsPage() {
 
                         {/* Right: Actions */}
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <Button size="sm" onClick={() => openMessageDialog(chat)} className="hover:opacity-90 bg-brand text-white">
+                          <Button size="sm" onClick={() => openMessageDialog(chat)} className="bg-brand text-white">
                             <MessageSquare className="h-4 w-4 mr-1.5" />
                             Send Message
                           </Button>
@@ -2232,7 +2227,7 @@ export default function TelegramChatsPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleUnlinkKol(chat)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
                           >
                             <Unlink className="h-4 w-4 mr-1.5" />
                             Unlink
@@ -2262,7 +2257,7 @@ export default function TelegramChatsPage() {
             <p className="text-gray-600">
               Bot commands that respond to users ({commands.length} total)
             </p>
-            <Button className="bg-brand text-white" onClick={() => openCommandDialog()}>
+            <Button variant="brand" onClick={() => openCommandDialog()}>
               <Plus className="h-4 w-4 mr-2" />
               Add Command
             </Button>
@@ -2285,7 +2280,7 @@ export default function TelegramChatsPage() {
                 <p className="text-gray-500 max-w-md mx-auto mb-4">
                   Add bot commands that will respond when users type them in Telegram chats.
                 </p>
-                <Button className="bg-brand text-white" onClick={() => openCommandDialog()}>
+                <Button variant="brand" onClick={() => openCommandDialog()}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Your First Command
                 </Button>
@@ -2357,7 +2352,7 @@ export default function TelegramChatsPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteCommand(command)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -2548,7 +2543,7 @@ export default function TelegramChatsPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleUnlinkClient(chat)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
                           >
                             <Unlink className="h-4 w-4 mr-1.5" />
                             Unlink
