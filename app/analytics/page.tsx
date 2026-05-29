@@ -5,6 +5,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -382,60 +384,56 @@ export default function AnalyticsPage() {
     // only the data sections below get skeletoned (audit 2026-05-07).
     return (
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-brand" />
-            Team Analytics
-          </h2>
-          <p className="text-gray-600 text-sm mt-0.5">
-            Pipeline, Discovery, team workload, and health alerts at a glance.
-          </p>
-        </div>
+        <PageHeader
+          icon={BarChart3}
+          title="Team Analytics"
+          subtitle="Pipeline, Discovery, team workload, and health alerts at a glance."
+        />
+        {/* KPI strip skeletons — must mirror the actual `grid-cols-2
+            md:grid-cols-4 gap-3` shape so the layout doesn't shift
+            under the user when data arrives. KpiCard renders rounded-xl. */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24" />)}
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
         </div>
-        <Skeleton className="h-64" />
-        <Skeleton className="h-48" />
+        <Skeleton className="h-64 rounded-lg" />
+        <Skeleton className="h-48 rounded-lg" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-brand" />
-            Team Analytics
-          </h2>
-          <p className="text-gray-600 text-sm mt-0.5">
-            Pipeline, Discovery, team workload, and health alerts at a glance.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={String(windowDays)} onValueChange={(v) => setWindowDays(Number(v) as 7 | 14 | 30 | 90)}>
-            <SelectTrigger className="h-9 w-32 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Last 7 days</SelectItem>
-              <SelectItem value="14">Last 14 days</SelectItem>
-              <SelectItem value="30">Last 30 days</SelectItem>
-              <SelectItem value="90">Last 90 days</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9"
-            onClick={() => fetchData(true)}
-            disabled={refreshing}
-          >
-            {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        icon={BarChart3}
+        title="Team Analytics"
+        subtitle="Pipeline, Discovery, team workload, and health alerts at a glance."
+        actions={(
+          <>
+            <Select value={String(windowDays)} onValueChange={(v) => setWindowDays(Number(v) as 7 | 14 | 30 | 90)}>
+              <SelectTrigger className="h-9 w-32 text-sm focus-brand">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="14">Last 14 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={() => fetchData(true)}
+              disabled={refreshing}
+            >
+              {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            </Button>
+          </>
+        )}
+      />
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -552,7 +550,7 @@ export default function AnalyticsPage() {
                     </div>
                     <div className="min-w-[60px] text-right">
                       {isNew ? (
-                        <Badge variant="secondary" className="bg-blue-50 text-blue-700 text-[10px]">new</Badge>
+                        <StatusBadge tone="info" size="sm">new</StatusBadge>
                       ) : row.trend_pct != null && row.trend_pct !== 0 ? (
                         <span className={`inline-flex items-center text-xs font-semibold tabular-nums ${
                           isUp ? 'text-rose-600' : isDown ? 'text-emerald-600' : 'text-gray-400'
@@ -625,12 +623,9 @@ export default function AnalyticsPage() {
               .sort((a, b) => b[1] - a[1])
               .slice(0, 4)
               .map(([tier, n]) => (
-                <span
-                  key={tier}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600"
-                >
-                  {tier}: <strong className="text-gray-900">{n}</strong>
-                </span>
+                <StatusBadge key={tier} tone="neutral" size="sm">
+                  {tier}: <strong className="text-gray-900 ml-1">{n}</strong>
+                </StatusBadge>
               ))}
           </div>
         </div>
@@ -866,7 +861,7 @@ export default function AnalyticsPage() {
             <Button variant="outline" onClick={() => setEditOpen(false)} disabled={editSubmitting}>
               Cancel
             </Button>
-            <Button variant="brand" onClick={submitEdit} disabled={editSubmitting || !editAmount.trim()} className="hover:opacity-90">
+            <Button variant="brand" onClick={submitEdit} disabled={editSubmitting || !editAmount.trim()}>
               {editSubmitting && <Loader2 className="h-3 w-3 mr-2 animate-spin" />}
               Save
             </Button>
