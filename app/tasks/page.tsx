@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -1501,44 +1502,36 @@ export default function TasksPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
-      <div className="w-full">
-        <div className="space-y-4">
-          {/* Header */}
-          <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-            <div className="pb-5 border-b border-gray-100 flex flex-row items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="bg-gray-100 p-2 rounded-lg">
-                  <ListTodo className="h-6 w-6 text-gray-600" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Tasks</h2>
-                  <p className="text-sm text-gray-500">Manage team tasks, SOPs, and recurring work</p>
-                </div>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="brand">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Task
-                    <ChevronDown className="h-3 w-3 ml-1.5 opacity-70" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => openForm()}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Task
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setWizardOpen(true)}>
-                    <Package className="h-4 w-4 mr-2" />
-                    New Deliverable
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={ListTodo}
+        title="Tasks"
+        subtitle="Manage team tasks, SOPs, and recurring work"
+        actions={(
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="brand">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Task
+                <ChevronDown className="h-3 w-3 ml-1.5 opacity-70" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => openForm()}>
+                <Plus className="h-4 w-4 mr-2" />
+                New Task
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setWizardOpen(true)}>
+                <Package className="h-4 w-4 mr-2" />
+                New Deliverable
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      />
 
-            {/* Tabs */}
-            <div className="pt-4">
+      {/* Tabs */}
+      <div>
               {loading ? (
                 <div className="flex gap-2">
                   {[1, 2, 3].map((i) => <Skeleton key={i} className="h-9 w-28 rounded" />)}
@@ -1666,12 +1659,10 @@ export default function TasksPage() {
                 )}
               </button>
             </div>
-          </div>
-
-          {/* Grouped Tables */}
-          {loading ? (
-            <div className="p-6 space-y-3">
-              {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-12 w-full rounded" />)}
+      {/* Grouped Tables */}
+      {loading ? (
+        <div className="p-6 space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded" />)}
             </div>
           ) : filtered.length === 0 ? (
             <div className="w-full bg-white border border-gray-200 shadow-sm">
@@ -1766,8 +1757,6 @@ export default function TasksPage() {
               })}
             </div>
           )}
-        </div>
-      </div>
 
       {/* Task Detail Modal */}
       <TaskDetailModal

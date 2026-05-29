@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useAuth } from '@/contexts/AuthContext';
 import { TaskService, Task, DashboardStats } from '@/lib/taskService';
 import { ClientService } from '@/lib/clientService';
@@ -94,36 +96,31 @@ export default function MyDashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[calc(100vh-64px)] bg-gray-50 p-6">
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-64" />
-          <div className="grid grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-lg" />)}
-          </div>
-          <Skeleton className="h-64 rounded-lg" />
+      <div className="space-y-6">
+        <PageHeader
+          icon={LayoutDashboard}
+          title="My Dashboard"
+          subtitle="Your assigned tasks and progress"
+        />
+        <div className="grid grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
         </div>
+        <Skeleton className="h-64 rounded-lg" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-gray-50">
-      <div className="w-full">
-        <div className="space-y-4">
-          {/* Header */}
-          <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-            <div className="flex items-center gap-3">
-              <div className="bg-gray-100 p-2 rounded-lg">
-                <LayoutDashboard className="h-6 w-6 text-gray-600" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">My Dashboard</h2>
-                <p className="text-sm text-gray-500">Your assigned tasks and progress</p>
-              </div>
-            </div>
-          </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={LayoutDashboard}
+        title="My Dashboard"
+        subtitle="Your assigned tasks and progress"
+      />
 
-          {/* Client Filter Tabs */}
+      {/* Client Filter Tabs */}
           {taskClients.length > 0 && (
             <div className="px-0">
               <Tabs value={clientFilter} onValueChange={setClientFilter}>
@@ -182,14 +179,12 @@ export default function MyDashboardPage() {
             <TaskSection title="Recently Completed" icon={CheckCircle2} color="text-emerald-600" tasks={recentlyCompleted} getDueDateColor={getDueDateColor} clientMap={clientMap} />
           )}
 
-          {tasks.length === 0 && (
-            <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-12 text-center">
-              <LayoutDashboard className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">No tasks assigned to you yet.</p>
-            </div>
-          )}
-        </div>
-      </div>
+      {tasks.length === 0 && (
+        <EmptyState
+          icon={LayoutDashboard}
+          title="No tasks assigned to you yet."
+        />
+      )}
     </div>
   );
 }

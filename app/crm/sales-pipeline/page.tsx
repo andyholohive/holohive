@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageHeader } from '@/components/ui/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -7375,18 +7376,17 @@ export default function SalesPipelinePage() {
   if (loading) {
     return (
       <div className="flex flex-col h-full gap-6">
-        {/* Header — real title/subtitle render immediately so the user
-            sees page context; only the data sections below skeleton. */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Sales Pipeline</h2>
-            <p className="text-gray-600">Playbook-driven sales pipeline</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-10 w-64 rounded-md" />
-            <Skeleton className="h-10 w-36 rounded-md" />
-          </div>
-        </div>
+        <PageHeader
+          icon={Target}
+          title="Sales"
+          subtitle="Track and manage your active sales opportunities"
+          actions={(
+            <>
+              <Skeleton className="h-10 w-64 rounded-md" />
+              <Skeleton className="h-10 w-36 rounded-md" />
+            </>
+          )}
+        />
 
         {/* Stats Cards — [Responsive cleanup, May 2026] add fallbacks */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -7428,13 +7428,12 @@ export default function SalesPipelinePage() {
       {/* Activity Slide-Over (rendered via portal to document.body) */}
       {renderSlideOver()}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Sales Pipeline</h2>
-          <p className="text-gray-600">Playbook-driven sales pipeline</p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        icon={Target}
+        title="Sales"
+        subtitle="Track and manage your active sales opportunities"
+        actions={(
+          <>
           <Button
             variant="outline"
             size="sm"
@@ -7457,12 +7456,13 @@ export default function SalesPipelinePage() {
           >
             <Download className="h-4 w-4 mr-1" /> Export CSV
           </Button>
-          <Button onClick={() => { setForm({ name: '', owner_id: user?.id || undefined }); setIsCreateOpen(true); }} className="bg-brand text-white">
+          <Button variant="brand" onClick={() => { setForm({ name: '', owner_id: user?.id || undefined }); setIsCreateOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" />
             New Opportunity
           </Button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       {/* [Sales-pipeline space optimization, May 2026] Combined
           "Pipeline Activity" container — was previously two separate
