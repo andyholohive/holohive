@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageHeader } from '@/components/ui/page-header';
 import { Checkbox } from '@/components/ui/checkbox';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { KpiCard } from '@/components/ui/kpi-card';
@@ -1034,17 +1035,17 @@ export default function NetworkPage() {
   if (loading) {
     return (
       <div className="flex flex-col h-full gap-6">
-        {/* Header — real title/subtitle render immediately. */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Network</h2>
-            <p className="text-gray-600">Manage your partners and affiliates</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-10 w-64" />
-            <Skeleton className="h-10 w-32" />
-          </div>
-        </div>
+        <PageHeader
+          icon={Handshake}
+          title="Network"
+          subtitle="Manage your partners and affiliates"
+          actions={(
+            <>
+              <Skeleton className="h-10 w-64" />
+              <Skeleton className="h-10 w-32" />
+            </>
+          )}
+        />
         {/* Stats cards skeleton — rounded-xl matches the loaded
             KpiCard radius (audit 2026-05-06; was rounded-lg). */}
         <div className="grid grid-cols-4 gap-4">
@@ -1078,35 +1079,35 @@ export default function NetworkPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Network</h2>
-          <p className="text-gray-600">Manage your partners and affiliates</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search..."
-              className="pl-10 w-64 focus-brand"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          {activeTab === 'partners' ? (
-            <Button onClick={() => { setEditingPartner(null); setPartnerForm({ name: '', status: 'active' }); setPartnerDialogAffiliateMode('link'); setNewAffiliateInPartnerDialog({ name: '', status: 'new' }); setIsNewPartnerOpen(true); }} className="hover:opacity-90 bg-brand text-white">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Partner
-            </Button>
-          ) : (
-            <Button onClick={() => { setEditingAffiliate(null); setAffiliateForm({ name: '', status: 'new' }); setIsNewAffiliateOpen(true); }} className="hover:opacity-90 bg-brand text-white">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Affiliate
-            </Button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        icon={Handshake}
+        title="Network"
+        subtitle="Manage your partners and affiliates"
+        actions={(
+          <>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search..."
+                className="pl-10 w-64 focus-brand"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            {activeTab === 'partners' ? (
+              <Button variant="brand" onClick={() => { setEditingPartner(null); setPartnerForm({ name: '', status: 'active' }); setPartnerDialogAffiliateMode('link'); setNewAffiliateInPartnerDialog({ name: '', status: 'new' }); setIsNewPartnerOpen(true); }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Partner
+              </Button>
+            ) : (
+              <Button variant="brand" onClick={() => { setEditingAffiliate(null); setAffiliateForm({ name: '', status: 'new' }); setIsNewAffiliateOpen(true); }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Affiliate
+              </Button>
+            )}
+          </>
+        )}
+      />
 
       {/* Stats Cards — flat KpiCard baseline (was 4 ad-hoc gradient cards
           before 2026-05-06; replaced for visual consistency with /analytics
@@ -1396,14 +1397,14 @@ export default function NetworkPage() {
                   </Select>
                 </div>
                 {/* Apply Button */}
-                <Button variant="brand" size="sm" onClick={handleBulkUpdatePartners} disabled={Object.keys(bulkPartnerEdit).length === 0} className="h-8 hover:opacity-90">
+                <Button variant="brand" size="sm" onClick={handleBulkUpdatePartners} disabled={Object.keys(bulkPartnerEdit).length === 0} className="h-8">
                   Apply Changes
                 </Button>
                 {/* Delete Button */}
                 <Button
                   size="sm"
                   onClick={() => setIsBulkDeletePartnerDialogOpen(true)}
-                  className="h-8 bg-red-600 hover:bg-red-700 text-white"
+                  className="h-8 bg-rose-600 hover:bg-rose-700 text-white"
                 >
                   Delete
                 </Button>
@@ -1679,7 +1680,7 @@ export default function NetworkPage() {
                                   Mark as Contacted
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  className="text-red-600"
+                                  className="text-rose-600"
                                   onClick={() => handleDeletePartner(partner)}
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
@@ -1756,7 +1757,7 @@ export default function NetworkPage() {
                               Mark as Contacted
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              className="text-red-600"
+                              className="text-rose-600"
                               onClick={() => handleDeletePartner(partner)}
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
@@ -1891,14 +1892,14 @@ export default function NetworkPage() {
                   </Select>
                 </div>
                 {/* Apply Button */}
-                <Button variant="brand" size="sm" onClick={handleBulkUpdateAffiliates} disabled={Object.keys(bulkAffiliateEdit).length === 0} className="h-8 hover:opacity-90">
+                <Button variant="brand" size="sm" onClick={handleBulkUpdateAffiliates} disabled={Object.keys(bulkAffiliateEdit).length === 0} className="h-8">
                   Apply Changes
                 </Button>
                 {/* Delete Button */}
                 <Button
                   size="sm"
                   onClick={() => setIsBulkDeleteAffiliateDialogOpen(true)}
-                  className="h-8 bg-red-600 hover:bg-red-700 text-white"
+                  className="h-8 bg-rose-600 hover:bg-rose-700 text-white"
                 >
                   Delete
                 </Button>
@@ -2181,7 +2182,7 @@ export default function NetworkPage() {
                                   Mark as Contacted
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  className="text-red-600"
+                                  className="text-rose-600"
                                   onClick={() => handleDeleteAffiliate(affiliate)}
                                 >
                                   <Trash2 className="h-4 w-4 mr-2" />
@@ -2273,7 +2274,7 @@ export default function NetworkPage() {
                               Mark as Contacted
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              className="text-red-600"
+                              className="text-rose-600"
                               onClick={() => handleDeleteAffiliate(affiliate)}
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
@@ -2640,7 +2641,7 @@ export default function NetworkPage() {
               <Button type="button" variant="outline" onClick={() => setIsNewPartnerOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="brand" type="submit" disabled={isSubmitting || !partnerForm.name.trim()} className="hover:opacity-90">
+              <Button variant="brand" type="submit" disabled={isSubmitting || !partnerForm.name.trim()}>
                 {isSubmitting ? 'Saving...' : editingPartner ? 'Save Changes' : 'Create Partner'}
               </Button>
             </DialogFooter>
@@ -2796,7 +2797,7 @@ export default function NetworkPage() {
               <Button type="button" variant="outline" onClick={() => setIsNewAffiliateOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="brand" type="submit" disabled={isSubmitting || !affiliateForm.name.trim()} className="hover:opacity-90">
+              <Button variant="brand" type="submit" disabled={isSubmitting || !affiliateForm.name.trim()}>
                 {isSubmitting ? 'Saving...' : editingAffiliate ? 'Save Changes' : 'Create Affiliate'}
               </Button>
             </DialogFooter>
@@ -2841,7 +2842,7 @@ export default function NetworkPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleUnlinkPartnerContact(link.id)}
-                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                        className="h-8 w-8 p-0 text-rose-500 hover:text-rose-700"
                       >
                         <X className="h-4 w-4" />
                       </Button>
@@ -2915,7 +2916,7 @@ export default function NetworkPage() {
                       Primary contact
                     </Label>
                   </div>
-                  <Button variant="brand" onClick={handleLinkContactToPartner} disabled={!selectedContactId || isSubmitting} className="w-full hover:opacity-90">
+                  <Button variant="brand" onClick={handleLinkContactToPartner} disabled={!selectedContactId || isSubmitting} className="w-full">
                     <LinkIcon className="h-4 w-4 mr-2" />
                     Link Contact
                   </Button>
@@ -2962,7 +2963,7 @@ export default function NetworkPage() {
                       Primary contact
                     </Label>
                   </div>
-                  <Button variant="brand" onClick={handleCreateAndLinkContactToPartner} disabled={!newContactForm.name.trim() || isSubmitting} className="w-full hover:opacity-90">
+                  <Button variant="brand" onClick={handleCreateAndLinkContactToPartner} disabled={!newContactForm.name.trim() || isSubmitting} className="w-full">
                     <Plus className="h-4 w-4 mr-2" />
                     {isSubmitting ? 'Creating...' : 'Create & Link Contact'}
                   </Button>
@@ -3010,7 +3011,7 @@ export default function NetworkPage() {
                       size="sm"
                       onClick={handleRemovePartnerAffiliateLink}
                       disabled={isSubmitting}
-                      className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                      className="h-8 w-8 p-0 text-rose-500 hover:text-rose-700"
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -3065,7 +3066,7 @@ export default function NetworkPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="brand" onClick={handleSavePartnerAffiliateLink} disabled={!selectedAffiliateForPartner || isSubmitting} className="w-full hover:opacity-90">
+                  <Button variant="brand" onClick={handleSavePartnerAffiliateLink} disabled={!selectedAffiliateForPartner || isSubmitting} className="w-full">
                     <LinkIcon className="h-4 w-4 mr-2" />
                     {isSubmitting ? 'Saving...' : 'Link Affiliate'}
                   </Button>
@@ -3101,7 +3102,7 @@ export default function NetworkPage() {
                     className="focus-brand"
                     rows={2}
                   />
-                  <Button variant="brand" onClick={handleCreateAndLinkAffiliateToPartner} disabled={!newAffiliateFormForPartner.name.trim() || isSubmitting} className="w-full hover:opacity-90">
+                  <Button variant="brand" onClick={handleCreateAndLinkAffiliateToPartner} disabled={!newAffiliateFormForPartner.name.trim() || isSubmitting} className="w-full">
                     <Plus className="h-4 w-4 mr-2" />
                     {isSubmitting ? 'Creating...' : 'Create & Link Affiliate'}
                   </Button>
@@ -3154,7 +3155,7 @@ export default function NetworkPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleUnlinkAffiliateContact(link.id)}
-                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                        className="h-8 w-8 p-0 text-rose-500 hover:text-rose-700"
                       >
                         <X className="h-4 w-4" />
                       </Button>
@@ -3228,7 +3229,7 @@ export default function NetworkPage() {
                       Primary contact
                     </Label>
                   </div>
-                  <Button variant="brand" onClick={handleLinkContactToAffiliate} disabled={!selectedContactId || isSubmitting} className="w-full hover:opacity-90">
+                  <Button variant="brand" onClick={handleLinkContactToAffiliate} disabled={!selectedContactId || isSubmitting} className="w-full">
                     <LinkIcon className="h-4 w-4 mr-2" />
                     Link Contact
                   </Button>
@@ -3275,7 +3276,7 @@ export default function NetworkPage() {
                       Primary contact
                     </Label>
                   </div>
-                  <Button variant="brand" onClick={handleCreateAndLinkContactToAffiliate} disabled={!newContactForm.name.trim() || isSubmitting} className="w-full hover:opacity-90">
+                  <Button variant="brand" onClick={handleCreateAndLinkContactToAffiliate} disabled={!newContactForm.name.trim() || isSubmitting} className="w-full">
                     <Plus className="h-4 w-4 mr-2" />
                     {isSubmitting ? 'Creating...' : 'Create & Link Contact'}
                   </Button>
