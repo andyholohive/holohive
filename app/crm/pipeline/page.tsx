@@ -2853,12 +2853,15 @@ export default function PipelinePage() {
                 </>
               ) : (
                 <>
-                  <Input
-                    value={newContactForm.name}
-                    onChange={(e) => setNewContactForm({ ...newContactForm, name: e.target.value })}
-                    placeholder="Contact name *"
-                    className="focus-brand"
-                  />
+                  <div className="flex items-center gap-1">
+                    <Input
+                      value={newContactForm.name}
+                      onChange={(e) => setNewContactForm({ ...newContactForm, name: e.target.value })}
+                      placeholder="Contact name"
+                      className="focus-brand flex-1"
+                    />
+                    {!newContactForm.name && <RequiredAsterisk />}
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <Input
                       type="email"

@@ -2477,12 +2477,15 @@ export default function NetworkPage() {
                   </Select>
                 ) : (
                   <div className="space-y-2">
-                    <Input
-                      value={newAffiliateInPartnerDialog.name}
-                      onChange={(e) => setNewAffiliateInPartnerDialog({ ...newAffiliateInPartnerDialog, name: e.target.value })}
-                      placeholder="Affiliate name *"
-                      className="focus-brand"
-                    />
+                    <div className="flex items-center gap-1">
+                      <Input
+                        value={newAffiliateInPartnerDialog.name}
+                        onChange={(e) => setNewAffiliateInPartnerDialog({ ...newAffiliateInPartnerDialog, name: e.target.value })}
+                        placeholder="Affiliate name"
+                        className="focus-brand flex-1"
+                      />
+                      {!newAffiliateInPartnerDialog.name && <RequiredAsterisk />}
+                    </div>
                     <Select
                       value={newAffiliateInPartnerDialog.commission_model || ''}
                       onValueChange={(value) => setNewAffiliateInPartnerDialog({ ...newAffiliateInPartnerDialog, commission_model: value })}
@@ -2578,12 +2581,15 @@ export default function NetworkPage() {
 
                 {partnerDialogContactMode === 'create' && (
                   <div className="space-y-2">
-                    <Input
-                      value={newContactInPartnerDialog.name}
-                      onChange={(e) => setNewContactInPartnerDialog({ ...newContactInPartnerDialog, name: e.target.value })}
-                      placeholder="Contact name *"
-                      className="focus-brand"
-                    />
+                    <div className="flex items-center gap-1">
+                      <Input
+                        value={newContactInPartnerDialog.name}
+                        onChange={(e) => setNewContactInPartnerDialog({ ...newContactInPartnerDialog, name: e.target.value })}
+                        placeholder="Contact name"
+                        className="focus-brand flex-1"
+                      />
+                      {!newContactInPartnerDialog.name && <RequiredAsterisk />}
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                       <Input
                         type="email"
@@ -2916,12 +2922,15 @@ export default function NetworkPage() {
                 </>
               ) : (
                 <>
-                  <Input
-                    value={newContactForm.name}
-                    onChange={(e) => setNewContactForm({ ...newContactForm, name: e.target.value })}
-                    placeholder="Contact name *"
-                    className="focus-brand"
-                  />
+                  <div className="flex items-center gap-1">
+                    <Input
+                      value={newContactForm.name}
+                      onChange={(e) => setNewContactForm({ ...newContactForm, name: e.target.value })}
+                      placeholder="Contact name"
+                      className="focus-brand flex-1"
+                    />
+                    {!newContactForm.name && <RequiredAsterisk />}
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <Input
                       type="email"
@@ -3063,12 +3072,15 @@ export default function NetworkPage() {
                 </>
               ) : (
                 <>
-                  <Input
-                    value={newAffiliateFormForPartner.name}
-                    onChange={(e) => setNewAffiliateFormForPartner({ ...newAffiliateFormForPartner, name: e.target.value })}
-                    placeholder="Affiliate name *"
-                    className="focus-brand"
-                  />
+                  <div className="flex items-center gap-1">
+                    <Input
+                      value={newAffiliateFormForPartner.name}
+                      onChange={(e) => setNewAffiliateFormForPartner({ ...newAffiliateFormForPartner, name: e.target.value })}
+                      placeholder="Affiliate name"
+                      className="focus-brand flex-1"
+                    />
+                    {!newAffiliateFormForPartner.name && <RequiredAsterisk />}
+                  </div>
                   <Select
                     value={newAffiliateFormForPartner.commission_model || ''}
                     onValueChange={(value) => setNewAffiliateFormForPartner({ ...newAffiliateFormForPartner, commission_model: value })}
@@ -3223,12 +3235,15 @@ export default function NetworkPage() {
                 </>
               ) : (
                 <>
-                  <Input
-                    value={newContactForm.name}
-                    onChange={(e) => setNewContactForm({ ...newContactForm, name: e.target.value })}
-                    placeholder="Contact name *"
-                    className="focus-brand"
-                  />
+                  <div className="flex items-center gap-1">
+                    <Input
+                      value={newContactForm.name}
+                      onChange={(e) => setNewContactForm({ ...newContactForm, name: e.target.value })}
+                      placeholder="Contact name"
+                      className="focus-brand flex-1"
+                    />
+                    {!newContactForm.name && <RequiredAsterisk />}
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <Input
                       type="email"

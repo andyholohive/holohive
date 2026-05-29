@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
@@ -795,26 +796,32 @@ export default function DeliveryLogsPage() {
                             </Popover>
                           </td>
                           <td className="py-3 px-4">
-                            <Select value={inlineNew.work_type} onValueChange={(v) => setInlineNew({ ...inlineNew, work_type: v })}>
-                              <SelectTrigger
-                                className={`border-none shadow-none bg-transparent w-auto h-auto ${inlineNew.work_type ? workTypeBadge(inlineNew.work_type) : 'text-gray-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
-                                style={{ outline: 'none', boxShadow: 'none' }}
-                              >
-                                <SelectValue placeholder="Type *" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {WORK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
+                            <div className="inline-flex items-center">
+                              <Select value={inlineNew.work_type} onValueChange={(v) => setInlineNew({ ...inlineNew, work_type: v })}>
+                                <SelectTrigger
+                                  className={`border-none shadow-none bg-transparent w-auto h-auto ${inlineNew.work_type ? workTypeBadge(inlineNew.work_type) : 'text-gray-400'} px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none`}
+                                  style={{ outline: 'none', boxShadow: 'none' }}
+                                >
+                                  <SelectValue placeholder="Type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {WORK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                              {!inlineNew.work_type && <RequiredAsterisk />}
+                            </div>
                           </td>
                           <td className="py-3 px-4">
-                            <Input
-                              value={inlineNew.action}
-                              onChange={(e) => setInlineNew({ ...inlineNew, action: e.target.value })}
-                              placeholder="Action *"
-                              className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs font-medium text-gray-900"
-                              style={{ outline: 'none', boxShadow: 'none' }}
-                            />
+                            <div className="flex items-center">
+                              <Input
+                                value={inlineNew.action}
+                                onChange={(e) => setInlineNew({ ...inlineNew, action: e.target.value })}
+                                placeholder="Action"
+                                className="flex-1 border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 text-xs font-medium text-gray-900"
+                                style={{ outline: 'none', boxShadow: 'none' }}
+                              />
+                              {!inlineNew.action && <RequiredAsterisk />}
+                            </div>
                           </td>
                           <td className="py-3 px-4">
                             {inlineNewWhoMode === 'team' ? (

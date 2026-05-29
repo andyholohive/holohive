@@ -78,10 +78,26 @@ import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 inherits the label's gray/black color which fails the "required
 marker should be visually distinct" UX convention. Andy will flag it.
 
-For placeholder asterisks (e.g. `placeholder="Type *"`), there's no
-clean way to color part of a placeholder. Either convert to a proper
-Label + Input pair, or drop the asterisk from the placeholder and add
-a `<RequiredAsterisk />` sibling next to the field.
+For inline / table-row inputs that previously used `placeholder="Type *"`,
+drop the asterisk from the placeholder and wrap the field with a
+`<RequiredAsterisk />` sibling that conditionally renders while the
+value is empty:
+
+```tsx
+<div className="flex items-center gap-1">
+  <Input
+    value={form.name}
+    onChange={(e) => setForm({ ...form, name: e.target.value })}
+    placeholder="Contact name"
+    className="focus-brand flex-1"
+  />
+  {!form.name && <RequiredAsterisk />}
+</div>
+```
+
+This keeps the asterisk red and only shows it while the field is
+unfilled — the same UX intent as a label asterisk, but works for
+spaces where there's no room for a full Label.
 
 ---
 
