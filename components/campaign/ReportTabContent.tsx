@@ -333,7 +333,7 @@ export function ReportTabContent({
               onChange={onCustomMessageChange}
               placeholder="Add a custom message that will be displayed in the public report..."
             />
-            <Button variant="brand" onClick={onSaveCustomMessage} className="hover:opacity-90">
+            <Button variant="brand" onClick={onSaveCustomMessage}>
               Save Message
             </Button>
           </div>
@@ -404,7 +404,7 @@ export function ReportTabContent({
                         variant="ghost"
                         size="sm"
                         onClick={() => onDeleteFile(file.id, file.file_url)}
-                        className="hover:text-red-600"
+                        className="hover:text-rose-600"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

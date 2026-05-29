@@ -268,7 +268,7 @@ export default function Sidebar({ children }: SidebarProps) {
         <Button
           asChild
           variant={isActive ? 'default' : 'ghost'}
-          className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'} hover:opacity-90`}
+          className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'}`}
           style={isActive ? { backgroundColor: '#3e8692', color: 'white' } : {}}
           title={isSidebarCollapsed ? label : undefined}
         >

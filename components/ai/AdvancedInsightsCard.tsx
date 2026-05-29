@@ -46,7 +46,7 @@ export function AdvancedInsightsCard({ insights, onApplyInsight, onDismiss }: Ad
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 0.8) return 'text-emerald-600';
     if (confidence >= 0.6) return 'text-yellow-600';
-    return 'text-red-600';
+    return 'text-rose-600';
   };
 
   const formatConfidence = (confidence: number) => {
@@ -140,7 +140,7 @@ export function AdvancedInsightsCard({ insights, onApplyInsight, onDismiss }: Ad
               
               {insight.actionable && onApplyInsight && (
                 <div className="flex gap-2 pt-2">
-                  <Button size="sm" onClick={() => onApplyInsight(insight)} className="flex items-center gap-2 hover:opacity-90 bg-brand text-white">
+                  <Button size="sm" onClick={() => onApplyInsight(insight)} className="flex items-center gap-2 bg-brand text-white">
                     <Target className="w-3 h-3" />
                     Apply Insight
                   </Button>

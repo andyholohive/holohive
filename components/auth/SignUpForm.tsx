@@ -73,7 +73,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button variant="brand" onClick={onToggleMode} className="w-full hover:opacity-90">
+          <Button variant="brand" onClick={onToggleMode} className="w-full">
             Back to Sign In
           </Button>
         </CardContent>
@@ -148,7 +148,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
             />
           </div>
           
-          <Button variant="brand" type="submit" className="w-full hover:opacity-90" disabled={loading}>
+          <Button variant="brand" type="submit" className="w-full" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create Account
           </Button>

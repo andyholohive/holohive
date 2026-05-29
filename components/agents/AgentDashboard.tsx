@@ -109,7 +109,7 @@ const AGENT_INFO: Record<string, {
     label: 'SENTINEL',
     description: 'Pipeline Manager — monitors deal health and follow-ups',
     icon: Shield,
-    color: 'text-red-600',
+    color: 'text-rose-600',
     schedule: 'Mon/Thu 8:00 AM KST',
     type: 'scheduled',
   },
@@ -276,7 +276,7 @@ export default function AgentDashboard() {
   const statusIcon = (status: string) => {
     switch (status) {
       case 'completed': return <CheckCircle className="w-4 h-4 text-emerald-500" />;
-      case 'failed': return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'failed': return <XCircle className="w-4 h-4 text-rose-500" />;
       case 'running': return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
       default: return <Clock className="w-4 h-4 text-gray-400" />;
     }
@@ -285,7 +285,7 @@ export default function AgentDashboard() {
   const statusBadge = (status: string) => {
     const variants: Record<string, string> = {
       completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      failed: 'bg-red-50 text-red-700 border-red-200',
+      failed: 'bg-rose-50 text-rose-700 border-rose-200',
       running: 'bg-blue-50 text-blue-700 border-blue-200',
       pending: 'bg-gray-50 text-gray-600 border-gray-200',
       processing: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -435,7 +435,7 @@ export default function AgentDashboard() {
                         {agentStats.failed > 0 && (
                           <>
                             <span className="text-gray-300">|</span>
-                            <span className="text-red-500">{agentStats.failed} failed</span>
+                            <span className="text-rose-500">{agentStats.failed} failed</span>
                           </>
                         )}
                       </div>
@@ -492,7 +492,7 @@ export default function AgentDashboard() {
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-2">
                             <AlertTriangle className={`w-4 h-4 ${
-                              signal.tier === 1 ? 'text-red-500' : signal.tier === 2 ? 'text-amber-500' : 'text-blue-400'
+                              signal.tier === 1 ? 'text-rose-500' : signal.tier === 2 ? 'text-amber-500' : 'text-blue-400'
                             }`} />
                             <span className="text-sm font-medium text-gray-900">
                               {signal.opportunity?.name || 'Unknown'}
@@ -632,7 +632,7 @@ export default function AgentDashboard() {
                             )}
                           </div>
                           {run.error_message && (
-                            <p className="text-xs text-red-500 mt-0.5 truncate">{run.error_message}</p>
+                            <p className="text-xs text-rose-500 mt-0.5 truncate">{run.error_message}</p>
                           )}
                         </div>
                         <div className="text-right shrink-0">

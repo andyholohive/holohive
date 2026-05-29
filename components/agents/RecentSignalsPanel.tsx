@@ -49,7 +49,7 @@ interface RecentSignal {
 }
 
 const ACTION_TIER_STYLE: Record<string, { label: string; className: string }> = {
-  REACH_OUT_NOW:       { label: 'REACH OUT NOW',      className: 'bg-red-100 text-red-700 border-red-200' },
+  REACH_OUT_NOW:       { label: 'REACH OUT NOW',      className: 'bg-rose-100 text-rose-700 border-rose-200' },
   PRE_TOKEN_PRIORITY:  { label: 'PRE-TOKEN PRIORITY', className: 'bg-orange-100 text-orange-700 border-orange-200' },
   RESEARCH:            { label: 'RESEARCH',           className: 'bg-blue-100 text-blue-700 border-blue-200' },
   WATCH:               { label: 'WATCH',              className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
@@ -465,7 +465,7 @@ export default function RecentSignalsPanel() {
                             type="button"
                             onClick={() => deleteSignal(s.id, s.headline)}
                             disabled={isDeleting}
-                            className="text-gray-400 hover:text-red-600 p-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="text-gray-400 hover:text-rose-600 p-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Delete signal"
                             aria-label="Delete signal"
                           >

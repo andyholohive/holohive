@@ -158,7 +158,7 @@ export function TaskComments({ taskId, onCommentCountChange }: TaskCommentsProps
                   </Button>
                 )}
                 {(isOwner || isAdmin) && (
-                  <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs text-red-500 hover:text-red-700" onClick={() => handleDeleteComment(comment.id)}>
+                  <Button variant="ghost" size="sm" className="h-6 px-1.5 text-xs text-rose-500 hover:text-rose-700" onClick={() => handleDeleteComment(comment.id)}>
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 )}

@@ -3682,6 +3682,9 @@ const CampaignDetailsPage = () => {
 
   if (loading) {
     return (
+      // /campaigns/[id] is the 11k-line behemoth — structural refactor
+      // is its own tracked follow-up (see FOLLOW-UP in CLAUDE.md).
+      // lint-conventions: disable-next-line no-card-shell
       <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
         <div className="w-full px-4">
           <div className="space-y-4">
@@ -3759,6 +3762,8 @@ const CampaignDetailsPage = () => {
   }
 
   return (
+    // /campaigns/[id] behemoth — structural refactor is a tracked follow-up.
+    // lint-conventions: disable-next-line no-card-shell
     <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
       <div className="w-full">
         <div className="space-y-4">

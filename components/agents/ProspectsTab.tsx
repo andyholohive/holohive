@@ -91,7 +91,7 @@ const SIGNAL_LABELS: Record<string, string> = {
 };
 
 const ACTION_TIER_BADGE: Record<string, { label: string; color: string }> = {
-  REACH_OUT_NOW: { label: 'Reach Out', color: 'bg-red-100 text-red-700' },
+  REACH_OUT_NOW: { label: 'Reach Out', color: 'bg-rose-100 text-rose-700' },
   PRE_TOKEN_PRIORITY: { label: 'Pre-Token', color: 'bg-orange-100 text-orange-700' },
   WATCH: { label: 'Watch', color: 'bg-yellow-100 text-yellow-700' },
   RESEARCH: { label: 'Research', color: 'bg-blue-100 text-blue-700' },
@@ -123,7 +123,7 @@ function KoreaScoreCard({ prospectId, score, signalCount }: { prospectId: string
       <HoverCardPrimitive.Trigger asChild>
         <span
           className={`text-xs font-bold px-1.5 py-0.5 rounded cursor-help ${
-            score >= 70 ? 'bg-red-100 text-red-700' :
+            score >= 70 ? 'bg-rose-100 text-rose-700' :
             score >= 40 ? 'bg-orange-100 text-orange-700' :
             'bg-amber-100 text-amber-700'
           }`}
@@ -152,12 +152,12 @@ function KoreaScoreCard({ prospectId, score, signalCount }: { prospectId: string
                 {signals.filter((s: any) => s.is_active).slice(0, 8).map((s: any, i: number) => {
                   const isNegative = s.relevancy_weight < 0;
                   return (
-                    <div key={i} className={`rounded px-2 py-1.5 ${isNegative ? 'bg-red-50' : 'bg-gray-50'}`}>
+                    <div key={i} className={`rounded px-2 py-1.5 ${isNegative ? 'bg-rose-50' : 'bg-gray-50'}`}>
                       <div className="flex items-center justify-between gap-1">
-                        <span className={`font-medium ${isNegative ? 'text-red-700' : 'text-gray-800'}`}>
+                        <span className={`font-medium ${isNegative ? 'text-rose-700' : 'text-gray-800'}`}>
                           {SIGNAL_LABELS[s.signal_type] || s.signal_type}
                         </span>
-                        <span className={`text-[10px] font-bold ${isNegative ? 'text-red-600' : 'text-emerald-600'}`}>
+                        <span className={`text-[10px] font-bold ${isNegative ? 'text-rose-600' : 'text-emerald-600'}`}>
                           {isNegative ? '' : '+'}{s.relevancy_weight}
                         </span>
                       </div>
@@ -633,7 +633,7 @@ export default function ProspectsTab() {
           <Settings className="w-4 h-4 mr-1.5" />
           ICP Settings
         </Button>
-        <Button size="sm" onClick={() => { setScraperResult(null); setScraperError(null); setScraperOpen(true); }} className="hover:opacity-90 h-9 bg-brand text-white">
+        <Button size="sm" onClick={() => { setScraperResult(null); setScraperError(null); setScraperOpen(true); }} className="h-9 bg-brand text-white">
           <Download className="w-4 h-4 mr-1.5" />
           Import Prospects
         </Button>
@@ -682,7 +682,7 @@ export default function ProspectsTab() {
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
+            className="h-7 text-xs text-rose-600 border-rose-200 hover:bg-rose-50"
             onClick={handleBulkDelete}
             disabled={bulkActing}
           >
@@ -733,7 +733,7 @@ export default function ProspectsTab() {
                     <Globe className="w-10 h-10 mx-auto mb-3 text-gray-300" />
                     <p className="text-sm font-medium text-gray-700 mb-1">No prospects yet</p>
                     <p className="text-xs text-gray-400 mb-4">Import projects from DropsTab to start discovering new prospects.</p>
-                    <Button size="sm" onClick={() => { setScraperResult(null); setScraperError(null); setScraperOpen(true); }} className="hover:opacity-90 bg-brand text-white">
+                    <Button size="sm" onClick={() => { setScraperResult(null); setScraperError(null); setScraperOpen(true); }} className="bg-brand text-white">
                       <Download className="w-4 h-4 mr-1.5" />
                       Import Prospects
                     </Button>
@@ -827,7 +827,7 @@ export default function ProspectsTab() {
                           </span>
                         )}
                         {p.is_disqualified && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700">DQ</span>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">DQ</span>
                         )}
                       </div>
                     </TableCell>
@@ -867,7 +867,7 @@ export default function ProspectsTab() {
                           <DropdownMenuItem onClick={() => handleDismiss(p.id)} className="text-gray-500">
                             <XCircle className="h-4 w-4 mr-2" /> Dismiss
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { if (confirm('Delete this prospect?')) handleDelete(p.id); }} className="text-red-600">
+                          <DropdownMenuItem onClick={() => { if (confirm('Delete this prospect?')) handleDelete(p.id); }} className="text-rose-600">
                             <Trash2 className="h-4 w-4 mr-2" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -1044,7 +1044,7 @@ export default function ProspectsTab() {
             )}
 
             {scraperError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700">
                 {scraperError}
               </div>
             )}
@@ -1063,7 +1063,7 @@ export default function ProspectsTab() {
               {scraperResult ? 'Done' : 'Cancel'}
             </Button>
             {(!scraperResult || scraperRunning) && (
-              <Button variant="brand" onClick={handleRunScraper} disabled={scraperRunning || (scraperSource === 'dropstab' && scraperTabs.length === 0)} className="hover:opacity-90">
+              <Button variant="brand" onClick={handleRunScraper} disabled={scraperRunning || (scraperSource === 'dropstab' && scraperTabs.length === 0)}>
                 {scraperRunning ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />

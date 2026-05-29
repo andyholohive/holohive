@@ -16,6 +16,6 @@
  */
 export function RequiredAsterisk() {
   return (
-    <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>
+    <span className="text-rose-500 ml-0.5" aria-hidden="true">*</span>
   );
 }

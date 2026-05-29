@@ -62,7 +62,7 @@ export function RecurringConfigEditor({ value, onChange }: RecurringConfigProps)
           <RefreshCw className="h-4 w-4 text-blue-600" />
           <Label className="text-sm font-semibold text-blue-700">Recurring Task</Label>
         </div>
-        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-gray-400 hover:text-red-500" onClick={disable}>
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-gray-400 hover:text-rose-500" onClick={disable}>
           <X className="h-3.5 w-3.5" />
         </Button>
       </div>

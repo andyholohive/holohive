@@ -238,7 +238,7 @@ export function SidebarCustomizeDialog({
                             title={isHidden ? 'Show in sidebar' : 'Hide from sidebar'}
                           >
                             {isHidden ? (
-                              <EyeOff className="h-3.5 w-3.5 text-red-500" />
+                              <EyeOff className="h-3.5 w-3.5 text-rose-500" />
                             ) : (
                               <Eye className="h-3.5 w-3.5 text-gray-300" />
                             )}
@@ -263,7 +263,7 @@ export function SidebarCustomizeDialog({
             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
             Reset
           </Button>
-          <Button onClick={() => onOpenChange(false)} className="hover:opacity-90 bg-brand text-white">
+          <Button onClick={() => onOpenChange(false)} className="bg-brand text-white">
             Done
           </Button>
         </DialogFooter>

@@ -403,7 +403,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
               <div className={`rounded-lg border p-2.5 text-xs flex items-center gap-2 ${
                 config.last_test_status === 'ok'
                   ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                  : 'border-red-200 bg-red-50 text-red-800'
+                  : 'border-rose-200 bg-rose-50 text-rose-800'
               }`}>
                 {config.last_test_status === 'ok'
                   ? <CheckCircle className="h-3.5 w-3.5" />
@@ -433,7 +433,7 @@ export default function IntelligenceAlertsDialog({ open, onOpenChange }: Props) 
             onClick={save}
             disabled={saving || !dirty || loading}
             style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-            className="hover:opacity-90"
+           
           >
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {saving ? 'Saving…' : 'Save'}

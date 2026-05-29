@@ -256,10 +256,10 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
 
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded">Skip</span>
+                  <span className="text-xs font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded">Skip</span>
                   <span className="text-[10px] text-gray-400">0 points — not a fit</span>
                 </div>
-                <TagList items={skipCats} setItems={setSkipCats} color="bg-red-50 text-red-700" />
+                <TagList items={skipCats} setItems={setSkipCats} color="bg-rose-50 text-rose-700" />
                 <CategorySelect list={skipCats} setList={setSkipCats} placeholder="+ Add category to Skip" />
               </div>
             </div>
@@ -303,7 +303,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
           {/* Disqualify Keywords */}
           <div className="grid gap-2">
             <Label className="text-sm font-semibold">Auto-Disqualify Keywords <span className="font-normal text-gray-400">(score = 0 if name contains any)</span></Label>
-            <TagList items={disqualifyKeywords} setItems={setDisqualifyKeywords} color="bg-red-50 text-red-600" />
+            <TagList items={disqualifyKeywords} setItems={setDisqualifyKeywords} color="bg-rose-50 text-rose-600" />
             <div className="flex gap-1.5 mt-1.5">
               <Input
                 value={newKeyword}
@@ -363,7 +363,7 @@ export default function ICPSettingsDialog({ open, onClose, onScoresUpdated }: IC
             {rescoring ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-1.5" />}
             Save & Rescore All
           </Button>
-          <Button variant="brand" onClick={handleSave} disabled={saving} className="hover:opacity-90">
+          <Button variant="brand" onClick={handleSave} disabled={saving}>
             {saving ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : null}
             Save
           </Button>

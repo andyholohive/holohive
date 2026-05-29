@@ -262,7 +262,7 @@ function DimensionBar({ label, value }: { label: string; value: number | null })
     value >= 70 ? "bg-emerald-500" :
     value >= 50 ? "bg-blue-500" :
     value >= 30 ? "bg-yellow-500" :
-    "bg-red-500";
+    "bg-rose-500";
   return (
     <div className="text-center">
       <div className="text-[10px] text-gray-500 uppercase truncate" title={label}>{label}</div>
@@ -735,7 +735,7 @@ function SnapshotRow({ s, onDelete }: { s: KolChannelSnapshot; onDelete: () => v
               <span
                 className={`text-xs px-1.5 py-0.5 rounded font-semibold ${
                   growthPct > 0 ? 'bg-emerald-50 text-emerald-700'
-                  : growthPct < 0 ? 'bg-red-50 text-red-700'
+                  : growthPct < 0 ? 'bg-rose-50 text-rose-700'
                   : 'bg-gray-100 text-gray-600'
                 }`}
                 title="Month-over-month follower growth"
@@ -763,7 +763,7 @@ function SnapshotRow({ s, onDelete }: { s: KolChannelSnapshot; onDelete: () => v
           {s.notes && <p className="mt-2 text-xs text-gray-600 italic">"{s.notes}"</p>}
         </div>
         <Button size="sm" variant="ghost" onClick={onDelete} title="Delete">
-          <Trash2 className="h-3 w-3 text-red-500" />
+          <Trash2 className="h-3 w-3 text-rose-500" />
         </Button>
       </div>
     </div>
@@ -835,6 +835,8 @@ function SnapshotForm({
     <form onSubmit={handleSubmit} className="border border-gray-200 rounded-md p-3 bg-gray-50 space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <FormField label="Snapshot Month *">
+          {/* TODO: migrate to DateField pattern (Popover + Calendar).
+              lint-conventions: disable-next-line no-input-type-date */}
           <Input type="date" value={snapshotDate} onChange={(e) => setSnapshotDate(e.target.value)} className="h-8 text-xs" />
         </FormField>
         <FormField label="Follower Count *">
@@ -956,7 +958,7 @@ function CallLogRow({ c, onDelete }: { c: KolCallLog; onDelete: () => void }) {
           </div>
         </div>
         <Button size="sm" variant="ghost" onClick={onDelete} title="Delete">
-          <Trash2 className="h-3 w-3 text-red-500" />
+          <Trash2 className="h-3 w-3 text-rose-500" />
         </Button>
       </div>
     </div>
@@ -1019,6 +1021,8 @@ function CallLogForm({
     <form onSubmit={handleSubmit} className="border border-gray-200 rounded-md p-3 bg-gray-50 space-y-2">
       <div className="grid grid-cols-3 gap-2">
         <FormField label="Date *">
+          {/* TODO: migrate to DateField pattern (Popover + Calendar).
+              lint-conventions: disable-next-line no-input-type-date */}
           <Input type="date" value={callDate} onChange={(e) => setCallDate(e.target.value)} className="h-8 text-xs" />
         </FormField>
         <FormField label="Call Type">

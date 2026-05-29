@@ -226,11 +226,11 @@ export default function FundingRadarPanel() {
               key={i}
               className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
                 isKR
-                  ? 'bg-red-50 text-red-700 border border-red-200'
+                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
                   : 'bg-gray-50 text-gray-600 border border-gray-200'
               }`}
             >
-              {isKR && <Flag className="w-2.5 h-2.5 mr-0.5 text-red-500" />}
+              {isKR && <Flag className="w-2.5 h-2.5 mr-0.5 text-rose-500" />}
               {inv}
             </span>
           );
@@ -259,7 +259,7 @@ export default function FundingRadarPanel() {
             </div>
           </div>
 
-          <Button variant="brand" onClick={handleScan} disabled={scanning} size="sm" className="hover:opacity-90 h-8">
+          <Button variant="brand" onClick={handleScan} disabled={scanning} size="sm" className="h-8">
             {scanning ? (
               <>
                 <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
@@ -349,7 +349,7 @@ export default function FundingRadarPanel() {
                 ? 'No projects with Korean VC backing detected yet.'
                 : 'Run a scan to discover recently funded crypto projects.'}
             </p>
-            <Button variant="brand" onClick={handleScan} disabled={scanning} size="sm" className="hover:opacity-90">
+            <Button variant="brand" onClick={handleScan} disabled={scanning} size="sm">
               <Radar className="w-4 h-4 mr-1.5" />
               Scan Funding Rounds
             </Button>
@@ -395,7 +395,7 @@ export default function FundingRadarPanel() {
                           {p.has_korean_vc && (
                             <Tooltip>
                               <TooltipTrigger>
-                                <span className="text-[10px] bg-red-50 text-red-600 px-1 py-0.5 rounded font-semibold border border-red-200 flex items-center gap-0.5">
+                                <span className="text-[10px] bg-rose-50 text-rose-600 px-1 py-0.5 rounded font-semibold border border-rose-200 flex items-center gap-0.5">
                                   <Flag className="w-2.5 h-2.5" /> KR VC
                                 </span>
                               </TooltipTrigger>
@@ -520,7 +520,7 @@ export default function FundingRadarPanel() {
                           <div className="font-semibold text-gray-700 mb-1">Korea Relevancy</div>
                           <div className="text-gray-600">
                             {p.korea_relevancy_score > 0 ? (
-                              <span className={`font-bold ${p.korea_relevancy_score >= 70 ? 'text-red-600' : p.korea_relevancy_score >= 40 ? 'text-orange-600' : 'text-amber-600'}`}>
+                              <span className={`font-bold ${p.korea_relevancy_score >= 70 ? 'text-rose-600' : p.korea_relevancy_score >= 40 ? 'text-orange-600' : 'text-amber-600'}`}>
                                 Score: {p.korea_relevancy_score}
                               </span>
                             ) : (
@@ -582,7 +582,7 @@ export default function FundingRadarPanel() {
                     {round.has_korean_vc && (
                       <Tooltip>
                         <TooltipTrigger>
-                          <span className="text-[10px] bg-red-50 text-red-600 px-1.5 py-0.5 rounded font-semibold border border-red-200 flex items-center gap-0.5 shrink-0">
+                          <span className="text-[10px] bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded font-semibold border border-rose-200 flex items-center gap-0.5 shrink-0">
                             <Flag className="w-2.5 h-2.5" /> {round.korean_vcs || 'Korean VC'}
                           </span>
                         </TooltipTrigger>
@@ -593,7 +593,7 @@ export default function FundingRadarPanel() {
                     {/* Lead investor */}
                     {round.lead_investor && (
                       <span className="text-[10px] text-gray-500 truncate">
-                        Lead: <span className={`font-medium ${isKoreanVC(round.lead_investor) ? 'text-red-600' : 'text-gray-700'}`}>{round.lead_investor}</span>
+                        Lead: <span className={`font-medium ${isKoreanVC(round.lead_investor) ? 'text-rose-600' : 'text-gray-700'}`}>{round.lead_investor}</span>
                       </span>
                     )}
 

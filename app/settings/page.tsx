@@ -508,6 +508,11 @@ function SettingsContent() {
 
   if (loading) {
     return (
+      // /settings uses a deliberate max-w-2xl mx-auto centered-form shell
+      // (different from the standard admin space-y-6 layout). This is
+      // intentional per the May 2026 audit decision; account-settings
+      // pages benefit from a narrow centered form rather than full-width.
+      // lint-conventions: disable-next-line no-card-shell
       <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50 py-8">
         <div className="w-full max-w-2xl mx-auto">
           <div className="space-y-6">
@@ -542,6 +547,9 @@ function SettingsContent() {
   }
 
   return (
+    // /settings uses a deliberate max-w-2xl mx-auto centered-form shell.
+    // See the loading branch above for the rationale.
+    // lint-conventions: disable-next-line no-card-shell
     <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50 py-8">
       <div className="w-full max-w-2xl mx-auto">
         <div className="space-y-6">

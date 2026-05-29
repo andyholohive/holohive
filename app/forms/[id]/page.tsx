@@ -1045,6 +1045,10 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
         />
       )}
       {field.field_type === 'date' && (
+        // Form-builder preview pane: native date input is intentional
+        // here because end-users on /public/forms/* see exactly this
+        // rendering. DateField is for admin pages, not form previews.
+        // lint-conventions: disable-next-line no-input-type-date
         <Input type="date" className="focus-brand" disabled />
       )}
       {field.field_type === 'select' && (
@@ -2593,6 +2597,8 @@ export default function FormBuilderPage() {
                               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
                               {field.required && <span className="text-rose-500 ml-1">*</span>}
                             </Label>
+                            {/* Form-builder preview: native date input matches what
+                                public form viewers see. lint-conventions: disable-next-line no-input-type-date */}
                             <Input type="date" className="focus-brand" disabled />
                           </div>
                         );

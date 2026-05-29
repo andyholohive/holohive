@@ -55,7 +55,7 @@ export function TaskAttachments({ taskId, onAttachmentCountChange }: TaskAttachm
   const getFileIcon = (mimeType: string | null) => {
     if (!mimeType) return <File className="h-5 w-5 text-gray-400" />;
     if (mimeType.startsWith('image/')) return <ImageIcon className="h-5 w-5 text-blue-500" />;
-    if (mimeType.includes('pdf')) return <FileText className="h-5 w-5 text-red-500" />;
+    if (mimeType.includes('pdf')) return <FileText className="h-5 w-5 text-rose-500" />;
     return <File className="h-5 w-5 text-gray-400" />;
   };
 
@@ -170,7 +170,7 @@ export function TaskAttachments({ taskId, onAttachmentCountChange }: TaskAttachm
               {getFileIcon(uf.file.type)}
               <span className="flex-1 truncate">{uf.file.name}</span>
               {uf.error ? (
-                <span className="text-red-500">{uf.error}</span>
+                <span className="text-rose-500">{uf.error}</span>
               ) : (
                 <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                   <div className="h-full transition-all" style={{ width: `${uf.progress}%`, backgroundColor: '#3e8692' }} />
@@ -204,8 +204,8 @@ export function TaskAttachments({ taskId, onAttachmentCountChange }: TaskAttachm
                   </Button>
                 </a>
                 {isOwnerOrAdmin(att.uploaded_by) && (
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-red-50" onClick={() => handleDelete(att.id)}>
-                    <Trash2 className="h-3 w-3 text-red-500" />
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-rose-50" onClick={() => handleDelete(att.id)}>
+                    <Trash2 className="h-3 w-3 text-rose-500" />
                   </Button>
                 )}
               </div>

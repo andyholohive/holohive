@@ -78,7 +78,7 @@ interface Props {
 }
 
 const TIER_BADGE: Record<string, { bg: string; text: string }> = {
-  REACH_OUT_NOW: { bg: 'bg-red-100', text: 'text-red-700' },
+  REACH_OUT_NOW: { bg: 'bg-rose-100', text: 'text-rose-700' },
   PRE_TOKEN_PRIORITY: { bg: 'bg-amber-100', text: 'text-amber-700' },
   CONSIDER: { bg: 'bg-blue-100', text: 'text-blue-700' },
   DISMISS: { bg: 'bg-gray-100', text: 'text-gray-500' },
@@ -423,7 +423,7 @@ export default function DiscoveryTab({ onPromoted }: Props) {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="h-7 w-7 p-0 text-gray-400 hover:text-red-600 hover:border-red-200"
+                          className="h-7 w-7 p-0 text-gray-400 hover:text-rose-600 hover:border-rose-200"
                           onClick={() => dismiss(p)}
                           disabled={isBusy}
                           title="Dismiss this prospect"

@@ -18,7 +18,7 @@ interface AIScoreDisplayProps {
 }
 
 const ACTION_TIER_COLORS: Record<string, { bg: string; text: string }> = {
-  REACH_OUT_NOW: { bg: 'bg-red-100', text: 'text-red-800' },
+  REACH_OUT_NOW: { bg: 'bg-rose-100', text: 'text-rose-800' },
   PRE_TOKEN_PRIORITY: { bg: 'bg-orange-100', text: 'text-orange-800' },
   RESEARCH_FIRST: { bg: 'bg-blue-100', text: 'text-blue-800' },
   WATCH_FOR_TRIGGER: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
@@ -77,7 +77,7 @@ export default function AIScoreDisplay({
       <div className="flex items-center gap-1.5">
         {compositeScore > 0 && (
           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-            compositeScore >= 80 ? 'bg-red-100 text-red-700' :
+            compositeScore >= 80 ? 'bg-rose-100 text-rose-700' :
             compositeScore >= 60 ? 'bg-orange-100 text-orange-700' :
             compositeScore >= 45 ? 'bg-blue-100 text-blue-700' :
             'bg-gray-100 text-gray-600'
@@ -116,7 +116,7 @@ export default function AIScoreDisplay({
 
       <div className="flex items-center gap-3">
         <div className={`text-3xl font-bold ${
-          compositeScore >= 80 ? 'text-red-600' :
+          compositeScore >= 80 ? 'text-rose-600' :
           compositeScore >= 60 ? 'text-orange-600' :
           compositeScore >= 45 ? 'text-blue-600' :
           'text-gray-500'

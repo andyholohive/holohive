@@ -409,7 +409,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">Priority <span className="text-[10px] text-gray-400 font-normal">(auto)</span></Label>
                 <div className={`flex items-center gap-2 px-3 py-2 rounded-md border border-gray-200 text-sm font-medium capitalize ${
-                  priority === 'urgent' ? 'text-red-600 bg-red-50' :
+                  priority === 'urgent' ? 'text-rose-600 bg-rose-50' :
                   priority === 'high' ? 'text-orange-600 bg-orange-50' :
                   priority === 'medium' ? 'text-blue-600 bg-blue-50' :
                   'text-gray-400 bg-gray-50'
@@ -681,7 +681,7 @@ export function DeliverableWizard({ open, onOpenChange, teamMembers, clients, on
           </Button>
 
           {step < 3 ? (
-            <Button className="bg-brand text-white" size="sm" onClick={() => setStep(step + 1)} disabled={!canAdvance()}>
+            <Button variant="brand" size="sm" onClick={() => setStep(step + 1)} disabled={!canAdvance()}>
               Next <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           ) : (

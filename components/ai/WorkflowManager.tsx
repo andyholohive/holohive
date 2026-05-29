@@ -199,7 +199,7 @@ export function WorkflowManager() {
   const getSuccessRateColor = (rate: number) => {
     if (rate >= 90) return 'text-emerald-600';
     if (rate >= 70) return 'text-yellow-600';
-    return 'text-red-600';
+    return 'text-rose-600';
   };
 
   if (loading) {
@@ -272,7 +272,7 @@ export function WorkflowManager() {
         <h2 className="text-xl font-semibold text-gray-900">Automated Workflows</h2>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="brand" className="hover:opacity-90">
+            <Button variant="brand">
               <Plus className="w-4 h-4 mr-2" />
               New Workflow
             </Button>
@@ -372,7 +372,7 @@ export function WorkflowManager() {
                           size="sm"
                           variant="ghost"
                           onClick={() => removeAction(index)}
-                          className="text-red-600 hover:text-red-800"
+                          className="text-rose-600 hover:text-rose-800"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -505,7 +505,7 @@ export function WorkflowManager() {
           <p className="text-gray-600 mb-4">
             Create your first automated workflow to streamline campaign management tasks.
           </p>
-          <Button onClick={() => setIsCreateDialogOpen(true)} className="hover:opacity-90 bg-brand text-white">
+          <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-brand text-white">
             <Plus className="w-4 h-4 mr-2" />
             Create Workflow
           </Button>

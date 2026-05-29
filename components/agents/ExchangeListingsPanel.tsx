@@ -232,7 +232,7 @@ export default function ExchangeListingsPanel() {
             onClick={runNow}
             disabled={running || simulating}
             style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-            className="hover:opacity-90 h-9"
+            className="h-9"
           >
             {running ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Play className="w-4 h-4 mr-1.5" />}
             {running ? 'Running...' : 'Run Now'}
@@ -275,12 +275,12 @@ export default function ExchangeListingsPanel() {
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <XCircle className="h-3.5 w-3.5 text-red-500" />
+              <XCircle className="h-3.5 w-3.5 text-rose-500" />
               <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Delistings (30d)</span>
             </div>
             {loading ? <Skeleton className="h-7 w-20" /> : (
               <>
-                <div className="text-2xl font-bold text-red-700">{stats?.delisted_last_30d ?? 0}</div>
+                <div className="text-2xl font-bold text-rose-700">{stats?.delisted_last_30d ?? 0}</div>
                 <div className="text-xs text-gray-500 mt-0.5">disqualifier signals</div>
               </>
             )}
@@ -303,7 +303,7 @@ export default function ExchangeListingsPanel() {
                   ) : runs[0].status === 'running' ? (
                     <Loader2 className="h-3 w-3 animate-spin text-brand" />
                   ) : (
-                    <XCircle className="h-3 w-3 text-red-600" />
+                    <XCircle className="h-3 w-3 text-rose-600" />
                   )}
                   {runs[0].duration_ms ? `${Math.round(runs[0].duration_ms / 1000)}s` : runs[0].status}
                 </div>
@@ -372,7 +372,7 @@ export default function ExchangeListingsPanel() {
                             Listed
                           </Badge>
                         ) : (
-                          <Badge className="bg-red-100 text-red-700 pointer-events-none text-[10px] uppercase">
+                          <Badge className="bg-rose-100 text-rose-700 pointer-events-none text-[10px] uppercase">
                             Delisted
                           </Badge>
                         )}
@@ -387,7 +387,7 @@ export default function ExchangeListingsPanel() {
                       </TableCell>
                       <TableCell>
                         <span className={`text-xs font-semibold ${
-                          isListing ? 'text-emerald-700' : 'text-red-700'
+                          isListing ? 'text-emerald-700' : 'text-rose-700'
                         }`}>
                           {isListing ? '+' : ''}{d.relevancy_weight}
                         </span>
@@ -535,7 +535,7 @@ export default function ExchangeListingsPanel() {
             <Card className="mt-2">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-red-50">
+                  <TableRow className="bg-rose-50">
                     <TableHead>Symbol</TableHead>
                     <TableHead>Exchange</TableHead>
                     <TableHead>Pair</TableHead>
@@ -577,7 +577,7 @@ export default function ExchangeListingsPanel() {
                     ) : r.status === 'running' ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin text-brand shrink-0" />
                     ) : (
-                      <XCircle className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                      <XCircle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
                     )}
                     <span className="text-gray-500 shrink-0">{formatDate(r.started_at)}</span>
                     {r.duration_ms != null && (
@@ -591,7 +591,7 @@ export default function ExchangeListingsPanel() {
                       {s.prospect_matches ? ` · ${s.prospect_matches} matched` : ''}
                     </span>
                     {r.error_message && (
-                      <span className="text-red-600 truncate" title={r.error_message}>
+                      <span className="text-rose-600 truncate" title={r.error_message}>
                         {r.error_message.slice(0, 60)}
                       </span>
                     )}
@@ -632,7 +632,7 @@ export default function ExchangeListingsPanel() {
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
                 <div className="font-semibold text-gray-700">Last simulation</div>
                 {lastSimulation.run_error ? (
-                  <div className="text-red-600 flex items-center gap-1">
+                  <div className="text-rose-600 flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" /> {lastSimulation.run_error}
                   </div>
                 ) : (
@@ -667,7 +667,7 @@ export default function ExchangeListingsPanel() {
               onClick={runSimulation}
               disabled={simulating}
               style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-              className="hover:opacity-90"
+             
             >
               {simulating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {simulating ? 'Simulating...' : 'Run Simulation'}

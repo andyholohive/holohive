@@ -142,15 +142,15 @@ interface TopProspect {
 
 const SIGNAL_TYPE_CONFIG: Record<string, { icon: React.ElementType; label: string; color: string; bg: string; tier?: number }> = {
   // ═══ Tier 1 — Act Immediately ═══
-  tge_within_60d: { icon: Zap, label: 'TGE / Token Launch', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
-  mainnet_launch: { icon: Zap, label: 'Mainnet Launch', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
-  funding_round_5m: { icon: DollarSign, label: 'Funding Round ($5M+)', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
-  airdrop_announcement: { icon: Zap, label: 'Airdrop Announced', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
-  korea_expansion_announce: { icon: Globe, label: 'Korea Expansion', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
-  dao_asia_governance: { icon: Activity, label: 'DAO Asia Governance', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
-  korea_job_posting: { icon: Search, label: 'Korea Job Posting', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
-  korea_exchange_no_community: { icon: Building2, label: 'KR Exchange No Community', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
-  korea_collab: { icon: Zap, label: 'Korea Collaboration', color: 'text-red-700', bg: 'bg-red-50 border-red-200', tier: 1 },
+  tge_within_60d: { icon: Zap, label: 'TGE / Token Launch', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200', tier: 1 },
+  mainnet_launch: { icon: Zap, label: 'Mainnet Launch', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200', tier: 1 },
+  funding_round_5m: { icon: DollarSign, label: 'Funding Round ($5M+)', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200', tier: 1 },
+  airdrop_announcement: { icon: Zap, label: 'Airdrop Announced', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200', tier: 1 },
+  korea_expansion_announce: { icon: Globe, label: 'Korea Expansion', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200', tier: 1 },
+  dao_asia_governance: { icon: Activity, label: 'DAO Asia Governance', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200', tier: 1 },
+  korea_job_posting: { icon: Search, label: 'Korea Job Posting', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200', tier: 1 },
+  korea_exchange_no_community: { icon: Building2, label: 'KR Exchange No Community', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200', tier: 1 },
+  korea_collab: { icon: Zap, label: 'Korea Collaboration', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-200', tier: 1 },
 
   // ═══ Tier 2 — Act This Week ═══
   ecosystem_asia_initiative: { icon: Globe, label: 'Asia Ecosystem Initiative', color: 'text-purple-700', bg: 'bg-purple-50 border-purple-200', tier: 2 },
@@ -175,7 +175,7 @@ const SIGNAL_TYPE_CONFIG: Record<string, { icon: React.ElementType; label: strin
   web2_to_web3: { icon: Globe, label: 'Web2 to Web3', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 3 },
   accelerator_graduation: { icon: TrendingUp, label: 'Accelerator Grad', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 3 },
   community_growth_spike: { icon: Activity, label: 'Community Spike', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 3 },
-  dead_korean_presence: { icon: AlertCircle, label: 'Dead Korean Channel', color: 'text-red-700', bg: 'bg-red-50 border-red-300', tier: 3 },
+  dead_korean_presence: { icon: AlertCircle, label: 'Dead Korean Channel', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-300', tier: 3 },
   korea_community_mention: { icon: Activity, label: 'KR Community Mention', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 3 },
   korean_vc_cap_table: { icon: TrendingUp, label: 'Korean VC in Cap Table', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 3 },
 
@@ -183,13 +183,13 @@ const SIGNAL_TYPE_CONFIG: Record<string, { icon: React.ElementType; label: strin
   warm_intro_available: { icon: Zap, label: 'Warm Intro Available', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', tier: 4 },
   decision_maker_identified: { icon: Search, label: 'Decision Maker Found', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', tier: 4 },
   previous_contact_positive: { icon: Activity, label: 'Previous Contact (+)', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', tier: 4 },
-  previous_contact_cold: { icon: AlertCircle, label: 'Previous Contact (-)', color: 'text-red-700', bg: 'bg-red-50 border-red-300', tier: 4 },
+  previous_contact_cold: { icon: AlertCircle, label: 'Previous Contact (-)', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-300', tier: 4 },
 
   // ═══ Negative signals ═══
-  korea_exchange_delisting: { icon: AlertCircle, label: 'Exchange Delisting', color: 'text-red-700', bg: 'bg-red-50 border-red-300' },
-  korea_regulatory_warning: { icon: AlertCircle, label: 'Regulatory Warning', color: 'text-red-700', bg: 'bg-red-50 border-red-300' },
-  korea_scam_alert: { icon: AlertCircle, label: 'Scam Alert', color: 'text-red-700', bg: 'bg-red-50 border-red-300' },
-  korea_agency_present: { icon: AlertCircle, label: 'Has Korea Agency', color: 'text-red-700', bg: 'bg-red-50 border-red-300' },
+  korea_exchange_delisting: { icon: AlertCircle, label: 'Exchange Delisting', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-300' },
+  korea_regulatory_warning: { icon: AlertCircle, label: 'Regulatory Warning', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-300' },
+  korea_scam_alert: { icon: AlertCircle, label: 'Scam Alert', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-300' },
+  korea_agency_present: { icon: AlertCircle, label: 'Has Korea Agency', color: 'text-rose-700', bg: 'bg-rose-50 border-rose-300' },
 
   // ═══ Legacy (backward compat) ═══
   korea_community: { icon: Globe, label: 'Korean Community', color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200', tier: 1 },
@@ -239,7 +239,7 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 const ACTION_TIER_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  REACH_OUT_NOW: { label: 'Reach Out Now', color: 'text-red-700', bg: 'bg-red-100' },
+  REACH_OUT_NOW: { label: 'Reach Out Now', color: 'text-rose-700', bg: 'bg-rose-100' },
   PRE_TOKEN_PRIORITY: { label: 'Pre-Token Priority', color: 'text-orange-700', bg: 'bg-orange-100' },
   WATCH: { label: 'Watch', color: 'text-yellow-700', bg: 'bg-yellow-100' },
   RESEARCH: { label: 'Research', color: 'text-blue-700', bg: 'bg-blue-100' },
@@ -250,7 +250,7 @@ const ACTION_TIER_CONFIG: Record<string, { label: string; color: string; bg: str
 function TierBadge({ tier }: { tier?: number }) {
   if (!tier) return null;
   const config: Record<number, { label: string; color: string }> = {
-    1: { label: 'T1', color: 'bg-red-100 text-red-700' },
+    1: { label: 'T1', color: 'bg-rose-100 text-rose-700' },
     2: { label: 'T2', color: 'bg-purple-100 text-purple-700' },
     3: { label: 'T3', color: 'bg-blue-100 text-blue-700' },
     4: { label: 'T4', color: 'bg-emerald-100 text-emerald-700' },
@@ -563,7 +563,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 70) return 'text-red-700 bg-red-100';
+    if (score >= 70) return 'text-rose-700 bg-rose-100';
     if (score >= 40) return 'text-orange-700 bg-orange-100';
     if (score > 0) return 'text-amber-700 bg-amber-100';
     return 'text-gray-400 bg-gray-100';
@@ -1228,7 +1228,7 @@ export default function KoreaSignalsPanel({ onProspectClick }: KoreaSignalsPanel
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
-                                signal.relevancy_weight >= 40 ? 'bg-red-100 text-red-700' :
+                                signal.relevancy_weight >= 40 ? 'bg-rose-100 text-rose-700' :
                                 signal.relevancy_weight >= 25 ? 'bg-orange-100 text-orange-700' :
                                 'bg-amber-100 text-amber-700'
                               }`}>

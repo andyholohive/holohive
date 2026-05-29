@@ -186,7 +186,7 @@ export default function ChangelogModal() {
             ) : (
               <div />
             )}
-            <Button variant="brand" onClick={handleDismiss} className="text-white hover:opacity-90">
+            <Button variant="brand" onClick={handleDismiss} className="text-white">
               Got it!
             </Button>
           </div>

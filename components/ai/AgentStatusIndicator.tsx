@@ -43,9 +43,9 @@ export function AgentStatusIndicator({ status, currentStep, className }: AgentSt
     error: {
       icon: XCircle,
       label: 'Error occurred',
-      color: 'text-red-500',
-      bgColor: 'bg-red-50 dark:bg-red-950',
-      borderColor: 'border-red-200 dark:border-red-800',
+      color: 'text-rose-500',
+      bgColor: 'bg-rose-50 dark:bg-red-950',
+      borderColor: 'border-rose-200 dark:border-rose-800',
       animation: '',
     },
   };

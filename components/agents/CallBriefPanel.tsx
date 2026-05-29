@@ -78,7 +78,7 @@ export default function CallBriefPanel({ opportunityId, opportunityName }: CallB
               <p className="text-xs text-gray-500">Generate a call brief with deep prospect research</p>
             </div>
             {error && (
-              <p className="text-xs text-red-500">{error}</p>
+              <p className="text-xs text-rose-500">{error}</p>
             )}
             <div className="flex gap-2 justify-center">
               <Button
@@ -138,7 +138,7 @@ export default function CallBriefPanel({ opportunityId, opportunityName }: CallB
                   <span className="text-xs font-semibold text-gray-600">Gatekeeper Score</span>
                   <span className={`text-lg font-bold ${
                     (gatekeeperScore.total || 0) >= 70 ? 'text-emerald-600' :
-                    (gatekeeperScore.total || 0) >= 50 ? 'text-amber-600' : 'text-red-600'
+                    (gatekeeperScore.total || 0) >= 50 ? 'text-amber-600' : 'text-rose-600'
                   }`}>{gatekeeperScore.total || 0}/100</span>
                 </div>
                 {gatekeeperScore.dimensions && (
@@ -200,10 +200,10 @@ export default function CallBriefPanel({ opportunityId, opportunityName }: CallB
             {/* Risk Flags */}
             {riskFlags.length > 0 && (
               <div>
-                <span className="text-xs font-semibold text-red-600">Risk Flags</span>
+                <span className="text-xs font-semibold text-rose-600">Risk Flags</span>
                 <div className="mt-1 space-y-1">
                   {riskFlags.map((flag: string, i: number) => (
-                    <div key={i} className="flex items-start gap-1.5 text-xs text-red-600">
+                    <div key={i} className="flex items-start gap-1.5 text-xs text-rose-600">
                       <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
                       {flag}
                     </div>

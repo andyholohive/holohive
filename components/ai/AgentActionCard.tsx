@@ -123,7 +123,7 @@ function ActionItem({ action, index, reversibleActions, onUndo }: {
               {action.result.success ? (
                 <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
               ) : (
-                <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                <XCircle className="w-4 h-4 text-rose-500 flex-shrink-0" />
               )}
             </div>
             {action.result.message && (
@@ -184,8 +184,8 @@ function ActionItem({ action, index, reversibleActions, onUndo }: {
           )}
           {action.result.error && (
             <div className="overflow-hidden">
-              <div className="font-medium text-red-600 dark:text-red-400 mb-1">Error:</div>
-              <div className="bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 p-2 rounded text-xs break-words overflow-wrap-anywhere">
+              <div className="font-medium text-rose-600 dark:text-rose-400 mb-1">Error:</div>
+              <div className="bg-rose-50 dark:bg-red-950 text-rose-700 dark:text-rose-300 p-2 rounded text-xs break-words overflow-wrap-anywhere">
                 {action.result.error}
               </div>
             </div>

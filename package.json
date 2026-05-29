@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint && npm run lint:conventions",
+    "lint:next": "next lint",
+    "lint:conventions": "node scripts/lint-conventions.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.81.0",

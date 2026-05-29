@@ -144,7 +144,7 @@ const CONTACT_CONFIDENCE_STYLE: Record<string, string> = {
 };
 
 const ACTION_TIER_STYLE: Record<string, { label: string; className: string }> = {
-  REACH_OUT_NOW:       { label: 'REACH OUT NOW',      className: 'bg-red-100 text-red-700 border-red-200' },
+  REACH_OUT_NOW:       { label: 'REACH OUT NOW',      className: 'bg-rose-100 text-rose-700 border-rose-200' },
   PRE_TOKEN_PRIORITY:  { label: 'PRE-TOKEN PRIORITY', className: 'bg-orange-100 text-orange-700 border-orange-200' },
   RESEARCH:            { label: 'RESEARCH FIRST',     className: 'bg-blue-100 text-blue-700 border-blue-200' },
   WATCH:               { label: 'WATCH',              className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
@@ -155,7 +155,7 @@ const ACTION_TIER_STYLE: Record<string, { label: string; className: string }> = 
 const VERDICT_STYLE: Record<string, string> = {
   PASS: 'bg-emerald-100 text-emerald-700',
   BORDERLINE: 'bg-amber-100 text-amber-700',
-  FAIL: 'bg-red-100 text-red-700',
+  FAIL: 'bg-rose-100 text-rose-700',
 };
 
 const ICP_CRITERIA_LABELS: Record<string, string> = {
@@ -1285,13 +1285,13 @@ export default function DiscoveryPanel() {
           disabled for weeks — exactly what happened pre-audit
           (cron off May 12 → May 25, no UI signal). */}
       {scheduleHealth === 'disabled' && (
-        <div className="flex items-start gap-3 p-3 rounded-md border border-red-200 bg-red-50">
-          <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+        <div className="flex items-start gap-3 p-3 rounded-md border border-rose-200 bg-rose-50">
+          <AlertTriangle className="h-4 w-4 text-rose-600 mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-red-900">
+            <p className="text-sm font-medium text-rose-900">
               Discovery cron is disabled — no new prospects are being scanned.
             </p>
-            <p className="text-xs text-red-700 mt-0.5">
+            <p className="text-xs text-rose-700 mt-0.5">
               Last run: {schedule?.last_run_at ? new Date(schedule.last_run_at).toLocaleString() : 'never'} ({schedule?.last_run_status || 'unknown'}).
               Open the schedule dialog (gear icon at the top of /intelligence) and re-enable, or run an on-demand scan with &ldquo;Run Discovery&rdquo;.
             </p>
@@ -1338,7 +1338,7 @@ export default function DiscoveryPanel() {
             size="sm"
             onClick={() => setScanOpen(true)}
             style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-            className="hover:opacity-90 h-9"
+            className="h-9"
           >
             <Sparkles className="w-4 h-4 mr-1.5" />
             Run Discovery
@@ -1371,10 +1371,10 @@ export default function DiscoveryPanel() {
         <Card className="hover:shadow-md transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-1">
-              <Zap className="h-3.5 w-3.5 text-red-500" />
+              <Zap className="h-3.5 w-3.5 text-rose-500" />
               <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Hot Leads</span>
             </div>
-            <div className="text-2xl font-bold text-red-700">{hotLeadCount}</div>
+            <div className="text-2xl font-bold text-rose-700">{hotLeadCount}</div>
             <div className="text-xs text-gray-500 mt-0.5">Reach Out Now / Pre-Token</div>
           </CardContent>
         </Card>
@@ -1516,7 +1516,7 @@ export default function DiscoveryPanel() {
               onClick={() => setScanOpen(true)}
               size="sm"
               style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-              className="hover:opacity-90"
+             
             >
               <Sparkles className="w-4 h-4 mr-1.5" />
               Run Discovery
@@ -1797,11 +1797,11 @@ export default function DiscoveryPanel() {
                               it's a hard ICP-violation signal. */}
                           {p.post_korea_listing_at && (
                             <span
-                              className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-700 border border-red-200 pointer-events-none"
+                              className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 pointer-events-none"
                               title={`Listed on ${p.post_korea_listing_exchange} (${p.post_korea_listing_market_pair}) on ${new Date(p.post_korea_listing_at).toLocaleString()}`}
                             >
                               📍 LISTED ON {String(p.post_korea_listing_exchange || '').toUpperCase()}
-                              <span className="font-normal text-red-600 ml-0.5">
+                              <span className="font-normal text-rose-600 ml-0.5">
                                 {timeAgo(p.post_korea_listing_at)}
                               </span>
                             </span>
@@ -2010,9 +2010,9 @@ export default function DiscoveryPanel() {
                                 )}
                               </div>
                               {p.disqualification_reason && (
-                                <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 mb-2">
-                                  <h4 className="font-semibold text-red-700 text-xs mb-0.5">Disqualified</h4>
-                                  <p className="text-red-700 text-xs">{p.disqualification_reason}</p>
+                                <div className="bg-rose-50 border border-rose-200 rounded-lg p-2.5 mb-2">
+                                  <h4 className="font-semibold text-rose-700 text-xs mb-0.5">Disqualified</h4>
+                                  <p className="text-rose-700 text-xs">{p.disqualification_reason}</p>
                                 </div>
                               )}
                               {p.consideration_reason && !p.disqualification_reason && (
@@ -2042,10 +2042,10 @@ export default function DiscoveryPanel() {
                                         {check.pass ? (
                                           <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
                                         ) : (
-                                          <XCircle className="h-3.5 w-3.5 text-red-600 shrink-0 mt-0.5" />
+                                          <XCircle className="h-3.5 w-3.5 text-rose-600 shrink-0 mt-0.5" />
                                         )}
                                         <div className="flex-1 min-w-0">
-                                          <div className={`font-medium ${check.pass ? 'text-gray-900' : 'text-red-700'}`}>{label}</div>
+                                          <div className={`font-medium ${check.pass ? 'text-gray-900' : 'text-rose-700'}`}>{label}</div>
                                           <div className="text-gray-600 text-[11px]">{check.evidence}</div>
                                         </div>
                                       </div>
@@ -2137,7 +2137,7 @@ export default function DiscoveryPanel() {
                                                 type="button"
                                                 variant="outline"
                                                 size="sm"
-                                                className="h-6 text-[10px] text-red-700 border-red-200 hover:bg-red-50"
+                                                className="h-6 text-[10px] text-rose-700 border-rose-200 hover:bg-rose-50"
                                                 onClick={() => confirmOrDeletePoc(p.id, i, c.name, 'delete')}
                                                 disabled={pocActionBusy}
                                                 title="Remove this POC (hallucination / wrong person)"
@@ -2368,7 +2368,7 @@ export default function DiscoveryPanel() {
                                             type="button"
                                             onClick={() => deleteSignal(t.id, t.headline)}
                                             disabled={isDeleting}
-                                            className="text-gray-400 hover:text-red-600 p-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="text-gray-400 hover:text-rose-600 p-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                                             title="Delete this signal (soft delete — DB row stays)"
                                             aria-label="Delete signal"
                                           >
@@ -2542,7 +2542,7 @@ export default function DiscoveryPanel() {
                     {scanning ? (
                       <Loader2 className="h-3.5 w-3.5 text-brand animate-spin shrink-0" />
                     ) : scanProgress.stage === 'failed' ? (
-                      <AlertTriangle className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                      <AlertTriangle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
                     ) : (
                       <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                     )}
@@ -2661,7 +2661,7 @@ export default function DiscoveryPanel() {
                                           e.tier === 'RESEARCH' ? 'bg-amber-100 text-amber-700' :
                                           e.tier === 'WATCH' ? 'bg-purple-100 text-purple-700' :
                                           e.tier === 'NURTURE' ? 'bg-gray-100 text-gray-600' :
-                                          e.tier === 'SKIP' ? 'bg-red-50 text-red-500' :
+                                          e.tier === 'SKIP' ? 'bg-rose-50 text-rose-500' :
                                           'bg-gray-100 text-gray-500'
                                         }`}
                                       >
@@ -2700,8 +2700,8 @@ export default function DiscoveryPanel() {
                         {((scanProgress.detail.sources?.errors?.length ?? 0) > 0 ||
                           (scanProgress.detail.batch_errors?.length ?? 0) > 0) && (
                           <div>
-                            <div className="text-[10px] font-semibold text-red-700 mb-0.5">Errors</div>
-                            <ul className="text-[10px] text-red-600 space-y-0.5">
+                            <div className="text-[10px] font-semibold text-rose-700 mb-0.5">Errors</div>
+                            <ul className="text-[10px] text-rose-600 space-y-0.5">
                               {scanProgress.detail.sources?.errors?.map((e, i) => (
                                 <li key={`s-${i}`} className="truncate" title={e}>· {e}</li>
                               ))}
@@ -2722,7 +2722,7 @@ export default function DiscoveryPanel() {
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
                 <div className="font-semibold text-gray-700">Last scan</div>
                 {lastScanResult.error ? (
-                  <div className="text-red-600 flex items-center gap-1">
+                  <div className="text-rose-600 flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />
                     {lastScanResult.error}
                   </div>
@@ -2744,7 +2744,7 @@ export default function DiscoveryPanel() {
               onClick={runScan}
               disabled={scanning}
               style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-              className="hover:opacity-90"
+             
             >
               {scanning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {scanning ? 'Scanning...' : 'Start Scan'}
@@ -2895,7 +2895,7 @@ export default function DiscoveryPanel() {
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs space-y-1">
                 <div className="font-semibold text-gray-700">Result</div>
                 {rowDeepDive.result.error ? (
-                  <div className="text-red-600 flex items-center gap-1">
+                  <div className="text-rose-600 flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3" />
                     {rowDeepDive.result.error}
                   </div>
@@ -2956,7 +2956,7 @@ export default function DiscoveryPanel() {
                 onClick={startRowDeepDive}
                 disabled={rowDeepDive.running || rowDeepDive.xPocCount === 0}
                 style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-                className="hover:opacity-90"
+               
               >
                 {rowDeepDive.running && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 {rowDeepDive.running ? 'Running…' : 'Run Deep Dive'}
@@ -3087,7 +3087,7 @@ export default function DiscoveryPanel() {
             <Button
               onClick={copyDmToClipboard}
               style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-              className="hover:opacity-90"
+             
             >
               <CopyIcon className="h-4 w-4 mr-2" />
               Copy

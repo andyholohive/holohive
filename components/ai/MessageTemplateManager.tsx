@@ -260,7 +260,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
           </Button>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="brand" className="flex items-center gap-2 hover:opacity-90">
+              <Button variant="brand" className="flex items-center gap-2">
                 <Plus className="w-4 h-4" />
                 New Template
               </Button>
@@ -354,7 +354,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
                   <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={!newTemplate.name.trim() || !newTemplate.content.trim()} className="hover:opacity-90 bg-brand text-white">
+                  <Button variant="brand" type="submit" disabled={!newTemplate.name.trim() || !newTemplate.content.trim()}>
                     Create Template
                   </Button>
                 </DialogFooter>
@@ -425,7 +425,7 @@ export function MessageTemplateManager({ context, onTemplateSelected }: MessageT
               : 'Create your first message template to get started.'}
           </p>
           {!searchTerm && categoryFilter === 'all' && toneFilter === 'all' && audienceFilter === 'all' && (
-                          <Button onClick={() => setIsCreateDialogOpen(true)} className="hover:opacity-90 bg-brand text-white">
+                          <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-brand text-white">
                 <Plus className="w-4 h-4 mr-2" />
                 Create Template
               </Button>

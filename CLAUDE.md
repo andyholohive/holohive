@@ -682,6 +682,46 @@ Project memory lives at:
 
 ---
 
+## Convention linter
+
+The repo has a build-time linter that enforces the most common
+patterns from this doc: `scripts/lint-conventions.mjs`.
+
+Run it before pushing:
+```bash
+npm run lint:conventions   # custom rules only
+npm run lint               # next lint + custom rules
+```
+
+It catches:
+- `text-red-*`, `bg-red-*`, `border-red-*` (use `rose-*`)
+- `hover:opacity-90` (use `variant="brand"`)
+- `<Input type="date">` (use DateField)
+- `placeholder="X *"` patterns (use `<RequiredAsterisk />`)
+- `<Button className="bg-brand text-white">` (use `variant="brand"`)
+- `min-h-[calc(100vh-64px)] bg-gray-50` card-shell wrappers
+
+If you have a deliberate exception (form-builder preview, centered
+account-settings shell, etc.), add a directive:
+
+```tsx
+{/* lint-conventions: disable-next-line no-input-type-date */}
+<Input type="date" disabled />
+```
+
+Or on the same line:
+
+```tsx
+<Input type="date" /> {/* lint-conventions: disable-line no-input-type-date */}
+```
+
+Comma-separated rule IDs work too, and `*` disables all rules on
+that line. **Always add a one-line comment explaining WHY** — future
+audits will look at the exception and decide whether the rationale
+still holds.
+
+---
+
 **TL;DR for new pages:**
 
 If you're about to write any of these, **stop and use the primitive instead**:

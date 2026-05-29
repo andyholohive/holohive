@@ -156,10 +156,20 @@ export default function AutomationsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[calc(100vh-64px)] bg-gray-50 p-6 space-y-4">
-        <Skeleton className="h-10 w-64" />
+      <div className="space-y-6">
+        <Link href="/tasks" className="inline-flex items-center text-xs text-gray-500 hover:text-brand transition-colors w-fit">
+          <ArrowLeft className="h-3 w-3 mr-1" />
+          Back to Tasks
+        </Link>
+        <PageHeader
+          icon={Zap}
+          title="Task Automations"
+          subtitle="Manage automation rules and view execution history"
+        />
         <div className="grid gap-4">
-          {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 rounded-lg" />)}
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 rounded-lg" />
+          ))}
         </div>
       </div>
     );

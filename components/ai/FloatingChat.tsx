@@ -724,7 +724,7 @@ export default function FloatingChat() {
                   ) : (
                     <Button
                       onClick={createNewSession}
-                      className="w-full bg-gradient-to-r from-brand to-[#2d5a63] text-white hover:opacity-90 transition-all duration-200 rounded-xl"
+                      className="w-full bg-gradient-to-r from-brand to-[#2d5a63] text-white transition-all duration-200 rounded-xl"
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       New Chat
@@ -752,7 +752,7 @@ export default function FloatingChat() {
                           variant="ghost"
                           size="sm"
                           onClick={(e) => openDeleteDialog(session.id, e)}
-                          className="h-6 w-6 p-0 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-6 w-6 p-0 text-gray-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -1143,7 +1143,7 @@ export default function FloatingChat() {
                       className="flex-1 text-sm min-h-[60px] max-h-[120px] resize-none focus-brand overflow-y-auto"
                       rows={1}
                     />
-                    <Button variant="brand" onClick={sendMessage} disabled={!message.trim() || sending} size="sm" className="h-10 w-10 p-0 rounded-xl hover:opacity-90 transition-all duration-200 flex-shrink-0">
+                    <Button variant="brand" onClick={sendMessage} disabled={!message.trim() || sending} size="sm" className="h-10 w-10 p-0 rounded-xl transition-all duration-200 flex-shrink-0">
                       {sending ? (
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                       ) : (
@@ -1177,7 +1177,7 @@ export default function FloatingChat() {
             </Button>
             <Button
               onClick={handleDeleteSession}
-              className="hover:opacity-90"
+             
               style={{ backgroundColor: "#dc2626", color: "white" }}
             >
               Delete
@@ -1220,7 +1220,7 @@ export default function FloatingChat() {
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateListFromKOLs} disabled={!newListName.trim() || creatingList} className="hover:opacity-90 bg-brand text-white">
+            <Button variant="brand" onClick={handleCreateListFromKOLs} disabled={!newListName.trim() || creatingList}>
               {creatingList ? 'Creating...' : 'Create List'}
             </Button>
           </DialogFooter>

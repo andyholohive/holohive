@@ -595,7 +595,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                 their spend still counts toward the budget though.
               </p>
               {currentSpend != null && draft.weekly_cost_cap_usd != null && currentSpend >= draft.weekly_cost_cap_usd && (
-                <p className="text-[11px] text-red-700 mt-1 font-semibold">
+                <p className="text-[11px] text-rose-700 mt-1 font-semibold">
                   ⚠ Already at or over cap — next cron run would disable the schedule.
                 </p>
               )}
@@ -656,7 +656,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
                       <span>${schedule.last_run_summary.cost_usd.toFixed(3)}</span>
                     )}
                     {schedule.last_run_summary.error && (
-                      <span className="text-red-700">Error: {schedule.last_run_summary.error}</span>
+                      <span className="text-rose-700">Error: {schedule.last_run_summary.error}</span>
                     )}
                   </div>
                 )}
@@ -681,7 +681,7 @@ export default function IntelligenceScheduleDialog({ open, onOpenChange }: Props
             onClick={save}
             disabled={saving || running || !dirty || loading}
             style={{ backgroundColor: 'var(--brand)', color: 'white' }}
-            className="hover:opacity-90"
+           
           >
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {saving ? 'Saving…' : 'Save'}

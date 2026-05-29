@@ -56,14 +56,18 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[calc(100vh-64px)] bg-gray-50 p-6">
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-64" />
-          <div className="grid grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-lg" />)}
-          </div>
-          <Skeleton className="h-64 rounded-lg" />
+      <div className="space-y-6">
+        <PageHeader
+          icon={ShieldCheck}
+          title="Admin Overview"
+          subtitle="Team task overview and workload distribution"
+        />
+        <div className="grid grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
         </div>
+        <Skeleton className="h-64 rounded-lg" />
       </div>
     );
   }

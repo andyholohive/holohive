@@ -137,14 +137,14 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
               </div>
 
               {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700">
                   {error}
                 </div>
               )}
             </div>
             <DialogFooter>
               <Button variant="outline" type="button" onClick={handleClose}>Cancel</Button>
-              <Button variant="brand" type="submit" disabled={loading || (!url && !companyName)} className="hover:opacity-90">
+              <Button variant="brand" type="submit" disabled={loading || (!url && !companyName)}>
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -180,7 +180,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                   {report.qualified ? (
                     <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Qualified</Badge>
                   ) : (
-                    <Badge className="bg-red-100 text-red-800 border-red-200">Not Qualified</Badge>
+                    <Badge className="bg-rose-100 text-rose-800 border-rose-200">Not Qualified</Badge>
                   )}
                 </div>
 
@@ -211,7 +211,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                 </div>
 
                 {report.disqualification_reason && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700">
                     <strong>Disqualified:</strong> {report.disqualification_reason}
                   </div>
                 )}
@@ -226,7 +226,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                           {val?.pass ? (
                             <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
                           ) : (
-                            <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                            <XCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
                           )}
                           <div>
                             <span className="font-medium text-gray-700">{formatLabel(key)}</span>
@@ -281,12 +281,12 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
                       {signals.map((s: any, i: number) => (
                         <div key={i} className="flex items-start gap-2 p-2 bg-gray-50 rounded-md text-sm border border-gray-100">
                           <AlertTriangle className={`w-4 h-4 shrink-0 mt-0.5 ${
-                            s.tier === 1 ? 'text-red-500' : s.tier === 2 ? 'text-amber-500' : 'text-blue-500'
+                            s.tier === 1 ? 'text-rose-500' : s.tier === 2 ? 'text-amber-500' : 'text-blue-500'
                           }`} />
                           <div>
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <Badge className={`text-[10px] border ${
-                                s.tier === 1 ? 'bg-red-50 text-red-700 border-red-200' :
+                                s.tier === 1 ? 'bg-rose-50 text-rose-700 border-rose-200' :
                                 s.tier === 2 ? 'bg-amber-50 text-amber-700 border-amber-200' :
                                 'bg-blue-50 text-blue-700 border-blue-200'
                               }`}>Tier {s.tier}</Badge>
@@ -323,7 +323,7 @@ export default function ScoutQualifyDialog({ open, onClose, onOpportunityCreated
             </ScrollArea>
             <DialogFooter>
               <Button variant="outline" onClick={handleClose}>Close</Button>
-              <Button onClick={() => { setReport(null); setUrl(''); setCompanyName(''); }} className="hover:opacity-90 bg-brand text-white">
+              <Button onClick={() => { setReport(null); setUrl(''); setCompanyName(''); }} className="bg-brand text-white">
                 Qualify Another
               </Button>
             </DialogFooter>

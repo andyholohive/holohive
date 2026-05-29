@@ -144,10 +144,10 @@ export function TaskChecklist({ taskId }: TaskChecklistProps) {
             <Button
               variant="ghost"
               size="sm"
-              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
+              className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-rose-50"
               onClick={() => handleDelete(item.id)}
             >
-              <Trash2 className="h-3 w-3 text-red-400" />
+              <Trash2 className="h-3 w-3 text-rose-400" />
             </Button>
           </div>
         ))}

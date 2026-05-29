@@ -387,10 +387,10 @@ export function SubtaskList({ parentTaskId, onSubtaskClick }: SubtaskListProps) 
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 hover:bg-red-50"
+                  className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 hover:bg-rose-50"
                   onClick={() => handleDelete(subtask.id)}
                 >
-                  <Trash2 className="h-3 w-3 text-red-400" />
+                  <Trash2 className="h-3 w-3 text-rose-400" />
                 </Button>
               </div>
             );

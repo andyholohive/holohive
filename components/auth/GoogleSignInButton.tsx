@@ -74,7 +74,7 @@ export function GoogleSignInButton({ mode = 'signin' }: GoogleSignInButtonProps)
         {mode === 'signup' ? 'Sign up with Google' : 'Continue with Google'}
       </Button>
       {error && (
-        <p className="text-sm text-red-500 text-center">{error}</p>
+        <p className="text-sm text-rose-500 text-center">{error}</p>
       )}
     </div>
   )

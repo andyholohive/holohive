@@ -108,7 +108,7 @@ export function ForgotPasswordForm({ onBackToLogin }: ForgotPasswordFormProps) {
             />
           </div>
           
-          <Button variant="brand" type="submit" className="w-full hover:opacity-90" disabled={loading}>
+          <Button variant="brand" type="submit" className="w-full" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Send Reset Link
           </Button>

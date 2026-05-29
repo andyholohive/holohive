@@ -80,8 +80,8 @@ const PRIORITY_CONFIG: Record<string, { label: string; icon: typeof Minus; color
   low: { label: 'Low', icon: ArrowDown, color: 'text-gray-400', bg: 'bg-gray-50' },
   medium: { label: 'Medium', icon: Minus, color: 'text-blue-600', bg: 'bg-blue-50' },
   high: { label: 'High', icon: ArrowUp, color: 'text-orange-600', bg: 'bg-orange-50' },
-  urgent: { label: 'Urgent', icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
-  overdue: { label: 'Overdue', icon: AlertCircle, color: 'text-red-700', bg: 'bg-red-50' },
+  urgent: { label: 'Urgent', icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50' },
+  overdue: { label: 'Overdue', icon: AlertCircle, color: 'text-rose-700', bg: 'bg-rose-50' },
   complete: { label: 'Done', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
 };
 
@@ -373,7 +373,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
             </Button>
           )}
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button variant="brand" className="hover:opacity-90" onClick={handleSubmit} disabled={!form.task_name.trim() || !form.task_type || submitting}>
+          <Button variant="brand" onClick={handleSubmit} disabled={!form.task_name.trim() || !form.task_type || submitting}>
             {submitting ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
             ) : isEditing ? 'Save Changes' : 'Add Task'}
@@ -388,7 +388,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
       <div className="space-y-4">
         {/* Task Name */}
         <div className="grid gap-2">
-          <Label>Task Name <span className="text-red-500">*</span></Label>
+          <Label>Task Name <span className="text-rose-500">*</span></Label>
           <Input
             value={form.task_name}
             onChange={(e) => setForm({ ...form, task_name: e.target.value })}
@@ -494,7 +494,7 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
             stays populated for back-compat. */}
         <div className="grid gap-2">
           {/* Task Type */}
-          <Label>Task Type <span className="text-red-500">*</span></Label>
+          <Label>Task Type <span className="text-rose-500">*</span></Label>
           <Select value={form.task_type} onValueChange={(v) => setForm({ ...form, task_type: v })}>
             <SelectTrigger className="focus-brand"><SelectValue placeholder="Select type" /></SelectTrigger>
             <SelectContent>

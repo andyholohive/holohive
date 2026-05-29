@@ -71,7 +71,7 @@ export default function AISuggestionCard({ type, suggestion, onApply, onDismiss 
             </div>
             
             <div className="flex items-center space-x-2">
-              <MapPin className="h-4 w-4 text-red-600" />
+              <MapPin className="h-4 w-4 text-rose-600" />
               <div>
                 <p className="text-xs text-gray-500">Regions</p>
                 <p className="font-semibold">{campaignSuggestion.targetRegions.join(', ')}</p>
@@ -92,7 +92,7 @@ export default function AISuggestionCard({ type, suggestion, onApply, onDismiss 
             </div>
             
             <div className="flex items-center space-x-2">
-              <MapPin className="h-4 w-4 text-red-600" />
+              <MapPin className="h-4 w-4 text-rose-600" />
               <div>
                 <p className="text-xs text-gray-500">Regions</p>
                 <p className="font-semibold">{listSuggestion.criteria.regions?.join(', ')}</p>
@@ -126,7 +126,7 @@ export default function AISuggestionCard({ type, suggestion, onApply, onDismiss 
 
         {/* Action Buttons */}
         <div className="flex space-x-2 pt-2">
-          <Button onClick={() => onApply(suggestion)} className="flex-1 hover:opacity-90 bg-brand text-white">
+          <Button onClick={() => onApply(suggestion)} className="flex-1 bg-brand text-white">
             <Plus className="h-4 w-4 mr-2" />
             {isCampaign ? 'Create Campaign' : 'Create List'}
           </Button>

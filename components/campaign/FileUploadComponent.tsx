@@ -27,7 +27,7 @@ export function FileUploadComponent({ campaignId, onUploadSuccess }: FileUploadC
   const getFileIcon = (fileType: string) => {
     if (fileType.startsWith('image/')) return <ImageIcon className="h-8 w-8 text-blue-500" />;
     if (fileType.startsWith('video/')) return <Video className="h-8 w-8 text-purple-500" />;
-    if (fileType.includes('pdf')) return <FileText className="h-8 w-8 text-red-500" />;
+    if (fileType.includes('pdf')) return <FileText className="h-8 w-8 text-rose-500" />;
     return <File className="h-8 w-8 text-gray-500" />;
   };
 
@@ -194,7 +194,7 @@ export function FileUploadComponent({ campaignId, onUploadSuccess }: FileUploadC
                   {(uploadingFile.file.size / 1024 / 1024).toFixed(2)} MB
                 </p>
                 {uploadingFile.error ? (
-                  <p className="text-xs text-red-600 mt-1">{uploadingFile.error}</p>
+                  <p className="text-xs text-rose-600 mt-1">{uploadingFile.error}</p>
                 ) : (
                   <div className="mt-2">
                     <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
