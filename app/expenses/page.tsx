@@ -31,12 +31,15 @@ import {
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/ui/page-header';
+import { EmptyState } from '@/components/ui/empty-state';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import {
   DollarSign, Plus, Trash2, Upload, X, FileText, Image as ImageIcon,
   Check, Download, Filter as FilterIcon, AlertCircle, Calendar,
-  CreditCard, RefreshCw, Eye,
+  CreditCard, RefreshCw, Eye, TrendingUp,
 } from 'lucide-react';
 
 // ─── Types (mirror lib/expenseService.ts) ────────────────────────────
@@ -303,133 +306,80 @@ export default function ExpensesPage() {
 
   // ─── Render guards ────────────────────────────────────────────
   if (authLoading) {
-    return <div className="p-8 text-sm text-gray-500">Loading…</div>;
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          icon={DollarSign}
+          title="Expenses"
+          subtitle="Reimbursable spend tracking · super-admin only"
+        />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
+        </div>
+      </div>
+    );
   }
   if (!isSuperAdmin) {
     return (
-      <div className="max-w-2xl mx-auto mt-20 p-8 bg-white border border-red-200 rounded-lg">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
-          <div>
-            <h2 className="text-lg font-semibold text-red-900 mb-1">Super-admin only</h2>
-            <p className="text-sm text-red-700">
-              Expense tracking is restricted to super-admin accounts.
-              Your current role: <code>{userProfile?.role || 'unknown'}</code>.
-              Ask Andy if you need access.
-            </p>
-          </div>
-        </div>
+      <div className="space-y-6">
+        <PageHeader
+          icon={DollarSign}
+          title="Expenses"
+          subtitle="Reimbursable spend tracking · super-admin only"
+        />
+        <EmptyState
+          icon={AlertCircle}
+          title="Super-admin only"
+          description={`Expense tracking is restricted to super-admin accounts. Your current role: ${userProfile?.role || 'unknown'}. Ask Andy if you need access.`}
+        />
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* ─── Header ─── */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <DollarSign className="h-6 w-6 text-brand" />
-            Expenses
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Reimbursable spend tracking · super-admin only
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={exportCsv}>
-            <Download className="h-4 w-4 mr-1.5" /> Export CSV
-          </Button>
-          <Button size="sm" onClick={() => setAddOpen(true)} className="bg-brand text-white hover:opacity-90">
-            <Plus className="h-4 w-4 mr-1.5" /> Add Expense
-          </Button>
-        </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={DollarSign}
+        title="Expenses"
+        subtitle="Reimbursable spend tracking · super-admin only"
+        actions={(
+          <>
+            <Button variant="outline" size="sm" onClick={exportCsv}>
+              <Download className="h-4 w-4 mr-1.5" /> Export CSV
+            </Button>
+            <Button size="sm" onClick={() => setAddOpen(true)} className="bg-brand text-white hover:opacity-90">
+              <Plus className="h-4 w-4 mr-1.5" /> Add Expense
+            </Button>
+          </>
+        )}
+      />
+
+      {/* ─── KPI strip — matches /wallets KpiCard pattern ─── */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        <KpiCard
+          icon={DollarSign}
+          label="This month"
+          value={formatUSD(totalThisMonth)}
+          sub={expenses.filter(e => e.expense_date && e.expense_date >= new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0,10)).length + ' expenses'}
+        />
+        <KpiCard
+          icon={CreditCard}
+          label="Unpaid"
+          value={formatUSD(totalUnpaid)}
+          sub={`${expenses.filter(e => !e.is_paid).length} pending reimbursement`}
+          tone={totalUnpaid > 0 ? 'warn' : 'neutral'}
+        />
+        <KpiCard
+          icon={TrendingUp}
+          label="Top category"
+          value={topType ? TYPE_LABEL[topType[0] as ExpenseType] : '—'}
+          sub={topType ? formatUSD(topType[1]) : 'No spend yet'}
+        />
       </div>
 
-      {/* ─── Stats strip ─── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card className="border-gray-200">
-          <CardContent className="p-4">
-            <p className="text-xs uppercase tracking-wider text-gray-500 mb-1">This month</p>
-            <p className="text-2xl font-bold text-gray-900 tabular-nums">{formatUSD(totalThisMonth)}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-gray-200">
-          <CardContent className="p-4">
-            <p className="text-xs uppercase tracking-wider text-gray-500 mb-1">Unpaid</p>
-            <p className={`text-2xl font-bold tabular-nums ${totalUnpaid > 0 ? 'text-red-600' : 'text-gray-900'}`}>
-              {formatUSD(totalUnpaid)}
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-gray-200">
-          <CardContent className="p-4">
-            <p className="text-xs uppercase tracking-wider text-gray-500 mb-1">Top category</p>
-            {topType ? (
-              <p className="text-2xl font-bold text-gray-900">
-                {TYPE_LABEL[topType[0] as ExpenseType]}
-                <span className="text-base text-gray-500 ml-2">{formatUSD(topType[1])}</span>
-              </p>
-            ) : (
-              <p className="text-2xl font-bold text-gray-400">—</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ─── Filters ─── */}
-      <Card className="border-gray-200 mb-4">
-        <CardContent className="p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <FilterIcon className="h-4 w-4 text-gray-400" />
-            <Select value={filterPeriod} onValueChange={setFilterPeriod}>
-              <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All time</SelectItem>
-                <SelectItem value="this_month">This month</SelectItem>
-                <SelectItem value="last_month">Last month</SelectItem>
-                <SelectItem value="this_year">This year</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterUserId} onValueChange={setFilterUserId}>
-              <SelectTrigger className="w-[170px] h-9 text-sm"><SelectValue placeholder="User" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All users</SelectItem>
-                {users.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue placeholder="Type" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                {(['travel','software','meals_drinks','others'] as ExpenseType[]).map(t =>
-                  <SelectItem key={t} value={t}>{TYPE_LABEL[t]}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={filterFrequency} onValueChange={setFilterFrequency}>
-              <SelectTrigger className="w-[140px] h-9 text-sm"><SelectValue placeholder="Frequency" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All frequencies</SelectItem>
-                {(['one_time','daily','weekly','monthly'] as Frequency[]).map(f =>
-                  <SelectItem key={f} value={f}>{FREQ_LABEL[f]}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={filterPaid} onValueChange={setFilterPaid}>
-              <SelectTrigger className="w-[120px] h-9 text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All paid</SelectItem>
-                <SelectItem value="paid">Paid only</SelectItem>
-                <SelectItem value="unpaid">Unpaid only</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="ml-auto text-xs text-gray-500">{expenses.length} expenses</div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ─── Bulk action bar ─── */}
+      {/* ─── Bulk action bar (sticky when selection exists) ─── */}
       {selected.size > 0 && (
-        <div className="sticky top-0 z-20 flex items-center gap-2 mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg shadow-sm">
+        <div className="sticky top-0 z-20 flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg shadow-sm">
           <span className="text-sm font-medium text-emerald-800">{selected.size} selected</span>
           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={selectAllVisible}>Select all visible</Button>
           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={clearSelection}>Clear</Button>
@@ -443,14 +393,67 @@ export default function ExpensesPage() {
         </div>
       )}
 
-      {/* ─── Table ─── */}
+      {/* ─── Filters + Table in one card (matches /wallets pattern) ─── */}
       <Card className="border-gray-200 overflow-hidden">
+        {/* Filter bar */}
+        <div className="p-4 border-b border-gray-100 flex items-center gap-2 flex-wrap">
+          <FilterIcon className="h-4 w-4 text-gray-400 flex-shrink-0" />
+          <Select value={filterPeriod} onValueChange={setFilterPeriod}>
+            <SelectTrigger className="w-[140px] h-9 text-sm focus-brand"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All time</SelectItem>
+              <SelectItem value="this_month">This month</SelectItem>
+              <SelectItem value="last_month">Last month</SelectItem>
+              <SelectItem value="this_year">This year</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={filterUserId} onValueChange={setFilterUserId}>
+            <SelectTrigger className="w-[160px] h-9 text-sm focus-brand"><SelectValue placeholder="User" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All users</SelectItem>
+              {users.map(u => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterType} onValueChange={setFilterType}>
+            <SelectTrigger className="w-[140px] h-9 text-sm focus-brand"><SelectValue placeholder="Type" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All types</SelectItem>
+              {(['travel','software','meals_drinks','others'] as ExpenseType[]).map(t =>
+                <SelectItem key={t} value={t}>{TYPE_LABEL[t]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterFrequency} onValueChange={setFilterFrequency}>
+            <SelectTrigger className="w-[140px] h-9 text-sm focus-brand"><SelectValue placeholder="Frequency" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All frequencies</SelectItem>
+              {(['one_time','daily','weekly','monthly'] as Frequency[]).map(f =>
+                <SelectItem key={f} value={f}>{FREQ_LABEL[f]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterPaid} onValueChange={setFilterPaid}>
+            <SelectTrigger className="w-[120px] h-9 text-sm focus-brand"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All paid</SelectItem>
+              <SelectItem value="paid">Paid only</SelectItem>
+              <SelectItem value="unpaid">Unpaid only</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="ml-auto text-xs text-gray-500">{expenses.length} expenses</div>
+        </div>
+
+        {/* Table body */}
         {loading ? (
-          <div className="p-10 text-center text-sm text-gray-400">Loading expenses…</div>
-        ) : expenses.length === 0 ? (
-          <div className="p-10 text-center text-sm text-gray-400">
-            No expenses match these filters.
+          <div className="p-10">
+            <div className="space-y-2">
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10 rounded" />)}
+            </div>
           </div>
+        ) : expenses.length === 0 ? (
+          <EmptyState
+            icon={DollarSign}
+            title="No expenses match these filters"
+            description="Try widening the date range or clearing a filter."
+          />
         ) : (
           <Table>
             <TableHeader>
@@ -549,6 +552,31 @@ export default function ExpensesPage() {
         />
       )}
     </div>
+  );
+}
+
+// ─── KpiCard (mirrors the pattern from /wallets and other admin pages) ───
+function KpiCard({
+  icon: Icon, label, value, sub, tone,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: 'good' | 'warn' | 'neutral';
+}) {
+  const accent = tone === 'good' ? 'text-emerald-700'
+    : tone === 'warn' ? 'text-amber-700'
+    : 'text-gray-900';
+  return (
+    <Card className="border border-gray-200 shadow-sm p-4">
+      <div className="flex items-center gap-2 mb-1">
+        <Icon className="h-3.5 w-3.5 text-gray-400" />
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{label}</p>
+      </div>
+      <p className={`text-2xl font-bold tabular-nums ${accent}`}>{value}</p>
+      {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
+    </Card>
   );
 }
 
