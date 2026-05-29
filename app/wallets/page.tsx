@@ -31,6 +31,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { PageHeader } from '@/components/ui/page-header';
+import { KpiCard } from '@/components/ui/kpi-card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Wallet, Users, Activity, Repeat, Search, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -129,10 +130,10 @@ export default function WalletsPage() {
         // [Visible-error UX] Explicit error card with the failure
         // message instead of silently rendering the empty fallback.
         // Makes 401/network issues debuggable from the UI alone.
-        <Card className="border border-red-200 bg-red-50 p-4">
-          <p className="text-sm font-semibold text-red-900 mb-1">Couldn&apos;t load wallet summary</p>
-          <p className="text-xs text-red-700 font-mono break-all">{summaryError}</p>
-          <p className="text-xs text-red-600 mt-2">If this is a 401, try logging out and back in — your session may have expired.</p>
+        <Card className="border border-rose-200 bg-rose-50 p-4">
+          <p className="text-sm font-semibold text-rose-900 mb-1">Couldn&apos;t load wallet summary</p>
+          <p className="text-xs text-rose-700 font-mono break-all">{summaryError}</p>
+          <p className="text-xs text-rose-600 mt-2">If this is a 401, try logging out and back in — your session may have expired.</p>
         </Card>
       ) : summary ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -142,7 +143,7 @@ export default function WalletsPage() {
             label="Cross-campaign retention"
             value={`${summary.cross_event_pct.toFixed(1)}%`}
             sub={`${summary.retention.two_events + summary.retention.three_plus_events} wallets in 2+ events`}
-            tone={summary.cross_event_pct >= 10 ? 'good' : 'neutral'}
+            accent={summary.cross_event_pct >= 10 ? 'emerald' : 'gray'}
           />
           <KpiCard icon={Activity} label="EVM / Solana" value={`${summary.chain.evm.toLocaleString()} / ${summary.chain.solana.toLocaleString()}`} sub="Chain split" />
           <KpiCard
@@ -150,7 +151,7 @@ export default function WalletsPage() {
             label="Power users (3+ events)"
             value={summary.retention.three_plus_events.toLocaleString()}
             sub={`${summary.retention_pct.three_plus_events.toFixed(1)}% of total`}
-            tone="good"
+            accent="emerald"
           />
         </div>
       ) : (
@@ -187,28 +188,6 @@ export default function WalletsPage() {
 }
 
 // ─── Subcomponents ──────────────────────────────────────────────────
-
-function KpiCard({
-  icon: Icon, label, value, sub, tone,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: 'good' | 'warn' | 'neutral';
-}) {
-  const accent = tone === 'good' ? 'text-emerald-700' : tone === 'warn' ? 'text-amber-700' : 'text-gray-900';
-  return (
-    <Card className="border border-gray-200 shadow-sm p-4">
-      <div className="flex items-center gap-2 mb-1">
-        <Icon className="h-3.5 w-3.5 text-gray-400" />
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{label}</p>
-      </div>
-      <p className={`text-2xl font-bold tabular-nums ${accent}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
-    </Card>
-  );
-}
 
 /**
  * Retention funnel — three stacked bars showing what % of wallets

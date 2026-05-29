@@ -11,8 +11,9 @@ import { RequiredAsterisk } from '@/components/ui/required-asterisk';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Edit, Trash2, Share2, FileText, Copy, CheckCircle2, ExternalLink, Globe, Eye, Download, Upload, Users, Handshake, Link2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Share2, FileText, Copy, CheckCircle2, ExternalLink, Globe, Eye, Download, Upload, Users, Handshake, Link2, ClipboardList } from 'lucide-react';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageHeader } from '@/components/ui/page-header';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
@@ -559,18 +560,14 @@ export default function FormsPage() {
 
   return (
     <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Forms & Submissions</h2>
-            <p className="text-gray-600">
-              Create forms and view external submissions
-            </p>
-          </div>
-          {activeTab === 'forms' && (
+        <PageHeader
+          icon={ClipboardList}
+          title="Forms & Submissions"
+          subtitle="Create forms and view external submissions"
+          actions={(activeTab === 'forms' ? (
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="brand" className="hover:opacity-90">
+                <Button variant="brand">
                   <Plus className="h-4 w-4 mr-2" />
                   Create Form
                 </Button>
@@ -622,14 +619,14 @@ export default function FormsPage() {
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button variant="brand" onClick={handleCreateForm} disabled={isSubmitting} className="hover:opacity-90">
+                <Button variant="brand" onClick={handleCreateForm} disabled={isSubmitting}>
                   {isSubmitting ? 'Creating...' : 'Create Form'}
                 </Button>
               </DialogFooter>
             </DialogContent>
             </Dialog>
-          )}
-        </div>
+          ) : undefined)}
+        />
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -713,7 +710,7 @@ export default function FormsPage() {
                 : 'Create your first form to start collecting data'}
             </p>
             {!searchTerm && statusFilter === 'all' && (
-              <Button onClick={() => setIsCreateDialogOpen(true)} className="hover:opacity-90 bg-brand text-white">
+              <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-brand text-white">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Form
               </Button>
@@ -790,7 +787,7 @@ export default function FormsPage() {
                         onClick={() => handleDeleteForm(form.id, form.name)}
                         title="Delete form"
                       >
-                        <Trash2 className="h-4 w-4 text-red-600" />
+                        <Trash2 className="h-4 w-4 text-rose-600" />
                       </Button>
                     </div>
                     {form.status === 'published' && (
@@ -1117,7 +1114,7 @@ export default function FormsPage() {
               >
                 Cancel
               </Button>
-              <Button variant="brand" onClick={handleDuplicateForm} disabled={isDuplicating || !duplicateFormName.trim()} className="hover:opacity-90">
+              <Button variant="brand" onClick={handleDuplicateForm} disabled={isDuplicating || !duplicateFormName.trim()}>
                 {isDuplicating ? 'Duplicating...' : 'Duplicate Form'}
               </Button>
             </DialogFooter>
@@ -1185,7 +1182,7 @@ export default function FormsPage() {
                               onClick={() => handleDeleteResponse(response.id)}
                               title="Delete response"
                             >
-                              <Trash2 className="h-4 w-4 text-red-600" />
+                              <Trash2 className="h-4 w-4 text-rose-600" />
                             </Button>
                           </div>
                         </TableCell>
@@ -1263,7 +1260,7 @@ export default function FormsPage() {
                               className="text-sm text-gray-900 flex-1"
                               dangerouslySetInnerHTML={{ __html: field.label }}
                             />
-                            {field.required && !isDisplayOnly && <span className="text-red-500">*</span>}
+                            {field.required && !isDisplayOnly && <span className="text-rose-500">*</span>}
                           </div>
 
                           {/* Value Display - Only show for actual input fields */}
@@ -1276,7 +1273,7 @@ export default function FormsPage() {
                                     value === 'Yes'
                                       ? 'bg-emerald-100 text-emerald-800'
                                       : value === 'No'
-                                      ? 'bg-red-100 text-red-800'
+                                      ? 'bg-rose-100 text-rose-800'
                                       : 'bg-gray-100 text-gray-800'
                                   }`}>
                                     {value || '-'}

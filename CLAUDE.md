@@ -149,28 +149,42 @@ for the canonical wrapper. The base pattern:
 
 ## Stat / KPI cards
 
-The standard pattern (see `app/wallets/page.tsx` `KpiCard`):
+Use the shared `@/components/ui/kpi-card` — the canonical KpiCard.
+It's used across `/analytics`, `/dashboard`, `/crm/network`,
+`/crm/contacts`, `/crm/submissions`, `/expenses`, and `/wallets` so
+the visual treatment is identical everywhere.
 
 ```tsx
-function KpiCard({ icon: Icon, label, value, sub, tone }) {
-  const accent = tone === 'good' ? 'text-emerald-700'
-    : tone === 'warn' ? 'text-amber-700'
-    : 'text-gray-900';
-  return (
-    <Card className="border border-gray-200 shadow-sm p-4">
-      <div className="flex items-center gap-2 mb-1">
-        <Icon className="h-3.5 w-3.5 text-gray-400" />
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{label}</p>
-      </div>
-      <p className={`text-2xl font-bold tabular-nums ${accent}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
-    </Card>
-  );
-}
+import { KpiCard } from '@/components/ui/kpi-card';
+
+<KpiCard
+  icon={Handshake}
+  label="Active Partners"
+  value={42}
+  sub="3 added this week"
+  accent="brand"
+/>
 ```
 
-Always `tabular-nums` on numeric values. Always `[11px]` uppercase
-tracked-out labels. Always `text-2xl font-bold` value.
+**Accent palette:** `'gray' | 'brand' | 'emerald' | 'amber' | 'rose' | 'sky' | 'purple'`. Default `'gray'`.
+
+Use the accent prop to colorize the right-side icon square. Use
+brand-teal for the most operationally-interesting metric (Active Pipeline,
+Total Clients, etc.); reserve emerald for "this is good news",
+amber/rose for "this needs attention". Sky / purple for differentiation
+when you have 4+ KPIs in a strip.
+
+`value` accepts `string | number` so callers format their own (money,
+percentage, "EVM/Solana" splits). The component handles `tabular-nums`,
+the uppercase tracked-out label, and the `text-2xl font-bold` value
+internally — never roll your own inline variant.
+
+**Forbidden:** local `function KpiCard({ ..., tone })` definitions
+inside a page file. There used to be two implementations (the inline
+`tone`-prop variant on /expenses + /wallets vs the shared `accent`-prop
+one); they were reconciled in the May 2026 audit. If you need a new
+accent, add it to the shared component's palette, don't inline a
+divergent version.
 
 ---
 

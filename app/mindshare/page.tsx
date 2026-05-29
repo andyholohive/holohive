@@ -1385,7 +1385,7 @@ export default function MindsharePage() {
             <p className="text-sm text-gray-600">
               The universe ranked on the leaderboard. Includes your clients (auto-seeded) plus competitor benchmarks you add manually.
             </p>
-            <Button variant="brand" onClick={openCreateProject} className="hover:opacity-90">
+            <Button variant="brand" onClick={openCreateProject}>
               <Plus className="h-4 w-4 mr-1.5" /> Add Project
             </Button>
           </div>
@@ -1441,7 +1441,7 @@ export default function MindsharePage() {
                       }} /></TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" onClick={() => openEditProject(p)} className="h-7 w-7 p-0"><Edit className="h-3.5 w-3.5" /></Button>
-                        <Button variant="ghost" size="sm" onClick={() => deleteProject(p)} className="h-7 w-7 p-0 text-red-500 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => deleteProject(p)} className="h-7 w-7 p-0 text-rose-500 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1490,7 +1490,7 @@ export default function MindsharePage() {
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setEditingProject(null)}>Cancel</Button>
-                <Button variant="brand" onClick={saveProject} disabled={savingProject} className="hover:opacity-90">
+                <Button variant="brand" onClick={saveProject} disabled={savingProject}>
                   {savingProject ? 'Saving...' : 'Save'}
                 </Button>
               </DialogFooter>
@@ -1519,7 +1519,7 @@ export default function MindsharePage() {
               />
               <div className="flex items-center justify-between mt-3">
                 <p className="text-xs text-gray-500">All imports default to <strong>language=ko</strong> + active.</p>
-                <Button variant="brand" onClick={handleBulkImport} disabled={!importText.trim() || importing} className="hover:opacity-90">
+                <Button variant="brand" onClick={handleBulkImport} disabled={!importText.trim() || importing}>
                   <Upload className="h-3.5 w-3.5 mr-1.5" /> {importing ? 'Importing...' : 'Import'}
                 </Button>
               </div>
@@ -1807,7 +1807,7 @@ export default function MindsharePage() {
                           <SelectItem value="vi">Vietnamese</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-gray-400 hover:text-red-500" onClick={() => deleteChannel(c)}>
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-gray-400 hover:text-rose-500" onClick={() => deleteChannel(c)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>

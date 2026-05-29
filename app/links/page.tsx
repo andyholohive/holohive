@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/components/ui/page-header';
 import { toneClassName, type BadgeTone } from '@/components/ui/status-badge';
 
 // Access-level tone map. Module-scope so the closure-captured object
@@ -517,18 +518,16 @@ export default function LinksPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        {/* Header — real title/subtitle render immediately. */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Links</h2>
-            <p className="text-gray-600">Manage all your important links</p>
-          </div>
-          <Skeleton className="h-10 w-32" />
-        </div>
+        <PageHeader
+          icon={LinkIcon}
+          title="Links"
+          subtitle="Manage all your important links"
+          actions={<Skeleton className="h-10 w-32" />}
+        />
         <Skeleton className="h-10 w-80" />
         <div className="space-y-4">
-          {[1, 2, 3].map(i => (
-            <Skeleton key={i} className="h-48 w-full" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-48 w-full rounded-lg" />
           ))}
         </div>
       </div>
@@ -539,29 +538,26 @@ export default function LinksPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Links</h2>
-          <p className="text-gray-600">
-            Manage all your important links ({links.length} total)
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => window.open('/public/links/submit', '_blank')}
-            className="hover:opacity-90"
-          >
-            <ExternalLink className="h-4 w-4 mr-2" />
-            Submission Form
-          </Button>
-          <Button onClick={() => openDialog()} className="hover:opacity-90 bg-brand text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Link
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        icon={LinkIcon}
+        title="Links"
+        subtitle={`Manage all your important links (${links.length} total)`}
+        actions={(
+          <>
+            <Button
+              variant="outline"
+              onClick={() => window.open('/public/links/submit', '_blank')}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Submission Form
+            </Button>
+            <Button variant="brand" onClick={() => openDialog()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Link
+            </Button>
+          </>
+        )}
+      />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
@@ -791,7 +787,7 @@ export default function LinksPage() {
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() => handleDelete(link)}
-                                    className="text-red-600"
+                                    className="text-rose-600"
                                   >
                                     <Trash2 className="h-4 w-4 mr-2" />
                                     Delete
@@ -846,7 +842,7 @@ export default function LinksPage() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Client <span className="text-red-500">*</span></Label>
+                <Label>Client <span className="text-rose-500">*</span></Label>
                 <button
                   type="button"
                   className="text-xs text-brand cursor-pointer"
@@ -887,7 +883,7 @@ export default function LinksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Link Type <span className="text-red-500">*</span></Label>
+              <Label>Link Type <span className="text-rose-500">*</span></Label>
               <Popover open={linkTypesPopoverOpen} onOpenChange={setLinkTypesPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -932,7 +928,7 @@ export default function LinksPage() {
                       {getLinkTypeLabel(type)}
                       <button
                         onClick={() => toggleLinkType(type)}
-                        className="ml-1 hover:text-red-600"
+                        className="ml-1 hover:text-rose-600"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -943,7 +939,7 @@ export default function LinksPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Access <span className="text-red-500">*</span></Label>
+              <Label>Access <span className="text-rose-500">*</span></Label>
               <Select
                 value={formData.access}
                 onValueChange={(value: 'public' | 'partners' | 'team' | 'client') =>

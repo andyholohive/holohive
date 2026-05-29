@@ -20,6 +20,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
+import { KpiCard } from '@/components/ui/kpi-card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -370,7 +371,7 @@ export default function ExpensesPage() {
           label="Unpaid"
           value={formatUSD(totalUnpaid)}
           sub={`${expenses.filter(e => !e.is_paid).length} pending reimbursement`}
-          tone={totalUnpaid > 0 ? 'warn' : 'neutral'}
+          accent={totalUnpaid > 0 ? 'amber' : 'gray'}
         />
         <KpiCard
           icon={TrendingUp}
@@ -612,31 +613,6 @@ function DateField({
         />
       </PopoverContent>
     </Popover>
-  );
-}
-
-// ─── KpiCard (mirrors the pattern from /wallets and other admin pages) ───
-function KpiCard({
-  icon: Icon, label, value, sub, tone,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: 'good' | 'warn' | 'neutral';
-}) {
-  const accent = tone === 'good' ? 'text-emerald-700'
-    : tone === 'warn' ? 'text-amber-700'
-    : 'text-gray-900';
-  return (
-    <Card className="border border-gray-200 shadow-sm p-4">
-      <div className="flex items-center gap-2 mb-1">
-        <Icon className="h-3.5 w-3.5 text-gray-400" />
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{label}</p>
-      </div>
-      <p className={`text-2xl font-bold tabular-nums ${accent}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
-    </Card>
   );
 }
 
@@ -1036,7 +1012,7 @@ function DetailDialog({
                   const isImage = att.mime_type?.startsWith('image/');
                   return (
                     <div key={att.id} className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
-                      {isImage ? <ImageIcon className="h-4 w-4 text-violet-500" /> : <FileText className="h-4 w-4 text-red-500" />}
+                      {isImage ? <ImageIcon className="h-4 w-4 text-violet-500" /> : <FileText className="h-4 w-4 text-rose-500" />}
                       <span className="flex-1 truncate" title={att.file_name}>{att.file_name}</span>
                       <span className="text-xs text-gray-500 tabular-nums">
                         {att.file_size_bytes ? `${Math.round(att.file_size_bytes / 1024)}KB` : '—'}
@@ -1045,7 +1021,7 @@ function DetailDialog({
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
                       <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => deleteAttachment(att)}>
-                        <X className="h-3.5 w-3.5 text-red-500" />
+                        <X className="h-3.5 w-3.5 text-rose-500" />
                       </Button>
                     </div>
                   );
@@ -1056,7 +1032,7 @@ function DetailDialog({
         </div>
 
         <DialogFooter className="flex justify-between sm:justify-between">
-          <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={softDelete}>
+          <Button variant="ghost" size="sm" className="text-rose-600 hover:text-rose-700 hover:bg-rose-50" onClick={softDelete}>
             <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
           </Button>
           <Button onClick={onClose}>Close</Button>

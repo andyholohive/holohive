@@ -620,7 +620,7 @@ export default function DeliveryLogsPage() {
                     <Plus className="h-4 w-4 mr-1" />
                     Add Inline
                   </Button>
-                  <Button variant="brand" className="hover:opacity-90" onClick={() => openForm()}>
+                  <Button variant="brand" onClick={() => openForm()}>
                     <Expand className="h-4 w-4 mr-2" />
                     Add via Form
                   </Button>
@@ -743,7 +743,7 @@ export default function DeliveryLogsPage() {
                       <Button variant="outline" onClick={() => setIsAddingInline(true)}>
                         <Plus className="h-4 w-4 mr-1" /> Add Inline
                       </Button>
-                      <Button variant="brand" className="hover:opacity-90" onClick={() => openForm()}>
+                      <Button variant="brand" onClick={() => openForm()}>
                         <Expand className="h-4 w-4 mr-2" /> Add via Form
                       </Button>
                     </div>
@@ -970,8 +970,8 @@ export default function DeliveryLogsPage() {
                               <Button variant="ghost" size="sm" className="w-auto px-2 hover:bg-gray-100" onClick={() => openForm(entry)} title="Edit in popup">
                                 <Expand className="h-3.5 w-3.5 text-gray-600" />
                               </Button>
-                              <Button variant="ghost" size="sm" className="w-auto px-2 hover:bg-red-50" onClick={() => setDeletingId(entry.id)}>
-                                <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                              <Button variant="ghost" size="sm" className="w-auto px-2 hover:bg-rose-50" onClick={() => setDeletingId(entry.id)}>
+                                <Trash2 className="h-3.5 w-3.5 text-rose-600" />
                               </Button>
                             </div>
                           </td>
@@ -996,7 +996,7 @@ export default function DeliveryLogsPage() {
           <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1 pb-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label>Work Type <span className="text-red-500">*</span></Label>
+                <Label>Work Type <span className="text-rose-500">*</span></Label>
                 <Select value={form.work_type} onValueChange={(v) => setForm({ ...form, work_type: v })}>
                   <SelectTrigger className="focus-brand"><SelectValue placeholder="Select type" /></SelectTrigger>
                   <SelectContent>
@@ -1005,7 +1005,7 @@ export default function DeliveryLogsPage() {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>Date <span className="text-red-500">*</span></Label>
+                <Label>Date <span className="text-rose-500">*</span></Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="focus-brand justify-start text-left font-normal" style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: form.logged_at ? '#111827' : '#9ca3af' }}>
@@ -1020,7 +1020,7 @@ export default function DeliveryLogsPage() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label>Action <span className="text-red-500">*</span></Label>
+              <Label>Action <span className="text-rose-500">*</span></Label>
               <Input value={form.action} onChange={(e) => setForm({ ...form, action: e.target.value })} placeholder="What was done?" className="focus-brand" />
             </div>
             <div className="grid gap-2">
@@ -1071,7 +1071,7 @@ export default function DeliveryLogsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsFormOpen(false); setEditingId(null); }}>Cancel</Button>
-            <Button variant="brand" className="hover:opacity-90" onClick={handleSubmit} disabled={!form.work_type || !form.action.trim() || !form.logged_at}>
+            <Button variant="brand" onClick={handleSubmit} disabled={!form.work_type || !form.action.trim() || !form.logged_at}>
               {editingId ? 'Save Changes' : 'Add Entry'}
             </Button>
           </DialogFooter>
