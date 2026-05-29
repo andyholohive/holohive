@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge, type BadgeTone } from "@/components/ui/status-badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -444,15 +445,18 @@ export default function CampaignsPage() {
     }
   };
 
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case "Active": return "default";
-      case "Planning": return "secondary";
-      case "Paused": return "destructive";
-      case "Completed": return "outline";
-      default: return "secondary";
-    }
+  // Centralized BadgeTone mapping for campaign status pills — draws
+  // from the same StatusBadge palette as the rest of the app. Replaces
+  // the previous Badge variants + inline `style={{ backgroundColor:
+  // '#3e8692' }}` hack on the Active state.
+  const CAMPAIGN_STATUS_TONES: Record<string, BadgeTone> = {
+    Active: 'brand',
+    Planning: 'info',
+    Paused: 'warning',
+    Completed: 'neutral',
   };
+  const getStatusTone = (status: string): BadgeTone =>
+    CAMPAIGN_STATUS_TONES[status] ?? 'neutral';
 
   const CampaignCardSkeleton = () => (
     <Card className="transition-shadow h-full flex flex-col">
@@ -551,7 +555,7 @@ export default function CampaignsPage() {
       <div className="space-y-6">
         <PageHeader title="Campaigns" subtitle="Track and manage your marketing campaigns" />
         <div className="text-center py-8">
-          <p className="text-red-600">{error}</p>
+          <p className="text-rose-600">{error}</p>
           <Button onClick={fetchCampaigns} variant="brand" className="mt-4">
             Retry
           </Button>
@@ -583,7 +587,7 @@ export default function CampaignsPage() {
               <form onSubmit={handleCreateCampaign}>
                 <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
                   <div className="grid gap-2">
-                    <Label htmlFor="client">Client <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="client">Client <span className="text-rose-500">*</span></Label>
                     <Select value={newCampaign.client_id} onValueChange={(value) => setNewCampaign({ ...newCampaign, client_id: value })}>
                       <SelectTrigger className="focus-brand">
                         <SelectValue placeholder="Select a client" />
@@ -633,7 +637,7 @@ export default function CampaignsPage() {
                     )}
                   </div> */}
                   <div className="grid gap-2">
-                    <Label htmlFor="campaign-name">Campaign Name <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="campaign-name">Campaign Name <span className="text-rose-500">*</span></Label>
                     <Input
                       id="campaign-name"
                       value={newCampaign.name}
@@ -676,7 +680,7 @@ export default function CampaignsPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="start-date">Start Date <span className="text-red-500">*</span></Label>
+                      <Label htmlFor="start-date">Start Date <span className="text-rose-500">*</span></Label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
@@ -903,7 +907,7 @@ export default function CampaignsPage() {
                   )}
                   {/* Move Budget and Budget Allocation fields here, at the end */}
                   <div className="grid gap-2 mt-2">
-                    <Label htmlFor="totalBudget">Total Budget <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="totalBudget">Total Budget <span className="text-rose-500">*</span></Label>
                     <div className="relative w-full">
                       <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
                       <Input
@@ -971,7 +975,7 @@ export default function CampaignsPage() {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="text-red-500 hover:text-red-700"
+                              className="text-rose-500 hover:text-rose-700"
                               onClick={() => {
                                 setNewCampaign({
                                   ...newCampaign,
@@ -1005,7 +1009,7 @@ export default function CampaignsPage() {
                   <Button type="button" variant="outline" onClick={() => setIsNewCampaignOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={isSubmittingCampaign || !newCampaign.client_id || !newCampaign.name.trim() || !newCampaign.total_budget || !newCampaign.start_date} className="hover:opacity-90 bg-brand text-white">
+                  <Button variant="brand" type="submit" disabled={isSubmittingCampaign || !newCampaign.client_id || !newCampaign.name.trim() || !newCampaign.total_budget || !newCampaign.start_date}>
                     {isSubmittingCampaign ? "Creating..." : "Create Campaign"}
                   </Button>
                 </DialogFooter>
@@ -1121,7 +1125,7 @@ export default function CampaignsPage() {
             : "No campaigns yet."}
         >
           {(userProfile?.role === "super_admin" || userProfile?.role === "admin") && !searchTerm && statusFilter === "all" && (
-            <Button className="hover:opacity-90 bg-brand text-white" onClick={() => setIsNewCampaignOpen(true)}>
+            <Button variant="brand" onClick={() => setIsNewCampaignOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Create Your First Campaign
             </Button>
@@ -1148,13 +1152,9 @@ export default function CampaignsPage() {
                       )}
                       {campaign.name}
                     </div>
-                    <Badge
-                      variant={getStatusVariant(campaign.status)}
-                      className="text-xs"
-                      style={campaign.status === "Active" ? { backgroundColor: "#3e8692", color: "white", borderColor: "#3e8692" } : {}}
-                    >
+                    <StatusBadge tone={getStatusTone(campaign.status)}>
                       {campaign.status}
-                    </Badge>
+                    </StatusBadge>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -1288,13 +1288,9 @@ export default function CampaignsPage() {
                     </TableCell>
                     <TableCell className="text-gray-600">{campaign.client_name}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant={getStatusVariant(campaign.status)}
-                        className="text-xs"
-                        style={campaign.status === "Active" ? { backgroundColor: "#3e8692", color: "white", borderColor: "#3e8692" } : {}}
-                      >
+                      <StatusBadge tone={getStatusTone(campaign.status)}>
                         {campaign.status}
-                      </Badge>
+                      </StatusBadge>
                     </TableCell>
                     <TableCell className="text-gray-600">{CampaignService.formatCurrency(campaign.total_budget)}</TableCell>
                     <TableCell className="text-gray-600 text-sm">
@@ -1326,8 +1322,8 @@ export default function CampaignsPage() {
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-gray-200 rounded-full h-2 w-20">
                           <div
-                            className="h-2 rounded-full"
-                            style={{ width: `${progress}%`, backgroundColor: '#3e8692' }}
+                            className="h-2 bg-brand rounded-full"
+                            style={{ width: `${progress}%` }}
                           />
                         </div>
                         <span className="text-xs text-gray-600 w-8">{progress}%</span>
