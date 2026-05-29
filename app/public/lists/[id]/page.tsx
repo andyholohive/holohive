@@ -59,7 +59,7 @@ const getListStatusColor = (status: string) => {
   switch (status) {
     case 'curated': return 'bg-blue-100 text-blue-800';
     case 'approved': return 'bg-emerald-100 text-emerald-800';
-    case 'denied': return 'bg-red-100 text-red-800';
+    case 'denied': return 'bg-rose-100 text-rose-800';
     default: return 'bg-gray-100 text-gray-800';
   }
 };
@@ -104,7 +104,7 @@ const getPlatformIcon = (platform: string) => {
       );
     case 'YouTube':
       return (
-        <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+        <svg className="h-4 w-4 text-rose-500" viewBox="0 0 24 24" fill="currentColor">
           <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
         </svg>
       );
@@ -128,7 +128,7 @@ const getPlatformIcon = (platform: string) => {
 const getCreatorTypeColor = (type: string) => {
   const colorMap: { [key: string]: string } = {
     'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
-    'Drama-Forward': 'bg-red-100 text-red-800',
+    'Drama-Forward': 'bg-rose-100 text-rose-800',
     'Skeptic': 'bg-orange-100 text-orange-800',
     'Educator': 'bg-blue-100 text-blue-800',
     'Bridge Builder': 'bg-emerald-100 text-emerald-800',
@@ -662,11 +662,11 @@ export default function SharedListPage({ params }: { params: { id: string } }) {
                 required
               />
               {emailError && (
-                <p className="mt-2 text-sm text-red-600">{emailError}</p>
+                <p className="mt-2 text-sm text-rose-600">{emailError}</p>
               )}
             </div>
 
-            <Button variant="brand" type="submit" className="w-full hover:opacity-90">
+            <Button variant="brand" type="submit" className="w-full">
               Verify Email
             </Button>
           </form>

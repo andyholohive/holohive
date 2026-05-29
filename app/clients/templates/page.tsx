@@ -333,7 +333,7 @@ export default function ActionBoardTemplatesPage() {
           <h2 className="text-2xl font-bold text-gray-900">Action Board Templates</h2>
           <p className="text-gray-600">Reusable milestone sets you can apply to any client's Action Board.</p>
         </div>
-        <Button variant="brand" className="hover:opacity-90 flex-shrink-0" onClick={openNew}>
+        <Button variant="brand" className="flex-shrink-0" onClick={openNew}>
           <Plus className="h-4 w-4 mr-2" />
           New Template
         </Button>
@@ -439,11 +439,11 @@ export default function ActionBoardTemplatesPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 p-0 hover:bg-red-50"
+                        className="h-7 w-7 p-0 hover:bg-rose-50"
                         title="Delete"
                         onClick={() => setDeleteTarget(t)}
                       >
-                        <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                        <Trash2 className="h-3.5 w-3.5 text-rose-500" />
                       </Button>
                     </div>
                   </TableCell>
@@ -571,10 +571,10 @@ export default function ActionBoardTemplatesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 w-7 p-0 hover:bg-red-50 mt-1"
+                          className="h-7 w-7 p-0 hover:bg-rose-50 mt-1"
                           onClick={() => removeMilestone(idx)}
                         >
-                          <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                          <Trash2 className="h-3.5 w-3.5 text-rose-500" />
                         </Button>
                       </div>
 
@@ -604,7 +604,7 @@ export default function ActionBoardTemplatesPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 w-7 p-0 hover:bg-red-50 flex-shrink-0"
+                              className="h-7 w-7 p-0 hover:bg-rose-50 flex-shrink-0"
                               onClick={() => removeItem(idx, itemIdx)}
                             >
                               <X className="h-3 w-3 text-gray-400" />
@@ -629,7 +629,7 @@ export default function ActionBoardTemplatesPage() {
 
           <DialogFooter className="border-t border-gray-100 pt-4 flex-shrink-0">
             <Button variant="outline" onClick={() => setEditorOpen(false)}>Cancel</Button>
-            <Button variant="brand" className="hover:opacity-90" onClick={handleSave} disabled={saving || !editName.trim()}>
+            <Button variant="brand" onClick={handleSave} disabled={saving || !editName.trim()}>
               {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Template'}
             </Button>
           </DialogFooter>
@@ -641,7 +641,7 @@ export default function ActionBoardTemplatesPage() {
         <DialogContent className="sm:max-w-[400px] border-l-4 border-l-red-500 rounded-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
-              <Trash2 className="h-4 w-4 text-red-500" />
+              <Trash2 className="h-4 w-4 text-rose-500" />
               Delete template?
             </DialogTitle>
             <DialogDescription className="text-sm text-gray-600 pt-2">

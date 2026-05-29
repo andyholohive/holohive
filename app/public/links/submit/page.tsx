@@ -217,13 +217,13 @@ export default function LinkSubmitPage() {
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
+              <Label htmlFor="name">Name <span className="text-rose-500">*</span></Label>
               <Input
                 id="name"
                 placeholder="Enter link name"
@@ -235,7 +235,7 @@ export default function LinkSubmitPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="url">URL <span className="text-red-500">*</span></Label>
+              <Label htmlFor="url">URL <span className="text-rose-500">*</span></Label>
               <Input
                 id="url"
                 type="url"
@@ -248,7 +248,7 @@ export default function LinkSubmitPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Client <span className="text-red-500">*</span></Label>
+              <Label>Client <span className="text-rose-500">*</span></Label>
               <Popover open={clientPopoverOpen} onOpenChange={setClientPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -296,7 +296,7 @@ export default function LinkSubmitPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Link Type <span className="text-red-500">*</span></Label>
+              <Label>Link Type <span className="text-rose-500">*</span></Label>
               <Popover open={linkTypesPopoverOpen} onOpenChange={setLinkTypesPopoverOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -343,7 +343,7 @@ export default function LinkSubmitPage() {
                       <button
                         type="button"
                         onClick={() => toggleLinkType(type)}
-                        className="ml-1 hover:text-red-600"
+                        className="ml-1 hover:text-rose-600"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -354,7 +354,7 @@ export default function LinkSubmitPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Access <span className="text-red-500">*</span></Label>
+              <Label>Access <span className="text-rose-500">*</span></Label>
               <Select
                 value={formData.access}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, access: value }))}

@@ -142,7 +142,7 @@ export default async function OAuthAuthorizePage({
           >
             Deny
           </button>
-          <button type="submit" name="consent" value="allow" className="flex-1 px-4 py-2 rounded-md text-white text-sm font-semibold hover:opacity-90 bg-brand">
+          <button type="submit" name="consent" value="allow" className="flex-1 px-4 py-2 rounded-md text-white text-sm font-semibold bg-brand">
             Allow
           </button>
         </form>

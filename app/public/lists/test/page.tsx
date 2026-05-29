@@ -103,7 +103,7 @@ export default async function TestPage() {
             <div className="flex items-center space-x-2">
               <span className="font-semibold">Database Status:</span>
               <span className={`px-2 py-1 rounded text-sm ${
-                dbStatus === 'Connected' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                dbStatus === 'Connected' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
               }`}>
                 {dbStatus}
               </span>
@@ -127,7 +127,7 @@ export default async function TestPage() {
               <span className="font-semibold">Specific List Test:</span>
               <span className={`px-2 py-1 rounded text-sm ${
                 specificListStatus.includes('Found') ? 'bg-emerald-100 text-emerald-800' : 
-                specificListStatus.includes('Error') ? 'bg-red-100 text-red-800' : 
+                specificListStatus.includes('Error') ? 'bg-rose-100 text-rose-800' : 
                 'bg-yellow-100 text-yellow-800'
               }`}>
                 {specificListStatus}

@@ -115,7 +115,7 @@ const getRegionIcon = (region: string) => {
 const getCreatorTypeColor = (creatorType: string) => {
   const colorMap: { [key: string]: string } = {
     'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
-    'Drama-Forward': 'bg-red-100 text-red-800',
+    'Drama-Forward': 'bg-rose-100 text-rose-800',
     'Skeptic': 'bg-orange-100 text-orange-800',
     'Educator': 'bg-blue-100 text-blue-800',
     'Bridge Builder': 'bg-emerald-100 text-emerald-800',
@@ -144,7 +144,7 @@ const getPlatformIcon = (platform: string) => {
       );
     case 'YouTube':
       return (
-        <svg className="h-4 w-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+        <svg className="h-4 w-4 text-rose-500" viewBox="0 0 24 24" fill="currentColor">
           <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
         </svg>
       );
@@ -168,7 +168,7 @@ const getPlatformIcon = (platform: string) => {
 const getContentTypeColor = (type: string) => {
   const colorMap: { [key: string]: string } = {
     Post: 'bg-blue-100 text-blue-800',
-    Video: 'bg-red-100 text-red-800',
+    Video: 'bg-rose-100 text-rose-800',
     Article: 'bg-emerald-100 text-emerald-800',
     AMA: 'bg-purple-100 text-purple-800',
     Ambassadorship: 'bg-orange-100 text-orange-800',
@@ -853,7 +853,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                   required
                 />
                 {emailError && (
-                  <p className="mt-2 text-sm text-red-600">{emailError}</p>
+                  <p className="mt-2 text-sm text-rose-600">{emailError}</p>
                 )}
               </div>
               
@@ -907,9 +907,9 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Campaign Not Found</h2>
             <p className="text-gray-600 mb-4">This campaign doesn't exist or is not publicly accessible.</p>
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 text-left">
-                <p className="text-red-600 text-sm font-medium">Error Details:</p>
-                <p className="text-red-600 text-sm mt-1">{error}</p>
+              <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 mb-4 text-left">
+                <p className="text-rose-600 text-sm font-medium">Error Details:</p>
+                <p className="text-rose-600 text-sm mt-1">{error}</p>
                 <p className="text-gray-500 text-xs mt-2">Campaign ID: {campaignId}</p>
               </div>
             )}
@@ -2356,7 +2356,7 @@ export default function PublicCampaignPage({ params }: { params: { id: string } 
                                         if (['published', 'active', 'live', 'posted'].includes(s)) return 'bg-emerald-100 text-emerald-800';
                                         if (['scheduled'].includes(s)) return 'bg-blue-100 text-blue-800';
                                         if (['draft', 'pending'].includes(s)) return 'bg-yellow-100 text-yellow-800';
-                                        if (['failed', 'removed'].includes(s)) return 'bg-red-100 text-red-800';
+                                        if (['failed', 'removed'].includes(s)) return 'bg-rose-100 text-rose-800';
                                         return 'bg-gray-100 text-gray-800';
                                       })()}`}>
                                         {content.status ? content.status.charAt(0).toUpperCase() + content.status.slice(1).toLowerCase() : '-'}

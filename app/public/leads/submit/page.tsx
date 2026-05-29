@@ -230,13 +230,13 @@ export default function LeadSubmitPage() {
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="name">Lead/Opportunity Name <span className="text-red-500">*</span></Label>
+              <Label htmlFor="name">Lead/Opportunity Name <span className="text-rose-500">*</span></Label>
               <Input
                 id="name"
                 placeholder="Enter company or project name"
@@ -313,7 +313,7 @@ export default function LeadSubmitPage() {
                       <button
                         type="button"
                         onClick={() => toggleScope(scope)}
-                        className="ml-1 hover:text-red-600"
+                        className="ml-1 hover:text-rose-600"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -438,7 +438,7 @@ export default function LeadSubmitPage() {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="contact_name">Name <span className="text-red-500">*</span></Label>
+                  <Label htmlFor="contact_name">Name <span className="text-rose-500">*</span></Label>
                   <Input
                     id="contact_name"
                     placeholder="Primary contact name"

@@ -60,7 +60,7 @@ export default function ClientTasksPage() {
 
   const getDueDateColor = (dueDate: string | null) => {
     if (!dueDate) return 'text-gray-500';
-    if (dueDate < today) return 'text-red-600 font-semibold';
+    if (dueDate < today) return 'text-rose-600 font-semibold';
     const diffDays = Math.ceil((new Date(dueDate + 'T00:00:00').getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
     if (diffDays <= 3) return 'text-amber-600 font-semibold';
     return 'text-gray-500';
@@ -108,7 +108,7 @@ export default function ClientTasksPage() {
           {stats && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard label="Total" value={stats.total} color="text-gray-600" bg="bg-gray-50" />
-              <StatCard label="Overdue" value={stats.overdue} color="text-red-500" bg="bg-red-50" icon={AlertTriangle} />
+              <StatCard label="Overdue" value={stats.overdue} color="text-rose-500" bg="bg-rose-50" icon={AlertTriangle} />
               <StatCard label="In Progress" value={stats.inProgress} color="text-blue-500" bg="bg-blue-50" icon={PlayCircle} />
               <StatCard label="Completed" value={stats.byStatus['complete'] || 0} color="text-emerald-500" bg="bg-emerald-50" icon={CheckCircle2} />
             </div>

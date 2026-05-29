@@ -64,7 +64,7 @@ function SortableRow({ option, onToggleActive, onDelete }: SortableRowProps) {
             variant="outline"
             size="sm"
             onClick={() => onToggleActive(option)}
-            className="hover:opacity-90"
+           
           >
             {option.is_active ? 'Deactivate' : 'Activate'}
           </Button>
@@ -72,7 +72,7 @@ function SortableRow({ option, onToggleActive, onDelete }: SortableRowProps) {
             variant="outline"
             size="sm"
             onClick={() => onDelete(option.id)}
-            className="hover:bg-red-50 hover:text-red-700"
+            className="hover:bg-rose-50 hover:text-rose-700"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -288,7 +288,7 @@ export default function FieldOptionsPage() {
             </div>
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="brand" className="hover:opacity-90">
+                <Button variant="brand">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Option
                 </Button>
@@ -336,7 +336,7 @@ export default function FieldOptionsPage() {
                   <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button variant="brand" onClick={handleAddOption} className="hover:opacity-90">
+                  <Button variant="brand" onClick={handleAddOption}>
                     Add Option
                   </Button>
                 </DialogFooter>

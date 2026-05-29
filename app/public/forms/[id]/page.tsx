@@ -312,7 +312,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
             <div key={field.id} className="space-y-2">
               <Label htmlFor={field.id}>
                 <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-                {field.required && <span className="text-red-500 ml-1">*</span>}
+                {field.required && <span className="text-rose-500 ml-1">*</span>}
               </Label>
               {answers.map((answer, index) => (
                 <div key={index} className="flex gap-2 items-center">
@@ -326,10 +326,10 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                       setMultipleAnswers(prev => ({ ...prev, [field.id]: newAnswers }));
                       handleFieldChange(field.id, newAnswers.filter(a => a.trim()));
                     }}
-                    className={`focus-brand flex-1 ${hasError ? 'border-red-500' : ''}`}
+                    className={`focus-brand flex-1 ${hasError ? 'border-rose-500' : ''}`}
                   />
                   {index === answers.length - 1 && (
-                    <Button type="button" onClick={() => { setMultipleAnswers(prev => ({ ...prev, [field.id]: [...answers, ''] })); }} className="hover:opacity-90 bg-brand text-white">
+                    <Button type="button" onClick={() => { setMultipleAnswers(prev => ({ ...prev, [field.id]: [...answers, ''] })); }} className="bg-brand text-white">
                       +
                     </Button>
                   )}
@@ -342,14 +342,14 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                         setMultipleAnswers(prev => ({ ...prev, [field.id]: newAnswers }));
                         handleFieldChange(field.id, newAnswers.filter(a => a.trim()));
                       }}
-                      className="hover:bg-red-50 hover:text-red-700"
+                      className="hover:bg-rose-50 hover:text-rose-700"
                     >
                       ×
                     </Button>
                   )}
                 </div>
               ))}
-              {hasError && <p className="text-sm text-red-500">{hasError}</p>}
+              {hasError && <p className="text-sm text-rose-500">{hasError}</p>}
             </div>
           );
         }
@@ -357,14 +357,14 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
           <div key={field.id} className="space-y-2">
             <Label htmlFor={field.id}>
               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-rose-500 ml-1">*</span>}
             </Label>
             <Input
               id={field.id}
               type={field.field_type}
               value={formData[field.id] || ''}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
-              className={`focus-brand ${hasError ? 'border-red-500' : ''}`}
+              className={`focus-brand ${hasError ? 'border-rose-500' : ''}`}
             />
             {field.allow_attachments && (
               <div className="space-y-2">
@@ -428,7 +428,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                               [field.id]: prev[field.id].filter((_, i) => i !== index)
                             }));
                           }}
-                          className="h-6 w-6 p-0 hover:bg-red-50 hover:text-red-700"
+                          className="h-6 w-6 p-0 hover:bg-rose-50 hover:text-rose-700"
                         >
                           ×
                         </Button>
@@ -438,7 +438,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                 )}
               </div>
             )}
-            {hasError && <p className="text-sm text-red-500">{hasError}</p>}
+            {hasError && <p className="text-sm text-rose-500">{hasError}</p>}
           </div>
         );
 
@@ -449,7 +449,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
             <div key={field.id} className="space-y-2">
               <Label htmlFor={field.id}>
                 <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-                {field.required && <span className="text-red-500 ml-1">*</span>}
+                {field.required && <span className="text-rose-500 ml-1">*</span>}
               </Label>
               {answers.map((answer, index) => (
                 <div key={index} className="flex gap-2 items-start">
@@ -463,10 +463,10 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                       handleFieldChange(field.id, newAnswers.filter(a => a.trim()));
                     }}
                     rows={4}
-                    className={`focus-brand flex-1 ${hasError ? 'border-red-500' : ''}`}
+                    className={`focus-brand flex-1 ${hasError ? 'border-rose-500' : ''}`}
                   />
                   {index === answers.length - 1 && (
-                    <Button type="button" onClick={() => { setMultipleAnswers(prev => ({ ...prev, [field.id]: [...answers, ''] })); }} className="hover:opacity-90 bg-brand text-white">
+                    <Button type="button" onClick={() => { setMultipleAnswers(prev => ({ ...prev, [field.id]: [...answers, ''] })); }} className="bg-brand text-white">
                       +
                     </Button>
                   )}
@@ -479,14 +479,14 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                         setMultipleAnswers(prev => ({ ...prev, [field.id]: newAnswers }));
                         handleFieldChange(field.id, newAnswers.filter(a => a.trim()));
                       }}
-                      className="hover:bg-red-50 hover:text-red-700"
+                      className="hover:bg-rose-50 hover:text-rose-700"
                     >
                       ×
                     </Button>
                   )}
                 </div>
               ))}
-              {hasError && <p className="text-sm text-red-500">{hasError}</p>}
+              {hasError && <p className="text-sm text-rose-500">{hasError}</p>}
             </div>
           );
         }
@@ -494,14 +494,14 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
           <div key={field.id} className="space-y-2">
             <Label htmlFor={field.id}>
               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-rose-500 ml-1">*</span>}
             </Label>
             <Textarea
               id={field.id}
               value={formData[field.id] || ''}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
               rows={4}
-              className={`focus-brand ${hasError ? 'border-red-500' : ''}`}
+              className={`focus-brand ${hasError ? 'border-rose-500' : ''}`}
             />
             {field.allow_attachments && (
               <div className="space-y-2">
@@ -565,7 +565,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                               [field.id]: prev[field.id].filter((_, i) => i !== index)
                             }));
                           }}
-                          className="h-6 w-6 p-0 hover:bg-red-50 hover:text-red-700"
+                          className="h-6 w-6 p-0 hover:bg-rose-50 hover:text-rose-700"
                         >
                           ×
                         </Button>
@@ -575,7 +575,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                 )}
               </div>
             )}
-            {hasError && <p className="text-sm text-red-500">{hasError}</p>}
+            {hasError && <p className="text-sm text-rose-500">{hasError}</p>}
           </div>
         );
 
@@ -584,13 +584,13 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
           <div key={field.id} className="space-y-2">
             <Label htmlFor={field.id}>
               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-rose-500 ml-1">*</span>}
             </Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className={`focus-brand w-full justify-start text-left font-normal ${hasError ? 'border-red-500' : ''}`}
+                  className={`focus-brand w-full justify-start text-left font-normal ${hasError ? 'border-rose-500' : ''}`}
                   style={{
                     borderColor: hasError ? '#ef4444' : '#e5e7eb',
                     backgroundColor: 'white',
@@ -616,7 +616,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                 />
               </PopoverContent>
             </Popover>
-            {hasError && <p className="text-sm text-red-500">{hasError}</p>}
+            {hasError && <p className="text-sm text-rose-500">{hasError}</p>}
           </div>
         );
 
@@ -629,7 +629,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
           <div key={field.id} className="space-y-2">
             <Label htmlFor={field.id}>
               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-rose-500 ml-1">*</span>}
             </Label>
             <Select
               value={selectedValue}
@@ -660,7 +660,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                 }
               }}
             >
-              <SelectTrigger className={`focus-brand ${hasError ? 'border-red-500' : ''}`}>
+              <SelectTrigger className={`focus-brand ${hasError ? 'border-rose-500' : ''}`}>
                 <SelectValue placeholder="Select an option" />
               </SelectTrigger>
               <SelectContent>
@@ -713,7 +713,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                 />
               </div>
             )}
-            {hasError && <p className="text-sm text-red-500">{hasError}</p>}
+            {hasError && <p className="text-sm text-rose-500">{hasError}</p>}
           </div>
         );
 
@@ -722,7 +722,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
           <div key={field.id} className="space-y-2">
             <Label>
               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-rose-500 ml-1">*</span>}
             </Label>
             <RadioGroup value={formData[field.id] || ''} onValueChange={(value) => handleFieldChange(field.id, value)}>
               <div className="space-y-2">
@@ -736,7 +736,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                 ))}
               </div>
             </RadioGroup>
-            {hasError && <p className="text-sm text-red-500">{hasError}</p>}
+            {hasError && <p className="text-sm text-rose-500">{hasError}</p>}
           </div>
         );
 
@@ -745,7 +745,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
           <div key={field.id} className="space-y-2">
             <Label>
               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-rose-500 ml-1">*</span>}
             </Label>
             <div className="space-y-2">
               {field.options?.map((option: string) => (
@@ -789,7 +789,7 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
                 </>
               )}
             </div>
-            {hasError && <p className="text-sm text-red-500">{hasError}</p>}
+            {hasError && <p className="text-sm text-rose-500">{hasError}</p>}
           </div>
         );
 
@@ -862,8 +862,8 @@ export default function PublicFormPage({ params }: { params: { id: string } }) {
           <div className="flex justify-center mb-6">
             <Image src="/images/logo.png" alt="Logo" width={60} height={60} className="rounded-xl" />
           </div>
-          <div className="rounded-full bg-red-50 p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-            <FileText className="h-10 w-10 text-red-500" />
+          <div className="rounded-full bg-rose-50 p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+            <FileText className="h-10 w-10 text-rose-500" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Form Not Available</h2>
           <p className="text-lg text-gray-600 leading-relaxed">{error}</p>

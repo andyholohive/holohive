@@ -341,8 +341,10 @@ export default function DeliverablesPage() {
                               </div>
                               <div className="w-full bg-gray-100 rounded-full h-1">
                                 <div
-                                  className="h-1 rounded-full transition-all"
-                                  style={{ width: `${progressPct}%`, backgroundColor: d.template.color || '#3e8692' }}
+                                  className="h-1 bg-brand rounded-full transition-all"
+                                  style={d.template.color
+                                    ? { width: `${progressPct}%`, backgroundColor: d.template.color }
+                                    : { width: `${progressPct}%` }}
                                 />
                               </div>
                             </div>

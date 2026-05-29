@@ -479,7 +479,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-red-600">Error</CardTitle>
+            <CardTitle className="text-rose-600">Error</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-700">{error}</p>
@@ -517,7 +517,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
                   required
                 />
                 {emailError && (
-                  <p className="text-sm text-red-600 mt-2">{emailError}</p>
+                  <p className="text-sm text-rose-600 mt-2">{emailError}</p>
                 )}
               </div>
               <Button type="submit" className="w-full bg-brand hover:bg-[#2d6570]">
@@ -548,7 +548,7 @@ export default function PublicReportPage({ params }: { params: { id: string } })
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-red-600">Error</CardTitle>
+            <CardTitle className="text-rose-600">Error</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-gray-700">{error}</p>

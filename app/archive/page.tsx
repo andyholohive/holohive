@@ -327,7 +327,7 @@ export default function ArchivePage() {
       </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded">
             {error}
           </div>
         )}
@@ -565,7 +565,7 @@ export default function ArchivePage() {
               <Button variant="outline" onClick={() => setIsRestoreDialogOpen(false)} disabled={isProcessing}>
                 Cancel
               </Button>
-              <Button variant="brand" onClick={confirmRestore} disabled={isProcessing} className="hover:opacity-90">
+              <Button variant="brand" onClick={confirmRestore} disabled={isProcessing}>
                 {isProcessing ? 'Restoring...' : 'Restore'}
               </Button>
             </DialogFooter>
@@ -576,7 +576,7 @@ export default function ArchivePage() {
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-red-600">
+              <DialogTitle className="flex items-center gap-2 text-rose-600">
                 <AlertTriangle className="h-5 w-5" />
                 Permanently Delete {selectedItem?.type}
               </DialogTitle>
@@ -685,7 +685,7 @@ function ArchivedItemCard({
           <Button
             variant="outline"
             size="sm"
-            className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+            className="w-full text-rose-600 hover:text-rose-700 hover:bg-rose-50"
             onClick={onDelete}
           >
             <Trash2 className="h-4 w-4 mr-2" />

@@ -28,7 +28,7 @@ interface DetailResponse {
 }
 
 const ACTION_TIER_STYLE: Record<string, { label: string; className: string }> = {
-  REACH_OUT_NOW:       { label: 'REACH OUT NOW',      className: 'bg-red-100 text-red-700 border-red-200' },
+  REACH_OUT_NOW:       { label: 'REACH OUT NOW',      className: 'bg-rose-100 text-rose-700 border-rose-200' },
   PRE_TOKEN_PRIORITY:  { label: 'PRE-TOKEN PRIORITY', className: 'bg-orange-100 text-orange-700 border-orange-200' },
   RESEARCH:            { label: 'RESEARCH',           className: 'bg-blue-100 text-blue-700 border-blue-200' },
   WATCH:               { label: 'WATCH',              className: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
@@ -277,9 +277,9 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
               <p className="text-sm text-gray-400 italic">No reasoning recorded yet.</p>
             )}
             {p.disqualification_reason && (
-              <div className="mt-3 bg-red-50 border border-red-200 rounded p-2 text-xs">
-                <div className="font-semibold text-red-700 mb-0.5">Disqualified</div>
-                <div className="text-red-700">{p.disqualification_reason}</div>
+              <div className="mt-3 bg-rose-50 border border-rose-200 rounded p-2 text-xs">
+                <div className="font-semibold text-rose-700 mb-0.5">Disqualified</div>
+                <div className="text-rose-700">{p.disqualification_reason}</div>
               </div>
             )}
             {p.consideration_reason && !p.disqualification_reason && (
@@ -304,10 +304,10 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                       {check.pass ? (
                         <CheckCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0 mt-0.5" />
                       ) : (
-                        <XCircle className="h-3.5 w-3.5 text-red-600 shrink-0 mt-0.5" />
+                        <XCircle className="h-3.5 w-3.5 text-rose-600 shrink-0 mt-0.5" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className={`font-medium ${check.pass ? 'text-gray-900' : 'text-red-700'}`}>{label}</div>
+                        <div className={`font-medium ${check.pass ? 'text-gray-900' : 'text-rose-700'}`}>{label}</div>
                         <div className="text-gray-600 text-[11px]">{check.evidence}</div>
                       </div>
                     </div>
@@ -414,7 +414,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                       </Badge>
                       <span className={`text-[10px] font-semibold ${
                         r.status === 'completed' ? 'text-emerald-700' :
-                        r.status === 'failed' ? 'text-red-700' :
+                        r.status === 'failed' ? 'text-rose-700' :
                         'text-gray-600'
                       }`}>
                         {r.status}
@@ -436,7 +436,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                       </div>
                     )}
                     {r.error_message && (
-                      <p className="text-[11px] text-red-600 mt-1">Error: {r.error_message}</p>
+                      <p className="text-[11px] text-rose-600 mt-1">Error: {r.error_message}</p>
                     )}
                   </div>
                   {typeof r.output_summary?.cost_usd === 'number' && (

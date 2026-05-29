@@ -163,7 +163,7 @@ export default function TemplatesPage() {
                 <p className="text-sm text-gray-500">Reusable task presets for quick creation</p>
               </div>
             </div>
-            <Button onClick={() => setShowCreateDialog(true)} className="bg-brand text-white">
+            <Button variant="brand" onClick={() => setShowCreateDialog(true)}>
               <Plus className="h-4 w-4 mr-2" /> New Template
             </Button>
           </div>

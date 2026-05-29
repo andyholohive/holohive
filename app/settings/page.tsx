@@ -706,7 +706,7 @@ function SettingsContent() {
 
               {/* Save Button */}
               <div className="flex justify-end pt-4 border-t">
-                <Button variant="brand" onClick={handleSave} disabled={saving} className="hover:opacity-90">
+                <Button variant="brand" onClick={handleSave} disabled={saving}>
                   {saving ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -747,7 +747,7 @@ function SettingsContent() {
               <div className="flex items-center justify-between py-2 border-t">
                 <span className="text-sm text-gray-600">Status</span>
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  userProfile?.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                  userProfile?.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
                 }`}>
                   {userProfile?.is_active ? 'Active' : 'Inactive'}
                 </span>
@@ -921,7 +921,7 @@ function SettingsContent() {
 
                   {/* Save Button */}
                   <div className="flex justify-end pt-4 border-t">
-                    <Button variant="brand" onClick={handleSaveBooking} disabled={bookingSaving} className="hover:opacity-90">
+                    <Button variant="brand" onClick={handleSaveBooking} disabled={bookingSaving}>
                       {bookingSaving ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1025,7 +1025,7 @@ function SettingsContent() {
                     </span>
                   </div>
                   <div className="pt-4 border-t">
-                    <Button variant="brand" onClick={handleConnectGoogle} disabled={googleActionLoading} className="hover:opacity-90">
+                    <Button variant="brand" onClick={handleConnectGoogle} disabled={googleActionLoading}>
                       <Video className="h-4 w-4 mr-2" />
                       Connect Google Calendar
                     </Button>
@@ -1102,8 +1102,8 @@ function SettingsContent() {
                     {/* Last Error */}
                     {webhookStatus?.last_error_message && (
                       <div className="py-2 border-t">
-                        <span className="text-sm text-red-600 block mb-1">Last Error</span>
-                        <p className="text-xs text-red-500">
+                        <span className="text-sm text-rose-600 block mb-1">Last Error</span>
+                        <p className="text-xs text-rose-500">
                           {webhookStatus.last_error_message}
                           {webhookStatus.last_error_date && (
                             <span className="text-gray-400 ml-2">
@@ -1142,7 +1142,7 @@ function SettingsContent() {
                           </Button>
                         </>
                       ) : (
-                        <Button variant="brand" onClick={handleRegisterWebhook} disabled={webhookActionLoading} className="hover:opacity-90">
+                        <Button variant="brand" onClick={handleRegisterWebhook} disabled={webhookActionLoading}>
                           {webhookActionLoading ? (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                           ) : (

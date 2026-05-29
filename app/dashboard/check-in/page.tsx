@@ -245,7 +245,7 @@ function CheckInForm() {
 
           {/* Submit */}
           <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-200">
-            <Button variant="brand" onClick={handleSubmit} disabled={submitting} className="hover:opacity-90">
+            <Button variant="brand" onClick={handleSubmit} disabled={submitting}>
               {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               {submittedAt ? 'Update check-in' : 'Submit check-in'}
             </Button>

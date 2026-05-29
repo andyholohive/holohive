@@ -165,7 +165,7 @@ export default function AIInsightsPage() {
                 variant="outline"
                 size="sm"
                 onClick={loadInsights}
-                className="hover:opacity-90"
+               
               >
                 <Zap className="w-4 h-4 mr-2" />
                 Refresh
@@ -188,7 +188,7 @@ export default function AIInsightsPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Button
                   variant="outline"
-                  className="h-20 flex flex-col items-center justify-center gap-2 hover:opacity-90"
+                  className="h-20 flex flex-col items-center justify-center gap-2"
                   onClick={() => console.log('Generate campaign suggestion')}
                 >
                   <TrendingUp className="w-6 h-6" />
@@ -196,7 +196,7 @@ export default function AIInsightsPage() {
                 </Button>
                 <Button
                   variant="outline"
-                  className="h-20 flex flex-col items-center justify-center gap-2 hover:opacity-90"
+                  className="h-20 flex flex-col items-center justify-center gap-2"
                   onClick={() => console.log('Optimize budget')}
                 >
                   <DollarSign className="w-6 h-6" />
@@ -204,7 +204,7 @@ export default function AIInsightsPage() {
                 </Button>
                 <Button
                   variant="outline"
-                  className="h-20 flex flex-col items-center justify-center gap-2 hover:opacity-90"
+                  className="h-20 flex flex-col items-center justify-center gap-2"
                   onClick={() => console.log('Find KOLs')}
                 >
                   <Users className="w-6 h-6" />

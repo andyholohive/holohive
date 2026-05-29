@@ -148,13 +148,13 @@ export default function PartnerSubmitPage() {
         <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 sm:p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="name">Partner/Company Name <span className="text-red-500">*</span></Label>
+              <Label htmlFor="name">Partner/Company Name <span className="text-rose-500">*</span></Label>
               <Input
                 id="name"
                 placeholder="Enter partner or company name"
@@ -218,7 +218,7 @@ export default function PartnerSubmitPage() {
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="poc_name">Name <span className="text-red-500">*</span></Label>
+                  <Label htmlFor="poc_name">Name <span className="text-rose-500">*</span></Label>
                   <Input
                     id="poc_name"
                     placeholder="Contact person's name"

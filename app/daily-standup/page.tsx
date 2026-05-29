@@ -250,12 +250,12 @@ export default function DailyStandupPage() {
               <Button
                 variant="outline"
                 onClick={() => window.open('/public/standup/submit', '_blank')}
-                className="hover:opacity-90"
+               
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Submission Form
               </Button>
-              <Button variant="brand" className="hover:opacity-90" onClick={() => openForm()}
+              <Button variant="brand" onClick={() => openForm()}
                 disabled={hasSubmittedToday && !editingId}
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -330,7 +330,7 @@ export default function DailyStandupPage() {
                     {standups.length === 0 ? 'No stand-up submissions yet.' : 'No entries match your filters.'}
                   </p>
                   {standups.length === 0 && !hasSubmittedToday && (
-                    <Button variant="brand" className="mt-4 hover:opacity-90" onClick={() => openForm()}
+                    <Button variant="brand" className="mt-4" onClick={() => openForm()}
                     >
                       <Plus className="h-4 w-4 mr-2" /> Submit Your First Stand-Up
                     </Button>
@@ -380,7 +380,7 @@ export default function DailyStandupPage() {
                                       <Check className="h-3 w-3" /> Done
                                     </span>
                                   ) : (
-                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-red-700 bg-red-100 px-2.5 py-1 rounded-full">
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-rose-700 bg-rose-100 px-2.5 py-1 rounded-full">
                                       <X className="h-3 w-3" /> Not Done
                                     </span>
                                   )}
@@ -389,8 +389,8 @@ export default function DailyStandupPage() {
                                       <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-gray-200" onClick={() => openForm(entry)}>
                                         <Edit className="h-3.5 w-3.5 text-gray-500" />
                                       </Button>
-                                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-red-50" onClick={() => setDeletingId(entry.id)}>
-                                        <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-rose-50" onClick={() => setDeletingId(entry.id)}>
+                                        <Trash2 className="h-3.5 w-3.5 text-rose-500" />
                                       </Button>
                                     </div>
                                   )}
@@ -444,7 +444,7 @@ export default function DailyStandupPage() {
           <div className="space-y-5 max-h-[60vh] overflow-y-auto px-1 pb-2">
             {/* Completed yesterday */}
             <div className="grid gap-2">
-              <Label>Did you complete yesterday's priorities? <span className="text-red-500">*</span></Label>
+              <Label>Did you complete yesterday's priorities? <span className="text-rose-500">*</span></Label>
               <Select value={form.completed_yesterday} onValueChange={(v) => setForm({ ...form, completed_yesterday: v })}>
                 <SelectTrigger className="focus-brand">
                   <SelectValue placeholder="Select..." />
@@ -458,7 +458,7 @@ export default function DailyStandupPage() {
 
             {/* Top Priorities */}
             <div className="grid gap-2">
-              <Label>Top 1-2 Priorities <span className="text-red-500">*</span></Label>
+              <Label>Top 1-2 Priorities <span className="text-rose-500">*</span></Label>
               <p className="text-xs text-gray-400 -mt-1">What will you finish or move forward significantly today? (e.g., "Send outbound pitch deck to 10 partners" instead of "Work on deck")</p>
               <Textarea
                 value={form.priorities}
@@ -471,7 +471,7 @@ export default function DailyStandupPage() {
 
             {/* Output Goal */}
             <div className="grid gap-2">
-              <Label>Output Goal <span className="text-red-500">*</span></Label>
+              <Label>Output Goal <span className="text-rose-500">*</span></Label>
               <p className="text-xs text-gray-400 -mt-1">Quantify what success looks like today (e.g., "Book 2 calls")</p>
               <Textarea
                 value={form.output_goal}
@@ -497,7 +497,7 @@ export default function DailyStandupPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setIsFormOpen(false); setEditingId(null); }}>Cancel</Button>
-            <Button variant="brand" className="hover:opacity-90" onClick={handleSubmit} disabled={!form.completed_yesterday || !form.priorities.trim() || !form.output_goal.trim() || submitting}>
+            <Button variant="brand" onClick={handleSubmit} disabled={!form.completed_yesterday || !form.priorities.trim() || !form.output_goal.trim() || submitting}>
               {submitting ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
               ) : editingId ? 'Save Changes' : 'Submit'}

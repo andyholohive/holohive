@@ -1813,7 +1813,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
               </div>
               <button
                 type="submit"
-                className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
+                className="w-full py-3 px-6 rounded-xl font-semibold text-white transition-all duration-200 active:scale-[0.98]"
                 style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.1) 100%)', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 2px 20px rgba(0,0,0,0.1)' }}
               >
                 Access Portal
@@ -2020,7 +2020,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                 ? `${Math.abs(delta).toFixed(0)}%`
                 : `${Math.abs(delta)}${unit ? ` ${unit}` : ''}`;
             return (
-              <p className={`text-xs mt-1 font-medium ${up ? 'text-emerald-600' : 'text-red-600'}`}>
+              <p className={`text-xs mt-1 font-medium ${up ? 'text-emerald-600' : 'text-rose-600'}`}>
                 {up ? '↑' : '↓'} {value} this week
               </p>
             );
@@ -2941,7 +2941,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                           const isPdf = ext === 'pdf';
                           const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
                           const isDoc = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
-                          const iconColor = isPdf ? 'text-red-500 bg-red-100' : isImage ? 'text-blue-500 bg-blue-100' : isDoc ? 'text-indigo-500 bg-indigo-100' : 'text-gray-500 bg-gray-100';
+                          const iconColor = isPdf ? 'text-rose-500 bg-rose-100' : isImage ? 'text-blue-500 bg-blue-100' : isDoc ? 'text-indigo-500 bg-indigo-100' : 'text-gray-500 bg-gray-100';
                           return (
                             <a
                               key={i}
@@ -3053,7 +3053,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                             const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
                             const isDoc = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
                             const iconColor = isPdf
-                              ? 'text-red-500 bg-red-100'
+                              ? 'text-rose-500 bg-rose-100'
                               : isImage
                               ? 'text-blue-500 bg-blue-100'
                               : isDoc
@@ -3632,7 +3632,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
               >
                 <Bell className="h-5 w-5 text-white" />
                 {totalUnread > 0 && (
-                  <div className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
+                  <div className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full bg-rose-500 flex items-center justify-center">
                     <span className="text-white text-[10px] font-bold">!</span>
                   </div>
                 )}
@@ -3711,7 +3711,7 @@ export default function ClientPortalPage({ params }: { params: { id: string } })
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5">
                                   <p className="text-sm font-medium text-gray-900 truncate">{activity.title}</p>
-                                  {!activity.is_read && <div className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />}
+                                  {!activity.is_read && <div className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />}
                                 </div>
                                 {activity.description && <p className="text-xs text-gray-500 truncate">{activity.description}</p>}
                               </div>

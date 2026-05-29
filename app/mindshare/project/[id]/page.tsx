@@ -206,7 +206,7 @@ export default function StorytellerPage() {
             <p className="text-sm text-gray-500 mt-3">Loading channels…</p>
           </div>
         ) : error ? (
-          <div className="p-12 text-center text-sm text-red-600">{error}</div>
+          <div className="p-12 text-center text-sm text-rose-600">{error}</div>
         ) : items.length === 0 ? (
           <div className="p-12 text-center">
             <MessageSquare className="h-8 w-8 text-gray-300 mx-auto mb-2" />
@@ -310,7 +310,7 @@ function TrendBadge({ delta, priorIsZero }: { delta: number; priorIsZero: boolea
   }
   const up = delta > 0;
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-semibold ${up ? 'text-emerald-600' : 'text-red-600'}`}>
+    <span className={`inline-flex items-center gap-1 text-xs font-semibold ${up ? 'text-emerald-600' : 'text-rose-600'}`}>
       {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
       {Math.abs(delta).toFixed(0)}%
     </span>

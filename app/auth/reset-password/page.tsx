@@ -251,7 +251,7 @@ export default function ResetPasswordPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
               
-              <Button onClick={() => router.push('/auth')} className="w-full mt-4 hover:opacity-90 bg-brand text-white">
+              <Button onClick={() => router.push('/auth')} className="w-full mt-4 bg-brand text-white">
                 Back to Sign In
               </Button>
             </CardContent>
@@ -317,7 +317,7 @@ export default function ResetPasswordPage() {
                 />
               </div>
               
-              <Button variant="brand" type="submit" className="w-full hover:opacity-90" disabled={loading}>
+              <Button variant="brand" type="submit" className="w-full" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Update Password
               </Button>

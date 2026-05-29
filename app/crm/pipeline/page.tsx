@@ -322,7 +322,7 @@ export default function PipelinePage() {
     negotiation: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', solid: 'bg-orange-500' },
     contract: { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', solid: 'bg-cyan-500' },
     closed_won: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', solid: 'bg-emerald-500' },
-    closed_lost: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', solid: 'bg-red-500' },
+    closed_lost: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', solid: 'bg-rose-500' },
     account_active: { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', solid: 'bg-teal-500' },
     account_at_risk: { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', solid: 'bg-yellow-500' },
     account_churned: { bg: 'bg-slate-50', text: 'text-slate-700', border: 'border-slate-200', solid: 'bg-slate-500' },
@@ -337,7 +337,7 @@ export default function PipelinePage() {
     v2_contract: { bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', solid: 'bg-cyan-500' },
     v2_closed_won: { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', solid: 'bg-emerald-500' },
     orbit: { bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', solid: 'bg-orange-500' },
-    v2_closed_lost: { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', solid: 'bg-red-500' },
+    v2_closed_lost: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200', solid: 'bg-rose-500' },
   };
 
   useEffect(() => {
@@ -1242,13 +1242,13 @@ export default function PipelinePage() {
               Mark as Won
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleMoveStage(opp, 'closed_lost')}>
-              <X className="h-4 w-4 mr-2 text-red-600" />
+              <X className="h-4 w-4 mr-2 text-rose-600" />
               Mark as Lost
             </DropdownMenuItem>
           </>
         )}
         <DropdownMenuItem
-          className="text-red-600"
+          className="text-rose-600"
           onClick={() => handleDeleteOpportunity(opp)}
         >
           <Trash2 className="h-4 w-4 mr-2" />
@@ -2401,14 +2401,14 @@ export default function PipelinePage() {
               </div>
             )}
             {/* Apply Button */}
-            <Button variant="brand" size="sm" onClick={handleBulkUpdate} disabled={Object.keys(bulkEdit).length === 0} className="h-8 hover:opacity-90">
+            <Button variant="brand" size="sm" onClick={handleBulkUpdate} disabled={Object.keys(bulkEdit).length === 0} className="h-8">
               Apply Changes
             </Button>
             {/* Delete Button */}
             <Button
               size="sm"
               onClick={() => setIsBulkDeleteDialogOpen(true)}
-              className="h-8 bg-red-600 hover:bg-red-700 text-white"
+              className="h-8 bg-rose-600 hover:bg-rose-700 text-white"
             >
               Delete
             </Button>
@@ -2723,7 +2723,7 @@ export default function PipelinePage() {
               <Button type="button" variant="outline" onClick={() => setIsNewOpportunityOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="brand" type="submit" disabled={isSubmitting || !opportunityForm.name.trim()} className="hover:opacity-90">
+              <Button variant="brand" type="submit" disabled={isSubmitting || !opportunityForm.name.trim()}>
                 {isSubmitting ? 'Saving...' : editingOpportunity ? 'Save Changes' : 'Create Opportunity'}
               </Button>
             </DialogFooter>
@@ -2773,7 +2773,7 @@ export default function PipelinePage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleUnlinkContact(link.id)}
-                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                        className="h-8 w-8 p-0 text-rose-500 hover:text-rose-700"
                       >
                         <X className="h-4 w-4" />
                       </Button>
@@ -2846,7 +2846,7 @@ export default function PipelinePage() {
                       Primary contact
                     </Label>
                   </div>
-                  <Button variant="brand" onClick={handleLinkContact} disabled={!selectedContactId || isSubmitting} className="w-full hover:opacity-90">
+                  <Button variant="brand" onClick={handleLinkContact} disabled={!selectedContactId || isSubmitting} className="w-full">
                     <LinkIcon className="h-4 w-4 mr-2" />
                     Link Contact
                   </Button>
@@ -2893,7 +2893,7 @@ export default function PipelinePage() {
                       Primary contact
                     </Label>
                   </div>
-                  <Button variant="brand" onClick={handleCreateAndLinkContact} disabled={!newContactForm.name.trim() || isSubmitting} className="w-full hover:opacity-90">
+                  <Button variant="brand" onClick={handleCreateAndLinkContact} disabled={!newContactForm.name.trim() || isSubmitting} className="w-full">
                     <Plus className="h-4 w-4 mr-2" />
                     {isSubmitting ? 'Creating...' : 'Create & Link Contact'}
                   </Button>
@@ -3037,7 +3037,7 @@ export default function PipelinePage() {
             <Button variant="outline" onClick={handleKeepAsLead}>
               Keep as Lead
             </Button>
-            <Button variant="brand" onClick={handleConvertToDeal} className="hover:opacity-90">
+            <Button variant="brand" onClick={handleConvertToDeal}>
               Convert to Deal
             </Button>
           </DialogFooter>
@@ -3062,7 +3062,7 @@ export default function PipelinePage() {
             <Button variant="outline" onClick={handleKeepAsDeal}>
               Keep as Deal
             </Button>
-            <Button variant="brand" onClick={handleConvertToAccount} className="hover:opacity-90">
+            <Button variant="brand" onClick={handleConvertToAccount}>
               Convert to Account
             </Button>
           </DialogFooter>

@@ -193,13 +193,13 @@ export default function StandupSubmitPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-lg text-sm">
                 {error}
               </div>
             )}
 
             <div className="space-y-2">
-              <Label>Did you complete yesterday&apos;s priorities? <span className="text-red-500">*</span></Label>
+              <Label>Did you complete yesterday&apos;s priorities? <span className="text-rose-500">*</span></Label>
               <Select
                 value={formData.completed_yesterday}
                 onValueChange={(v) => setFormData(prev => ({ ...prev, completed_yesterday: v }))}
@@ -216,7 +216,7 @@ export default function StandupSubmitPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Top 1-2 Priorities <span className="text-red-500">*</span></Label>
+              <Label>Top 1-2 Priorities <span className="text-rose-500">*</span></Label>
               <p className="text-xs text-gray-400 -mt-1">What will you finish or move forward significantly today?</p>
               <Textarea
                 placeholder='e.g., Send outbound pitch deck to 10 partners'
@@ -229,7 +229,7 @@ export default function StandupSubmitPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Output Goal <span className="text-red-500">*</span></Label>
+              <Label>Output Goal <span className="text-rose-500">*</span></Label>
               <p className="text-xs text-gray-400 -mt-1">Quantify what success looks like today</p>
               <Textarea
                 placeholder='e.g., Book 2 calls'

@@ -406,7 +406,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
               <Button variant="outline" size="sm" onClick={handleCancel}>
                 Cancel
               </Button>
-              <Button variant="brand" size="sm" onClick={handleSave} className="hover:opacity-90">
+              <Button variant="brand" size="sm" onClick={handleSave}>
                 <Save className="h-4 w-4 mr-2" />
                 Save
               </Button>
@@ -428,7 +428,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                 variant="outline"
                 size="sm"
                 onClick={() => handleDeleteField(field.id, field.label)}
-                className="hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+                className="hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -604,7 +604,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
               <Button variant="outline" size="sm" onClick={handleCancel}>
                 Cancel
               </Button>
-              <Button variant="brand" size="sm" onClick={handleSave} className="hover:opacity-90">
+              <Button variant="brand" size="sm" onClick={handleSave}>
                 <Save className="h-4 w-4 mr-2" />
                 Save
               </Button>
@@ -626,7 +626,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                 variant="outline"
                 size="sm"
                 onClick={() => handleDeleteField(field.id, field.label)}
-                className="hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+                className="hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -672,7 +672,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                 variant="outline"
                 size="sm"
                 onClick={() => handleDeleteField(field.id, field.label)}
-                className="hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+                className="hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -931,7 +931,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                   className="focus-brand"
                   disabled={editFieldType === 'select' && isYesNoDropdown}
                 />
-                <Button variant="brand" type="button" onClick={addOption} size="sm" className="hover:opacity-90">Add</Button>
+                <Button variant="brand" type="button" onClick={addOption} size="sm">Add</Button>
               </div>
               <div className="space-y-1">
                 {editOptions.map((option, index) => (
@@ -961,7 +961,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
             <Button variant="outline" size="sm" onClick={handleCancel}>
               Cancel
             </Button>
-            <Button variant="brand" size="sm" onClick={handleSave} className="hover:opacity-90">
+            <Button variant="brand" size="sm" onClick={handleSave}>
               <Save className="h-4 w-4 mr-2" />
               Save
             </Button>
@@ -972,7 +972,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
           <div className="flex items-center justify-between">
             <Label>
               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-              {field.required && <span className="text-red-500 ml-1">*</span>}
+              {field.required && <span className="text-rose-500 ml-1">*</span>}
             </Label>
             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <Button
@@ -987,7 +987,7 @@ function SortableFieldItem({ field, handleOpenFieldDialog, handleDeleteField, ed
                 variant="outline"
                 size="sm"
                 onClick={() => handleDeleteField(field.id, field.label)}
-                className="hover:bg-red-50 hover:text-red-700 hover:border-red-300"
+                className="hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -1131,7 +1131,7 @@ function SortablePageTab({ pageNum, currentPage, fieldsCount, totalPages, onPage
           variant={currentPage === pageNum ? 'default' : 'outline'}
           size="sm"
           onClick={() => onPageClick(pageNum)}
-          className={`rounded-none border-0 ${currentPage === pageNum ? 'hover:opacity-90' : ''}`}
+          className={`rounded-none border-0 `}
           style={currentPage === pageNum ? { backgroundColor: '#3e8692', color: 'white' } : {}}
         >
           Page {pageNum}
@@ -1146,9 +1146,9 @@ function SortablePageTab({ pageNum, currentPage, fieldsCount, totalPages, onPage
             e.stopPropagation();
             onDeletePage(pageNum);
           }}
-          className="h-5 w-5 p-0 absolute -top-2 -right-2 bg-white border border-gray-200 rounded-full hover:bg-red-50 hover:border-red-300"
+          className="h-5 w-5 p-0 absolute -top-2 -right-2 bg-white border border-gray-200 rounded-full hover:bg-rose-50 hover:border-rose-300"
         >
-          <X className="h-3 w-3 text-red-600" />
+          <X className="h-3 w-3 text-rose-600" />
         </Button>
       )}
     </div>
@@ -2106,15 +2106,15 @@ export default function FormBuilderPage() {
           </div>
           {form.status === 'published' && (
             <div className="flex gap-2">
-              <Button variant="outline" onClick={handleCopyShareLink} className="hover:opacity-90">
+              <Button variant="outline" onClick={handleCopyShareLink}>
                 {copiedLink ? <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" /> : <Copy className="h-4 w-4 mr-2" />}
                 Copy Link
               </Button>
-              <Button variant="outline" onClick={handleOpenConnectDialog} className="hover:opacity-90">
+              <Button variant="outline" onClick={handleOpenConnectDialog}>
                 {form.subdomain_enabled ? <Globe className="h-4 w-4 mr-2 text-emerald-600" /> : <LinkIcon className="h-4 w-4 mr-2" />}
                 Connect
               </Button>
-              <Button variant="outline" onClick={handleOpenShareLink} className="hover:opacity-90">
+              <Button variant="outline" onClick={handleOpenShareLink}>
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open
               </Button>
@@ -2166,7 +2166,7 @@ export default function FormBuilderPage() {
                             <Button variant="outline" size="sm" onClick={() => setIsEditingInfo(false)}>
                               Cancel
                             </Button>
-                            <Button variant="brand" size="sm" onClick={handleSaveInfo} disabled={isSavingInfo} className="hover:opacity-90">
+                            <Button variant="brand" size="sm" onClick={handleSaveInfo} disabled={isSavingInfo}>
                               <Save className="h-4 w-4 mr-2" />
                               Save
                             </Button>
@@ -2228,14 +2228,14 @@ export default function FormBuilderPage() {
                     </SortableContext>
                   </DndContext>
                   <div className="flex gap-2">
-                    <Button onClick={handleAddPage} variant="outline" size="sm" className="hover:opacity-90">
+                    <Button onClick={handleAddPage} variant="outline" size="sm">
                       <Plus className="h-4 w-4 mr-1" />
                       Add Page
                     </Button>
                     <Button
                       onClick={() => handleOpenFieldDialog()}
                       size="sm"
-                      className="hover:opacity-90"
+                     
                       style={{ backgroundColor: '#3e8692', color: 'white' }}
                     >
                       <Plus className="h-4 w-4 mr-1" />
@@ -2344,7 +2344,7 @@ export default function FormBuilderPage() {
                       onClick={() => setCurrentPage(prev => prev + 1)}
                       disabled={currentPage === totalPages}
                       style={{ backgroundColor: '#3e8692', color: 'white' }}
-                      className="hover:opacity-90"
+                     
                     >
                       {form.enable_thank_you_page
                         ? (currentPage === totalPages - 1 ? 'Submit' : currentPage === totalPages ? 'Done' : 'Next')
@@ -2445,7 +2445,7 @@ export default function FormBuilderPage() {
                           <div key={field.id} className="space-y-2">
                             <Label>
                               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-                              {field.required && <span className="text-red-500 ml-1">*</span>}
+                              {field.required && <span className="text-rose-500 ml-1">*</span>}
                             </Label>
                             {field.allow_multiple ? (
                               <div className="flex gap-2">
@@ -2455,7 +2455,7 @@ export default function FormBuilderPage() {
                                   className="focus-brand flex-1"
                                   disabled
                                 />
-                                <Button variant="brand" type="button" className="hover:opacity-90" disabled>
+                                <Button variant="brand" type="button" disabled>
                                   +
                                 </Button>
                               </div>
@@ -2484,7 +2484,7 @@ export default function FormBuilderPage() {
                           <div key={field.id} className="space-y-2">
                             <Label>
                               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-                              {field.required && <span className="text-red-500 ml-1">*</span>}
+                              {field.required && <span className="text-rose-500 ml-1">*</span>}
                             </Label>
                             {field.allow_multiple ? (
                               <div className="flex gap-2">
@@ -2494,7 +2494,7 @@ export default function FormBuilderPage() {
                                   className="focus-brand flex-1"
                                   disabled
                                 />
-                                <Button variant="brand" type="button" className="hover:opacity-90" disabled>
+                                <Button variant="brand" type="button" disabled>
                                   +
                                 </Button>
                               </div>
@@ -2523,7 +2523,7 @@ export default function FormBuilderPage() {
                           <div key={field.id} className="space-y-2">
                             <Label>
                               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-                              {field.required && <span className="text-red-500 ml-1">*</span>}
+                              {field.required && <span className="text-rose-500 ml-1">*</span>}
                             </Label>
                             <Select disabled>
                               <SelectTrigger className="focus-brand">
@@ -2547,7 +2547,7 @@ export default function FormBuilderPage() {
                           <div key={field.id} className="space-y-2">
                             <Label>
                               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-                              {field.required && <span className="text-red-500 ml-1">*</span>}
+                              {field.required && <span className="text-rose-500 ml-1">*</span>}
                             </Label>
                             <div className="space-y-2">
                               {field.options?.map((option, idx) => (
@@ -2566,7 +2566,7 @@ export default function FormBuilderPage() {
                           <div key={field.id} className="space-y-2">
                             <Label>
                               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-                              {field.required && <span className="text-red-500 ml-1">*</span>}
+                              {field.required && <span className="text-rose-500 ml-1">*</span>}
                             </Label>
                             <div className="space-y-2">
                               {field.options?.map((option, idx) => (
@@ -2591,7 +2591,7 @@ export default function FormBuilderPage() {
                           <div key={field.id} className="space-y-2">
                             <Label>
                               <span dangerouslySetInnerHTML={{ __html: field.label }} style={{ whiteSpace: 'pre-wrap' }} />
-                              {field.required && <span className="text-red-500 ml-1">*</span>}
+                              {field.required && <span className="text-rose-500 ml-1">*</span>}
                             </Label>
                             <Input type="date" className="focus-brand" disabled />
                           </div>
@@ -2620,7 +2620,7 @@ export default function FormBuilderPage() {
                       onClick={() => setCurrentPage(prev => prev + 1)}
                       disabled={currentPage === totalPages}
                       style={{ backgroundColor: '#3e8692', color: 'white' }}
-                      className="hover:opacity-90"
+                     
                     >
                       {form.enable_thank_you_page
                         ? (currentPage === totalPages - 1 ? 'Submit' : currentPage === totalPages ? 'Done' : 'Next')
@@ -2639,7 +2639,7 @@ export default function FormBuilderPage() {
                 <div className="flex items-center justify-between">
                   <CardTitle>Responses ({responses.length})</CardTitle>
                   {responses.length > 0 && (
-                    <Button onClick={handleExportCSV} variant="outline" className="hover:opacity-90">
+                    <Button onClick={handleExportCSV} variant="outline">
                       <Download className="h-4 w-4 mr-2" />
                       Export CSV
                     </Button>
@@ -2682,7 +2682,7 @@ export default function FormBuilderPage() {
                                   <Building2 className="h-3 w-3 mr-1" />
                                   {response.client_name}
                                 </Badge>
-                                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-gray-400 hover:text-red-500" onClick={() => handleUnlinkClient(response.id)} title="Unlink client">
+                                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-gray-400 hover:text-rose-500" onClick={() => handleUnlinkClient(response.id)} title="Unlink client">
                                   <X className="h-3 w-3" />
                                 </Button>
                               </div>
@@ -2725,7 +2725,7 @@ export default function FormBuilderPage() {
                                 <Download className="h-4 w-4" />
                               </Button>
                               <Button variant="outline" size="sm" onClick={() => handleDeleteResponse(response.id)} title="Delete response">
-                                <Trash2 className="h-4 w-4 text-red-600" />
+                                <Trash2 className="h-4 w-4 text-rose-600" />
                               </Button>
                             </div>
                           </TableCell>
@@ -2947,7 +2947,7 @@ export default function FormBuilderPage() {
                   <Label>Options</Label>
                   <div className="flex gap-2 mb-2">
                     <Input value={optionInput} onChange={(e) => setOptionInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addOption())} placeholder="Add option" className="focus-brand" />
-                    <Button variant="brand" type="button" onClick={addOption} size="sm" className="hover:opacity-90">Add</Button>
+                    <Button variant="brand" type="button" onClick={addOption} size="sm">Add</Button>
                   </div>
                   <div className="space-y-1">
                     {fieldForm.options.map((option, index) => (
@@ -2964,7 +2964,7 @@ export default function FormBuilderPage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsFieldDialogOpen(false)}>Cancel</Button>
-              <Button variant="brand" onClick={handleSaveField} disabled={isSavingField} className="hover:opacity-90">
+              <Button variant="brand" onClick={handleSaveField} disabled={isSavingField}>
                 {isSavingField ? 'Saving...' : 'Save Field'}
               </Button>
             </DialogFooter>
@@ -3038,7 +3038,7 @@ export default function FormBuilderPage() {
                               className="text-sm text-gray-900 flex-1"
                               dangerouslySetInnerHTML={{ __html: field.label }}
                             />
-                            {field.required && !isDisplayOnly && <span className="text-red-500">*</span>}
+                            {field.required && !isDisplayOnly && <span className="text-rose-500">*</span>}
                           </div>
 
                           {/* Value Display - Only show for actual input fields */}
@@ -3051,7 +3051,7 @@ export default function FormBuilderPage() {
                                     value === 'Yes'
                                       ? 'bg-emerald-100 text-emerald-800'
                                       : value === 'No'
-                                      ? 'bg-red-100 text-red-800'
+                                      ? 'bg-rose-100 text-rose-800'
                                       : 'bg-gray-100 text-gray-800'
                                   }`}>
                                     {value || '-'}
@@ -3179,7 +3179,7 @@ export default function FormBuilderPage() {
               <Button variant="outline" onClick={() => setConnectDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="brand" onClick={handleSaveConnect} disabled={savingConnect} className="hover:opacity-90">
+              <Button variant="brand" onClick={handleSaveConnect} disabled={savingConnect}>
                 {savingConnect ? 'Saving...' : 'Save'}
               </Button>
             </DialogFooter>

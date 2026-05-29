@@ -649,7 +649,7 @@ export default function ChatPage() {
                     variant="ghost"
                     size="sm"
                     onClick={(e) => openDeleteDialog(session.id, e)}
-                    className="h-6 w-6 p-0 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="h-6 w-6 p-0 text-gray-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
@@ -736,7 +736,7 @@ export default function ChatPage() {
                   className="flex-1 text-sm min-h-[48px] max-h-[200px] resize-none focus-brand overflow-y-auto"
                   rows={1}
                 />
-                <Button onClick={async () => { if (message.trim()) { await createNewSession(); } }} disabled={!message.trim()} size="sm" className="h-12 w-12 p-0 rounded-xl hover:opacity-90 transition-all duration-200 flex-shrink-0 bg-brand text-white">
+                <Button onClick={async () => { if (message.trim()) { await createNewSession(); } }} disabled={!message.trim()} size="sm" className="h-12 w-12 p-0 rounded-xl transition-all duration-200 flex-shrink-0 bg-brand text-white">
                   <Send className="h-5 w-5" />
                 </Button>
               </div>
@@ -1013,7 +1013,7 @@ export default function ChatPage() {
                   className="flex-1 text-sm min-h-[48px] max-h-[200px] resize-none focus-brand overflow-y-auto"
                   rows={1}
                 />
-                <Button variant="brand" onClick={sendMessage} disabled={!message.trim() || sending} size="sm" className="h-12 w-12 p-0 rounded-xl hover:opacity-90 transition-all duration-200 flex-shrink-0">
+                <Button variant="brand" onClick={sendMessage} disabled={!message.trim() || sending} size="sm" className="h-12 w-12 p-0 rounded-xl transition-all duration-200 flex-shrink-0">
                   {sending ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                   ) : (
@@ -1044,7 +1044,7 @@ export default function ChatPage() {
             </Button>
             <Button
               onClick={handleDeleteSession}
-              className="hover:opacity-90"
+             
               style={{ backgroundColor: "#dc2626", color: "white" }}
             >
               Delete
@@ -1087,7 +1087,7 @@ export default function ChatPage() {
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateListFromKOLs} disabled={!newListName.trim() || creatingList} className="hover:opacity-90 bg-brand text-white">
+            <Button variant="brand" onClick={handleCreateListFromKOLs} disabled={!newListName.trim() || creatingList}>
               {creatingList ? 'Creating...' : 'Create List'}
             </Button>
           </DialogFooter>

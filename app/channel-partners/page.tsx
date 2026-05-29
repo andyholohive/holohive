@@ -224,7 +224,7 @@ export default function PartnersPage() {
               <p className="text-gray-600">Manage your channel partner relationships</p>
             </div>
             <div className="flex space-x-3">
-              <Button variant="brand" className="hover:opacity-90" disabled>
+              <Button variant="brand" disabled>
                 <Plus className="h-4 w-4 mr-2" />
                 Add Partner
               </Button>
@@ -256,7 +256,7 @@ export default function PartnersPage() {
           </div>
           {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
             <div>
-              <Button variant="brand" className="hover:opacity-90" onClick={() => { setIsEditMode(false); setIsNewPartnerOpen(true); }}
+              <Button variant="brand" onClick={() => { setIsEditMode(false); setIsNewPartnerOpen(true); }}
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Add Partner
@@ -284,7 +284,7 @@ export default function PartnersPage() {
                 {searchTerm ? 'No partners found matching your search.' : 'No partners found.'}
               </p>
               {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && !searchTerm && (
-                <Button variant="brand" className="mt-4 hover:opacity-90" onClick={() => { setIsEditMode(false); setIsNewPartnerOpen(true); }}
+                <Button variant="brand" className="mt-4" onClick={() => { setIsEditMode(false); setIsNewPartnerOpen(true); }}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Your First Partner
@@ -318,18 +318,17 @@ export default function PartnersPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeletePartner(partner.id)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-50 w-auto px-2"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-rose-50 w-auto px-2"
                             title="Delete partner"
                           >
-                            <Trash2 className="h-4 w-4 text-red-600" />
+                            <Trash2 className="h-4 w-4 text-rose-600" />
                           </Button>
                         </div>
                       )}
                     </div>
-                    <Badge 
-                      variant={partner.is_active ? 'default' : 'secondary'} 
-                      className="text-xs" 
-                      style={partner.is_active ? { backgroundColor: '#3e8692', color: 'white', borderColor: '#3e8692' } : {}}
+                    <Badge
+                      variant={partner.is_active ? 'default' : 'secondary'}
+                      className={partner.is_active ? 'text-xs bg-brand hover:bg-brand/90' : 'text-xs'}
                     >
                       {partner.is_active ? 'Active' : 'Inactive'}
                     </Badge>
@@ -456,7 +455,7 @@ export default function PartnersPage() {
                 <Button type="button" variant="outline" onClick={handleClosePartnerModal}>
                   Cancel
                 </Button>
-                <Button variant="brand" type="submit" disabled={isSubmitting || !newPartner.name.trim()} className="hover:opacity-90">
+                <Button variant="brand" type="submit" disabled={isSubmitting || !newPartner.name.trim()}>
                   {isSubmitting ? (isEditMode ? 'Saving...' : 'Creating...') : (isEditMode ? 'Save Partner' : 'Create Partner')}
                 </Button>
               </DialogFooter>

@@ -710,7 +710,7 @@ export default function FormsPage() {
                 : 'Create your first form to start collecting data'}
             </p>
             {!searchTerm && statusFilter === 'all' && (
-              <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-brand text-white">
+              <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Create Form
               </Button>

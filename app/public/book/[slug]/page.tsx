@@ -242,8 +242,8 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
           <div className="flex justify-center mb-6">
             <Image src="/images/logo.png" alt="Logo" width={60} height={60} className="rounded-xl" />
           </div>
-          <div className="rounded-full bg-red-50 p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-            <Calendar className="h-10 w-10 text-red-500" />
+          <div className="rounded-full bg-rose-50 p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+            <Calendar className="h-10 w-10 text-rose-500" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Page Not Available</h2>
           <p className="text-lg text-gray-600 leading-relaxed">{error || 'This booking page does not exist.'}</p>
@@ -591,7 +591,7 @@ export default function PublicBookingPage({ params }: { params: { slug: string }
                 </div>
 
                 <div className="pt-4">
-                  <Button variant="brand" type="submit" disabled={submitting || !bookerName.trim() || !bookerEmail.trim()} className="w-full h-12 text-base font-medium rounded-lg hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                  <Button variant="brand" type="submit" disabled={submitting || !bookerName.trim() || !bookerEmail.trim()} className="w-full h-12 text-base font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
                     {submitting ? (
                       <>
                         <Loader className="h-5 w-5 animate-spin" />
