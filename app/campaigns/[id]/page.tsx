@@ -43,6 +43,7 @@ import { ContentDashboardOverview } from "@/components/campaign/ContentDashboard
 import { ContentDashboardTableView } from "@/components/campaign/ContentDashboardTableView";
 import { MasterKolEditDialog } from "@/components/campaign/MasterKolEditDialog";
 import { EditPaymentDialog } from "@/components/campaign/EditPaymentDialog";
+import { ShareCampaignDialog } from "@/components/campaign/ShareCampaignDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserService } from "@/lib/userService";
 import { KOLService, MasterKOL } from "@/lib/kolService";
@@ -3525,156 +3526,9 @@ const CampaignDetailsPage = () => {
         payment={editingPayment}
       />
 
-      {/* Share Campaign Dialog */}
-      <Dialog open={isShareCampaignOpen} onOpenChange={setIsShareCampaignOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Share Campaign: {campaign?.name}</DialogTitle>
-            <DialogDescription>
-              Share this campaign by copying the link below.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Campaign Details</Label>
-              <div className="bg-cream-50 rounded-lg p-3 text-sm">
-                <div className="flex justify-between mb-2">
-                  <span className="font-medium">Client:</span>
-                  <span>{campaign?.client_name || 'Unknown'}</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="font-medium">Budget:</span>
-                  <span>{CampaignService.formatCurrency(campaign?.total_budget || 0)}</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span className="font-medium">Dates:</span>
-                  <span>{campaign ? new Date(campaign.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''} - {campaign?.end_date ? new Date(campaign.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="font-medium">Status:</span>
-                  <span>{campaign?.status}</span>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="public-password">Password for Public View</Label>
-              <div className="bg-sky-50 rounded-lg p-3 text-sm border border-sky-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-sky-900">Client Email:</span>
-                  <span className="text-sm font-mono text-sky-700">{campaign?.client_email || 'N/A'}</span>
-                </div>
-                <p className="text-xs text-brand mt-2">Use the client's email address as the password to access the public campaign view</p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="share-creator-type"
-                  checked={campaign?.share_creator_type || false}
-                  onCheckedChange={async (checked) => {
-                    if (campaign?.id) {
-                      try {
-                        await CampaignService.updateCampaign(campaign.id, {
-                          share_creator_type: checked as boolean
-                        } as any);
-                        setCampaign({ ...campaign, share_creator_type: checked as boolean });
-                      } catch (error) {
-                        console.error('Error updating campaign:', error);
-                      }
-                    }
-                  }}
-                />
-                <Label htmlFor="share-creator-type" className="text-sm font-medium cursor-pointer">
-                  Share Creator Type for KOLs
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="share-kol-notes"
-                  checked={(campaign as any)?.share_kol_notes || false}
-                  onCheckedChange={async (checked) => {
-                    if (campaign?.id) {
-                      try {
-                        await CampaignService.updateCampaign(campaign.id, {
-                          share_kol_notes: checked as boolean
-                        } as any);
-                        setCampaign({ ...campaign, share_kol_notes: checked as boolean } as any);
-                      } catch (error) {
-                        console.error('Error updating campaign:', error);
-                      }
-                    }
-                  }}
-                />
-                <Label htmlFor="share-kol-notes" className="text-sm font-medium cursor-pointer">
-                  Share KOL Notes
-                </Label>
-              </div>
-              {/* Sibling to share_kol_notes — same idea, but for the
-                  per-content-piece notes column on the Contents table
-                  in the public view. Gated by campaigns.share_content_notes
-                  (migration 065). */}
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="share-content-notes"
-                  checked={(campaign as any)?.share_content_notes || false}
-                  onCheckedChange={async (checked) => {
-                    if (campaign?.id) {
-                      try {
-                        await CampaignService.updateCampaign(campaign.id, {
-                          share_content_notes: checked as boolean,
-                        } as any);
-                        setCampaign({ ...campaign, share_content_notes: checked as boolean } as any);
-                      } catch (error) {
-                        console.error('Error updating campaign:', error);
-                      }
-                    }
-                  }}
-                />
-                <Label htmlFor="share-content-notes" className="text-sm font-medium cursor-pointer">
-                  Share Notes on Content Pieces
-                </Label>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="share-campaign-link">Share Link</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="share-campaign-link"
-                  value={`${typeof window !== 'undefined' ? window.location.origin : ''}/public/campaigns/${campaign?.id}`}
-                  readOnly
-                  className="flex-1 focus-brand"
-                />
-                <Button
-                  variant="outline"
-                  className="h-10"
-                  onClick={() => {
-                    if (typeof window !== 'undefined' && campaign?.id) {
-                      navigator.clipboard.writeText(`${window.location.origin}/public/campaigns/${campaign.id}`);
-                      toast({
-                        title: 'Link Copied',
-                        description: 'Campaign link has been copied to clipboard',
-                      });
-                    }
-                  }}
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-10"
-                  onClick={() => {
-                    if (typeof window !== 'undefined' && campaign?.id) {
-                      window.open(`${window.location.origin}/public/campaigns/${campaign.id}`, '_blank');
-                    }
-                  }}
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Share Campaign Dialog moved into
+          `components/campaign/ShareCampaignDialog.tsx` on 2026-06-02. */}
+      <ShareCampaignDialog open={isShareCampaignOpen} onOpenChange={setIsShareCampaignOpen} />
 
       {/* Warnings Dialog */}
       <Dialog open={isWarningsOpen} onOpenChange={setIsWarningsOpen}>
