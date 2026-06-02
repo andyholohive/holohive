@@ -3751,9 +3751,10 @@ const CampaignDetailsPage = () => {
               <Skeleton className="h-3 w-48" />
             </div>
 
-            {/* TabsList skeleton — underline pattern */}
+            {/* TabsList skeleton — underline pattern (4 tabs; Report
+                hidden per 2026-06-XX product decision). */}
             <div className="w-full border-b border-cream-200 flex gap-0.5">
-              {[24, 28, 32, 16, 18].map((w, i) => (
+              {[24, 28, 32, 16].map((w, i) => (
                 <div key={i} className="px-3.5 py-2.5">
                   <Skeleton className={`h-4 w-${w}`} />
                 </div>
@@ -4009,7 +4010,7 @@ const CampaignDetailsPage = () => {
             <span className="dot bg-brand" aria-hidden />
             <span className="label">Workspace</span>
             <span className="flex-1" />
-            <span className="counter">01 — Info · KOLs · Content · Budget · Report</span>
+            <span className="counter">01 — Info · KOLs · Content · Budget</span>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -4049,12 +4050,18 @@ const CampaignDetailsPage = () => {
               >
                 Budget
               </TabsTrigger>
+              {/* Report tab hidden 2026-06-XX per product decision —
+                  the surface wasn't getting use and the Report tab's
+                  ReportTabContent component is still wired below for
+                  easy restore (un-hide this trigger). */}
+              {false && (
               <TabsTrigger
                 value="report"
                 className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t"
               >
                 Report
               </TabsTrigger>
+              )}
             </TabsList>
             
             <TabsContent value="information" className="mt-6">
@@ -4068,9 +4075,16 @@ const CampaignDetailsPage = () => {
                   In view mode just an Edit affordance; in edit mode
                   the Name input + Status select live in the form
                   body for direct editing. */}
+              {/* Tab section header — same chrome as KOL Dashboard,
+                  Content Dashboard, Budget Management for consistency:
+                  brand-soft icon tile + display-serif 22px heading +
+                  border-cream-200 divider. */}
               <div className="pb-6 border-b border-cream-200 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <h2 className="display-serif text-[19px] text-ink-warm-900 leading-none">Campaign Details</h2>
+                  <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <h2 className="display-serif text-[22px] text-ink-warm-900 leading-tight">Campaign Details</h2>
                   {!editMode && (
                     <span className="text-[10px] mono uppercase tracking-[0.14em] text-ink-warm-500">View only</span>
                   )}
@@ -4418,7 +4432,7 @@ const CampaignDetailsPage = () => {
                     </div>
                   )}
                   {/* Campaign Overview Section */}
-                  <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
+                  <div className="bg-white p-6 rounded-[14px] border border-cream-200 shadow-card">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
                         <FileText className="h-4 w-4" />
@@ -4433,7 +4447,7 @@ const CampaignDetailsPage = () => {
                       {false && (
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="flex items-center gap-2 mb-2">
-                          <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide">
+                          <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em]">
                             Outline
                           </div>
                           <Badge variant="outline" className="text-[10px] text-ink-warm-500 border-cream-300">Internal</Badge>
@@ -4454,7 +4468,7 @@ const CampaignDetailsPage = () => {
                       )}
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="flex items-center gap-2 mb-2">
-                          <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide">
+                          <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em]">
                             Description
                           </div>
                           <Badge variant="outline" className="text-[10px] text-brand border-brand">Client-Facing</Badge>
@@ -4475,7 +4489,7 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Timeline Section */}
-                  <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
+                  <div className="bg-white p-6 rounded-[14px] border border-cream-200 shadow-card">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
                         <CalendarIcon className="h-4 w-4" />
@@ -4484,7 +4498,7 @@ const CampaignDetailsPage = () => {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Start Date</div>
+                        <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Start Date</div>
                         {editMode ? (
                       <Popover key="start-date-popover">
                         <PopoverTrigger asChild>
@@ -4513,7 +4527,7 @@ const CampaignDetailsPage = () => {
                     )}
                   </div>
                   <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                    <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">End Date</div>
+                    <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">End Date</div>
                     {editMode ? (
                       <Popover key="end-date-popover">
                         <PopoverTrigger asChild>
@@ -4543,7 +4557,7 @@ const CampaignDetailsPage = () => {
                     )}
                   </div>
                   <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                    <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2 flex items-center gap-2">
+                    <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
                       <MapPin className="h-3.5 w-3.5 text-brand" />
                       Region
                     </div>
@@ -4577,7 +4591,7 @@ const CampaignDetailsPage = () => {
                       preserved — flip to true to restore the field here. */}
                   {false && (
                   <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                    <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2 flex items-center gap-2">
+                    <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
                       <Activity className="h-3.5 w-3.5 text-brand" />
                       Current Phase
                     </div>
@@ -4617,7 +4631,7 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Client Information Section */}
-                  <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
+                  <div className="bg-white p-6 rounded-[14px] border border-cream-200 shadow-card">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
                         <Building2 className="h-4 w-4" />
@@ -4626,7 +4640,7 @@ const CampaignDetailsPage = () => {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Client</div>
+                        <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-3">Client</div>
                         {editMode ? (
                           <Select value={form?.client_id || ""} onValueChange={value => handleChange("client_id", value)}>
                             <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand">
@@ -4665,7 +4679,7 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Client Communication Section - Hidden */}
-                  {false && <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
+                  {false && <div className="bg-white p-6 rounded-[14px] border border-cream-200 shadow-card">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
                         <Phone className="h-4 w-4" />
@@ -4674,7 +4688,7 @@ const CampaignDetailsPage = () => {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Intro Call</div>
+                        <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Intro Call</div>
                         {editMode ? (
                           <div className="flex items-center gap-2">
                             <Checkbox
@@ -4702,7 +4716,7 @@ const CampaignDetailsPage = () => {
                       </div>
                       {!!(editMode ? form?.intro_call : campaign?.intro_call) && (
                         <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                          <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Intro Call Date</div>
+                          <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Intro Call Date</div>
                           {editMode ? (
                         <Popover key="intro-call-popover">
                           <PopoverTrigger asChild>
@@ -4732,7 +4746,7 @@ const CampaignDetailsPage = () => {
                         </div>
                       )}
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Proposal Sent</div>
+                        <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Proposal Sent</div>
                         {editMode ? (
                           <Checkbox id="proposal_sent" checked={!!form?.proposal_sent} onCheckedChange={checked => handleChange("proposal_sent", !!checked)} />
                         ) : (
@@ -4752,7 +4766,7 @@ const CampaignDetailsPage = () => {
                         )}
                       </div>
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">NDA Signed</div>
+                        <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">NDA Signed</div>
                         {editMode ? (
                           <Checkbox id="nda_signed" checked={!!form?.nda_signed} onCheckedChange={checked => handleChange("nda_signed", !!checked)} />
                         ) : (
@@ -4775,7 +4789,7 @@ const CampaignDetailsPage = () => {
                   </div>}
 
                   {/* Team & Management Section */}
-                  <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
+                  <div className="bg-white p-6 rounded-[14px] border border-cream-200 shadow-card">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
                         <Users className="h-4 w-4" />
@@ -4784,7 +4798,7 @@ const CampaignDetailsPage = () => {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Manager</div>
+                        <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-3">Manager</div>
                         {editMode ? (
                           <Select value={form?.manager || ""} onValueChange={value => handleChange("manager", value)}>
                             <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand">
@@ -4825,7 +4839,7 @@ const CampaignDetailsPage = () => {
                           plumbed so existing data isn't lost. */}
                       {false && (
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Call Support</div>
+                        <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Call Support</div>
                         {editMode ? (
                           <Checkbox id="call_support" checked={!!form?.call_support} onCheckedChange={checked => handleChange("call_support", !!checked)} />
                         ) : (
@@ -4849,7 +4863,7 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Campaign Settings Section */}
-                  <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
+                  <div className="bg-white p-6 rounded-[14px] border border-cream-200 shadow-card">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
                         <BadgeCheck className="h-4 w-4" />
@@ -4858,7 +4872,7 @@ const CampaignDetailsPage = () => {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Client Choosing KOLs</div>
+                        <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Client Choosing KOLs</div>
                         {editMode ? (
                           <Checkbox id="client_choosing_kols" checked={!!form?.client_choosing_kols} onCheckedChange={checked => handleChange("client_choosing_kols", !!checked)} />
                         ) : (
@@ -4878,7 +4892,7 @@ const CampaignDetailsPage = () => {
                         )}
                       </div>
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Multi-Activation</div>
+                        <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Multi-Activation</div>
                         {editMode ? (
                           <Checkbox id="multi_activation" checked={!!form?.multi_activation} onCheckedChange={checked => handleChange("multi_activation", !!checked)} />
                         ) : (
@@ -4901,7 +4915,7 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Approved Access Section */}
-                  <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
+                  <div className="bg-white p-6 rounded-[14px] border border-cream-200 shadow-card">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
                         <Users className="h-4 w-4" />
@@ -4981,7 +4995,7 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Budget Section */}
-                  <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
+                  <div className="bg-white p-6 rounded-[14px] border border-cream-200 shadow-card">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
                         <DollarSign className="h-4 w-4" />
@@ -4993,7 +5007,7 @@ const CampaignDetailsPage = () => {
                       <div className="bg-white p-5 rounded-lg border border-cream-200">
                         <div className="grid grid-cols-2 gap-6 mb-4">
                           <div>
-                            <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Total Budget</div>
+                            <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Total Budget</div>
                             {editMode ? (
                               <div className="relative w-full">
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-warm-500 pointer-events-none">$</span>
@@ -5015,7 +5029,7 @@ const CampaignDetailsPage = () => {
                             )}
                           </div>
                           <div>
-                            <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Allocated</div>
+                            <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Allocated</div>
                             <div className="text-2xl font-bold text-brand">{CampaignService.formatCurrency(campaign.total_allocated || 0)}</div>
                           </div>
                         </div>
@@ -5036,7 +5050,7 @@ const CampaignDetailsPage = () => {
 
                       {/* Budget Type */}
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Budget Type</div>
+                        <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-3">Budget Type</div>
                         {editMode ? (
                           <div className="flex gap-4">
                             {budgetTypeOptions.map(type => (
@@ -5072,7 +5086,7 @@ const CampaignDetailsPage = () => {
                     </div>
                     {editMode ? (
                       <div className="mt-4 bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Regional Allocations</div>
+                        <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-3">Regional Allocations</div>
                         <div className="flex flex-col gap-2">
                       {allocations.map((alloc, idx) => (
                         <div key={alloc.id || idx} className="flex items-center gap-2">
@@ -5135,7 +5149,7 @@ const CampaignDetailsPage = () => {
                     ) : (
                       Array.isArray(campaign.budget_allocations) && campaign.budget_allocations.length > 0 && (
                         <div className="mt-4 bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
-                          <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Regional Allocations</div>
+                          <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-3">Regional Allocations</div>
                           <div className="flex flex-wrap gap-2">
                             {campaign.budget_allocations.map((alloc: any) => (
                               <Badge key={alloc.id} variant="secondary" className="px-3 py-1.5 text-sm">
@@ -5161,10 +5175,10 @@ const CampaignDetailsPage = () => {
           </TabsContent>
 
           <TabsContent value="kols" className="mt-6">
-              <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
+              <CardHeader className="pb-6 border-b border-cream-200 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="bg-cream-100 p-2 rounded-lg">
-                    <Users className="h-6 w-6 text-ink-warm-700" />
+                  <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
+                    <Users className="h-4 w-4" />
                   </div>
                   <h2 className="display-serif text-[22px] text-ink-warm-900 leading-tight">KOL Dashboard</h2>
                 </div>
@@ -7351,10 +7365,10 @@ const CampaignDetailsPage = () => {
           </TabsContent>
 
           <TabsContent value="contents" className="mt-6">
-              <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
+              <CardHeader className="pb-6 border-b border-cream-200 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="bg-cream-100 p-2 rounded-lg"><FileText className="h-6 w-6 text-ink-warm-700" /></div>
-                  <h2 className="text-2xl font-bold text-ink-warm-900">Content Dashboard</h2>
+                  <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0"><FileText className="h-4 w-4" /></div>
+                  <h2 className="display-serif text-[22px] text-ink-warm-900 leading-tight">Content Dashboard</h2>
                 </div>
                 <div className="flex items-center">
                   <Dialog open={false} onOpenChange={setIsAddContentsDialogOpen}>
@@ -9211,12 +9225,12 @@ const CampaignDetailsPage = () => {
 
           {/* Budget Tab */}
           <TabsContent value="payments" className="mt-6">
-              <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
+              <CardHeader className="pb-6 border-b border-cream-200 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="bg-cream-100 p-2 rounded-lg">
-                    <DollarSign className="h-6 w-6 text-ink-warm-700" />
+                  <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
+                    <DollarSign className="h-4 w-4" />
                   </div>
-                  <h2 className="text-2xl font-bold text-ink-warm-900">Budget Management</h2>
+                  <h2 className="display-serif text-[22px] text-ink-warm-900 leading-tight">Budget Management</h2>
                 </div>
                 <div className="flex items-center gap-3">
                   <Button
