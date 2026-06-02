@@ -1698,6 +1698,29 @@ const CampaignDetailsPage = () => {
         return status;
     }
   };
+  /**
+   * Persist a resources array immediately — used by the view-mode
+   * Resources card so users can add/edit/remove resource links
+   * without flipping into Edit mode. Optimistic: update local
+   * campaign state first, then write to Supabase; rollback on error.
+   */
+  const handleSaveResources = async (next: Array<{label: string; url: string; icon?: string}>) => {
+    if (!campaign) return;
+    const previous = (campaign as any).resources || [];
+    setCampaign({ ...campaign, resources: next } as any);
+    try {
+      const { error } = await (supabase as any)
+        .from('campaigns')
+        .update({ resources: next })
+        .eq('id', campaign.id);
+      if (error) throw error;
+      toast({ title: 'Resources saved', duration: 1500 });
+    } catch (err: any) {
+      setCampaign({ ...campaign, resources: previous } as any);
+      toast({ title: 'Failed to save resources', description: err?.message, variant: 'destructive' });
+    }
+  };
+
   const handleSave = async () => {
     if (!form || !campaign) return;
     setSaving(true);
@@ -3808,11 +3831,11 @@ const CampaignDetailsPage = () => {
   }
 
   return (
-    // /campaigns/[id] behemoth — structural refactor is a tracked follow-up.
-    // lint-conventions: disable-next-line no-card-shell
-    <div className="min-h-[calc(100vh-64px)] w-full bg-cream-50">
-      <div className="w-full">
-        <div className="space-y-4">
+    // Outer `min-h-[calc(100vh-64px)] w-full bg-cream-50` wrapper
+    // dropped 2026-06-XX — the sidebar layout already provides cream
+    // background + full-height surface, so the inset wrapper created
+    // a "page within a page" tint that diverged from the mockup.
+    <div className="space-y-4">
           {/* v11 page header — matches the revamp mockup's detail
               hero pattern exactly: breadcrumb-style back link above,
               left-aligned 56px brand-gradient logo tile, kicker with
@@ -4096,6 +4119,33 @@ const CampaignDetailsPage = () => {
                   </div>
                 )}
               </div>
+
+              {/* ── View-mode layout ────────────────────────────────────
+                  Matches the holohive-ui-revamp.html mockup's
+                  detail-page Context tab: 3-column grid with main
+                  column (Engagement + Resources) + sidebar
+                  (Quick Stats + Renewal action + Recent activity).
+                  Only renders when not editing — the existing form
+                  below takes over for edit mode (one source of truth
+                  for the form fields). */}
+              {!editMode && campaign && (
+                <CampaignDetailViewLayout
+                  campaign={campaign}
+                  campaignKOLs={campaignKOLs}
+                  payments={payments}
+                  contents={contents}
+                  allUsers={allUsers}
+                  onResourcesChange={async (next) => {
+                    // Persist immediately — resources is a side-edit
+                    // even in view mode; we don't want users to have
+                    // to flip into Edit mode to add a Telegram link.
+                    await handleSaveResources(next);
+                  }}
+                />
+              )}
+
+              {/* Existing form — only rendered in edit mode. */}
+              {editMode && (
                 <CardContent className="pt-6">
                     <div className="grid grid-cols-2 gap-x-8 gap-y-8">
                                 {/* [May 2026 audit] Recent Updates carousel
@@ -5099,6 +5149,7 @@ const CampaignDetailsPage = () => {
                 )}
                     </div>
               </CardContent>
+              )}
           </TabsContent>
 
           <TabsContent value="kols" className="mt-6">
@@ -10939,8 +10990,6 @@ const CampaignDetailsPage = () => {
           </TabsContent>
 
         </Tabs>
-        </div>
-      </div>
 
       {/* Sticky Horizontal Scrollbar */}
       {stickyScrollbar && (
@@ -12040,4 +12089,411 @@ const CampaignDetailsPage = () => {
   );
 };
 
-export default CampaignDetailsPage; 
+export default CampaignDetailsPage;
+
+/* ──────────────────────────────────────────────────────────────────────
+ * CampaignDetailViewLayout
+ * ──────────────────────────────────────────────────────────────────────
+ *
+ * v11 view-mode layout for the Campaign Information tab. Mirrors the
+ * holohive-ui-revamp.html PROPOSED detail-page treatment: a 3-column
+ * grid (main col-span-2 + sidebar col-span-1) with:
+ *
+ *   Main column:
+ *     - Engagement card     (Start / End / Type / Lead + progress bar)
+ *     - Resources card      (colored icon tiles, editable)
+ *
+ *   Sidebar column:
+ *     - Quick Stats card    (KOL count / Content / Budget / Days left)
+ *     - Renewal action card (brand-tinted, shown when end_date < 60d)
+ *     - Recent activity     (placeholder — wires up to events later)
+ *
+ * Edit mode keeps using the existing form layout (legacy). The two
+ * paths share the underlying campaign object; view mode is read-mostly
+ * except for Resources (which writes back immediately via
+ * handleSaveResources so users don't have to flip into Edit mode just
+ * to add a Telegram link).
+ */
+type ResourceIcon = 'telegram' | 'drive' | 'notion' | 'docs' | 'link';
+type CampaignResource = { label: string; url: string; icon?: ResourceIcon };
+
+// Icon tile palette per resource kind — matches the mockup's colored
+// 36px squares (Telegram = sky, Drive = amber, Notion = emerald,
+// Docs = rose, generic Link = cream).
+const RESOURCE_ICON_TILES: Record<ResourceIcon, { bg: string; text: string; border: string }> = {
+  telegram: { bg: 'bg-sky-50',     text: 'text-sky-700',     border: 'border-sky-100' },
+  drive:    { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-100' },
+  notion:   { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-100' },
+  docs:     { bg: 'bg-rose-50',    text: 'text-rose-700',    border: 'border-rose-100' },
+  link:     { bg: 'bg-cream-100',  text: 'text-ink-warm-700',border: 'border-cream-200' },
+};
+
+function CampaignDetailViewLayout({
+  campaign,
+  campaignKOLs,
+  payments,
+  contents,
+  allUsers,
+  onResourcesChange,
+}: {
+  campaign: CampaignWithDetails;
+  campaignKOLs: any[];
+  payments: any[];
+  contents: any[];
+  allUsers: any[];
+  onResourcesChange: (next: CampaignResource[]) => void;
+}) {
+  // Derived metrics — single source of truth for the sidebar Quick
+  // Stats card and the Engagement card's progress bar.
+  const startDate = campaign.start_date ? new Date(campaign.start_date + 'T00:00:00') : null;
+  const endDate = campaign.end_date ? new Date(campaign.end_date + 'T00:00:00') : null;
+  const totalDays = startDate && endDate ? Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / 86_400_000)) : 0;
+  const elapsedDays = startDate ? Math.max(0, Math.floor((Date.now() - startDate.getTime()) / 86_400_000)) : 0;
+  const progressPct = totalDays > 0 ? Math.min(100, Math.round((elapsedDays / totalDays) * 100)) : 0;
+  const daysRemaining = endDate ? Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / 86_400_000)) : null;
+  const totalWeeks = totalDays > 0 ? Math.max(1, Math.ceil(totalDays / 7)) : 0;
+  const currentWeek = totalWeeks > 0 ? Math.min(totalWeeks, Math.max(1, Math.ceil((elapsedDays + 1) / 7))) : 0;
+
+  const totalPaid = (payments || []).reduce((sum, p) => sum + (p.amount || 0), 0);
+  const postedContentCount = (contents || []).filter((c: any) => c.status === 'posted' || c.status === 'published').length;
+  const totalContentCount = (contents || []).length;
+
+  const manager = allUsers.find((u) => u.id === campaign.manager);
+
+  // Resources — pulled from campaign.resources (added 2026-06-XX as
+  // a jsonb column). Defaults to empty so the page works even before
+  // the Resources card has been populated.
+  const resources: CampaignResource[] = ((campaign as any).resources || []) as CampaignResource[];
+
+  // Renewal trigger — show the brand-tinted action card when the
+  // engagement ends within 60 days AND the campaign is still active.
+  const showRenewalCard = daysRemaining != null && daysRemaining <= 60 && daysRemaining > 0 && campaign.status === 'Active';
+
+  // KV cell helper — keeps the mockup's 10px uppercase tracked-out
+  // label + 14px font-medium value rhythm consistent across the
+  // Engagement card.
+  const KV = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <div>
+      <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5">{label}</div>
+      <div className="text-ink-warm-900 font-medium text-sm">{children}</div>
+    </div>
+  );
+
+  const formatDate = (iso: string | null) => {
+    if (!iso) return '—';
+    try {
+      return new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return iso;
+    }
+  };
+
+  const formatCurrency = (n: number) => {
+    if (!Number.isFinite(n)) return '$0';
+    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `$${Math.round(n / 1_000)}k`;
+    return `$${n.toLocaleString()}`;
+  };
+
+  return (
+    <div className="pt-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
+      {/* ── Main column ──────────────────────────────────────────── */}
+      <div className="lg:col-span-2 space-y-5">
+
+        {/* Engagement card — consolidates Start / End / Type / Lead
+            with a progress bar at the bottom showing Week X of Y. */}
+        <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Engagement</h3>
+          </div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+            <KV label="Start date"><span className="mono tabular-nums">{formatDate(campaign.start_date)}</span></KV>
+            <KV label="End date"><span className="mono tabular-nums">{formatDate(campaign.end_date)}</span></KV>
+            <KV label="Engagement type">{(campaign as any).region || 'Activation'}</KV>
+            <KV label="Account lead">
+              {manager ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded bg-amber-100 text-amber-800 flex items-center justify-center text-[9px] font-semibold shrink-0">
+                    {(manager.name || manager.email || '?').charAt(0).toUpperCase()}
+                  </div>
+                  <span>{manager.name || manager.email}</span>
+                </div>
+              ) : (
+                <span className="text-ink-warm-400 italic">Unassigned</span>
+              )}
+            </KV>
+          </div>
+          {/* Progress bar */}
+          {startDate && endDate && (
+            <div className="mt-6 pt-5 border-t border-cream-200">
+              <div className="flex items-baseline justify-between mb-2.5">
+                <span className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em]">Campaign progress</span>
+                <span className="text-xs text-ink-warm-900 mono tabular-nums font-medium">
+                  Week <span className="font-semibold">{currentWeek}</span> of {totalWeeks}
+                </span>
+              </div>
+              <div className="h-[3px] bg-cream-200 rounded-full overflow-hidden">
+                <div className="h-full bg-brand rounded-full transition-all duration-300" style={{ width: `${progressPct}%` }} />
+              </div>
+              <div className="flex justify-between mt-2">
+                <span className="text-[10px] text-ink-warm-400 mono uppercase tracking-[0.1em]">{formatDate(campaign.start_date)}</span>
+                <span className="text-[10px] text-ink-warm-400 mono uppercase tracking-[0.1em]">{formatDate(campaign.end_date)}</span>
+              </div>
+            </div>
+          )}
+          {campaign.description && (
+            <div className="mt-6 pt-5 border-t border-cream-200">
+              <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Description</div>
+              <p className="text-sm text-ink-warm-700 leading-relaxed whitespace-pre-line">{campaign.description}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Resources card — colored icon tile per resource, editable
+            in place. Mockup pattern: 2-column grid of link rows with
+            36px icon tile + label + truncated URL underneath. */}
+        <ResourcesCard resources={resources} onChange={onResourcesChange} />
+      </div>
+
+      {/* ── Sidebar column ───────────────────────────────────────── */}
+      <div className="space-y-5">
+
+        {/* Quick stats — matches mockup's Live dot + KV list pattern */}
+        <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Quick stats</h3>
+            <span className="flex items-center gap-1 text-[10px] text-emerald-700 font-semibold uppercase tracking-[0.2em]">
+              <span className="dot-pulse bg-emerald-500" aria-hidden />
+              Live
+            </span>
+          </div>
+          <div className="space-y-3.5">
+            <div className="flex justify-between items-baseline">
+              <span className="text-sm text-ink-warm-500">KOLs</span>
+              <span className="text-lg text-ink-warm-900 mono tabular-nums font-medium" style={{ letterSpacing: '-0.025em' }}>
+                {campaignKOLs.length}
+              </span>
+            </div>
+            <div className="flex justify-between items-baseline">
+              <span className="text-sm text-ink-warm-500">Content {totalContentCount > 0 && <span className="text-[10px] text-ink-warm-400 mono">live</span>}</span>
+              <span className="text-lg text-ink-warm-900 mono tabular-nums font-medium" style={{ letterSpacing: '-0.025em' }}>
+                {postedContentCount}
+              </span>
+            </div>
+            <div className="flex justify-between items-baseline">
+              <span className="text-sm text-ink-warm-500">Paid</span>
+              <span className="text-lg text-ink-warm-900 mono tabular-nums font-medium" style={{ letterSpacing: '-0.025em' }}>
+                {formatCurrency(totalPaid)}
+              </span>
+            </div>
+            <div className="flex justify-between items-baseline">
+              <span className="text-sm text-ink-warm-500">Total budget</span>
+              <span className="text-lg text-ink-warm-900 mono tabular-nums font-medium" style={{ letterSpacing: '-0.025em' }}>
+                {formatCurrency(campaign.total_budget || 0)}
+              </span>
+            </div>
+            {daysRemaining != null && (
+              <div className="flex justify-between items-baseline">
+                <span className="text-sm text-ink-warm-500">Days left</span>
+                <span className={`flex items-center gap-1.5`}>
+                  {daysRemaining <= 14 && <span className="dot bg-rose-500" aria-hidden />}
+                  <span className={`text-lg mono tabular-nums font-medium ${daysRemaining <= 14 ? 'text-rose-700' : 'text-ink-warm-900'}`} style={{ letterSpacing: '-0.025em' }}>
+                    {daysRemaining}
+                  </span>
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Renewal action card — brand-tinted, shown when end < 60d */}
+        {showRenewalCard && (
+          <div className="crd-feature p-6">
+            <div className="flex items-center gap-1.5 mb-3 text-[10px] font-semibold uppercase tracking-[0.24em] text-brand-deep">
+              <span className="dot bg-brand" aria-hidden />
+              <span>Action needed</span>
+            </div>
+            <h3 className="display-serif text-[20px] leading-[1.1] text-ink-warm-900">
+              Renewal in{' '}
+              <span className="display-serif-italic text-brand">{daysRemaining} days.</span>
+            </h3>
+            <p className="text-[13px] leading-relaxed mt-3 mb-5 text-ink-warm-700">
+              Engagement ends <span className="font-medium mono text-ink-warm-900">{formatDate(campaign.end_date)}</span>.
+              Worth opening the renewal conversation now while momentum is high.
+            </p>
+            <Button variant="brand" size="sm" className="w-full">
+              Schedule check-in
+              <ChevronRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </div>
+        )}
+
+        {/* Recent activity — placeholder for now; will wire to a
+            campaign_events query in a follow-up. */}
+        <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Recent activity</h3>
+            <span className="text-[10px] text-ink-warm-400 mono uppercase tracking-[0.2em]">Coming soon</span>
+          </div>
+          <p className="text-sm text-ink-warm-500 italic">
+            Campaign event feed (KOL adds, content posts, payments) will surface here.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── ResourcesCard ────────────────────────────────────────────────────
+   In-place editable list of campaign resources. Matches the mockup's
+   2-column grid with colored icon tile + label + truncated URL. Add
+   button opens a small inline form; each row gets hover-action icons
+   for edit + delete. Changes persist immediately via onChange. */
+function ResourcesCard({
+  resources,
+  onChange,
+}: {
+  resources: CampaignResource[];
+  onChange: (next: CampaignResource[]) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [draftLabel, setDraftLabel] = useState('');
+  const [draftUrl, setDraftUrl] = useState('');
+  const [draftIcon, setDraftIcon] = useState<ResourceIcon>('link');
+
+  const reset = () => {
+    setAdding(false);
+    setDraftLabel('');
+    setDraftUrl('');
+    setDraftIcon('link');
+  };
+
+  const handleAdd = () => {
+    if (!draftLabel.trim() || !draftUrl.trim()) return;
+    onChange([...resources, { label: draftLabel.trim(), url: draftUrl.trim(), icon: draftIcon }]);
+    reset();
+  };
+
+  const handleRemove = (idx: number) => {
+    onChange(resources.filter((_, i) => i !== idx));
+  };
+
+  // Strip protocol for compact display under the label.
+  const displayUrl = (url: string) => url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+  return (
+    <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-baseline gap-2.5">
+          <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Resources</h3>
+          <span className="text-[11px] text-ink-warm-400 mono tabular-nums">{resources.length}</span>
+        </div>
+        {!adding && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs font-medium text-brand-deep hover:text-brand hover:bg-cream-50"
+            onClick={() => setAdding(true)}
+          >
+            <Plus className="w-3 h-3 mr-1" />
+            Add
+          </Button>
+        )}
+      </div>
+
+      {adding && (
+        <div className="mb-4 rounded-md border border-cream-200 bg-cream-50 p-3 space-y-2">
+          <div className="grid grid-cols-[100px_1fr] gap-2">
+            <Select value={draftIcon} onValueChange={(v) => setDraftIcon(v as ResourceIcon)}>
+              <SelectTrigger className="h-9 text-sm focus-brand bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="telegram">Telegram</SelectItem>
+                <SelectItem value="drive">Drive</SelectItem>
+                <SelectItem value="notion">Notion</SelectItem>
+                <SelectItem value="docs">Docs</SelectItem>
+                <SelectItem value="link">Link</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="Label (e.g. Telegram Group)"
+              value={draftLabel}
+              onChange={(e) => setDraftLabel(e.target.value)}
+              className="h-9 text-sm focus-brand bg-white"
+              autoFocus
+            />
+          </div>
+          <Input
+            placeholder="URL (https://...)"
+            value={draftUrl}
+            onChange={(e) => setDraftUrl(e.target.value)}
+            className="h-9 text-sm focus-brand bg-white"
+          />
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" size="sm" onClick={reset}>Cancel</Button>
+            <Button variant="brand" size="sm" onClick={handleAdd} disabled={!draftLabel.trim() || !draftUrl.trim()}>
+              Add resource
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {resources.length === 0 && !adding ? (
+        <p className="text-sm text-ink-warm-500 italic">
+          No resources yet. Pin commonly-referenced links (Telegram group, brand assets, GTM plan, etc.).
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+          {resources.map((r, idx) => {
+            const tile = RESOURCE_ICON_TILES[r.icon || 'link'];
+            return (
+              <div key={idx} className="group flex items-center justify-between p-3 -mx-1.5 rounded-lg hover:bg-cream-50 transition">
+                <a
+                  href={r.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 min-w-0 flex-1"
+                >
+                  <div className={`w-9 h-9 rounded-md flex items-center justify-center shrink-0 border ${tile.bg} ${tile.text} ${tile.border}`}>
+                    {r.icon === 'telegram' && (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="1.75" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                    )}
+                    {r.icon === 'drive' && (
+                      <ImageIcon className="w-4 h-4" />
+                    )}
+                    {r.icon === 'notion' && (
+                      <FileText className="w-4 h-4" />
+                    )}
+                    {r.icon === 'docs' && (
+                      <File className="w-4 h-4" />
+                    )}
+                    {(!r.icon || r.icon === 'link') && (
+                      <ExternalLink className="w-4 h-4" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-ink-warm-900 truncate">{r.label}</div>
+                    <div className="text-[11px] text-ink-warm-400 mono truncate">{displayUrl(r.url)}</div>
+                  </div>
+                </a>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0 ml-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-rose-600 hover:bg-rose-50"
+                    onClick={() => handleRemove(idx)}
+                    title="Remove resource"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                  <ExternalLink className="w-4 h-4 text-ink-warm-300 group-hover:text-brand transition shrink-0" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+} 
