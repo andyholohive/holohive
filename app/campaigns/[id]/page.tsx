@@ -42,6 +42,7 @@ import { BudgetTableView } from "@/components/campaign/BudgetTableView";
 import { ContentDashboardOverview } from "@/components/campaign/ContentDashboardOverview";
 import { ContentDashboardTableView } from "@/components/campaign/ContentDashboardTableView";
 import { MasterKolEditDialog } from "@/components/campaign/MasterKolEditDialog";
+import { EditPaymentDialog } from "@/components/campaign/EditPaymentDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserService } from "@/lib/userService";
 import { KOLService, MasterKOL } from "@/lib/kolService";
@@ -271,15 +272,7 @@ const CampaignDetailsPage = () => {
   const [customMessage, setCustomMessage] = useState('');
   const [shareReportPublicly, setShareReportPublicly] = useState(false);
 
-  const [newPaymentData, setNewPaymentData] = useState({
-    campaign_kol_id: '',
-    amount: 0,
-    payment_date: '',
-    payment_method: 'Fiat',
-    content_id: 'none',
-    transaction_id: '',
-    notes: ''
-  });
+  // `newPaymentData` moved into <EditPaymentDialog>.
 
   // `selectedKOLsForPayment`, `multiKOLPayments`, `paymentType`,
   // `nonKOLPayment` moved into <RecordPaymentDialog> on 2026-06-02.
@@ -1478,63 +1471,6 @@ const CampaignDetailsPage = () => {
     }
   };
 
-  const handleAddPayment = async () => {
-    if (!campaign?.id || !newPaymentData.campaign_kol_id || newPaymentData.amount <= 0) {
-      toast({ title: "Error", description: "Please fill in all required fields.", variant: "destructive" });
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('payments')
-        .insert({
-          campaign_id: campaign.id,
-          campaign_kol_id: newPaymentData.campaign_kol_id,
-          amount: newPaymentData.amount,
-          payment_date: newPaymentData.payment_date,
-          payment_method: newPaymentData.payment_method,
-          content_id: newPaymentData.content_id === 'none' ? null : newPaymentData.content_id || null,
-          transaction_id: newPaymentData.transaction_id || null,
-          notes: newPaymentData.notes || null
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setPayments(prev => [data, ...prev]);
-      
-      // Update the KOL's paid amount in the campaign_kols table
-      const currentKol = campaignKOLs.find(kol => kol.id === newPaymentData.campaign_kol_id);
-      const currentPaid = currentKol?.paid || 0;
-      const newPaid = currentPaid + newPaymentData.amount;
-      
-      await supabase
-        .from('campaign_kols')
-        .update({ paid: newPaid })
-        .eq('id', newPaymentData.campaign_kol_id);
-
-      setCampaignKOLs(prev => prev.map(kol => 
-        kol.id === newPaymentData.campaign_kol_id ? { ...kol, paid: newPaid } : kol
-      ));
-
-      setNewPaymentData({
-        campaign_kol_id: '',
-        amount: 0,
-        payment_date: '',
-        payment_method: 'Fiat',
-        content_id: 'none',
-        transaction_id: '',
-        notes: ''
-      });
-      setIsAddingPayment(false);
-      toast({ title: "Success", description: "Payment recorded successfully." });
-    } catch (err) {
-      console.error('Error adding payment:', err);
-      toast({ title: "Error", description: "Failed to record payment.", variant: "destructive" });
-    }
-  };
-
   // `handleAddMultiKOLPayments` + `handleAddNonKOLPayment` moved into
   // <RecordPaymentDialog>. Both supabase inserts now live in that
   // component, which calls `fetchPayments` + `setCampaignKOLs`
@@ -1542,96 +1478,14 @@ const CampaignDetailsPage = () => {
 
   // `handleDeletePayment` moved into <BudgetTableView> on 2026-06-02.
 
+  // Just opens the dialog with the payment data — the dialog now
+  // owns its own form state and seeds from the payment prop.
   const handleEditPayment = (payment: any) => {
     setEditingPayment(payment);
-    setNewPaymentData({
-      campaign_kol_id: payment.campaign_kol_id,
-      amount: payment.amount,
-      payment_date: payment.payment_date,
-      payment_method: payment.payment_method,
-      content_id: payment.content_id || 'none',
-      transaction_id: payment.transaction_id || '',
-      notes: payment.notes || ''
-    });
     setIsEditingPayment(true);
   };
 
-  const handleUpdatePayment = async () => {
-    if (!editingPayment) return;
-
-    try {
-      const oldAmount = editingPayment.amount;
-      const newAmount = newPaymentData.amount;
-
-      // Update the payment
-      const { error } = await supabase
-        .from('payments')
-        .update({
-          campaign_kol_id: newPaymentData.campaign_kol_id,
-          amount: newAmount,
-          payment_date: newPaymentData.payment_date,
-          payment_method: newPaymentData.payment_method,
-          content_id: (() => {
-            // Handle array of content IDs
-            if (Array.isArray(newPaymentData.content_id)) {
-              return newPaymentData.content_id.length > 0 ? newPaymentData.content_id : null;
-            }
-            // Handle legacy single content_id
-            return newPaymentData.content_id === 'none' ? null : (newPaymentData.content_id ? [newPaymentData.content_id] : null);
-          })(),
-          transaction_id: newPaymentData.transaction_id || null,
-          notes: newPaymentData.notes || null
-        })
-        .eq('id', editingPayment.id);
-
-      if (error) throw error;
-
-      // Update the KOL's paid amount in the campaign_kols table
-      const currentKol = campaignKOLs.find(kol => kol.id === newPaymentData.campaign_kol_id);
-      const currentPaid = currentKol?.paid || 0;
-      const newPaid = currentPaid - oldAmount + newAmount;
-      
-      await supabase
-        .from('campaign_kols')
-        .update({ paid: newPaid })
-        .eq('id', newPaymentData.campaign_kol_id);
-
-      // Update local state
-      setCampaignKOLs(prev => prev.map(kol => 
-        kol.id === newPaymentData.campaign_kol_id ? { ...kol, paid: newPaid } : kol
-      ));
-
-      setPayments(prev => prev.map(p => 
-        p.id === editingPayment.id ? {
-          ...p,
-          campaign_kol_id: newPaymentData.campaign_kol_id,
-          amount: newAmount,
-          payment_date: newPaymentData.payment_date,
-          payment_method: newPaymentData.payment_method,
-          content_id: newPaymentData.content_id === 'none' ? null : newPaymentData.content_id,
-          transaction_id: newPaymentData.transaction_id || null,
-          notes: newPaymentData.notes || null
-        } : p
-      ));
-
-      // Reset form
-      setNewPaymentData({
-        campaign_kol_id: '',
-        amount: 0,
-        payment_date: '',
-        payment_method: 'Fiat',
-        content_id: 'none',
-        transaction_id: '',
-        notes: ''
-      });
-      setIsEditingPayment(false);
-      setEditingPayment(null);
-      toast({ title: "Success", description: "Payment updated successfully." });
-    } catch (err) {
-      console.error('Error updating payment:', err);
-      toast({ title: "Error", description: "Failed to update payment.", variant: "destructive" });
-    }
-  };
+  // `handleUpdatePayment` moved into <EditPaymentDialog> on 2026-06-02.
 
 
   // Add a getStatusColor helper:
@@ -3660,161 +3514,16 @@ const CampaignDetailsPage = () => {
 
       {/* Bulk Delete Payments dialog moved into <BudgetTableView>. */}
 
-      {/* Edit Payment Dialog */}
-      <Dialog open={isEditingPayment} onOpenChange={setIsEditingPayment}>
-        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Edit Payment</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4 flex-1 overflow-y-auto px-1">
-            <div className="grid gap-2">
-              <Label htmlFor="edit-kol">KOL</Label>
-              <Select
-                value={newPaymentData.campaign_kol_id}
-                onValueChange={(value) => setNewPaymentData(prev => ({ ...prev, campaign_kol_id: value }))}
-              >
-                <SelectTrigger className="focus-brand">
-                  <SelectValue placeholder="Select KOL" />
-                </SelectTrigger>
-                <SelectContent>
-                  {campaignKOLs.map((kol) => (
-                    <SelectItem key={kol.id} value={kol.id}>
-                      {kol.master_kol?.name || 'Unknown KOL'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-amount">Amount (USD)</Label>
-              <div className="relative w-full">
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-warm-500 pointer-events-none">$</span>
-                <Input
-                  id="edit-amount"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9,]*"
-                  className="focus-brand pl-6 w-full"
-                  value={newPaymentData.amount ? Number(newPaymentData.amount).toLocaleString('en-US') : ''}
-                  onChange={(e) => {
-                    const raw = e.target.value.replace(/[^0-9]/g, '');
-                    setNewPaymentData(prev => ({ ...prev, amount: parseFloat(raw) || 0 }));
-                  }}
-                  placeholder="Enter amount"
-                />
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <Label>Payment Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={`focus-brand justify-start text-left font-normal h-9 ${newPaymentData.payment_date ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {newPaymentData.payment_date ? formatDisplayDate(newPaymentData.payment_date) : "Select payment date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="!bg-white border shadow-md w-auto p-0 z-50" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={newPaymentData.payment_date ? new Date(newPaymentData.payment_date) : undefined}
-                    onSelect={date => setNewPaymentData(prev => ({
-                      ...prev,
-                      payment_date: date ? formatDateLocal(date) : ''
-                    }))}
-                    initialFocus
-                    classNames={{
-                      day_selected: "text-white hover:text-white focus:text-white",
-                    }}
-                    modifiersStyles={{
-                      selected: { backgroundColor: "#3e8692" }
-                    }}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-payment-method">Payment Method</Label>
-              <Select
-                value={newPaymentData.payment_method}
-                onValueChange={(value) => setNewPaymentData(prev => ({ ...prev, payment_method: value }))}
-              >
-                <SelectTrigger className="focus-brand">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Token">Token</SelectItem>
-                  <SelectItem value="Fiat">Fiat</SelectItem>
-                  <SelectItem value="WL">WL</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-content">Content</Label>
-              <MultiSelect
-                options={contents
-                  .filter(content => content.campaign_kols_id === newPaymentData.campaign_kol_id)
-                  .map(content => content.id)}
-                selected={Array.isArray(newPaymentData.content_id) ? newPaymentData.content_id : (newPaymentData.content_id && newPaymentData.content_id !== 'none' ? [newPaymentData.content_id] : [])}
-                onSelectedChange={(selectedIds) => setNewPaymentData(prev => ({ ...prev, content_id: selectedIds as unknown as string }))}
-                className="focus-brand"
-                triggerContent={
-                  <div>
-                    {(() => {
-                      const selectedIds = Array.isArray(newPaymentData.content_id) ? newPaymentData.content_id : (newPaymentData.content_id && newPaymentData.content_id !== 'none' ? [newPaymentData.content_id] : []);
-                      if (selectedIds.length === 0) {
-                        return <span className="text-ink-warm-400">Select content</span>;
-                      }
-                      const selectedContents = contents.filter(c => selectedIds.includes(c.id));
-                      return (
-                        <span className="text-sm">
-                          {selectedContents.length} content{selectedContents.length !== 1 ? 's' : ''} selected
-                        </span>
-                      );
-                    })()}
-                  </div>
-                }
-                renderOption={(contentId) => {
-                  const content = contents.find(c => c.id === contentId);
-                  if (!content) return contentId;
-                  return `${content.type || 'Content'} - ${content.platform || 'Unknown'}${content.activation_date ? ` (${formatDisplayDate(content.activation_date)})` : ''}`;
-                }}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-transaction-id">Transaction ID (Optional)</Label>
-              <Input
-                id="edit-transaction-id"
-                value={newPaymentData.transaction_id}
-                onChange={(e) => setNewPaymentData(prev => ({ ...prev, transaction_id: e.target.value }))}
-                placeholder="Enter transaction ID"
-                className="focus-brand"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-notes">Notes (Optional)</Label>
-              <Textarea
-                id="edit-notes"
-                value={newPaymentData.notes}
-                onChange={(e) => setNewPaymentData(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Add any notes about this payment"
-                rows={3}
-                className="focus-brand"
-              />
-            </div>
-          </div>
-          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
-            <Button variant="outline" onClick={() => setIsEditingPayment(false)}>
-              Cancel
-            </Button>
-            <Button variant="brand" onClick={handleUpdatePayment} disabled={!newPaymentData.campaign_kol_id || newPaymentData.amount <= 0}>
-              Update Payment
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Edit Payment Dialog moved into
+          `components/campaign/EditPaymentDialog.tsx` on 2026-06-02. */}
+      <EditPaymentDialog
+        open={isEditingPayment}
+        onOpenChange={(open) => {
+          setIsEditingPayment(open);
+          if (!open) setEditingPayment(null);
+        }}
+        payment={editingPayment}
+      />
 
       {/* Share Campaign Dialog */}
       <Dialog open={isShareCampaignOpen} onOpenChange={setIsShareCampaignOpen}>
