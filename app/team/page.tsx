@@ -10,8 +10,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
-import { Search, Shield, Loader2, UserCheck, UserX, Clock, Ban, Trash2, ChevronDown, ChevronUp, Link2, X, AlertTriangle, Download } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Search, Shield, Loader2, UserCheck, UserX, Clock, Ban, Trash2, ChevronDown, ChevronUp, Link2, X, AlertTriangle, Download, Users } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
@@ -96,8 +98,19 @@ export default function TeamPage() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  // Pending vs Approved tab — mirrors the Clients page filter pattern.
+  // Default to "approved" because that's the steady-state view; the
+  // pending tab's count chip draws attention when there's queue.
+  const [statusFilter, setStatusFilter] = useState<'approved' | 'pending'>('approved');
+  // isAdmin/isSuperAdmin used to live in `useState(false)` and were
+  // hydrated by an async `checkAdminStatus()` fetch — that caused the
+  // Pending tab to pop in ~300ms after the page loaded (flash of
+  // missing tab). They're now derived synchronously from
+  // `userProfile.role` (already in memory via AuthContext), so the
+  // tab visibility is correct on first paint. `userProfile` may be
+  // null for a frame before AuthContext hydrates, but during that
+  // frame the page's own `loading` skeleton is rendering, so the
+  // user never sees the "Approved-only" tab list flicker.
   const [updatingRoleId, setUpdatingRoleId] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -118,6 +131,8 @@ export default function TeamPage() {
 
   const { toast } = useToast();
   const { userProfile } = useAuth();
+  const isSuperAdmin = userProfile?.role === 'super_admin';
+  const isAdmin = userProfile?.role === 'super_admin' || userProfile?.role === 'admin';
 
   const GUEST_PAGES = [
     { key: '/crm/sales-pipeline', label: 'Sales Pipeline', group: 'CRM' },
@@ -136,7 +151,6 @@ export default function TeamPage() {
 
   useEffect(() => {
     fetchTeamMembers();
-    checkAdminStatus();
     fetchTgChats();
   }, []);
 
@@ -224,12 +238,6 @@ export default function TeamPage() {
     }
   };
 
-  const checkAdminStatus = async () => {
-    const isSuper = await UserService.isCurrentUserSuperAdmin();
-    const isAdm = await UserService.isCurrentUserAdmin();
-    setIsSuperAdmin(isSuper);
-    setIsAdmin(isAdm);
-  };
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     if (!isSuperAdmin) return;
@@ -495,106 +503,200 @@ export default function TeamPage() {
     });
   };
 
+  // Derived counts — used both in the tab chips and the SectionHeader
+  // counter. Computed on filtered (search-aware) buckets so the count
+  // and the visible grid always agree.
+  const visibleMembers = statusFilter === 'pending' ? filteredPendingMembers : filteredActiveMembers;
+  const totalCount = pendingMembers.length + activeMembers.length;
+
   return (
     <div className="space-y-6">
       <PageHeader
         icon={Shield}
         title="Team Members"
         subtitle="Manage your team members"
+        kicker="People · Team"
+        kickerDot="violet"
       />
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input
-          placeholder="Search team members..."
-          className="pl-10 focus-brand"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          disabled={loading}
-        />
-      </div>
-
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <Card key={index}>
-              <CardHeader className="pb-4">
-                <div className="flex flex-col items-center text-center">
-                  <Skeleton className="h-16 w-16 rounded-full mb-3" />
-                  <div className="mb-2">
-                    <Skeleton className="h-6 w-32 mb-2" />
-                    <Skeleton className="h-4 w-48 mb-2" />
+        <div className="space-y-4">
+          {/* SectionHeader skeleton — mirrors the loaded layout. */}
+          <div className="section-head first flex items-center gap-3">
+            <span className="dot bg-brand/30" aria-hidden />
+            <Skeleton className="h-3 w-24" />
+            <span className="flex-1 h-px bg-cream-200" aria-hidden />
+            <Skeleton className="h-3 w-32" />
+          </div>
+          {/* Filter toolbar skeleton — tabs left, search right. */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex gap-1 p-1 rounded-md bg-cream-100 border border-cream-200">
+              <Skeleton className="h-8 w-24 rounded" />
+              <Skeleton className="h-8 w-20 rounded" />
+            </div>
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
+              <Input placeholder="Search team members..." className="pl-10 focus-brand" disabled />
+            </div>
+          </div>
+          {/* Member card skeleton grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <Card key={index} className="crd-hover flex flex-col h-full">
+                <CardHeader className="pb-2">
+                  <div className="flex flex-col items-center text-center">
+                    <Skeleton className="h-16 w-16 rounded-full mb-3" />
+                    <Skeleton className="h-5 w-32 mb-1.5" />
+                    <Skeleton className="h-3 w-40 mb-3" />
+                    <Skeleton className="h-5 w-20 rounded-full" />
                   </div>
-                  <Skeleton className="h-5 w-16 rounded-full" />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {Array.from({ length: 4 }).map((__, j) => (
-                  <div key={j} className="flex items-center justify-between">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-4 w-24" />
+                </CardHeader>
+                <CardContent className="pt-3 border-t border-cream-100 flex flex-col flex-1 space-y-3">
+                  {Array.from({ length: 3 }).map((__, j) => (
+                    <div key={j} className="flex items-center justify-between">
+                      <Skeleton className="h-3 w-20" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                  ))}
+                  <div className="mt-auto pt-3 border-t border-cream-100 flex gap-2">
+                    <Skeleton className="h-8 flex-1 rounded-md" />
+                    <Skeleton className="h-8 flex-1 rounded-md" />
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       ) : (
         <>
-          {/* Pending Approval Section */}
-          {isAdmin && filteredPendingMembers.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-amber-600" />
-                <h3 className="text-lg font-semibold text-amber-800">
-                  Pending Approval ({filteredPendingMembers.length})
-                </h3>
+          {/* ── Members ──────────────────────────────────────────────
+              Single SectionHeader carries the chapter rhythm; the
+              filter toolbar (tabs left, search right) sits beneath
+              it the same way it does on /clients. The Pending tab
+              uses an amber accent so a queue draws attention; the
+              Approved tab uses the brand teal. */}
+          <div className="space-y-4">
+            <SectionHeader
+              label="Members"
+              dot="violet"
+              counter={`${visibleMembers.length} of ${totalCount} ${statusFilter === 'pending' ? 'pending' : 'approved'}`}
+              first
+            />
+
+            {/* Filter toolbar — tabs (left) + search (right) */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'approved' | 'pending')}>
+                <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+                  <TabsTrigger
+                    value="approved"
+                    className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card px-4 py-2"
+                  >
+                    Approved
+                    <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none">{activeMembers.length}</span>
+                  </TabsTrigger>
+                  {/* Pending is admin-only — non-admins shouldn't see
+                      a queue they can't action. The tab is hidden
+                      entirely, not just disabled, to keep the toolbar
+                      tidy for members/guests. */}
+                  {isAdmin && (
+                    <TabsTrigger
+                      value="pending"
+                      className="data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-card px-4 py-2"
+                    >
+                      <Clock className="h-3.5 w-3.5 mr-1.5" />
+                      Pending
+                      <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full pointer-events-none">{pendingMembers.length}</span>
+                    </TabsTrigger>
+                  )}
+                </TabsList>
+              </Tabs>
+              <div className="relative flex-1 min-w-[220px] max-w-sm">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
+                <Input
+                  placeholder="Search team members..."
+                  className="pl-10 focus-brand"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
+            </div>
+
+          {/* ── Pending tab ── admin-only; non-admins can't reach
+              this tab so the gate is "statusFilter === pending" only. */}
+          {statusFilter === 'pending' && isAdmin && (
+            filteredPendingMembers.length === 0 ? (
+              <EmptyState
+                icon={Clock}
+                title={searchTerm ? 'No pending requests match' : 'No pending requests'}
+                description={searchTerm
+                  ? 'Try adjusting your search terms.'
+                  : 'New sign-ups will appear here for approval.'}
+              />
+            ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredPendingMembers.map((member) => (
-                  <Card key={member.id} className="border-amber-200 bg-amber-50/50">
-                    <CardHeader className="pb-3">
+                  // Chrome is identical to the approved card — same Card
+                  // shell, same avatar tone, same cream-100 dividers.
+                  // The only thing that flags the row as pending is the
+                  // pulse-dot "Pending approval" StatusBadge + the
+                  // Approve/Reject action row. Amber tint dropped per
+                  // 2026-06-02 design pass so the two card states
+                  // visually align in the grid.
+                  <Card key={member.id} className="crd-hover group flex flex-col h-full">
+                    <CardHeader className="pb-2">
                       <div className="flex flex-col items-center text-center">
-                        <div className="mb-2">
+                        <div className="mb-3">
                           <InitialsAvatar
                             name={member.name || member.email}
                             src={member.profile_photo_url}
-                            size="sm"
-                            tone="warning"
+                            size="md"
+                            tone="brand"
                           />
                         </div>
-                        <h3 className="font-semibold text-gray-900">
+                        <h3 className="text-base font-semibold text-ink-warm-900 tracking-tight">
                           {member.name || 'Unnamed User'}
                         </h3>
-                        <p className="text-sm text-gray-500">{member.email}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          Signed up {formatDate(member.created_at)}
-                        </p>
+                        <p className="text-sm text-ink-warm-500 mt-0.5">{member.email}</p>
+                        <div className="mt-2">
+                          <StatusBadge tone="warning" size="sm" bordered withDot="pulse">
+                            Pending approval
+                          </StatusBadge>
+                        </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-3 pt-0">
-                      <div>
-                        <label className="text-xs text-gray-500 mb-1 block">Assign Role</label>
-                        <Select
-                          value={pendingRoles[member.id] || member.role}
-                          onValueChange={(value) =>
-                            setPendingRoles(prev => ({ ...prev, [member.id]: value }))
-                          }
-                        >
-                          <SelectTrigger className="h-9 text-sm focus-brand">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="member">Member</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="guest">Guest</SelectItem>
-                            {isSuperAdmin && (
-                              <SelectItem value="super_admin">Super Admin</SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
+                    <CardContent className="pt-3 border-t border-cream-100 flex flex-col flex-1">
+                      <div className="space-y-3 mb-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-ink-warm-500">Signed up</span>
+                          <span className="font-medium text-ink-warm-900 tabular-nums">
+                            {formatDate(member.created_at)}
+                          </span>
+                        </div>
+                        <div>
+                          <label className="text-[11px] mono uppercase tracking-[0.14em] text-ink-warm-500 mb-1 block">Assign Role</label>
+                          <Select
+                            value={pendingRoles[member.id] || member.role}
+                            onValueChange={(value) =>
+                              setPendingRoles(prev => ({ ...prev, [member.id]: value }))
+                            }
+                          >
+                            <SelectTrigger className="h-9 text-sm focus-brand">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="member">Member</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="guest">Guest</SelectItem>
+                              {isSuperAdmin && (
+                                <SelectItem value="super_admin">Super Admin</SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
+                      {/* Approve / Reject pinned to bottom so action row
+                          aligns across cards in the grid. */}
+                      <div className="mt-auto pt-3 border-t border-cream-100 flex gap-2">
                         <Button
                           variant="brand"
                           size="sm"
@@ -615,7 +717,12 @@ export default function TeamPage() {
                           onClick={() => handleReject(member)}
                           disabled={approvingId === member.id || rejectingId === member.id}
                           variant="outline"
-                          className="flex-1 border-rose-300 text-rose-600 hover:bg-rose-50"
+                          // Explicit hover:text-rose-700 — without it,
+                          // the shadcn outline variant's
+                          // `hover:text-accent-foreground` kicks in and
+                          // the label turns dark gray on hover. Same
+                          // fix applied to Deactivate / Remove below.
+                          className="flex-1 border-rose-300 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
                           size="sm"
                         >
                           {rejectingId === member.id ? (
@@ -632,31 +739,24 @@ export default function TeamPage() {
                   </Card>
                 ))}
               </div>
-            </div>
+            )
           )}
 
-          {/* Active Members Section */}
-          {filteredActiveMembers.length === 0 && filteredPendingMembers.length === 0 ? (
-            <EmptyState
-              icon={Shield}
-              title={searchTerm ? 'No team members found' : 'No team members yet'}
-              description={searchTerm
-                ? 'Try adjusting your search terms.'
-                : 'Team members will appear here.'}
-            />
-          ) : (
-            <>
-              {isAdmin && filteredPendingMembers.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-semibold text-gray-700">
-                    Active Members ({filteredActiveMembers.length})
-                  </h3>
-                </div>
-              )}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* ── Approved tab ── default view; visible to all roles. */}
+          {statusFilter === 'approved' && (
+            filteredActiveMembers.length === 0 ? (
+              <EmptyState
+                icon={Shield}
+                title={searchTerm ? 'No team members found' : 'No team members yet'}
+                description={searchTerm
+                  ? 'Try adjusting your search terms.'
+                  : 'Team members will appear here once they\'re approved.'}
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredActiveMembers.map((member) => (
-                  <Card key={member.id}>
-                    <CardHeader className="pb-4">
+                  <Card key={member.id} className="crd-hover group flex flex-col h-full">
+                    <CardHeader className="pb-2">
                       <div className="flex flex-col items-center text-center">
                         <div className="mb-3">
                           <InitialsAvatar
@@ -666,13 +766,13 @@ export default function TeamPage() {
                             tone="brand"
                           />
                         </div>
-                        <div className="mb-2">
-                          <h3 className="font-semibold text-gray-900 text-lg">
+                        <div>
+                          <h3 className="text-base font-semibold text-ink-warm-900 tracking-tight">
                             {member.name || 'Unnamed User'}
                           </h3>
-                          <p className="text-sm text-gray-500">{member.email}</p>
+                          <p className="text-sm text-ink-warm-500 mt-0.5">{member.email}</p>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="mt-2 flex items-center gap-2">
                           {isSuperAdmin && member.id !== userProfile?.id ? (
                             <div className="relative">
                               {updatingRoleId === member.id && (
@@ -685,7 +785,7 @@ export default function TeamPage() {
                                 onValueChange={(value) => handleRoleChange(member.id, value)}
                                 disabled={updatingRoleId === member.id}
                               >
-                                <SelectTrigger className="h-9 text-xs w-[120px] focus-brand">
+                                <SelectTrigger className="h-8 text-xs w-[120px] focus-brand">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -697,29 +797,25 @@ export default function TeamPage() {
                               </Select>
                             </div>
                           ) : (
-                            <StatusBadge tone={ROLE_TONES[member.role] ?? 'neutral'}>
+                            <StatusBadge tone={ROLE_TONES[member.role] ?? 'neutral'} size="sm" bordered>
                               {formatRoleLabel(member.role)}
                             </StatusBadge>
                           )}
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="pt-3 border-t border-cream-100 flex flex-col flex-1 space-y-3">
                       {/* Join Date */}
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Join Date</span>
-                        <span className="font-medium text-gray-900">
+                        <span className="text-sm text-ink-warm-500">Joined</span>
+                        <span className="font-medium text-ink-warm-900 tabular-nums">
                           {formatDate(member.created_at)}
                         </span>
                       </div>
 
-                      {/* Status */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Status</span>
-                        <span className="font-medium text-gray-900">
-                          {member.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
+                      {/* Status row removed — Approved tab already
+                          filters by `is_active === true`, so the row
+                          always read "Active" and added vertical noise. */}
 
                       {/* Telegram link. Read-only for everyone except
                           super_admin. Super admin: opens a popover with
@@ -730,7 +826,7 @@ export default function TeamPage() {
                           chats — chat_id equals the other party's user
                           id), so it goes straight into users.telegram_id. */}
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Telegram</span>
+                        <span className="text-sm text-ink-warm-500">Telegram</span>
                         {(() => {
                           // Three states for the trigger:
                           //   linked   — telegram_id set AND a matching telegram_chats row exists. Emerald.
@@ -791,10 +887,10 @@ export default function TeamPage() {
                             <PopoverContent align="end" className="w-80 p-4">
                               <div className="space-y-3">
                                 <div>
-                                  <p className="text-xs font-semibold text-gray-900 uppercase tracking-wider">
+                                  <p className="text-xs font-semibold text-ink-warm-900 uppercase tracking-wider">
                                     {state === 'orphan' ? 'Backfill' : 'Link'} {member.name}'s Telegram
                                   </p>
-                                  <p className="text-xs text-gray-500 mt-1">
+                                  <p className="text-xs text-ink-warm-500 mt-1">
                                     {state === 'orphan'
                                       ? `Telegram ID ${member.telegram_id} is saved but the bot has no DM record. Pull it from Telegram, or pick a different chat below.`
                                       : 'Pick the private chat the bot has with this person.'}
@@ -843,7 +939,7 @@ export default function TeamPage() {
                                         >
                                           {chat.title || '(untitled)'}
                                           {linkedTo && (
-                                            <span className="text-gray-400 ml-1">
+                                            <span className="text-ink-warm-400 ml-1">
                                               (linked to {linkedTo.name})
                                             </span>
                                           )}
@@ -864,8 +960,16 @@ export default function TeamPage() {
                                   </Button>
                                 )}
                                 {tgChats.length === 0 && state === 'unlinked' && (
-                                  <div className="rounded-md bg-amber-50 border border-amber-200 p-2.5">
-                                    <p className="text-xs text-amber-800">
+                                  // Cream tile + amber AlertTriangle icon
+                                  // preserves the "needs attention" cue
+                                  // while letting the popover chrome stay
+                                  // on the v11 cream/ink-warm palette.
+                                  // Previously the entire tile was amber-50
+                                  // which made the popover feel like two
+                                  // unrelated surfaces stitched together.
+                                  <div className="rounded-md bg-cream-50 border border-cream-200 p-2.5 flex items-start gap-2">
+                                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+                                    <p className="text-xs text-ink-warm-700">
                                       No private DM chats tracked yet. Ask {member.name} to send a message to the bot first, then refresh.
                                     </p>
                                   </div>
@@ -879,8 +983,8 @@ export default function TeamPage() {
 
                       {/* X ID */}
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">X</span>
-                        <span className={`font-medium ${member.x_id ? 'text-gray-900' : 'text-rose-600'}`}>
+                        <span className="text-sm text-ink-warm-500">X</span>
+                        <span className={`font-medium ${member.x_id ? 'text-ink-warm-900' : 'text-rose-600'}`}>
                           {member.x_id ? (
                             <a
                               href={`https://x.com/${member.x_id}`}
@@ -899,16 +1003,21 @@ export default function TeamPage() {
                       {/* Last Updated */}
                       {member.updated_at && (
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Last Updated</span>
-                          <span className="font-medium text-gray-900">
+                          <span className="text-sm text-ink-warm-500">Last Updated</span>
+                          <span className="font-medium text-ink-warm-900">
                             {formatDate(member.updated_at)}
                           </span>
                         </div>
                       )}
 
-                      {/* Admin actions: Deactivate / Remove */}
+                      {/* Admin actions: Deactivate / Remove.
+                          `mt-auto` pushes the action row to the bottom
+                          of the card so the divider + buttons align
+                          across cards in the grid regardless of how
+                          much content sits above (telegram state,
+                          X handle, last-updated row all vary). */}
                       {isAdmin && member.id !== userProfile?.id && (
-                        <div className="pt-2 border-t border-gray-100 space-y-2">
+                        <div className="mt-auto pt-3 border-t border-cream-100 space-y-2">
                           {confirmDeleteId === member.id ? (
                             <div className="space-y-2">
                               <p className="text-xs text-rose-600 text-center font-medium">
@@ -944,7 +1053,7 @@ export default function TeamPage() {
                                 onClick={() => handleDeactivate(member)}
                                 disabled={deactivatingId === member.id}
                                 variant="outline"
-                                className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50"
+                                className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
                                 size="sm"
                               >
                                 {deactivatingId === member.id ? (
@@ -959,7 +1068,7 @@ export default function TeamPage() {
                               <Button
                                 onClick={() => setConfirmDeleteId(member.id)}
                                 variant="outline"
-                                className="flex-1 border-rose-300 text-rose-600 hover:bg-rose-50"
+                                className="flex-1 border-rose-300 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
                                 size="sm"
                               >
                                 <Trash2 className="h-3 w-3 mr-1" />
@@ -982,13 +1091,13 @@ export default function TeamPage() {
                               setGuestPermsOpen(null);
                             }
                           }}
-                          className="pt-2 border-t border-gray-100"
+                          className="pt-2 border-t border-cream-100"
                         >
                           <CollapsibleTrigger asChild>
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="flex items-center justify-between w-full text-sm font-medium text-gray-700 py-1 h-auto px-0 hover:bg-transparent"
+                              className="flex items-center justify-between w-full text-sm font-medium text-ink-warm-700 py-1 h-auto px-0 hover:bg-transparent"
                             >
                               <span>Page Permissions</span>
                               {guestPermsOpen === member.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -996,7 +1105,7 @@ export default function TeamPage() {
                           </CollapsibleTrigger>
                           <CollapsibleContent>
                             <div className="mt-2 space-y-1">
-                              <div className="grid grid-cols-[1fr,auto,auto,auto] gap-x-2 text-[11px] text-gray-500 uppercase tracking-wider pb-1 border-b border-gray-100">
+                              <div className="grid grid-cols-[1fr,auto,auto,auto] gap-x-2 text-[11px] text-ink-warm-500 uppercase tracking-wider pb-1 border-b border-cream-100">
                                 <span>Page</span>
                                 <span className="w-12 text-center">View</span>
                                 <span className="w-12 text-center">Edit</span>
@@ -1006,7 +1115,7 @@ export default function TeamPage() {
                                 const perms = guestPerms[member.id]?.[page.key] || { can_view: false, can_edit: false, can_delete: false };
                                 return (
                                   <div key={page.key} className="grid grid-cols-[1fr,auto,auto,auto] gap-x-2 items-center py-0.5">
-                                    <span className="text-xs text-gray-700">{page.label}</span>
+                                    <span className="text-xs text-ink-warm-700">{page.label}</span>
                                     <div className="w-12 flex justify-center">
                                       <Checkbox checked={perms.can_view} onCheckedChange={() => toggleGuestPerm(member.id, page.key, 'can_view')} />
                                     </div>
@@ -1027,8 +1136,9 @@ export default function TeamPage() {
                   </Card>
                 ))}
               </div>
-            </>
+            )
           )}
+          </div>
         </>
       )}
     </div>

@@ -4,7 +4,9 @@ import { useState, useEffect, Fragment, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { KpiCard } from '@/components/ui/kpi-card';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -73,7 +75,7 @@ const getStatusColor = (status: string) => {
   return tone === 'info'    ? 'bg-sky-100 text-sky-800'
        : tone === 'warning' ? 'bg-amber-100 text-amber-800'
        : tone === 'success' ? 'bg-emerald-100 text-emerald-800'
-       :                      'bg-gray-100 text-gray-700';
+       :                      'bg-cream-100 text-ink-warm-700';
 };
 
 const getRegionIcon = (region: string) => {
@@ -132,7 +134,7 @@ const getCreatorTypeColor = (type: string) => {
     'Bridge Builder': 'bg-emerald-100 text-emerald-800',
     'Visionary': 'bg-indigo-100 text-indigo-800',
     'Onboarder': 'bg-teal-100 text-teal-800',
-    'General': 'bg-gray-100 text-gray-800',
+    'General': 'bg-cream-100 text-ink-warm-700',
     'Gaming': 'bg-pink-100 text-pink-800',
     'Crypto': 'bg-yellow-100 text-yellow-800',
     'Memecoin': 'bg-orange-100 text-orange-800',
@@ -143,20 +145,28 @@ const getCreatorTypeColor = (type: string) => {
     'Airdrop': 'bg-teal-100 text-teal-800',
     'Art': 'bg-pink-100 text-pink-800'
   };
-  return colorMap[type] || 'bg-gray-100 text-gray-800';
+  return colorMap[type] || 'bg-cream-100 text-ink-warm-700';
 };
 
-// List status colors (for curated/approved/denied)
-const getListStatusColor = (status: string) => {
+// Title-case helper for status strings (curated → Curated, etc.).
+// Same pattern as the KolProfileModal helper.
+const titleCase = (s: string | null | undefined): string => {
+  if (!s) return '';
+  return s
+    .split(/[\s_-]+/)
+    .map((w) => (w.length ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : ''))
+    .join(' ');
+};
+
+// Map list status to the centralized StatusBadge tone palette.
+// Curated reads as "in-progress / informational" (info/sky), Approved
+// as "done/healthy" (success), Denied as "blocked" (danger).
+const getListStatusTone = (status: string | null | undefined): BadgeTone => {
   switch (status) {
-    case 'curated':
-      return 'bg-blue-100 text-blue-800';
-    case 'approved':
-      return 'bg-emerald-100 text-emerald-800';
-    case 'denied':
-      return 'bg-rose-100 text-rose-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
+    case 'curated': return 'info';
+    case 'approved': return 'success';
+    case 'denied': return 'danger';
+    default: return 'neutral';
   }
 };
 
@@ -745,7 +755,7 @@ export default function ListsPage() {
   };
   const accessSortIcon = (key: AccessSortKey) => {
     if (accessSort.key !== key) return null;
-    return <span className="ml-0.5 text-[10px] text-gray-500">{accessSort.dir === 'asc' ? '▲' : '▼'}</span>;
+    return <span className="ml-0.5 text-[10px] text-ink-warm-500">{accessSort.dir === 'asc' ? '▲' : '▼'}</span>;
   };
 
   const toggleAccessExpand = (id: string) => {
@@ -1304,6 +1314,8 @@ export default function ListsPage() {
           <PageHeader
             title="Lists"
             subtitle="Manage your KOL lists and notes"
+            kicker="Talent · Lists"
+            kickerDot="amber"
             actions={(
               <>
                 <Button variant="brand" disabled>
@@ -1317,22 +1329,38 @@ export default function ListsPage() {
               </>
             )}
           />
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input placeholder="Search lists by name, notes, or KOLs..." className="pl-10 focus-brand" disabled />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex space-x-1">
-              {['All', 'Curated', 'Approved', 'Denied'].map((tab) => (
-                <Skeleton key={tab} className="h-9 w-24 rounded-lg" />
+          {/* ── Lists skeleton ───────────────────────────────────────
+              Mirrors the loaded layout — SectionHeader skeleton +
+              filter toolbar (tabs left, search middle, view toggle
+              right) + card grid. Nothing shifts when data lands. */}
+          <div className="space-y-4">
+            <div className="section-head first flex items-center gap-3">
+              <span className="dot bg-brand/30" aria-hidden />
+              <Skeleton className="h-3 w-16" />
+              <span className="flex-1 h-px bg-cream-200" aria-hidden />
+              <Skeleton className="h-3 w-32" />
+            </div>
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex gap-1 p-1 rounded-md bg-cream-100 border border-cream-200">
+                <Skeleton className="h-8 w-14 rounded" />
+                <Skeleton className="h-8 w-32 rounded" />
+              </div>
+              <div className="relative flex-1 min-w-[220px] max-w-sm">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
+                <Input placeholder="Search lists by name, notes, or KOLs..." className="pl-10 focus-brand" disabled />
+              </div>
+              <div className="ml-auto flex gap-1 p-1 rounded-md bg-cream-100 border border-cream-200">
+                <Skeleton className="h-8 w-10 rounded" />
+                <Skeleton className="h-8 w-10 rounded" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <ListCardSkeleton key={index} />
               ))}
             </div>
-            <Skeleton className="h-9 w-20 rounded-lg" />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <ListCardSkeleton key={index} />
-            ))}
           </div>
         </div>
       </ProtectedRoute>
@@ -1343,7 +1371,7 @@ export default function ListsPage() {
     return (
       <ProtectedRoute>
         <div className="space-y-6">
-          <PageHeader title="Lists" subtitle="Manage your KOL lists and notes" />
+          <PageHeader title="Lists" subtitle="Manage your KOL lists and notes" kicker="Talent · Lists" kickerDot="amber" />
           <div className="text-center py-8">
             <p className="text-rose-600">{error}</p>
             <Button variant="brand" onClick={fetchLists} className="mt-4">
@@ -1361,6 +1389,8 @@ export default function ListsPage() {
         <PageHeader
           title="Lists"
           subtitle="Manage your KOL lists and notes"
+          kicker="Talent · Lists"
+          kickerDot="amber"
           actions={(
             <>
               <Button variant="brand" onClick={() => setIsCombineListsDialogOpen(true)}
@@ -1383,101 +1413,122 @@ export default function ListsPage() {
                   Add List
                 </Button>
               </DialogTrigger>
-                              <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden">
+                              <DialogContent className="max-w-6xl max-h-[85vh] flex flex-col">
                 <DialogHeader>
                   <DialogTitle>{isEditMode ? 'Edit List' : 'Add New List'}</DialogTitle>
                   <DialogDescription>
                     {isEditMode ? 'Update the list information below.' : 'Create a new list to organize your KOLs.'}
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleCreateList}>
-                  <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
-                    <div className="grid gap-2">
-                      <Label htmlFor="name">List Name</Label>
-                      <Input
-                        id="name"
-                        value={newList.name}
-                        onChange={(e) => setNewList({ ...newList, name: e.target.value })}
-                        placeholder="Enter list name"
-                        className="focus-brand"
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="notes">Notes</Label>
-                      <Textarea
-                        id="notes"
-                        value={newList.notes}
-                        onChange={(e) => setNewList({ ...newList, notes: e.target.value })}
-                        placeholder="Enter notes about this list..."
-                        className="focus-brand min-h-[100px]"
-                      />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="approved-emails">Approved Emails (Optional)</Label>
-                      <p className="text-sm text-gray-600 mb-2">
-                        Add email addresses that can access this list via public link. Separate multiple emails with commas or new lines. Leave empty for public access.
-                      </p>
-                      <div className="flex flex-col gap-2">
-                        <Textarea
-                          id="approved-emails"
-                          value={emailInput}
-                          onChange={(e) => setEmailInput(e.target.value)}
-                          placeholder="Enter email addresses (comma or newline separated)&#10;e.g. email1@example.com, email2@example.com&#10;or one per line"
-                          className="focus-brand min-h-[80px]"
-                          rows={3}
+                {/* Form needs flex-col flex-1 min-h-0 so the flex chain
+                    from DialogContent (flex-col) reaches the inner body
+                    div's flex-1. Without it the form isn't a flex
+                    container, the inner flex-1 becomes a no-op, and
+                    the body grows to fit ALL content — pushing the
+                    Select KOLs table past the dialog boundary instead
+                    of scrolling inside. Same fix as Add Client. */}
+                <form onSubmit={handleCreateList} className="flex flex-col flex-1 min-h-0">
+                  {/* Two-column body on lg+ — form fields on the left,
+                      Select KOLs on the right. The right column gets
+                      ~2x the width of the left (1:2 ratio via
+                      `lg:grid-cols-[minmax(300px,1fr)_2fr]`) because
+                      the KOL table has 6+ columns and benefits from
+                      every extra pixel. Left column has a 300px floor
+                      so the form inputs stay usable. Columns stack on
+                      smaller screens. */}
+                  <div className="grid gap-6 py-4 flex-1 overflow-y-auto px-1 lg:grid-cols-[minmax(300px,1fr)_2fr]">
+                    {/* ── Left column: List metadata ───────────────── */}
+                    <div className="space-y-4 min-w-0">
+                      <div className="grid gap-2">
+                        <Label htmlFor="name">List Name</Label>
+                        <Input
+                          id="name"
+                          value={newList.name}
+                          onChange={(e) => setNewList({ ...newList, name: e.target.value })}
+                          placeholder="Enter list name"
+                          className="focus-brand"
+                          required
                         />
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            // Parse input for multiple emails (comma or newline separated)
-                            const emails = emailInput
-                              .split(/[\n,]+/)
-                              .map(email => email.trim().toLowerCase())
-                              .filter(email => email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
-                            const newEmails = emails.filter(email => !newList.approved_emails.includes(email));
-                            if (newEmails.length > 0) {
-                              setNewList({ ...newList, approved_emails: [...newList.approved_emails, ...newEmails] });
-                              setEmailInput('');
-                            }
-                          }}
-                          disabled={!emailInput.trim()}
-                          variant="brand"
-                          className="w-fit"
-                        >
-                          Add Emails
-                        </Button>
                       </div>
-                      {newList.approved_emails.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {newList.approved_emails.map((email, index) => (
-                            <div
-                              key={index}
-                              className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm"
-                            >
-                              <span>{email}</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setNewList({
-                                    ...newList,
-                                    approved_emails: newList.approved_emails.filter((_, i) => i !== index)
-                                  });
-                                }}
-                                className="ml-1 text-gray-500 hover:text-gray-700"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </div>
-                          ))}
+                      <div className="grid gap-2">
+                        <Label htmlFor="notes">Notes</Label>
+                        <Textarea
+                          id="notes"
+                          value={newList.notes}
+                          onChange={(e) => setNewList({ ...newList, notes: e.target.value })}
+                          placeholder="Enter notes about this list..."
+                          className="focus-brand min-h-[100px]"
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="approved-emails">Approved Emails (Optional)</Label>
+                        <p className="text-sm text-ink-warm-700 mb-2">
+                          Add email addresses that can access this list via public link. Separate multiple emails with commas or new lines. Leave empty for public access.
+                        </p>
+                        <div className="flex flex-col gap-2">
+                          <Textarea
+                            id="approved-emails"
+                            value={emailInput}
+                            onChange={(e) => setEmailInput(e.target.value)}
+                            placeholder="Enter email addresses (comma or newline separated)&#10;e.g. email1@example.com, email2@example.com&#10;or one per line"
+                            className="focus-brand min-h-[80px]"
+                            rows={3}
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              // Parse input for multiple emails (comma or newline separated)
+                              const emails = emailInput
+                                .split(/[\n,]+/)
+                                .map(email => email.trim().toLowerCase())
+                                .filter(email => email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+                              const newEmails = emails.filter(email => !newList.approved_emails.includes(email));
+                              if (newEmails.length > 0) {
+                                setNewList({ ...newList, approved_emails: [...newList.approved_emails, ...newEmails] });
+                                setEmailInput('');
+                              }
+                            }}
+                            disabled={!emailInput.trim()}
+                            variant="brand"
+                            className="w-fit"
+                          >
+                            Add Emails
+                          </Button>
                         </div>
-                      )}
+                        {newList.approved_emails.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {newList.approved_emails.map((email, index) => (
+                              <div
+                                key={index}
+                                className="inline-flex items-center gap-1 px-3 py-1 bg-cream-100 text-ink-warm-700 rounded-full text-sm"
+                              >
+                                <span>{email}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setNewList({
+                                      ...newList,
+                                      approved_emails: newList.approved_emails.filter((_, i) => i !== index)
+                                    });
+                                  }}
+                                  className="ml-1 text-ink-warm-500 hover:text-ink-warm-700"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="border-t pt-4 mt-2"></div>
-
-                    <div className="grid gap-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    {/* ── Right column: Select KOLs tile ────────────
+                        min-w-0 + overflow-hidden so the wide KOL
+                        table inside can't push the tile past the
+                        column width. The table itself scrolls
+                        horizontally inside its own overflow wrapper. */}
+                    <div className="grid gap-2 bg-cream-50 p-4 rounded-[14px] border border-cream-200 min-w-0 overflow-hidden h-fit lg:sticky lg:top-0">
                       <Label className="text-base font-semibold">Select KOLs ({newList.selectedKOLs.length} selected)</Label>
                       {/* Search bar */}
                       <div className="mb-3">
@@ -1492,7 +1543,7 @@ export default function ListsPage() {
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="mb-2"
+                        className="mb-2 self-start"
                         onClick={() => {
                           const allIds = filteredAvailableKOLs.map(kol => kol.id);
                           if (allIds.length > 0 && allIds.every(id => newList.selectedKOLs.includes(id))) {
@@ -1506,13 +1557,29 @@ export default function ListsPage() {
                       >
                         {filteredAvailableKOLs.length > 0 && filteredAvailableKOLs.every(kol => newList.selectedKOLs.includes(kol.id)) ? 'Deselect All' : 'Select All'}
                       </Button>
-                      <div className="border rounded-lg overflow-hidden mt-2">
-                        <Table>
+                      {/* Single scroll container handles BOTH axes —
+                          vertical scrolling (max-h-[50vh]) and
+                          horizontal scrolling (table wider than the
+                          container). Using a raw <table> instead of
+                          shadcn's <Table> primitive because <Table>
+                          wraps the table in its own `overflow-auto`
+                          div, which means the horizontal scrollbar
+                          ends up at the bottom of the table content
+                          (way below the viewport when scrolled).
+                          By putting <table> directly in this wrapper,
+                          the horizontal scrollbar sits at the bottom
+                          of the visible 50vh viewport regardless of
+                          vertical scroll position. min-w-[900px]
+                          forces the table wide enough that 7 columns
+                          stay legible, triggering the horizontal
+                          scrollbar in typical column widths. */}
+                      <div className="border border-cream-200 rounded-[14px] overflow-auto max-h-[50vh] mt-2">
+                        <table className="w-full min-w-[900px] caption-bottom text-sm">
                           <TableHeader>
-                            <TableRow className="bg-gray-50">
-                              <TableHead className="w-12">Select</TableHead>
-                              <TableHead>Name</TableHead>
-                              <TableHead className="relative bg-gray-50 select-none">
+                            <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-12">Select</TableHead>
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</TableHead>
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 select-none">
                                 <div className="flex items-center gap-1 cursor-pointer group">
                                   <span>Followers</span>
                                   <Popover>
@@ -1523,7 +1590,7 @@ export default function ListsPage() {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[200px] p-0" align="start">
                                       <div className="p-3">
-                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Followers</div>
+                                        <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Followers</div>
                                         <div className="flex items-center gap-2 mb-2">
                                           <Select
                                             value={followersOperator}
@@ -1569,7 +1636,7 @@ export default function ListsPage() {
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 select-none">
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 select-none">
                                 <div className="flex items-center gap-1 cursor-pointer group">
                                   <span>Rating</span>
                                   <Popover>
@@ -1580,7 +1647,7 @@ export default function ListsPage() {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[200px] p-0" align="start">
                                       <div className="p-3">
-                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Rating</div>
+                                        <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Rating</div>
                                         <div className="flex items-center gap-2 mb-2">
                                           <Select
                                             value={ratingOperator}
@@ -1626,7 +1693,7 @@ export default function ListsPage() {
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 select-none">
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 select-none">
                                 <div className="flex items-center gap-1 cursor-pointer group">
                                   <span>Region</span>
                                   <Popover>
@@ -1637,11 +1704,11 @@ export default function ListsPage() {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[200px] p-0" align="start">
                                       <div className="p-3">
-                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Region</div>
+                                        <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Region</div>
                                         {['Vietnam','Turkey','SEA','Philippines','Korea','Global','China','Brazil'].map((region) => (
                                           <div
                                             key={region}
-                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                             onClick={() => {
                                               const newRegions = regionFilter.includes(region)
                                                 ? regionFilter.filter(r => r !== region)
@@ -1676,7 +1743,7 @@ export default function ListsPage() {
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 select-none">
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 select-none">
                                 <div className="flex items-center gap-1 cursor-pointer group">
                                   <span>Platform</span>
                                   <Popover>
@@ -1687,11 +1754,11 @@ export default function ListsPage() {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[200px] p-0" align="start">
                                       <div className="p-3">
-                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Platform</div>
+                                        <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Platform</div>
                                         {['X','Telegram','YouTube','Facebook','TikTok'].map((platform) => (
                                           <div
                                             key={platform}
-                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                             onClick={() => {
                                               const newPlatforms = platformFilter.includes(platform)
                                                 ? platformFilter.filter(p => p !== platform)
@@ -1725,7 +1792,7 @@ export default function ListsPage() {
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 select-none">
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 select-none">
                                 <div className="flex items-center gap-1 cursor-pointer group">
                                   <span>Creator Type</span>
                                   <Popover>
@@ -1736,11 +1803,11 @@ export default function ListsPage() {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[250px] p-0" align="start">
                                       <div className="p-3">
-                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Creator Type</div>
+                                        <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Creator Type</div>
                                         {['Native (Meme/Culture)','Drama-Forward','Skeptic','Educator','Bridge Builder','Visionary','Onboarder','General','Gaming','Crypto','Memecoin','NFT','Trading','AI','Research','Airdrop','Art'].map((type) => (
                                           <div
                                             key={type}
-                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                             onClick={() => {
                                               const newTypes = creatorTypeFilter.includes(type)
                                                 ? creatorTypeFilter.filter(t => t !== type)
@@ -1777,7 +1844,7 @@ export default function ListsPage() {
                           <TableBody>
                             {filteredAvailableKOLs.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                                <TableCell colSpan={7} className="text-center py-8 text-ink-warm-500">
                                   No KOLs found.
                                 </TableCell>
                               </TableRow>
@@ -1810,7 +1877,7 @@ export default function ListsPage() {
                                           href={kol.link} 
                                           target="_blank" 
                                           rel="noopener noreferrer"
-                                              className="text-sm text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-1 rounded px-1 py-0.5 transition-all duration-200"
+                                              className="text-sm text-brand hover:text-brand-dark focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-1 rounded px-1 py-0.5 transition-all duration-200"
                                         >
                                           View Profile
                                         </a>
@@ -1826,7 +1893,7 @@ export default function ListsPage() {
                                         <Star
                                           key={star}
                                           className={`h-3 w-3 ${
-                                            star <= (kol.rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+                                            star <= (kol.rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-ink-warm-300'
                                           }`}
                                         />
                                       ))}
@@ -1867,11 +1934,11 @@ export default function ListsPage() {
                               ))
                             )}
                           </TableBody>
-                        </Table>
+                        </table>
                       </div>
-                    </div> {/* Close bg-gray-50 wrapper */}
+                    </div> {/* Close bg-cream-50 wrapper */}
                   </div> {/* Close grid gap-4 */}
-                  <DialogFooter>
+                  <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                     <Button type="button" variant="outline" onClick={handleCloseListModal}>
                       Cancel
                     </Button>
@@ -1893,11 +1960,11 @@ export default function ListsPage() {
               <DialogTitle>Archive List</DialogTitle>
             </DialogHeader>
             <div className="py-4">
-              <p className="text-gray-600">
+              <p className="text-ink-warm-700">
                 Are you sure you want to archive this list? You can restore it later from the Archive page.
               </p>
             </div>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setIsDeleteListDialogOpen(false)}>
                 Cancel
               </Button>
@@ -1918,11 +1985,11 @@ export default function ListsPage() {
               <DialogTitle>Remove KOL from List</DialogTitle>
             </DialogHeader>
             <div className="py-4">
-              <p className="text-gray-600">
+              <p className="text-ink-warm-700">
                 Are you sure you want to remove <strong>{kolToDelete?.kolName}</strong> from this list?
               </p>
             </div>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setIsDeleteKOLDialogOpen(false)}>
                 Cancel
               </Button>
@@ -1938,15 +2005,15 @@ export default function ListsPage() {
 
         {/* View List Dialog */}
         <Dialog open={isViewListDialogOpen} onOpenChange={setIsViewListDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+          <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>View List: {viewingList?.name}</DialogTitle>
             </DialogHeader>
-            <div className="max-h-[60vh] overflow-y-auto px-3 pb-6">
+            <div className="flex-1 overflow-y-auto px-1">
               {viewingList?.notes && (
                 <div className="mb-6">
-                  <h4 className="font-semibold text-sm text-gray-700 mb-2">Notes:</h4>
-                  <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700">
+                  <h4 className="font-semibold text-sm text-ink-warm-700 mb-2">Notes:</h4>
+                  <div className="bg-cream-50 rounded-lg p-3 text-sm text-ink-warm-700">
                     {viewingList.notes}
                   </div>
                 </div>
@@ -1954,12 +2021,12 @@ export default function ListsPage() {
               {viewingList?.kols && viewingList.kols.length > 0 ? (
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-semibold text-sm text-gray-700">
+                    <h4 className="font-semibold text-sm text-ink-warm-700">
                       KOLs in this list ({viewingList.kols.length})
                     </h4>
                     <div className="flex items-center gap-2">
                       {viewListSortOrder && (
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-ink-warm-500">
                           Sorted by: {viewListSortOrder.field} ({viewListSortOrder.direction})
                         </span>
                       )}
@@ -1974,13 +2041,13 @@ export default function ListsPage() {
                       </Button>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 mb-2">Click on column headers to sort. Save the sort order to apply it to the public list view.</p>
+                  <p className="text-xs text-ink-warm-500 mb-2">Click on column headers to sort. Save the sort order to apply it to the public list view.</p>
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-gray-50">
+                        <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
                           <TableHead
-                            className="cursor-pointer hover:bg-gray-100 select-none"
+                            className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 cursor-pointer hover:bg-cream-100 select-none"
                             onClick={() => handleViewListSort('name')}
                           >
                             <div className="flex items-center gap-1">
@@ -1991,7 +2058,7 @@ export default function ListsPage() {
                             </div>
                           </TableHead>
                           <TableHead
-                            className="cursor-pointer hover:bg-gray-100 select-none"
+                            className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 cursor-pointer hover:bg-cream-100 select-none"
                             onClick={() => handleViewListSort('followers')}
                           >
                             <div className="flex items-center gap-1">
@@ -2002,7 +2069,7 @@ export default function ListsPage() {
                             </div>
                           </TableHead>
                           <TableHead
-                            className="cursor-pointer hover:bg-gray-100 select-none"
+                            className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 cursor-pointer hover:bg-cream-100 select-none"
                             onClick={() => handleViewListSort('region')}
                           >
                             <div className="flex items-center gap-1">
@@ -2013,7 +2080,7 @@ export default function ListsPage() {
                             </div>
                           </TableHead>
                           <TableHead
-                            className="cursor-pointer hover:bg-gray-100 select-none"
+                            className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 cursor-pointer hover:bg-cream-100 select-none"
                             onClick={() => handleViewListSort('platform')}
                           >
                             <div className="flex items-center gap-1">
@@ -2024,7 +2091,7 @@ export default function ListsPage() {
                             </div>
                           </TableHead>
                           <TableHead
-                            className="cursor-pointer hover:bg-gray-100 select-none"
+                            className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 cursor-pointer hover:bg-cream-100 select-none"
                             onClick={() => handleViewListSort('creator_type')}
                           >
                             <div className="flex items-center gap-1">
@@ -2035,7 +2102,7 @@ export default function ListsPage() {
                             </div>
                           </TableHead>
                           <TableHead
-                            className="cursor-pointer hover:bg-gray-100 select-none"
+                            className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 cursor-pointer hover:bg-cream-100 select-none"
                             onClick={() => handleViewListSort('status')}
                           >
                             <div className="flex items-center gap-1">
@@ -2045,7 +2112,7 @@ export default function ListsPage() {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead>Notes</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Notes</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -2059,7 +2126,7 @@ export default function ListsPage() {
                                     href={kol.link} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
-                                    className="text-sm text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-1 rounded px-1 py-0.5 transition-all duration-200"
+                                    className="text-sm text-brand hover:text-brand-dark focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-1 rounded px-1 py-0.5 transition-all duration-200"
                                   >
                                     View Profile
                                   </a>
@@ -2150,11 +2217,11 @@ export default function ListsPage() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-gray-500">No KOLs in this list.</p>
+                  <p className="text-ink-warm-500">No KOLs in this list.</p>
                 </div>
               )}
             </div>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setIsViewListDialogOpen(false)}>
                 Close
               </Button>
@@ -2174,7 +2241,7 @@ export default function ListsPage() {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>List Details</Label>
-                <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                <div className="bg-cream-50 rounded-lg p-3 text-sm">
                   <div className="flex justify-between mb-2">
                     <span className="font-medium">Name:</span>
                     <span>{sharingList?.name}</span>
@@ -2186,7 +2253,7 @@ export default function ListsPage() {
                   {sharingList?.notes && (
                     <div className="flex justify-between">
                       <span className="font-medium">Notes:</span>
-                      <span className="text-gray-600 max-w-[200px] truncate" title={sharingList.notes}>
+                      <span className="text-ink-warm-700 max-w-[200px] truncate" title={sharingList.notes}>
                         {sharingList.notes}
                       </span>
                     </div>
@@ -2230,7 +2297,7 @@ export default function ListsPage() {
                 </div>
               </div>
             </div>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setIsShareListDialogOpen(false)}>
                 Close
               </Button>
@@ -2250,7 +2317,7 @@ export default function ListsPage() {
 
         {/* Email Views Dialog (LEGACY — kept temporarily; superseded by ListAccessDialog above) */}
         <Dialog open={isEmailViewsDialogOpen} onOpenChange={setIsEmailViewsDialogOpen}>
-          <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden">
+          <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Eye className="h-5 w-5" />
@@ -2266,24 +2333,24 @@ export default function ListsPage() {
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand"></div>
                 </div>
               ) : emailViews.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  <Eye className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <div className="text-center py-8 text-ink-warm-500">
+                  <Eye className="h-12 w-12 mx-auto mb-4 text-ink-warm-300" />
                   <p>No email views recorded yet.</p>
                   <p className="text-sm mt-2">Views will appear here when users access the list via the public link.</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                  <div className="text-sm text-gray-500 mb-3">
+                  <div className="text-sm text-ink-warm-500 mb-3">
                     {emailViews.length} view{emailViews.length !== 1 ? 's' : ''} recorded
                   </div>
                   {emailViews.map((view) => (
                     <div
                       key={view.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                      className="flex items-center justify-between p-3 bg-cream-50 rounded-lg hover:bg-cream-100 transition-colors"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 truncate">{view.email}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="font-medium text-ink-warm-900 truncate">{view.email}</p>
+                        <p className="text-xs text-ink-warm-500">
                           {new Date(view.viewed_at).toLocaleString('en-US', {
                             year: 'numeric',
                             month: 'short',
@@ -2298,7 +2365,7 @@ export default function ListsPage() {
                 </div>
               )}
             </div>
-            <DialogFooter>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setIsEmailViewsDialogOpen(false)}>
                 Close
               </Button>
@@ -2308,15 +2375,19 @@ export default function ListsPage() {
 
         {/* Combine Lists Dialog */}
         <Dialog open={isCombineListsDialogOpen} onOpenChange={setIsCombineListsDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
+          <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Combine Lists</DialogTitle>
               <DialogDescription>
                 Select multiple lists to combine into a new list. All unique KOLs will be merged.
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleCombineLists}>
-              <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3">
+            {/* Same flex-col flex-1 min-h-0 fix as Add/Edit List —
+                without it the form breaks the flex chain and the
+                inner Select Lists list pushes the dialog past the
+                viewport instead of scrolling inside. */}
+            <form onSubmit={handleCombineLists} className="flex flex-col flex-1 min-h-0">
+              <div className="grid gap-4 py-4 flex-1 overflow-y-auto px-1">
                 <div className="grid gap-2">
                   <Label htmlFor="combined-list-name">New List Name</Label>
                   <Input
@@ -2331,8 +2402,14 @@ export default function ListsPage() {
 
                 <div className="border-t pt-4"></div>
 
-                <div className="grid gap-2">
-                  <div className="flex items-center justify-between">
+                {/* Select Lists tile — min-w-0 prevents the list-row
+                    Cards from pushing the tile past the dialog body
+                    width when a list name is very long. The inner
+                    list scrolls vertically inside a max-h so a
+                    50-list account doesn't make the whole dialog
+                    body taller than the viewport. */}
+                <div className="grid gap-2 min-w-0">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <Label className="text-base font-semibold">
                       Select Lists to Combine ({selectedListsToCombine.length} selected)
                     </Label>
@@ -2352,9 +2429,9 @@ export default function ListsPage() {
                     </Button>
                   </div>
 
-                  <div className="space-y-2 mt-2">
+                  <div className="space-y-2 mt-2 max-h-[40vh] overflow-y-auto overflow-x-hidden px-0.5 -mx-0.5">
                     {lists.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
+                      <div className="text-center py-8 text-ink-warm-500">
                         No lists available.
                       </div>
                     ) : (
@@ -2371,14 +2448,17 @@ export default function ListsPage() {
                         };
 
                         return (
-                          <div
+                          // v11 Card row — selected state uses brand-soft
+                          // tint to match the page's "selection mode is on"
+                          // pattern from /kols bulk-action bar.
+                          <Card
                             key={list.id}
-                            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                              isSelected ? 'border-brand bg-brand/5' : 'border-gray-200 hover:border-gray-300'
+                            className={`p-4 cursor-pointer transition-colors ${
+                              isSelected ? 'border-brand-light bg-brand-soft' : 'hover:bg-cream-50'
                             }`}
                             onClick={toggleSelection}
                           >
-                            <div className="flex items-start space-x-3">
+                            <div className="flex items-start gap-3">
                               <div onClick={(e) => e.stopPropagation()}>
                                 <Checkbox
                                   checked={isSelected}
@@ -2386,22 +2466,22 @@ export default function ListsPage() {
                                   className="mt-1"
                                 />
                               </div>
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between mb-1">
-                                  <div className="font-medium text-gray-900">{list.name}</div>
-                                  <Badge variant="outline" className="text-xs">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-1 gap-2">
+                                  <div className="font-medium text-ink-warm-900 truncate">{list.name}</div>
+                                  <StatusBadge tone="neutral" size="sm" bordered>
                                     {kolCount} KOL{kolCount !== 1 ? 's' : ''}
-                                  </Badge>
+                                  </StatusBadge>
                                 </div>
                                 {list.notes && (
-                                  <p className="text-sm text-gray-600 line-clamp-2">{list.notes}</p>
+                                  <p className="text-sm text-ink-warm-700 line-clamp-2">{list.notes}</p>
                                 )}
-                                <div className="text-xs text-gray-500 mt-1">
+                                <div className="text-xs text-ink-warm-500 mt-1 tabular-nums">
                                   Created: {formatDate(list.created_at)}
                                 </div>
                               </div>
                             </div>
-                          </div>
+                          </Card>
                         );
                       })
                     )}
@@ -2409,9 +2489,12 @@ export default function ListsPage() {
                 </div>
 
                 {selectedListsToCombine.length > 0 && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
-                    <div className="font-medium text-blue-900 mb-1">Preview</div>
-                    <div className="text-blue-800">
+                  // Brand-soft preview tile — was bg-blue-50/text-blue-800
+                  // (outside the v11 palette). Same chrome as the "Save
+                  // as template" form in /clients milestones modal.
+                  <div className="rounded-[14px] border border-brand-light bg-brand-soft p-3 text-sm">
+                    <div className="text-[11px] mono uppercase tracking-[0.14em] text-brand-deep mb-1">Preview</div>
+                    <div className="text-ink-warm-700">
                       {(() => {
                         const selectedLists = lists.filter(list => selectedListsToCombine.includes(list.id));
                         const uniqueKolIds = new Set<string>();
@@ -2424,7 +2507,7 @@ export default function ListsPage() {
                   </div>
                 )}
               </div>
-              <DialogFooter>
+              <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                 <Button
                   type="button"
                   variant="outline"
@@ -2444,66 +2527,88 @@ export default function ListsPage() {
           </DialogContent>
         </Dialog>
 
-        <div className="flex items-center space-x-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search lists by name, notes, or KOLs..."
-              className="pl-10 focus-brand"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+        {/* ── Lists ──────────────────────────────────────────────────
+            Single SectionHeader carries the chapter rhythm; toolbar
+            below has tabs (left, primary filter) + search (middle,
+            refine-within) + view-mode toggle (right). Matches the
+            /clients & /kols toolbar pattern. */}
+        <div className="space-y-4">
+          <SectionHeader
+            label="Lists"
+            dot="amber"
+            counter={`${filteredLists.length} of ${statusCounts.all} list${statusCounts.all === 1 ? '' : 's'}${statusFilter === 'access' ? ' · access view' : ''}`}
+            first
+          />
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Per-status tabs (Curated / Approved / Denied) hidden
+                per 2026-06-02 product decision — status was redundant
+                with the badge on each card and didn't drive enough
+                filtering use to justify the toolbar real estate.
+                Functionality preserved (statusFilter still toggles
+                between 'all' and 'access'); state untouched for
+                easy restore. */}
+            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+              <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+                <TabsTrigger
+                  value="all"
+                  className="data-[state=active]:bg-white data-[state=active]:text-ink-warm-900 data-[state=active]:shadow-card px-4 py-2"
+                >
+                  All
+                  <span className="ml-2 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.all}</span>
+                </TabsTrigger>
+                {/* [Access tab v1] Switches the page from the list grid
+                    to a per-list access + visits overview. Brand-tinted
+                    counter so it reads distinctly from the All tab. */}
+                <TabsTrigger
+                  value="access"
+                  className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card px-4 py-2"
+                >
+                  Access &amp; Visits
+                  <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none">{accessTabCount}</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
+              <Input
+                placeholder="Search lists by name, notes, or KOLs..."
+                className="pl-10 focus-brand"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {/* View-mode toggle — hidden on the Access & Visits tab
+                because that view is always a table (the card layout
+                doesn't make sense for grant/visit data). Pushed to
+                the right with ml-auto on the All tab; each segment
+                matches the v11 tab chrome so the toggle visually
+                belongs to the same toolbar family. */}
+            {statusFilter !== 'access' && (
+              <div className="ml-auto flex bg-cream-100 p-1 rounded-md border border-cream-200">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`h-8 px-3 ${viewMode === 'card' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:bg-cream-200 hover:text-ink-warm-700'}`}
+                  onClick={() => setViewMode('card')}
+                  title="Card view"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`h-8 px-3 ${viewMode === 'table' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:bg-cream-200 hover:text-ink-warm-700'}`}
+                  onClick={() => setViewMode('table')}
+                  title="Table view"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
-        </div>
-        <div className="flex items-center justify-between">
-          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-            <TabsList>
-              <TabsTrigger value="all">
-                All
-                <Badge variant="secondary" className="ml-2 bg-gray-200 text-gray-700 pointer-events-none">{statusCounts.all}</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="curated">
-                Curated
-                <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-800 pointer-events-none">{statusCounts.curated}</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="approved">
-                Approved
-                <Badge variant="secondary" className="ml-2 bg-emerald-100 text-emerald-800 pointer-events-none">{statusCounts.approved}</Badge>
-              </TabsTrigger>
-              <TabsTrigger value="denied">
-                Denied
-                <Badge variant="secondary" className="ml-2 bg-rose-100 text-rose-800 pointer-events-none">{statusCounts.denied}</Badge>
-              </TabsTrigger>
-              {/* [Access tab v1] Switches the page from the list grid to
-                  a per-list access + visits overview. Same visual
-                  pattern as the status tabs (label + count badge);
-                  badge uses brand tint to set it apart semantically
-                  from the status colors above. */}
-              <TabsTrigger value="access">
-                Access &amp; Visits
-                <Badge variant="secondary" className="ml-2 bg-brand/10 text-brand pointer-events-none">{accessTabCount}</Badge>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <div className="flex bg-gray-100 p-1 rounded-lg">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`px-3 py-2 ${viewMode === 'card' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
-              onClick={() => setViewMode('card')}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={`px-3 py-2 ${viewMode === 'table' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
-              onClick={() => setViewMode('table')}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
         {/* [Access tab v1] Centralized access + visits overview. Renders
             in place of the list grid when the user clicks the
             "Access & Visits" tab. Each list shows summary metrics; click
@@ -2516,35 +2621,30 @@ export default function ListsPage() {
               const totalVisits = accessOverviewByList.reduce((s, b) => s + b.visits.length, 0);
               const listsWithActivity = accessOverviewByList.filter(b => b.activeGrants.length > 0 || b.visits.length > 0).length;
               const distinctViewers = new Set(listVisits.map(v => v.email.toLowerCase())).size;
-              const StatCard = ({ icon: Icon, label, value }: { icon: any; label: string; value: number }) => (
-                <Card className="border-0 shadow-sm rounded-xl">
-                  <CardContent className="p-5 flex items-center gap-4">
-                    <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-lg shadow-sm flex-shrink-0">
-                      <Icon className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-gray-900 leading-none">{value}</p>
-                      <p className="text-xs text-gray-500 uppercase tracking-wider mt-1">{label}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
+              // Use the shared <KpiCard> primitive (same one /dashboard,
+              // /analytics, /crm/network, /crm/contacts, /expenses, and
+              // /wallets use) so this tab's hero stats read with the
+              // same rhythm as every other KPI strip in the app.
+              // Accent palette: brand for the primary "access is on"
+              // metric, sky for informational visit count, emerald for
+              // "positive activity", purple for segmentation.
               return (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <StatCard icon={Shield} label="Active Grants" value={totalActiveGrants} />
-                  <StatCard icon={Eye} label="Total Visits" value={totalVisits} />
-                  <StatCard icon={Activity} label="Lists w/ Activity" value={listsWithActivity} />
-                  <StatCard icon={Users} label="Distinct Viewers" value={distinctViewers} />
+                  <KpiCard icon={Shield}   label="Active Grants"      value={totalActiveGrants} accent="brand"   />
+                  <KpiCard icon={Eye}      label="Total Visits"       value={totalVisits}       accent="sky"     />
+                  <KpiCard icon={Activity} label="Lists w/ Activity"  value={listsWithActivity} accent="emerald" />
+                  <KpiCard icon={Users}    label="Distinct Viewers"   value={distinctViewers}   accent="purple"  />
                 </div>
               );
             })()}
 
-            {/* [Access tab v1] Search + status filter bar — mirrors the
-                main lists page filtering pattern. Status options are
-                derived from the lists currently in view. */}
+            {/* Search + count toolbar — Status filter popover hidden
+                per 2026-06-02 product decision (pairs with the main
+                per-status tab + card badge removal). accessStatusFilter
+                state preserved for easy restore. */}
             <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
               <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
                 <Input
                   placeholder="Search lists…"
                   className="pl-10 focus-brand"
@@ -2552,85 +2652,67 @@ export default function ListsPage() {
                   onChange={(e) => setAccessSearchTerm(e.target.value)}
                 />
               </div>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9">
-                    Status
-                    {accessStatusFilter.length > 0 && (
-                      <Badge variant="secondary" className="ml-2 bg-brand/10 text-brand pointer-events-none">
-                        {accessStatusFilter.length}
-                      </Badge>
-                    )}
-                    <ChevronDown className="h-3.5 w-3.5 ml-1.5 text-gray-400" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-48 p-2" align="start">
-                  <div className="space-y-1">
-                    {LIST_STATUS_ORDER.map(s => {
-                      const checked = accessStatusFilter.includes(s);
-                      return (
-                        <label key={s} className="flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-gray-100 cursor-pointer capitalize">
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={(c) => {
-                              setAccessStatusFilter(prev =>
-                                c ? Array.from(new Set([...prev, s])) : prev.filter(x => x !== s)
-                              );
-                            }}
-                          />
-                          <span>{s}</span>
-                        </label>
-                      );
-                    })}
-                    {accessStatusFilter.length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-start h-auto px-2 py-1.5 mt-1 text-xs text-gray-500 hover:text-gray-700 border-t border-gray-100 rounded-none"
-                        onClick={() => setAccessStatusFilter([])}
-                      >
-                        Clear filter
-                      </Button>
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
-              <span className="text-xs text-gray-500 sm:ml-auto">
+              <span className="text-xs text-ink-warm-500 sm:ml-auto tabular-nums">
                 {filteredSortedAccess.length} of {accessOverviewByList.length} list{accessOverviewByList.length === 1 ? '' : 's'}
               </span>
             </div>
 
             {/* Per-list overview table */}
-            <Card className="border-0 shadow-md rounded-xl overflow-hidden">
+            <Card className="border-cream-200 overflow-hidden">
               {loadingAccess ? (
-                <div className="p-12 text-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-200 border-t-brand mx-auto" />
-                  <p className="text-sm text-gray-500 mt-3">Loading access &amp; visits…</p>
-                </div>
+                // Structural skeleton — same shape as the loaded table
+                // (header row + 5 body rows w/ chevron + name + 3
+                // numeric columns + date). Replaces the spinner +
+                // "Loading…" text so nothing shifts on load.
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[40px]"></TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">List</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Active Grants</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Visits</TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Last Visit</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i} className="border-cream-100">
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-4 rounded-sm" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-40" /></TableCell>
+                        <TableCell className="py-3.5 px-5 text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                        <TableCell className="py-3.5 px-5 text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                        <TableCell className="py-3.5 px-5"><Skeleton className="h-3 w-20" /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               ) : filteredSortedAccess.length === 0 ? (
-                <div className="p-12 text-center text-sm text-gray-500">
-                  {accessSearchTerm || accessStatusFilter.length > 0
-                    ? 'No lists match your filters.'
-                    : 'No lists yet.'}
+                <div className="p-8">
+                  <EmptyState
+                    icon={Shield}
+                    title={accessSearchTerm ? 'No lists match' : 'No lists yet'}
+                    description={accessSearchTerm
+                      ? 'Try widening your search.'
+                      : 'Once lists exist with grants or visits, they\'ll appear here.'}
+                  />
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-gray-50">
-                      <TableHead className="w-[40px]"></TableHead>
-                      <TableHead className="cursor-pointer select-none hover:text-gray-900" onClick={() => toggleAccessSort('name')}>
+                    {/* Status column hidden — pairs with the main lists
+                        view's per-status tab + card badge removal. */}
+                    <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-[40px]"></TableHead>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 cursor-pointer select-none hover:text-ink-warm-900" onClick={() => toggleAccessSort('name')}>
                         List{accessSortIcon('name')}
                       </TableHead>
-                      <TableHead className="cursor-pointer select-none hover:text-gray-900" onClick={() => toggleAccessSort('status')}>
-                        Status{accessSortIcon('status')}
-                      </TableHead>
-                      <TableHead className="text-right cursor-pointer select-none hover:text-gray-900" onClick={() => toggleAccessSort('grants')}>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right cursor-pointer select-none hover:text-ink-warm-900" onClick={() => toggleAccessSort('grants')}>
                         Active Grants{accessSortIcon('grants')}
                       </TableHead>
-                      <TableHead className="text-right cursor-pointer select-none hover:text-gray-900" onClick={() => toggleAccessSort('visits')}>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right cursor-pointer select-none hover:text-ink-warm-900" onClick={() => toggleAccessSort('visits')}>
                         Visits{accessSortIcon('visits')}
                       </TableHead>
-                      <TableHead className="cursor-pointer select-none hover:text-gray-900" onClick={() => toggleAccessSort('lastVisit')}>
+                      <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 cursor-pointer select-none hover:text-ink-warm-900" onClick={() => toggleAccessSort('lastVisit')}>
                         Last Visit{accessSortIcon('lastVisit')}
                       </TableHead>
                     </TableRow>
@@ -2642,56 +2724,47 @@ export default function ListsPage() {
                       return (
                         <Fragment key={bucket.list.id}>
                           <TableRow
-                            className={`${hasDetail ? 'cursor-pointer hover:bg-gray-50/50' : ''} transition-colors`}
+                            className={`${hasDetail ? 'cursor-pointer hover:bg-cream-50/50' : ''} transition-colors`}
                             onClick={() => hasDetail && toggleAccessExpand(bucket.list.id)}
                           >
                             <TableCell className="py-3">
                               {hasDetail ? (
                                 isExpanded
-                                  ? <ChevronDown className="h-4 w-4 text-gray-400" />
-                                  : <ChevronRight className="h-4 w-4 text-gray-400" />
+                                  ? <ChevronDown className="h-4 w-4 text-ink-warm-400" />
+                                  : <ChevronRight className="h-4 w-4 text-ink-warm-400" />
                               ) : <span className="inline-block w-4" />}
                             </TableCell>
-                            <TableCell className="font-medium text-gray-900">{bucket.list.name}</TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className={`text-xs capitalize ${
-                                bucket.list.status === 'approved' ? 'bg-emerald-100 text-emerald-800' :
-                                bucket.list.status === 'denied' ? 'bg-rose-100 text-rose-800' :
-                                'bg-blue-100 text-blue-800'
-                              }`}>
-                                {bucket.list.status || 'curated'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right font-semibold text-gray-900">
+                            <TableCell className="py-3.5 px-5 font-medium text-ink-warm-900">{bucket.list.name}</TableCell>
+                            <TableCell className="py-3.5 px-5 text-right font-semibold text-ink-warm-900 tabular-nums">
                               {bucket.activeGrants.length}
                             </TableCell>
-                            <TableCell className="text-right font-semibold text-gray-900">
+                            <TableCell className="py-3.5 px-5 text-right font-semibold text-ink-warm-900 tabular-nums">
                               {bucket.visits.length}
                             </TableCell>
-                            <TableCell className="text-sm text-gray-500">
+                            <TableCell className="py-3.5 px-5 text-sm text-ink-warm-500 tabular-nums">
                               {bucket.lastVisitAt
                                 ? new Date(bucket.lastVisitAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                                 : '—'}
                             </TableCell>
                           </TableRow>
                           {isExpanded && (
-                            <TableRow className="bg-gray-50/30">
-                              <TableCell colSpan={6} className="py-4 px-6">
+                            <TableRow className="bg-cream-50/30">
+                              <TableCell colSpan={5} className="py-4 px-6">
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                   {/* Active Grants column */}
                                   <div>
-                                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                    <p className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                       <Shield className="h-3 w-3" /> Who has access ({bucket.activeGrants.length})
                                     </p>
                                     {bucket.activeGrants.length === 0 ? (
-                                      <p className="text-xs text-gray-400 italic py-2">No active grants.</p>
+                                      <p className="text-xs text-ink-warm-400 italic py-2">No active grants.</p>
                                     ) : (
                                       <div className="space-y-1.5">
                                         {bucket.activeGrants.map(g => (
-                                          <div key={g.id} className="flex items-center gap-2 text-xs bg-white rounded p-2 border border-gray-100">
-                                            <Mail className="h-3 w-3 text-gray-400 flex-shrink-0" />
-                                            <span className="font-medium text-gray-900 truncate flex-1">{g.email}</span>
-                                            <span className="text-gray-400 text-[10px] flex-shrink-0">
+                                          <div key={g.id} className="flex items-center gap-2 text-xs bg-white rounded p-2 border border-cream-100">
+                                            <Mail className="h-3 w-3 text-ink-warm-400 flex-shrink-0" />
+                                            <span className="font-medium text-ink-warm-900 truncate flex-1">{g.email}</span>
+                                            <span className="text-ink-warm-400 text-[10px] flex-shrink-0">
                                               {g.granted_by_name ? `by ${g.granted_by_name} · ` : ''}
                                               {new Date(g.granted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                               {g.expires_at && ` · exp ${new Date(g.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
@@ -2701,31 +2774,31 @@ export default function ListsPage() {
                                       </div>
                                     )}
                                     {bucket.revokedGrants.length > 0 && (
-                                      <p className="text-[10px] text-gray-400 mt-2">
+                                      <p className="text-[10px] text-ink-warm-400 mt-2">
                                         + {bucket.revokedGrants.length} revoked / expired
                                       </p>
                                     )}
                                   </div>
                                   {/* Visits column */}
                                   <div>
-                                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                    <p className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                       <Eye className="h-3 w-3" /> Recent visits ({bucket.visits.length})
                                     </p>
                                     {bucket.visits.length === 0 ? (
-                                      <p className="text-xs text-gray-400 italic py-2">No visits yet.</p>
+                                      <p className="text-xs text-ink-warm-400 italic py-2">No visits yet.</p>
                                     ) : (
                                       <div className="space-y-1.5 max-h-64 overflow-y-auto">
                                         {bucket.visits.slice(0, 20).map(v => (
-                                          <div key={v.id} className="flex items-center gap-2 text-xs bg-white rounded p-2 border border-gray-100">
-                                            <Clock className="h-3 w-3 text-gray-400 flex-shrink-0" />
-                                            <span className="text-gray-900 truncate flex-1">{v.email}</span>
-                                            <span className="text-gray-400 text-[10px] flex-shrink-0">
+                                          <div key={v.id} className="flex items-center gap-2 text-xs bg-white rounded p-2 border border-cream-100">
+                                            <Clock className="h-3 w-3 text-ink-warm-400 flex-shrink-0" />
+                                            <span className="text-ink-warm-900 truncate flex-1">{v.email}</span>
+                                            <span className="text-ink-warm-400 text-[10px] flex-shrink-0">
                                               {new Date(v.viewed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                             </span>
                                           </div>
                                         ))}
                                         {bucket.visits.length > 20 && (
-                                          <p className="text-[10px] text-gray-400 text-center pt-1">+ {bucket.visits.length - 20} older visits</p>
+                                          <p className="text-[10px] text-ink-warm-400 text-center pt-1">+ {bucket.visits.length - 20} older visits</p>
                                         )}
                                       </div>
                                     )}
@@ -2760,60 +2833,64 @@ export default function ListsPage() {
         ) : viewMode === 'card' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {paginatedLists.map((list) => (
-              <Card key={list.id} className="transition-shadow group h-full flex flex-col">
-                <CardHeader className="pb-4">
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
-                      <div className="flex items-center">
-                        <div className="bg-gray-100 p-1.5 rounded-lg mr-2">
-                          <List className="h-5 w-5 text-gray-600" />
-                        </div>
-                        {list.name}
+              // v11 list card — same shape as the /clients card:
+              // logo tile + name (left) + hover-action cluster (right)
+              // in CardHeader; status badge row; CardContent has the
+              // body + action button rows pinned via mt-auto.
+              <Card key={list.id} className="crd-hover group flex flex-col h-full">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      {/* Brand-soft tile + List icon — matches the
+                          /clients logo tile fallback chrome. */}
+                      <div className="w-10 h-10 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center flex-shrink-0">
+                        <List className="h-5 w-5" />
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditList(list)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2"
-                          title="Edit list"
-                        >
-                          <Edit className="h-4 w-4 text-gray-600" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteList(list.id)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2"
-                          title="Delete list"
-                        >
-                          <Trash2 className="h-4 w-4 text-rose-600" />
-                        </Button>
-                      </div>
+                      <span className="text-base font-semibold text-ink-warm-900 tracking-tight truncate min-w-0">{list.name}</span>
                     </div>
-                    <div className="flex gap-2 items-center">
-                      <Badge variant="outline" className="text-xs">
-                        {list.kols?.length || 0} KOL{(list.kols?.length || 0) !== 1 ? 's' : ''}
-                      </Badge>
-                      {list.status && (
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getListStatusColor(list.status)}`}>
-                          {list.status.charAt(0).toUpperCase() + list.status.slice(1)}
-                        </span>
-                      )}
+                    {/* Hover-action cluster — opacity-60 at rest,
+                        sharpens on card hover. Square 28px tiles. */}
+                    <div className="flex items-center gap-0.5 flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity duration-200">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); handleEditList(list); }}
+                        className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-ink-warm-900 hover:bg-cream-100"
+                        title="Edit list"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteList(list.id); }}
+                        className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-rose-600 hover:bg-rose-50"
+                        title="Delete list"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center text-sm text-gray-600">
-                      <Calendar className="h-4 w-4 mr-2 text-gray-600" />
-                      <span className="text-gray-600">{formatDate(list.created_at)}</span>
-                    </div>
+                  {/* Status badge row — KOL count only. Status pill
+                      (Curated/Approved/Denied) hidden per 2026-06-02
+                      product decision; matches the per-status tab
+                      removal above. */}
+                  <div className="flex gap-2 flex-wrap">
+                    <StatusBadge tone="neutral" size="sm" bordered>
+                      {list.kols?.length || 0} KOL{(list.kols?.length || 0) !== 1 ? 's' : ''}
+                    </StatusBadge>
+                  </div>
+                  {/* Created date row — only render if present */}
+                  <div className="mt-2 flex items-center text-sm text-ink-warm-500">
+                    <Calendar className="h-4 w-4 mr-2 text-ink-warm-400" />
+                    <span className="tabular-nums">{formatDate(list.created_at)}</span>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-4 border-t border-gray-100 flex flex-col flex-1">
+                <CardContent className="pt-3 border-t border-cream-100 flex flex-col flex-1">
                   {list.notes && (
-                    <div className="mb-4">
-                      <h4 className="font-semibold text-sm text-gray-700 mb-2">Notes:</h4>
-                      <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 min-h-[60px] max-h-[100px] overflow-y-auto">
+                    <div className="mb-3">
+                      <div className="text-[11px] mono uppercase tracking-[0.14em] text-ink-warm-500 mb-1.5">Notes</div>
+                      <div className="bg-cream-50 border border-cream-200 rounded-md p-2.5 text-sm text-ink-warm-700 min-h-[48px] max-h-[100px] overflow-y-auto">
                         {list.notes}
                       </div>
                     </div>
@@ -2871,46 +2948,40 @@ export default function ListsPage() {
           <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-50">
-                  <TableHead className="font-semibold">List Name</TableHead>
-                  <TableHead className="font-semibold">Status</TableHead>
-                  <TableHead className="font-semibold">KOLs</TableHead>
-                  <TableHead className="font-semibold">Created</TableHead>
-                  <TableHead className="font-semibold">Notes</TableHead>
-                  <TableHead className="font-semibold text-right">Actions</TableHead>
+                {/* Status column hidden per 2026-06-02 product decision
+                    — pairs with the per-status tab + card badge removal. */}
+                <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">List Name</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">KOLs</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Created</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Notes</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedLists.map((list) => (
                   <TableRow
                     key={list.id}
-                    className="cursor-pointer hover:bg-gray-50"
+                    className="cursor-pointer hover:bg-cream-50"
                     onClick={() => handleViewList(list)}
                   >
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <div className="bg-gray-100 p-1.5 rounded-lg">
-                          <List className="h-4 w-4 text-gray-600" />
+                        <div className="bg-cream-100 p-1.5 rounded-lg">
+                          <List className="h-4 w-4 text-ink-warm-700" />
                         </div>
-                        <span className="font-medium text-gray-900">{list.name}</span>
+                        <span className="font-medium text-ink-warm-900">{list.name}</span>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {list.status && (
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getListStatusColor(list.status)}`}>
-                          {list.status.charAt(0).toUpperCase() + list.status.slice(1)}
-                        </span>
-                      )}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className="text-xs">
                         {list.kols?.length || 0} KOL{(list.kols?.length || 0) !== 1 ? 's' : ''}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-gray-600 text-sm">
+                    <TableCell className="text-ink-warm-700 text-sm">
                       {formatDate(list.created_at)}
                     </TableCell>
-                    <TableCell className="text-gray-600 text-sm max-w-[200px] truncate">
+                    <TableCell className="text-ink-warm-700 text-sm max-w-[200px] truncate">
                       {list.notes || '-'}
                     </TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
@@ -2963,7 +3034,7 @@ export default function ListsPage() {
         {/* Pagination */}
         {filteredLists.length > itemsPerPage && (
           <div className="flex items-center justify-between pt-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-ink-warm-700">
               Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredLists.length)} of {filteredLists.length} lists
             </p>
             <div className="flex items-center gap-2">
@@ -2976,7 +3047,7 @@ export default function ListsPage() {
                 <ChevronLeft className="h-4 w-4 mr-1" />
                 Previous
               </Button>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-ink-warm-700">
                 Page {currentPage} of {totalPages}
               </span>
               <Button
@@ -2991,6 +3062,7 @@ export default function ListsPage() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </ProtectedRoute>
   );
@@ -3000,35 +3072,43 @@ export default function ListsPage() {
 // Pure JSX with no props/closure; one stable function reference for the
 // whole app lifetime so React's reconciler treats every instance as the
 // same component type (no remount on parent re-render).
+// Structural skeleton mirroring the new v11 list card 1:1 so the
+// layout doesn't shift when data lands. Same logo tile + name +
+// hover-action cluster + status badge row + created-date row +
+// 2-row action grid as the loaded card.
 function ListCardSkeleton() {
   return (
-    <Card className="transition-shadow h-full flex flex-col">
-      <CardHeader className="pb-4">
-        <div className="mb-3">
-          <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
-            <div className="flex items-center">
-              <Skeleton className="h-8 w-8 rounded-lg mr-2" />
-              <Skeleton className="h-5 w-40" />
-            </div>
+    <Card className="crd-hover h-full flex flex-col">
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <Skeleton className="h-10 w-10 rounded-md flex-shrink-0" />
+            <Skeleton className="h-5 w-32" />
           </div>
-          <div className="flex gap-2">
-            <Skeleton className="h-6 w-16 rounded-full" />
-            <Skeleton className="h-6 w-20 rounded-full" />
+          <div className="flex items-center gap-0.5 flex-shrink-0 opacity-60">
+            <Skeleton className="h-7 w-7 rounded-md" />
+            <Skeleton className="h-7 w-7 rounded-md" />
           </div>
         </div>
-        <div className="space-y-2">
-          <div className="flex items-center text-sm text-gray-600">
-            <Skeleton className="h-4 w-4 mr-2" />
-            <Skeleton className="h-4 w-36" />
-          </div>
+        <div className="flex gap-2 flex-wrap">
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
+        <div className="mt-2 flex items-center">
+          <Skeleton className="h-4 w-4 mr-2 rounded-sm" />
+          <Skeleton className="h-4 w-28" />
         </div>
       </CardHeader>
-      <CardContent className="pt-4 border-t border-gray-100 flex flex-col flex-1">
-        <div className="flex gap-2 mt-auto">
-          <Skeleton className="h-8 w-full rounded" />
-          <Skeleton className="h-8 w-full rounded" />
+      <CardContent className="pt-3 border-t border-cream-100 flex flex-col flex-1">
+        <div className="mt-auto space-y-2">
+          <div className="flex gap-2">
+            <Skeleton className="h-8 flex-1 rounded-md" />
+            <Skeleton className="h-8 flex-1 rounded-md" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-8 flex-1 rounded-md" />
+            <Skeleton className="h-8 flex-1 rounded-md" />
+          </div>
         </div>
-        <Skeleton className="h-8 w-full rounded mt-2" />
       </CardContent>
     </Card>
   );

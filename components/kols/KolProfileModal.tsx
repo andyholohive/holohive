@@ -10,7 +10,10 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatusBadge, type BadgeTone } from "@/components/ui/status-badge";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -88,7 +91,11 @@ export function KolProfileModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      {/* flex-col so the header + TabsList stay pinned and only the
+          per-tab body scrolls. Matches the inner-scroll pattern used
+          by the /clients dialogs — scrollbar sits inset between the
+          dialog edges instead of at the outer rounded corner. */}
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span>{kol.name}</span>
@@ -97,7 +104,7 @@ export function KolProfileModal({
                 href={kol.link}
                 target="_blank"
                 rel="noreferrer"
-                className="text-blue-600 hover:text-blue-800"
+                className="text-brand hover:text-brand-dark"
                 title="Open KOL link"
               >
                 <ExternalLink className="h-4 w-4" />
@@ -106,32 +113,83 @@ export function KolProfileModal({
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="overview" className="mt-2">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="deliverables">Deliverables</TabsTrigger>
-            <TabsTrigger value="snapshots">Snapshots</TabsTrigger>
-            <TabsTrigger value="calls">Call Logs</TabsTrigger>
+        <Tabs defaultValue="overview" className="mt-2 flex-1 flex flex-col min-h-0">
+          {/* v11 tab chrome — cream-100 base + warm hairline + the
+              active-state shadow-card so the lift matches /clients,
+              /team, and the parent /kols toolbar. */}
+          <TabsList className="grid w-full grid-cols-4 bg-cream-100 p-1 h-auto border border-cream-200 shrink-0">
+            <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Overview</TabsTrigger>
+            <TabsTrigger value="deliverables" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Deliverables</TabsTrigger>
+            <TabsTrigger value="snapshots" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Snapshots</TabsTrigger>
+            <TabsTrigger value="calls" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Call Logs</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="mt-4">
+          <TabsContent value="overview" className="mt-4 flex-1 overflow-y-auto px-1">
             <OverviewTab kol={kol} onKolChanged={onKolChanged} score={score} />
           </TabsContent>
 
-          <TabsContent value="deliverables" className="mt-4">
+          <TabsContent value="deliverables" className="mt-4 flex-1 overflow-y-auto px-1">
             <DeliverablesTab kolId={kol.id} onMetricsChanged={onMetricsChanged} />
           </TabsContent>
 
-          <TabsContent value="snapshots" className="mt-4">
+          <TabsContent value="snapshots" className="mt-4 flex-1 overflow-y-auto px-1">
             <SnapshotsTab kolId={kol.id} onMetricsChanged={onMetricsChanged} />
           </TabsContent>
 
-          <TabsContent value="calls" className="mt-4">
+          <TabsContent value="calls" className="mt-4 flex-1 overflow-y-auto px-1">
             <CallLogsTab kolId={kol.id} />
           </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/* ─────────────────────────── Shared helpers ─────────────────────────── */
+
+/**
+ * Title-case a status string. DB stores statuses as lowercase tokens
+ * (`'published'`, `'scheduled'`, `'in_progress'`); displaying them raw
+ * looks unfinished. This converts to "Published", "Scheduled",
+ * "In Progress" without forcing all-caps that would crowd the badge.
+ */
+const titleCase = (s: string | null | undefined): string => {
+  if (!s) return '';
+  return s
+    .split(/[\s_-]+/)
+    .map((w) => (w.length ? w.charAt(0).toUpperCase() + w.slice(1).toLowerCase() : ''))
+    .join(' ');
+};
+
+/**
+ * Structural skeleton mirroring the shape of a content/snapshot/call
+ * log row — small chrome header (title + 1-2 chips), 3-5 mini-stats,
+ * and an optional notes line. Used across the three loading-data
+ * tabs so the loading shell matches the loaded row at a glance.
+ */
+function RowSkeleton({ stats = 5, notes = true }: { stats?: number; notes?: boolean }) {
+  return (
+    <Card className="p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-12 rounded" />
+            <Skeleton className="h-4 w-16 rounded" />
+          </div>
+          <div className={`mt-2 grid gap-2 grid-cols-${stats}`} style={{ gridTemplateColumns: `repeat(${stats}, minmax(0, 1fr))` }}>
+            {Array.from({ length: stats }).map((_, i) => (
+              <div key={i} className="text-center space-y-1">
+                <Skeleton className="h-2 w-12 mx-auto" />
+                <Skeleton className="h-3 w-10 mx-auto" />
+              </div>
+            ))}
+          </div>
+          {notes && <Skeleton className="mt-2 h-3 w-3/4" />}
+        </div>
+        <Skeleton className="h-6 w-6 rounded shrink-0" />
+      </div>
+    </Card>
   );
 }
 
@@ -170,7 +228,7 @@ function OverviewTab({
       {/* Compact KOL summary — read-only here; editing happens in the
           /kols list inline. The point of this section is "is this the
           right KOL?", not "edit everything". */}
-      <div className="grid grid-cols-2 gap-3 p-3 bg-gray-50 rounded-md">
+      <Card className="grid grid-cols-2 gap-3 p-3 bg-cream-50">
         <Field label="Region" value={kol.region || "—"} />
         <Field label="Followers" value={kol.followers ? KOLService.formatFollowers(kol.followers) : "—"} />
         <Field label="Platform" value={(kol.platform || []).join(", ") || "—"} />
@@ -180,7 +238,7 @@ function OverviewTab({
           value={
             kol.community
               ? kol.community_link
-                ? <a href={kol.community_link} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Yes (link)</a>
+                ? <a href={kol.community_link} target="_blank" rel="noreferrer" className="text-brand hover:underline">Yes (link)</a>
                 : "Yes"
               : "No"
           }
@@ -198,31 +256,31 @@ function OverviewTab({
                 </span>
               </span>
             ) : (
-              <span className="text-gray-400" title={score?.reason || undefined}>
+              <span className="text-ink-warm-400" title={score?.reason || undefined}>
                 {score?.reason ? "Insufficient data" : "—"}
               </span>
             )
           }
         />
-      </div>
+      </Card>
 
       {/* Per-dimension breakdown — only when a score exists. Helps the
           team understand WHY a KOL scored a given number. */}
       {score?.score != null && score.dimensions && (
-        <div className="grid grid-cols-5 gap-2 p-3 bg-white border border-gray-200 rounded-md">
+        <Card className="grid grid-cols-5 gap-2 p-3">
           <DimensionBar label="Engagement" value={score.dimensions.engagement_quality} />
           <DimensionBar label="Reach" value={score.dimensions.reach_efficiency} />
           <DimensionBar label="Channel" value={score.dimensions.channel_health} />
           <DimensionBar label="Growth" value={score.dimensions.growth_trajectory} />
           <DimensionBar label="Activation" value={score.dimensions.activation_impact} />
-        </div>
+        </Card>
       )}
 
       {/* Notes field — editable here. The /kols list also exposes this
           as the "Notes" column, but inline-editing a textarea in a
           table cell is cramped; the modal is a better home. */}
       <div className="space-y-1.5">
-        <label className="text-xs font-semibold text-gray-700">Notes</label>
+        <label className="text-xs font-semibold text-ink-warm-700">Notes</label>
         <Textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -230,7 +288,7 @@ function OverviewTab({
           placeholder="Free-form notes about this KOL…"
           className="min-h-[100px] focus-brand"
         />
-        {savingNotes && <p className="text-xs text-gray-500">Saving…</p>}
+        {savingNotes && <p className="text-xs text-ink-warm-500">Saving…</p>}
       </div>
     </div>
   );
@@ -239,8 +297,8 @@ function OverviewTab({
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="text-xs">
-      <div className="text-gray-500 font-semibold uppercase tracking-wide">{label}</div>
-      <div className="mt-0.5 text-gray-900">{value}</div>
+      <div className="text-ink-warm-500 font-semibold uppercase tracking-wide">{label}</div>
+      <div className="mt-0.5 text-ink-warm-900">{value}</div>
     </div>
   );
 }
@@ -254,8 +312,8 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 function DimensionBar({ label, value }: { label: string; value: number | null }) {
   if (value == null) return (
     <div className="text-center">
-      <div className="text-[10px] text-gray-500 uppercase">{label}</div>
-      <div className="text-xs text-gray-300">—</div>
+      <div className="text-[10px] text-ink-warm-500 uppercase">{label}</div>
+      <div className="text-xs text-ink-warm-300">—</div>
     </div>
   );
   const color =
@@ -265,11 +323,11 @@ function DimensionBar({ label, value }: { label: string; value: number | null })
     "bg-rose-500";
   return (
     <div className="text-center">
-      <div className="text-[10px] text-gray-500 uppercase truncate" title={label}>{label}</div>
-      <div className="mt-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+      <div className="text-[10px] text-ink-warm-500 uppercase truncate" title={label}>{label}</div>
+      <div className="mt-1 h-1 bg-cream-100 rounded-full overflow-hidden">
         <div className={`h-full ${color} transition-all`} style={{ width: `${value}%` }} />
       </div>
-      <div className="text-[10px] text-gray-700 mt-0.5">{value}</div>
+      <div className="text-[10px] text-ink-warm-700 mt-0.5">{value}</div>
     </div>
   );
 }
@@ -366,18 +424,25 @@ function DeliverablesTab({ kolId, onMetricsChanged }: { kolId: string; onMetrics
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-ink-warm-500">
           {list.length} deliverable{list.length === 1 ? '' : 's'} across all campaigns.
         </p>
-        <p className="text-[11px] text-gray-400">
+        <p className="text-[11px] text-ink-warm-400">
           To add a deliverable, open the campaign and use its Contents tab.
         </p>
       </div>
 
       {loading ? (
-        <p className="text-xs text-gray-500">Loading…</p>
+        // Structural skeleton — 3 rows of the same shape as a real
+        // deliverable row. Replaces the old "Loading…" text so the
+        // tab doesn't visibly shift when data arrives.
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <RowSkeleton key={i} stats={5} notes />
+          ))}
+        </div>
       ) : list.length === 0 ? (
-        <p className="text-xs text-gray-500 italic p-4 bg-gray-50 rounded-md text-center">
+        <p className="text-xs text-ink-warm-500 italic p-4 bg-cream-50 rounded-md text-center">
           No deliverables yet. They'll appear here once content is added to a campaign the KOL is on.
         </p>
       ) : (
@@ -467,45 +532,46 @@ function ContentDeliverableRowView({
     setEditing(false);
   };
 
-  // Status badge color — match the campaign-side conventions where
-  // possible. Falls back to gray for unknown values.
-  const statusClass = (() => {
+  // Map free-text status to a centralized StatusBadge tone so the
+  // pill draws from the same 9-tone palette used everywhere else
+  // (instead of one-off color classes). Falls back to neutral.
+  const statusTone: BadgeTone = (() => {
     const s = (row.status || '').toLowerCase();
-    if (s === 'published' || s === 'completed' || s === 'posted') return 'bg-emerald-50 text-emerald-700 border border-emerald-100';
-    if (s === 'scheduled' || s === 'planned') return 'bg-blue-50 text-blue-700 border border-blue-100';
-    if (s === 'cancelled' || s === 'rejected') return 'bg-rose-50 text-rose-700 border border-rose-100';
-    return 'bg-gray-100 text-gray-600';
+    if (s === 'published' || s === 'completed' || s === 'posted') return 'success';
+    if (s === 'scheduled' || s === 'planned') return 'info';
+    if (s === 'cancelled' || s === 'rejected') return 'danger';
+    return 'neutral';
   })();
 
   return (
-    <div className="border border-gray-200 rounded-md p-3 bg-white">
+    <Card className="p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             {row.campaign && (
               <Link
                 href={`/campaigns/${row.campaign.id}`}
-                className="text-sm font-semibold text-gray-900 hover:text-brand inline-flex items-center gap-1"
+                className="text-sm font-semibold text-ink-warm-900 hover:text-brand inline-flex items-center gap-1"
                 title="Open campaign"
               >
                 {row.campaign.name}
-                <ExternalLink className="h-3 w-3 text-gray-400" />
+                <ExternalLink className="h-3 w-3 text-ink-warm-400" />
               </Link>
             )}
             {row.type && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-100">
-                {row.type}
-              </span>
+              <StatusBadge tone="purple" size="sm" bordered>
+                {titleCase(row.type)}
+              </StatusBadge>
             )}
             {row.platform && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 uppercase tracking-wide">
-                {row.platform}
-              </span>
+              <StatusBadge tone="neutral" size="sm" bordered>
+                <span className="uppercase tracking-wide">{row.platform}</span>
+              </StatusBadge>
             )}
             {row.status && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded ${statusClass}`}>
-                {row.status}
-              </span>
+              <StatusBadge tone={statusTone} size="sm" bordered withDot>
+                {titleCase(row.status)}
+              </StatusBadge>
             )}
           </div>
 
@@ -532,7 +598,7 @@ function ContentDeliverableRowView({
           )}
 
           {!editing && row.notes && (
-            <p className="mt-2 text-xs text-gray-600 italic">&quot;{row.notes}&quot;</p>
+            <p className="mt-2 text-xs text-ink-warm-700 italic">&quot;{row.notes}&quot;</p>
           )}
           {editing && (
             <div className="mt-2">
@@ -540,7 +606,7 @@ function ContentDeliverableRowView({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Notes (optional)"
-                className="min-h-[50px] text-xs"
+                className="min-h-[50px] text-xs focus-brand"
               />
             </div>
           )}
@@ -549,12 +615,12 @@ function ContentDeliverableRowView({
         <div className="flex items-center gap-1 flex-shrink-0">
           {!editing ? (
             <Button size="sm" variant="ghost" onClick={() => setEditing(true)} title="Edit metrics & notes">
-              <Pencil className="h-3 w-3 text-gray-500" />
+              <Pencil className="h-3 w-3 text-ink-warm-500" />
             </Button>
           ) : (
             <>
               <Button size="sm" variant="ghost" onClick={handleCancel} disabled={saving} title="Cancel">
-                <X className="h-3 w-3 text-gray-500" />
+                <X className="h-3 w-3 text-ink-warm-500" />
               </Button>
               <Button size="sm" variant="ghost" onClick={handleSave} disabled={saving} title="Save">
                 <Save className="h-3 w-3 text-emerald-600" />
@@ -563,7 +629,7 @@ function ContentDeliverableRowView({
           )}
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -578,12 +644,12 @@ function NumField({
 }) {
   return (
     <div className="space-y-0.5">
-      <div className="text-[10px] text-gray-500 uppercase text-center">{label}</div>
+      <div className="text-[10px] text-ink-warm-500 uppercase text-center">{label}</div>
       <Input
         type="number"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-7 text-xs text-center"
+        className="h-7 text-xs text-center focus-brand"
       />
     </div>
   );
@@ -592,7 +658,7 @@ function NumField({
 function Stat({ label, value }: { label: string; value: number | null }) {
   return (
     <div className="text-center">
-      <div className="text-[10px] text-gray-500 uppercase">{label}</div>
+      <div className="text-[10px] text-ink-warm-500 uppercase">{label}</div>
       <div className="text-xs font-semibold">{value != null ? value.toLocaleString() : "—"}</div>
     </div>
   );
@@ -607,7 +673,7 @@ function Stat({ label, value }: { label: string; value: number | null }) {
 function FormField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">{label}</label>
+      <label className="text-[10px] font-semibold text-ink-warm-700 uppercase tracking-wide">{label}</label>
       {children}
     </div>
   );
@@ -664,7 +730,7 @@ function SnapshotsTab({ kolId, onMetricsChanged }: { kolId: string; onMetricsCha
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-ink-warm-500">
           {list.length} monthly snapshot{list.length === 1 ? "" : "s"} logged.
           {list.length < 2 && (
             <span className="ml-1 text-amber-600">
@@ -688,9 +754,15 @@ function SnapshotsTab({ kolId, onMetricsChanged }: { kolId: string; onMetricsCha
       )}
 
       {loading ? (
-        <p className="text-xs text-gray-500">Loading…</p>
+        // Snapshot rows have 4 mini-stats (Views/Reactions/Posts/ER)
+        // so the skeleton uses stats=4 to match the loaded shape.
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <RowSkeleton key={i} stats={4} notes={false} />
+          ))}
+        </div>
       ) : list.length === 0 ? (
-        <p className="text-xs text-gray-500 italic p-4 bg-gray-50 rounded-md text-center">
+        <p className="text-xs text-ink-warm-500 italic p-4 bg-cream-50 rounded-md text-center">
           No snapshots yet. Log a monthly snapshot to feed the Channel Health and Growth Trajectory score dimensions.
         </p>
       ) : (
@@ -719,29 +791,30 @@ function SnapshotRow({ s, onDelete }: { s: KolChannelSnapshot; onDelete: () => v
   const growthPct = s.follower_growth_pct != null ? Number(s.follower_growth_pct) : null;
   const engagementRate = s.engagement_rate != null ? Number(s.engagement_rate) : null;
 
+  // MoM growth tone — picked once so the badge below + any aria
+  // hints stay in sync. neutral covers exact-zero (no movement).
+  const growthTone: BadgeTone = growthPct == null
+    ? 'neutral'
+    : growthPct > 0 ? 'success' : growthPct < 0 ? 'danger' : 'neutral';
+
   return (
-    <div className="border border-gray-200 rounded-md p-3 bg-white">
+    <Card className="p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold">{monthLabel}</span>
-            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">
+            <span className="text-sm font-semibold text-ink-warm-900">{monthLabel}</span>
+            <StatusBadge tone="neutral" size="sm" bordered>
               {s.follower_count.toLocaleString()} followers
-            </span>
-            {/* MoM growth as a colored pill next to the follower count
-                — positive=green, negative=red, zero=gray. Reads as a
-                trend at a glance without the user parsing the number. */}
+            </StatusBadge>
+            {/* MoM growth as a StatusBadge — tone encodes direction
+                (success up / danger down / neutral flat) so the
+                trend reads at a glance without parsing the number. */}
             {growthPct != null && (
-              <span
-                className={`text-xs px-1.5 py-0.5 rounded font-semibold ${
-                  growthPct > 0 ? 'bg-emerald-50 text-emerald-700'
-                  : growthPct < 0 ? 'bg-rose-50 text-rose-700'
-                  : 'bg-gray-100 text-gray-600'
-                }`}
-                title="Month-over-month follower growth"
-              >
-                {growthPct > 0 ? '↑' : growthPct < 0 ? '↓' : '·'} {Math.abs(growthPct).toFixed(1)}%
-              </span>
+              <StatusBadge tone={growthTone} size="sm" bordered>
+                <span title="Month-over-month follower growth">
+                  {growthPct > 0 ? '↑' : growthPct < 0 ? '↓' : '·'} {Math.abs(growthPct).toFixed(1)}%
+                </span>
+              </StatusBadge>
             )}
           </div>
           {/* [May 2026 KOL overhaul follow-up] avg_forwards_per_post
@@ -760,13 +833,13 @@ function SnapshotRow({ s, onDelete }: { s: KolChannelSnapshot; onDelete: () => v
               value={engagementRate != null ? Number((engagementRate * 100).toFixed(2)) : null}
             />
           </div>
-          {s.notes && <p className="mt-2 text-xs text-gray-600 italic">"{s.notes}"</p>}
+          {s.notes && <p className="mt-2 text-xs text-ink-warm-700 italic">"{s.notes}"</p>}
         </div>
         <Button size="sm" variant="ghost" onClick={onDelete} title="Delete">
           <Trash2 className="h-3 w-3 text-rose-500" />
         </Button>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -832,30 +905,30 @@ function SnapshotForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="border border-gray-200 rounded-md p-3 bg-gray-50 space-y-2">
+    <form onSubmit={handleSubmit} className="rounded-[14px] border border-cream-200 p-3 bg-cream-50 space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <FormField label="Snapshot Month *">
           {/* TODO: migrate to DateField pattern (Popover + Calendar).
               lint-conventions: disable-next-line no-input-type-date */}
-          <Input type="date" value={snapshotDate} onChange={(e) => setSnapshotDate(e.target.value)} className="h-8 text-xs" />
+          <Input type="date" value={snapshotDate} onChange={(e) => setSnapshotDate(e.target.value)} className="h-8 text-xs focus-brand" />
         </FormField>
         <FormField label="Follower Count *">
-          <Input type="number" min={0} value={followerCount} onChange={(e) => setFollowerCount(e.target.value)} className="h-8 text-xs" placeholder="e.g. 12500" />
+          <Input type="number" min={0} value={followerCount} onChange={(e) => setFollowerCount(e.target.value)} className="h-8 text-xs focus-brand" placeholder="e.g. 12500" />
         </FormField>
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <FormField label="Avg Views"><Input type="number" value={avgViews} onChange={(e) => setAvgViews(e.target.value)} className="h-8 text-xs" /></FormField>
-        <FormField label="Avg Reactions"><Input type="number" value={avgReactions} onChange={(e) => setAvgReactions(e.target.value)} className="h-8 text-xs" /></FormField>
-        <FormField label="Posts/Week"><Input type="number" step="0.1" value={postingFreq} onChange={(e) => setPostingFreq(e.target.value)} className="h-8 text-xs" /></FormField>
+        <FormField label="Avg Views"><Input type="number" value={avgViews} onChange={(e) => setAvgViews(e.target.value)} className="h-8 text-xs focus-brand" /></FormField>
+        <FormField label="Avg Reactions"><Input type="number" value={avgReactions} onChange={(e) => setAvgReactions(e.target.value)} className="h-8 text-xs focus-brand" /></FormField>
+        <FormField label="Posts/Week"><Input type="number" step="0.1" value={postingFreq} onChange={(e) => setPostingFreq(e.target.value)} className="h-8 text-xs focus-brand" /></FormField>
       </div>
       <FormField label="Notes">
-        <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-[50px] text-xs" placeholder="e.g. KOL took a 2-week break, posting frequency dipped" />
+        <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-[50px] text-xs focus-brand" placeholder="e.g. KOL took a 2-week break, posting frequency dipped" />
       </FormField>
       <div className="flex justify-end gap-2 pt-1">
         <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={saving}>Cancel</Button>
         <Button type="submit" size="sm" disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
       </div>
-      <p className="text-[10px] text-gray-500 mt-1">
+      <p className="text-[10px] text-ink-warm-500 mt-1">
         Tip: Saving the same month twice updates the existing entry (no duplicates).
       </p>
     </form>
@@ -907,7 +980,7 @@ function CallLogsTab({ kolId }: { kolId: string }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-500">{list.length} call log{list.length === 1 ? "" : "s"}.</p>
+        <p className="text-xs text-ink-warm-500">{list.length} call log{list.length === 1 ? "" : "s"}.</p>
         {!showAddForm && (
           <Button size="sm" variant="outline" onClick={() => setShowAddForm(true)}>
             <Plus className="h-3 w-3 mr-1" /> Add Call Log
@@ -924,9 +997,15 @@ function CallLogsTab({ kolId }: { kolId: string }) {
       )}
 
       {loading ? (
-        <p className="text-xs text-gray-500">Loading…</p>
+        // Call logs are mostly notes — skeleton uses stats=0 and a
+        // small notes line via the helper to imply the prose body.
+        <div className="space-y-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <RowSkeleton key={i} stats={1} notes />
+          ))}
+        </div>
       ) : list.length === 0 ? (
-        <p className="text-xs text-gray-500 italic p-4 bg-gray-50 rounded-md text-center">
+        <p className="text-xs text-ink-warm-500 italic p-4 bg-cream-50 rounded-md text-center">
           No call logs yet. Add one after your next call with this KOL.
         </p>
       ) : (
@@ -942,13 +1021,21 @@ function CallLogsTab({ kolId }: { kolId: string }) {
 
 function CallLogRow({ c, onDelete }: { c: KolCallLog; onDelete: () => void }) {
   return (
-    <div className="border border-gray-200 rounded-md p-3 bg-white">
+    <Card className="p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-semibold">{new Date(c.call_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-            {c.call_type && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">{c.call_type}</span>}
-            {c.project && <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">{c.project}</span>}
+            <span className="text-sm font-semibold text-ink-warm-900">{new Date(c.call_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+            {c.call_type && (
+              <StatusBadge tone="purple" size="sm" bordered>
+                {titleCase(c.call_type)}
+              </StatusBadge>
+            )}
+            {c.project && (
+              <StatusBadge tone="neutral" size="sm" bordered>
+                {c.project}
+              </StatusBadge>
+            )}
           </div>
           <div className="mt-2 space-y-1.5 text-xs">
             {c.notes && <Section label="Notes" body={c.notes} />}
@@ -961,15 +1048,15 @@ function CallLogRow({ c, onDelete }: { c: KolCallLog; onDelete: () => void }) {
           <Trash2 className="h-3 w-3 text-rose-500" />
         </Button>
       </div>
-    </div>
+    </Card>
   );
 }
 
 function Section({ label, body }: { label: string; body: string }) {
   return (
     <div>
-      <span className="text-[10px] font-semibold text-gray-500 uppercase">{label}: </span>
-      <span className="text-gray-700">{body}</span>
+      <span className="text-[10px] font-semibold text-ink-warm-500 uppercase">{label}: </span>
+      <span className="text-ink-warm-700">{body}</span>
     </div>
   );
 }
@@ -1018,36 +1105,36 @@ function CallLogForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="border border-gray-200 rounded-md p-3 bg-gray-50 space-y-2">
+    <form onSubmit={handleSubmit} className="rounded-[14px] border border-cream-200 p-3 bg-cream-50 space-y-2">
       <div className="grid grid-cols-3 gap-2">
         <FormField label="Date *">
           {/* TODO: migrate to DateField pattern (Popover + Calendar).
               lint-conventions: disable-next-line no-input-type-date */}
-          <Input type="date" value={callDate} onChange={(e) => setCallDate(e.target.value)} className="h-8 text-xs" />
+          <Input type="date" value={callDate} onChange={(e) => setCallDate(e.target.value)} className="h-8 text-xs focus-brand" />
         </FormField>
         <FormField label="Call Type">
           <Select value={callType} onValueChange={setCallType}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select…" /></SelectTrigger>
+            <SelectTrigger className="h-8 text-xs focus-brand"><SelectValue placeholder="Select…" /></SelectTrigger>
             <SelectContent>
               {CALL_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
         </FormField>
         <FormField label="Project">
-          <Input value={project} onChange={(e) => setProject(e.target.value)} className="h-8 text-xs" placeholder="e.g. Valiant" />
+          <Input value={project} onChange={(e) => setProject(e.target.value)} className="h-8 text-xs focus-brand" placeholder="e.g. Valiant" />
         </FormField>
       </div>
       <FormField label="Notes">
-        <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-[50px] text-xs" placeholder="General debrief…" />
+        <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="min-h-[50px] text-xs focus-brand" placeholder="General debrief…" />
       </FormField>
       <FormField label="Market Intel">
-        <Textarea value={marketIntel} onChange={(e) => setMarketIntel(e.target.value)} className="min-h-[50px] text-xs" placeholder="Narratives/trends the KOL flagged…" />
+        <Textarea value={marketIntel} onChange={(e) => setMarketIntel(e.target.value)} className="min-h-[50px] text-xs focus-brand" placeholder="Narratives/trends the KOL flagged…" />
       </FormField>
       <FormField label="Recommended Angle">
-        <Textarea value={recommendedAngle} onChange={(e) => setRecommendedAngle(e.target.value)} className="min-h-[50px] text-xs" placeholder="Content approach they suggested…" />
+        <Textarea value={recommendedAngle} onChange={(e) => setRecommendedAngle(e.target.value)} className="min-h-[50px] text-xs focus-brand" placeholder="Content approach they suggested…" />
       </FormField>
       <FormField label="Feedback on HH">
-        <Textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} className="min-h-[50px] text-xs" placeholder="What they liked/disliked about working with us…" />
+        <Textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} className="min-h-[50px] text-xs focus-brand" placeholder="What they liked/disliked about working with us…" />
       </FormField>
       <div className="flex justify-end gap-2 pt-1">
         <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={saving}>Cancel</Button>

@@ -20,6 +20,7 @@ import type { KolDeliverable } from "@/lib/kolDeliverableService";
 import type { KolChannelSnapshot } from "@/lib/kolChannelSnapshotService";
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { KOLService, MasterKOL } from "@/lib/kolService";
@@ -303,7 +304,7 @@ export default function KOLsPage() {
                 onClick={() => onOpenChange?.(false)}
               />
               <div
-                className="fixed z-[9999] w-[220px] bg-white border border-gray-200 rounded-md shadow-lg"
+                className="fixed z-[9999] w-[220px] bg-white border border-cream-200 rounded-md shadow-lg"
                 style={{
                   left: triggerRect.left,
                   top: placement === 'down' ? triggerRect.bottom + 4 : undefined,
@@ -328,7 +329,7 @@ export default function KOLsPage() {
                     filteredOptions.map((option) => (
                       <div
                         key={option}
-                        className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-gray-100"
+                        className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-cream-100"
                         onClick={(e) => {
                           e.stopPropagation();
                           const newSelected = safeSelected.includes(option)
@@ -924,12 +925,12 @@ export default function KOLsPage() {
       'Bridge Builders': 'bg-teal-100 text-teal-800',
       'Visionaries': 'bg-cyan-100 text-cyan-800'
     };
-    return colorMap[contentType] || 'bg-gray-100 text-gray-800';
+    return colorMap[contentType] || 'bg-cream-100 text-ink-warm-700';
   };
 
   const getNicheColor = (niche: string) => {
     const colorMap: { [key: string]: string } = {
-      'General': 'bg-gray-100 text-gray-800',
+      'General': 'bg-cream-100 text-ink-warm-700',
       'Gaming': 'bg-indigo-100 text-indigo-800',
       'Crypto': 'bg-emerald-100 text-emerald-800',
       'Memecoin': 'bg-pink-100 text-pink-800',
@@ -940,7 +941,7 @@ export default function KOLsPage() {
       'Airdrop': 'bg-lime-100 text-lime-800',
       'Art': 'bg-rose-100 text-rose-800'
     };
-    return colorMap[niche] || 'bg-gray-100 text-gray-800';
+    return colorMap[niche] || 'bg-cream-100 text-ink-warm-700';
   };
 
   const getPricingColor = (pricing: string) => {
@@ -963,7 +964,7 @@ export default function KOLsPage() {
       'Tier 3': 'bg-yellow-100 text-yellow-800',
       'Tier 4': 'bg-emerald-100 text-emerald-800'
     };
-    return colorMap[tier] || 'bg-gray-100 text-gray-800';
+    return colorMap[tier] || 'bg-cream-100 text-ink-warm-700';
   };
 
   const getCreatorTypeColor = (creatorType: string) => {
@@ -975,7 +976,7 @@ export default function KOLsPage() {
       'Bridge Builder': 'bg-emerald-100 text-emerald-800',
       'Visionary': 'bg-indigo-100 text-indigo-800',
       'Onboarder': 'bg-teal-100 text-teal-800',
-      'General': 'bg-gray-100 text-gray-800',
+      'General': 'bg-cream-100 text-ink-warm-700',
       'Gaming': 'bg-pink-100 text-pink-800',
       'Crypto': 'bg-yellow-100 text-yellow-800',
       'Memecoin': 'bg-orange-100 text-orange-800',
@@ -986,7 +987,7 @@ export default function KOLsPage() {
       'Airdrop': 'bg-teal-100 text-teal-800',
       'Art': 'bg-pink-100 text-pink-800'
     };
-    return colorMap[creatorType] || 'bg-gray-100 text-gray-800';
+    return colorMap[creatorType] || 'bg-cream-100 text-ink-warm-700';
   };
 
   const getInHouseColor = (inHouse: string) => {
@@ -996,7 +997,7 @@ export default function KOLsPage() {
       'Contractor': 'bg-blue-100 text-blue-800',
       'Freelancer': 'bg-purple-100 text-purple-800'
     };
-    return colorMap[inHouse] || 'bg-gray-100 text-gray-800';
+    return colorMap[inHouse] || 'bg-cream-100 text-ink-warm-700';
   };
 
   const getActiveFilterCount = (filterKey: string) => {
@@ -1128,7 +1129,7 @@ export default function KOLsPage() {
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none" className="text-gray-500">
+                    <SelectItem value="none" className="text-ink-warm-500">
                       None
                     </SelectItem>
                     {dynamicFieldOptions.in_house?.map(option => (
@@ -1136,7 +1137,7 @@ export default function KOLsPage() {
                         {option}
                       </SelectItem>
                     ))}
-                    <SelectItem value="ADD_NEW" className="text-gray-900 font-medium">
+                    <SelectItem value="ADD_NEW" className="text-ink-warm-900 font-medium">
                       <Plus className="h-3 w-3 mr-1 inline" />
                       Add New Option
                     </SelectItem>
@@ -1144,7 +1145,7 @@ export default function KOLsPage() {
                 </Select>
                 
                 {addingNewOptionForRow === kolId && (
-                  <div className="absolute top-full left-0 mt-1 p-2 bg-white border border-gray-200 rounded-md shadow-lg z-50 w-64">
+                  <div className="absolute top-full left-0 mt-1 p-2 bg-white border border-cream-200 rounded-md shadow-lg z-50 w-64">
                     <div className="flex flex-col gap-2">
                       <Input
                         value={newOptionValue}
@@ -1253,7 +1254,7 @@ export default function KOLsPage() {
                     ) : (
                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
                     )}
-                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
@@ -1397,7 +1398,7 @@ export default function KOLsPage() {
                             field === 'deliverables' ? getNewContentTypeColor(item) :
                           field === 'niche' ? getNicheColor(item) : 
                             field === 'creator_type' ? getCreatorTypeColor(item) :
-                            field === 'content_type' ? getNewContentTypeColor(item) : 'bg-gray-100 text-gray-800'
+                            field === 'content_type' ? getNewContentTypeColor(item) : 'bg-cream-100 text-ink-warm-700'
                           } ${field === 'creator_type' || field === 'niche' || field === 'deliverables' || field === 'content_type' ? 'mr-1' : ''}`}>
                             {field === 'platform' ? getPlatformIcon(item) : item}
                         </span>
@@ -1406,7 +1407,7 @@ export default function KOLsPage() {
                     ) : (
                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
                     )}
-                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
@@ -1507,6 +1508,8 @@ export default function KOLsPage() {
         <PageHeader
           title="KOLs"
           subtitle="Manage your Key Opinion Leaders"
+          kicker="Talent · KOLs"
+          kickerDot="amber"
           actions={
             <Button variant="brand" disabled>
               <Plus className="h-4 w-4 mr-2" />
@@ -1515,36 +1518,38 @@ export default function KOLsPage() {
           }
         />
 
-        {/* Column visibility skeleton */}
-        <div className="mb-4">
-          <Button variant="outline" size="sm" className="flex items-center gap-2" disabled>
-            <Settings className="h-4 w-4" />
-            Column Visibility
-          </Button>
-          <p className="text-xs text-gray-500 mt-2">
+        {/* ── Roster skeleton ────────────────────────────────────
+            Mirrors loaded layout — SectionHeader + filter toolbar
+            (tabs left, search middle, columns right) + table. */}
+        <div className="space-y-4">
+          <div className="section-head first flex items-center gap-3">
+            <span className="dot bg-brand/30" aria-hidden />
+            <Skeleton className="h-3 w-20" />
+            <span className="flex-1 h-px bg-cream-200" aria-hidden />
+            <Skeleton className="h-3 w-28" />
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex gap-1 p-1 rounded-md bg-cream-100 border border-cream-200">
+              <Skeleton className="h-8 w-16 rounded" />
+              <Skeleton className="h-8 w-32 rounded" />
+            </div>
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
+              <Input placeholder="Search KOLs by name, region, or niche..." className="pl-10 focus-brand" disabled />
+            </div>
+            <Button variant="outline" size="sm" className="ml-auto flex items-center gap-2" disabled>
+              <Settings className="h-4 w-4" />
+              Columns
+            </Button>
+          </div>
+
+          <p className="text-xs text-ink-warm-500">
             <span className="text-rose-500 font-bold">!</span> indicates KOL not updated in 90+ days
           </p>
-        </div>
 
-        {/* Search bar skeleton */}
-        <div className="flex items-center space-x-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search KOLs by name, region, or niche..."
-              className="pl-10 focus-brand"
-              disabled
-            />
-          </div>
+          <KOLTableSkeleton visibleColumns={visibleColumns} addingNewOptionForRow={addingNewOptionForRow} />
         </div>
-
-        {/* Tabs skeleton */}
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-md w-fit">
-          <Skeleton className="h-8 w-16 rounded" />
-          <Skeleton className="h-8 w-28 rounded" />
-        </div>
-
-        <KOLTableSkeleton visibleColumns={visibleColumns} addingNewOptionForRow={addingNewOptionForRow} />
       </div>
     );
   }
@@ -1552,7 +1557,7 @@ export default function KOLsPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="KOLs" subtitle="Manage your Key Opinion Leaders" />
+        <PageHeader title="KOLs" subtitle="Manage your Key Opinion Leaders" kicker="Talent · KOLs" kickerDot="amber" />
         <div className="text-center py-8">
           <p className="text-rose-600">{error}</p>
           <Button onClick={fetchKOLs} className="mt-4">Retry</Button>
@@ -1566,6 +1571,8 @@ export default function KOLsPage() {
       <PageHeader
         title="KOLs"
         subtitle="Manage your Key Opinion Leaders"
+        kicker="Talent · KOLs"
+        kickerDot="amber"
         actions={
           <Button variant="brand" size="sm" onClick={handleAddNew} disabled={isSavingNewKOL}>
             {isSavingNewKOL ? (
@@ -1580,23 +1587,27 @@ export default function KOLsPage() {
         }
       />
 
-      {/* Bulk action bar (split into two rows) */}
+      {/* Bulk action bar — v11 Card chrome (rounded-[14px], warm
+          hairline border, inset top highlight) so the selection
+          surface visually belongs to the page instead of feeling like
+          a standalone widget. Brand-soft accent strip on the left
+          reinforces "selection mode is on." */}
       {selectedKOLs.length > 0 && (
-      <div className="mb-4 mt-6">
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+      <Card className="mb-4 mt-6 p-6 accent-l-brand">
+        <div>
           <div className="flex items-center gap-3 mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-              <span className="text-sm font-semibold text-gray-700">{selectedKOLs.length} KOL{selectedKOLs.length !== 1 ? 's' : ''} selected</span>
+              <span className="dot bg-brand" aria-hidden />
+              <span className="text-sm font-semibold text-ink-warm-900">{selectedKOLs.length} KOL{selectedKOLs.length !== 1 ? 's' : ''} selected</span>
             </div>
-            <div className="h-4 w-px bg-gray-300"></div>
-            <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
+            <div className="h-4 w-px bg-cream-200"></div>
+            <span className="text-[11px] mono uppercase tracking-[0.14em] text-ink-warm-500">Bulk Edit Fields</span>
           </div>
-          <div className="mb-4 pb-4 border-b border-gray-200">
+          <div className="mb-4 pb-4 border-b border-cream-200">
             <Button
               size="sm"
               variant="outline"
-              className="text-gray-600 border-gray-300 hover:bg-gray-50"
+              className="text-ink-warm-700 border-cream-300 hover:bg-cream-50"
               onClick={() => {
                 const allIds = filteredKOLs.map(kol => kol.id);
                 if (allIds.every(id => selectedKOLs.includes(id))) {
@@ -1612,7 +1623,7 @@ export default function KOLsPage() {
           <div className="flex flex-wrap items-end gap-2">
           {/* Platform */}
           <div className="min-w-[120px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Platform</span>
+            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Platform</span>
             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
               <MultiSelect
                 options={fieldOptions.platforms || []}
@@ -1627,7 +1638,7 @@ export default function KOLsPage() {
                     {bulkEdit.platform && bulkEdit.platform.length > 0 ? (
                       <>
                         {bulkEdit.platform.map((item, idx) => (
-                          <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 flex items-center">
+                          <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-cream-100 text-ink-warm-700 flex items-center">
                             {getPlatformIcon ? getPlatformIcon(item) : null}
                           </span>
                         ))}
@@ -1635,7 +1646,7 @@ export default function KOLsPage() {
                     ) : (
                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
                     )}
-                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
@@ -1645,7 +1656,7 @@ export default function KOLsPage() {
           </div>
           {/* Region */}
           <div className="min-w-[100px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Region</span>
+            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Region</span>
             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
               <MultiSelect
                 options={fieldOptions.regions || []}
@@ -1675,7 +1686,7 @@ export default function KOLsPage() {
                     ) : (
                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
                     )}
-                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
@@ -1685,7 +1696,7 @@ export default function KOLsPage() {
           </div>
           {/* Creator Type */}
           <div className="min-w-[120px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Creator Type</span>
+            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Creator Type</span>
             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
               <MultiSelect
                 options={fieldOptions.creatorTypes || []}
@@ -1706,7 +1717,7 @@ export default function KOLsPage() {
                     ) : (
                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
                     )}
-                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
@@ -1716,7 +1727,7 @@ export default function KOLsPage() {
           </div>
           {/* Content Type */}
           <div className="min-w-[120px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Content Type</span>
+            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Content Type</span>
             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
               <MultiSelect
                 options={fieldOptions.contentTypes || []}
@@ -1737,7 +1748,7 @@ export default function KOLsPage() {
                     ) : (
                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
                     )}
-                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
@@ -1747,7 +1758,7 @@ export default function KOLsPage() {
           </div>
           {/* Deliverables */}
           <div className="min-w-[120px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Deliverables</span>
+            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Deliverables</span>
             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
               <MultiSelect
                 options={fieldOptions.deliverables || []}
@@ -1768,7 +1779,7 @@ export default function KOLsPage() {
                     ) : (
                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
                     )}
-                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
@@ -1778,7 +1789,7 @@ export default function KOLsPage() {
           </div>
           {/* Pricing */}
           <div className="min-w-[100px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Pricing</span>
+            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Pricing</span>
             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
               <MultiSelect
                 options={fieldOptions.pricingTiers || []}
@@ -1806,7 +1817,7 @@ export default function KOLsPage() {
                     ) : (
                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
                     )}
-                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
           </div>
@@ -1816,7 +1827,7 @@ export default function KOLsPage() {
           </div>
           {/* Community Founder (renamed from "Community" per May 2026 spec). */}
           <div className="min-w-[100px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Community Founder</span>
+            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Community Founder</span>
             <Select value={bulkEdit.community === true ? 'yes' : bulkEdit.community === false ? 'no' : ''} onValueChange={v => setBulkEdit(prev => ({ ...prev, community: v === 'yes' }))}>
               <SelectTrigger
                 className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.community !== undefined ? (bulkEdit.community ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800') : ''}`}
@@ -1832,7 +1843,7 @@ export default function KOLsPage() {
           </div>
           {/* Group Chat */}
           <div className="min-w-[100px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Group Chat</span>
+            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Group Chat</span>
             <Select value={bulkEdit.group_chat === true ? 'yes' : bulkEdit.group_chat === false ? 'no' : ''} onValueChange={v => setBulkEdit(prev => ({ ...prev, group_chat: v === 'yes' }))}>
               <SelectTrigger
                 className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${bulkEdit.group_chat !== undefined ? (bulkEdit.group_chat ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800') : ''}`}
@@ -1848,7 +1859,7 @@ export default function KOLsPage() {
           </div>
           {/* In-House */}
           <div className="min-w-[100px] flex flex-col items-end justify-end">
-            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">In-House</span>
+            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">In-House</span>
             <div className="relative w-full">
               <Select value={bulkEdit.in_house || ''} onValueChange={v => {
                 if (v === 'ADD_NEW') {
@@ -1867,7 +1878,7 @@ export default function KOLsPage() {
                   {dynamicFieldOptions.in_house?.map(option => (
                     <SelectItem key={option} value={option}>{option}</SelectItem>
                   ))}
-                  <SelectItem value="ADD_NEW" className="text-gray-900 font-medium">
+                  <SelectItem value="ADD_NEW" className="text-ink-warm-900 font-medium">
                     <Plus className="h-3 w-3 mr-1 inline" />
                     Add New Option
                   </SelectItem>
@@ -1879,10 +1890,10 @@ export default function KOLsPage() {
                   setIsAddingNewOptionBulk(false);
                   setNewOptionValueBulk('');
                 }}>
-                  <div className="bg-white border border-gray-200 rounded-md shadow-lg p-4 min-w-[300px]" onClick={(e) => e.stopPropagation()}>
+                  <div className="bg-white border border-cream-200 rounded-md shadow-lg p-4 min-w-[300px]" onClick={(e) => e.stopPropagation()}>
                     <div className="space-y-3">
                       <div>
-                        <label className="text-sm font-medium text-gray-700 mb-1 block">Add New In-House Option</label>
+                        <label className="text-sm font-medium text-ink-warm-700 mb-1 block">Add New In-House Option</label>
                         <Input
                           value={newOptionValueBulk}
                           onChange={(e) => setNewOptionValueBulk(e.target.value)}
@@ -1921,7 +1932,7 @@ export default function KOLsPage() {
             </div>
           </div>
         </div>
-        <div className="mt-4 pt-4 border-t border-gray-200">
+        <div className="mt-4 pt-4 border-t border-cream-200">
           <div className="flex items-center justify-between">
             <div className="flex gap-3">
               <Button
@@ -1952,23 +1963,23 @@ export default function KOLsPage() {
                 Delete
               </Button>
             </div>
-            <div className="text-xs text-gray-500 font-medium">
+            <div className="text-xs text-ink-warm-500 font-medium">
               {selectedKOLs.length > 0 && `${selectedKOLs.length} item${selectedKOLs.length !== 1 ? 's' : ''} selected`}
             </div>
           </div>
         </div>
         </div>
-      </div>
+      </Card>
       )}
 
       {/* Filter Menu - Hidden as filters are now in table headers */}
       {false && (
       <div className="mb-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+        <div className="bg-white border border-cream-200 rounded-lg p-6 shadow-sm">
           <div className="flex flex-wrap items-end gap-2">
             {/* Platform Filter */}
             <div className="min-w-[120px] flex flex-col items-end justify-end">
-              <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Platform</span>
+              <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Platform</span>
               <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                 <MultiSelect
                   options={fieldOptions.platforms || []}
@@ -1981,7 +1992,7 @@ export default function KOLsPage() {
                       {filters.platform && filters.platform.length > 0 ? (
                         <>
                           {filters.platform.map((item, idx) => (
-                            <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 flex items-center">
+                            <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-cream-100 text-ink-warm-700 flex items-center">
                               {getPlatformIcon ? getPlatformIcon(item) : null}
                             </span>
                           ))}
@@ -1989,7 +2000,7 @@ export default function KOLsPage() {
                       ) : (
                         <span className="flex items-center text-xs font-semibold text-black">Select</span>
                       )}
-                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
@@ -1999,7 +2010,7 @@ export default function KOLsPage() {
             </div>
             {/* Region Filter */}
             <div className="min-w-[100px] flex flex-col items-end justify-end">
-              <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Region</span>
+              <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Region</span>
               <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                 <MultiSelect
                   options={fieldOptions.regions || []}
@@ -2027,7 +2038,7 @@ export default function KOLsPage() {
                       ) : (
                         <span className="flex items-center text-xs font-semibold text-black">Select</span>
                       )}
-                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
@@ -2037,7 +2048,7 @@ export default function KOLsPage() {
             </div>
             {/* Creator Type Filter */}
             <div className="min-w-[120px] flex flex-col items-end justify-end">
-              <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Creator Type</span>
+              <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Creator Type</span>
               <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                 <MultiSelect
                   options={fieldOptions.creatorTypes || []}
@@ -2056,7 +2067,7 @@ export default function KOLsPage() {
                       ) : (
                         <span className="flex items-center text-xs font-semibold text-black">Select</span>
                       )}
-                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
@@ -2066,7 +2077,7 @@ export default function KOLsPage() {
             </div>
             {/* Content Type Filter */}
             <div className="min-w-[120px] flex flex-col items-end justify-end">
-              <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Content Type</span>
+              <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Content Type</span>
               <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                 <MultiSelect
                   options={fieldOptions.contentTypes || []}
@@ -2085,7 +2096,7 @@ export default function KOLsPage() {
                       ) : (
                         <span className="flex items-center text-xs font-semibold text-black">Select</span>
                       )}
-                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
@@ -2095,7 +2106,7 @@ export default function KOLsPage() {
             </div>
             {/* Deliverables Filter */}
             <div className="min-w-[120px] flex flex-col items-end justify-end">
-              <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Deliverables</span>
+              <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Deliverables</span>
               <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                 <MultiSelect
                   options={fieldOptions.deliverables || []}
@@ -2114,7 +2125,7 @@ export default function KOLsPage() {
                       ) : (
                         <span className="flex items-center text-xs font-semibold text-black">Select</span>
                       )}
-                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
@@ -2124,7 +2135,7 @@ export default function KOLsPage() {
             </div>
             {/* Pricing Filter */}
             <div className="min-w-[100px] flex flex-col items-end justify-end">
-              <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Pricing</span>
+              <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Pricing</span>
               <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                 <MultiSelect
                   options={fieldOptions.pricingTiers || []}
@@ -2148,7 +2159,7 @@ export default function KOLsPage() {
                       ) : (
                         <span className="flex items-center text-xs font-semibold text-black">Select</span>
                       )}
-                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
@@ -2158,7 +2169,7 @@ export default function KOLsPage() {
             </div>
             {/* Community Founder filter (renamed from "Community"). */}
             <div className="min-w-[100px] flex flex-col items-end justify-end">
-              <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Community Founder</span>
+              <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Community Founder</span>
               <Select value={filters.community} onValueChange={v => setFilters(prev => ({ ...prev, community: v }))}>
                 <SelectTrigger
                   className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${filters.community === 'yes' ? 'bg-emerald-100 text-emerald-800' : filters.community === 'no' ? 'bg-rose-100 text-rose-800' : ''}`}
@@ -2174,7 +2185,7 @@ export default function KOLsPage() {
             </div>
             {/* Group Chat Filter */}
             <div className="min-w-[100px] flex flex-col items-end justify-end">
-              <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Group Chat</span>
+              <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Group Chat</span>
               <Select value={filters.group_chat} onValueChange={v => setFilters(prev => ({ ...prev, group_chat: v }))}>
                 <SelectTrigger
                   className={`border-none shadow-none bg-transparent w-full h-7 min-h-[28px] px-2 py-1 rounded-md text-xs font-medium inline-flex items-center gap-1 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none data-[state=open]:outline-none data-[state=open]:ring-0 data-[state=open]:border-none ${filters.group_chat === 'yes' ? 'bg-emerald-100 text-emerald-800' : filters.group_chat === 'no' ? 'bg-rose-100 text-rose-800' : ''}`}
@@ -2190,7 +2201,7 @@ export default function KOLsPage() {
             </div>
             {/* In House Filter */}
             <div className="min-w-[100px] flex flex-col items-end justify-end">
-              <span className="text-xs text-gray-600 font-semibold mb-1 self-start">In House</span>
+              <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">In House</span>
               <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                 <MultiSelect
                   options={[]}
@@ -2203,13 +2214,13 @@ export default function KOLsPage() {
                       {filters.in_house && filters.in_house.length > 0 ? (
                         <>
                           {filters.in_house.map(item => (
-                            <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 flex-shrink-0 mr-1">{item}</span>
+                            <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-cream-100 text-ink-warm-700 flex-shrink-0 mr-1">{item}</span>
                           ))}
                         </>
                       ) : (
                         <span className="flex items-center text-xs font-semibold text-black">Select</span>
                       )}
-                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
@@ -2219,7 +2230,7 @@ export default function KOLsPage() {
             </div>
             {/* Followers Filter */}
             <div className="min-w-[130px] flex flex-col items-end justify-end">
-              <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Followers</span>
+              <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Followers</span>
               <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
                 <Select
                   value={filters.followersOperator}
@@ -2279,89 +2290,101 @@ export default function KOLsPage() {
       </div>
       )}
 
-      {/* Column visibility dropdown */}
-      <div className="mb-4">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Column Visibility
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto min-w-80" align="start" side="top">
-            <div className="space-y-3">
-              <h4 className="font-medium text-sm">Toggle Columns</h4>
-              <div className="grid grid-cols-2 gap-3">
-                {Object.entries({
-                  name: 'Name',
-                  link: 'Link',
-                  platform: 'Platform',
-                  followers: 'Followers',
-                  region: 'Region',
-                  score: 'Score',
-                  projects: 'Projects',
-                  creator_type: 'Creator Type',
-                  content_type: 'Content Type',
-                  deliverables: 'Deliverables',
-                  pricing: 'Pricing Tier',
-                  latest_cost: 'Pricing',
-                  community: 'Community Founder',
-                  group_chat: 'Group Chat',
-                  in_house: 'In-House',
-                  description: 'Notes'
-                }).map(([key, label]) => (
-                  <label key={key} className="flex items-center justify-between cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors">
-                    <span className="text-sm font-medium mr-4">{label}</span>
-                    <Switch
-                      checked={visibleColumns[key as keyof typeof visibleColumns]}
-                      onCheckedChange={(checked) => {
-                        handleColumnVisibilityChange(key as keyof typeof defaultVisibleColumns, checked);
-                      }}
-                      className="data-[state=checked]:bg-brand data-[state=unchecked]:bg-gray-200"
-                    />
-                  </label>
-                ))}
+      {/* ── Roster ───────────────────────────────────────────────────
+          SectionHeader carries the chapter rhythm; the filter toolbar
+          beneath it consolidates tabs (left, primary filter) + search
+          (middle, refine-within) + column visibility (right, power
+          user). Matches the /clients & /team toolbar pattern. */}
+      <div className="space-y-4">
+        <SectionHeader
+          label="Roster"
+          dot="amber"
+          counter={`${kolTab === 'need_update' ? needUpdateCount : filteredKOLs.length} ${kolTab === 'need_update' ? 'need update' : 'of total'}`}
+          first
+        />
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <Tabs value={kolTab} onValueChange={setKolTab}>
+            <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+              <TabsTrigger
+                value="all"
+                className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm px-4 py-2"
+              >
+                All
+                <span className="ml-2 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none data-[state=active]:bg-brand-light data-[state=active]:text-brand">{filteredKOLs.length}</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="need_update"
+                className="data-[state=active]:bg-white data-[state=active]:text-rose-700 data-[state=active]:shadow-card text-sm px-4 py-2"
+              >
+                <span className="text-rose-500 font-bold mr-1">!</span> Need Update
+                <span className="ml-2 text-xs bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full pointer-events-none">{needUpdateCount}</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
+            <Input
+              placeholder="Search KOLs by name, region, or niche..."
+              className="pl-10 focus-brand"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {/* Column visibility — pushed to the right; power-user
+              affordance kept out of the primary filter flow. */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="ml-auto flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Columns
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto min-w-80" align="end" side="bottom">
+              <div className="space-y-3">
+                <h4 className="font-medium text-sm">Toggle Columns</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.entries({
+                    name: 'Name',
+                    link: 'Link',
+                    platform: 'Platform',
+                    followers: 'Followers',
+                    region: 'Region',
+                    score: 'Score',
+                    projects: 'Projects',
+                    creator_type: 'Creator Type',
+                    content_type: 'Content Type',
+                    deliverables: 'Deliverables',
+                    pricing: 'Pricing Tier',
+                    latest_cost: 'Pricing',
+                    community: 'Community Founder',
+                    group_chat: 'Group Chat',
+                    in_house: 'In-House',
+                    description: 'Notes'
+                  }).map(([key, label]) => (
+                    <label key={key} className="flex items-center justify-between cursor-pointer hover:bg-cream-50 p-2 rounded transition-colors">
+                      <span className="text-sm font-medium mr-4">{label}</span>
+                      <Switch
+                        checked={visibleColumns[key as keyof typeof visibleColumns]}
+                        onCheckedChange={(checked) => {
+                          handleColumnVisibilityChange(key as keyof typeof defaultVisibleColumns, checked);
+                        }}
+                        className="data-[state=checked]:bg-brand data-[state=unchecked]:bg-cream-200"
+                      />
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-        <p className="text-xs text-gray-500 mt-2">
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <p className="text-xs text-ink-warm-500">
           <span className="text-rose-500 font-bold">!</span> indicates KOL not updated in 90+ days
         </p>
       </div>
-
-      {/* Search bar */}
-      <div className="flex items-center space-x-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search KOLs by name, region, or niche..."
-            className="pl-10 focus-brand"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <Tabs value={kolTab} onValueChange={setKolTab}>
-        <TabsList className="bg-gray-100 p-1 h-auto">
-          <TabsTrigger
-            value="all"
-            className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-1.5"
-          >
-            All
-            <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full data-[state=active]:bg-brand-light data-[state=active]:text-brand">{filteredKOLs.length}</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="need_update"
-            className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm text-sm px-4 py-1.5"
-          >
-            <span className="text-rose-500 font-bold mr-1">!</span> Need Update
-            <span className="ml-2 text-xs bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full">{needUpdateCount}</span>
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
 
       <div ref={tableContainerRef} className="border rounded-lg overflow-auto">
         <Table className="min-w-full" style={{
@@ -2371,12 +2394,12 @@ export default function KOLsPage() {
           whiteSpace: 'nowrap'
         }} suppressHydrationWarning>
           <TableHeader>
-            <TableRow className="bg-gray-50 border-b border-gray-200">
-              <TableHead className="bg-gray-50 text-center whitespace-nowrap sticky left-0 z-20" style={{ width: 48, minWidth: 48, maxWidth: 48 }}>#</TableHead>
-              {visibleColumns.name && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap sticky left-[48px] z-20" style={{ boxShadow: '-1px 0 0 0 #e5e7eb, 2px 0 4px -2px rgba(0,0,0,0.1)' }}>Name</TableHead>}
-              {visibleColumns.link && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Link</TableHead>}
+            <TableRow className="bg-cream-50 hover:bg-cream-50 border-b border-cream-200">
+              <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-center whitespace-nowrap sticky left-0 z-20" style={{ width: 48, minWidth: 48, maxWidth: 48 }}>#</TableHead>
+              {visibleColumns.name && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 whitespace-nowrap sticky left-[48px] z-20" style={{ boxShadow: '-1px 0 0 0 #e5e7eb, 2px 0 4px -2px rgba(0,0,0,0.1)' }}>Name</TableHead>}
+              {visibleColumns.link && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 whitespace-nowrap">Link</TableHead>}
               {visibleColumns.platform && (
-                <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 whitespace-nowrap">
                   <div className="flex items-center gap-1 cursor-pointer group">
                     <span>Platform</span>
                     <Popover>
@@ -2387,11 +2410,11 @@ export default function KOLsPage() {
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
                         <div className="p-3">
-                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Platform</div>
+                          <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Platform</div>
                           {(fieldOptions.platforms || []).map((platform) => (
                             <div
                               key={platform}
-                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -2420,16 +2443,12 @@ export default function KOLsPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                    {filters.platform.length > 0 && (
-                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
-                        {filters.platform.length}
-                      </span>
-                    )}
+                    <FilterCountBadge count={filters.platform.length} />
                   </div>
                 </TableHead>
               )}
               {visibleColumns.followers && (
-                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">
                   <div className="flex items-center gap-1 cursor-pointer group">
                     <span>Followers</span>
                     <Popover>
@@ -2440,7 +2459,7 @@ export default function KOLsPage() {
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
                         <div className="p-3">
-                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Followers</div>
+                          <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Followers</div>
                           <div className="flex items-center gap-2 mb-2">
                             <Select
                               value={filters.followersOperator}
@@ -2476,16 +2495,12 @@ export default function KOLsPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                    {(filters.followersOperator && filters.followers) && (
-                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
-                        1
-                      </span>
-                    )}
+                    {(filters.followersOperator && filters.followers) && <FilterCountBadge count={1} />}
                   </div>
                 </TableHead>
               )}
               {visibleColumns.region && (
-                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">
                   <div className="flex items-center gap-1 cursor-pointer group">
                     <span>Region</span>
                     <Popover>
@@ -2496,11 +2511,11 @@ export default function KOLsPage() {
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
                         <div className="p-3">
-                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Region</div>
+                          <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Region</div>
                           {(fieldOptions.regions || []).map((region) => (
                             <div
                               key={region}
-                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -2530,16 +2545,12 @@ export default function KOLsPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                    {filters.region.length > 0 && (
-                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
-                        {filters.region.length}
-                      </span>
-                    )}
+                    <FilterCountBadge count={filters.region.length} />
                   </div>
                 </TableHead>
               )}
               {visibleColumns.creator_type && (
-                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">
                   <div className="flex items-center gap-1 cursor-pointer group">
                     <span>Creator Type</span>
                     <Popover>
@@ -2550,11 +2561,11 @@ export default function KOLsPage() {
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
                         <div className="p-3">
-                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Creator Type</div>
+                          <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Creator Type</div>
                           {(fieldOptions.creatorTypes || []).map((type) => (
                             <div
                               key={type}
-                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -2581,16 +2592,12 @@ export default function KOLsPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                    {filters.creator_type.length > 0 && (
-                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
-                        {filters.creator_type.length}
-                      </span>
-                    )}
+                    <FilterCountBadge count={filters.creator_type.length} />
                   </div>
                 </TableHead>
               )}
               {visibleColumns.content_type && (
-                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">
                   <div className="flex items-center gap-1 cursor-pointer group">
                     <span>Content Type</span>
                     <Popover>
@@ -2601,11 +2608,11 @@ export default function KOLsPage() {
                       </PopoverTrigger>
                       <PopoverContent className="w-[250px] p-0" align="start">
                         <div className="p-3">
-                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Content Type</div>
+                          <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Content Type</div>
                           {(fieldOptions.contentTypes || []).map((type) => (
                             <div
                               key={type}
-                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -2632,16 +2639,12 @@ export default function KOLsPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                    {filters.content_type.length > 0 && (
-                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
-                        {filters.content_type.length}
-                      </span>
-                    )}
+                    <FilterCountBadge count={filters.content_type.length} />
                   </div>
                 </TableHead>
               )}
               {visibleColumns.deliverables && (
-                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">
                   <div className="flex items-center gap-1 cursor-pointer group">
                     <span>Deliverables</span>
                     <Popover>
@@ -2652,11 +2655,11 @@ export default function KOLsPage() {
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
                         <div className="p-3">
-                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Deliverables</div>
+                          <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Deliverables</div>
                           {(fieldOptions.deliverables || []).map((deliverable) => (
                             <div
                               key={deliverable}
-                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -2683,16 +2686,12 @@ export default function KOLsPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                    {filters.deliverables.length > 0 && (
-                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
-                        {filters.deliverables.length}
-                      </span>
-                    )}
+                    <FilterCountBadge count={filters.deliverables.length} />
                   </div>
                 </TableHead>
               )}
               {visibleColumns.pricing && (
-                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">
                   <div className="flex items-center gap-1 cursor-pointer group">
                     <span>Pricing</span>
                     <Popover>
@@ -2703,11 +2702,11 @@ export default function KOLsPage() {
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
                         <div className="p-3">
-                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Pricing</div>
+                          <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Pricing</div>
                           {(fieldOptions.pricingTiers || []).map((pricing) => (
                             <div
                               key={pricing}
-                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -2734,27 +2733,23 @@ export default function KOLsPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                    {filters.pricing.length > 0 && (
-                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
-                        {filters.pricing.length}
-                      </span>
-                    )}
+                    <FilterCountBadge count={filters.pricing.length} />
                   </div>
                 </TableHead>
               )}
               {visibleColumns.latest_cost && (
-                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Pricing</TableHead>
               )}
               {/* Score: placeholder until Phase 3 (kol_channel_snapshots
                   + scoring formula) ships. Show a static "Score" header;
                   no filter yet (will get a numeric range filter in Phase 3). */}
               {visibleColumns.score && (
-                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Score</TableHead>
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Score</TableHead>
               )}
               {/* Projects Worked Together: free-text tags per spec v1.
                   Substring-match filter on the chip list. */}
               {visibleColumns.projects && (
-                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">
                   <div className="flex items-center gap-1 cursor-pointer group">
                     <span>Projects</span>
                     <Popover>
@@ -2765,7 +2760,7 @@ export default function KOLsPage() {
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
                         <div className="p-3">
-                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Projects</div>
+                          <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Projects</div>
                           <Input
                             type="text"
                             placeholder="Project name…"
@@ -2786,16 +2781,12 @@ export default function KOLsPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                    {filters.projects && (
-                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
-                        1
-                      </span>
-                    )}
+                    {filters.projects && <FilterCountBadge count={1} />}
                   </div>
                 </TableHead>
               )}
               {visibleColumns.community && (
-                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">
                   <div className="flex items-center gap-1 cursor-pointer group">
                     <span>Community Founder</span>
                     <Popover>
@@ -2806,11 +2797,11 @@ export default function KOLsPage() {
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
                         <div className="p-3">
-                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Community</div>
+                          <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Community</div>
                           {['Yes', 'No'].map((option) => (
                             <div
                               key={option}
-                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -2834,16 +2825,12 @@ export default function KOLsPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                    {filters.community && (
-                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
-                        1
-                      </span>
-                    )}
+                    {filters.community && <FilterCountBadge count={1} />}
                   </div>
                 </TableHead>
               )}
               {visibleColumns.group_chat && (
-                <TableHead className="bg-gray-50 border-r border-gray-200 select-none">
+                <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">
                   <div className="flex items-center gap-1 cursor-pointer group">
                     <span>Group Chat</span>
                     <Popover>
@@ -2854,11 +2841,11 @@ export default function KOLsPage() {
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
                         <div className="p-3">
-                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter Group Chat</div>
+                          <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Group Chat</div>
                           {['Yes', 'No'].map((option) => (
                             <div
                               key={option}
-                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -2882,16 +2869,12 @@ export default function KOLsPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                    {filters.group_chat && (
-                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
-                        1
-                      </span>
-                    )}
+                    {filters.group_chat && <FilterCountBadge count={1} />}
                   </div>
                 </TableHead>
               )}
               {visibleColumns.in_house && (
-                <TableHead className={`bg-gray-50 border-r border-gray-200 select-none ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}>
+                <TableHead className={`bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}>
                   <div className="flex items-center gap-1 cursor-pointer group">
                     <span>In-House</span>
                     <Popover>
@@ -2902,11 +2885,11 @@ export default function KOLsPage() {
                       </PopoverTrigger>
                       <PopoverContent className="w-[200px] p-0" align="start">
                         <div className="p-3">
-                          <div className="text-xs font-semibold text-gray-600 mb-2">Filter In-House</div>
+                          <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter In-House</div>
                           {(dynamicFieldOptions.in_house || []).map((option) => (
                             <div
                               key={option}
-                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -2933,18 +2916,14 @@ export default function KOLsPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                    {filters.in_house.length > 0 && (
-                      <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
-                        {filters.in_house.length}
-                      </span>
-                    )}
+                    <FilterCountBadge count={filters.in_house.length} />
                   </div>
                 </TableHead>
               )}
-              {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Notes</TableHead>}
-              {visibleColumns.wallet && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Wallet</TableHead>}
-              {visibleColumns.telegram && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Telegram</TableHead>}
-              <TableHead className="bg-gray-50 whitespace-nowrap">Actions</TableHead>
+              {visibleColumns.description && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Notes</TableHead>}
+              {visibleColumns.wallet && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Wallet</TableHead>}
+              {visibleColumns.telegram && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Telegram</TableHead>}
+              <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 whitespace-nowrap">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody className="bg-white">
@@ -2952,8 +2931,8 @@ export default function KOLsPage() {
               const kolWithVerified = kol as MasterKOL & { verifiedFollowers?: boolean };
               const isChecked = selectedKOLs.includes(kol.id);
               return (
-                <TableRow key={kol.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden text-center text-gray-600 group sticky left-0 z-10`} style={{ verticalAlign: 'middle', width: 48, minWidth: 48, maxWidth: 48 }}>
+                <TableRow key={kol.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-cream-100 transition-colors border-b border-cream-200`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden text-center text-ink-warm-700 group sticky left-0 z-10`} style={{ verticalAlign: 'middle', width: 48, minWidth: 48, maxWidth: 48 }}>
                     <div className="flex items-center justify-center w-full h-full">
                       {isChecked ? (
                         <Checkbox
@@ -2988,7 +2967,7 @@ export default function KOLsPage() {
                     </div>
                   </TableCell>
                   {visibleColumns.name && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden sticky left-[48px] z-10`} style={{ boxShadow: '-1px 0 0 0 #e5e7eb, 2px 0 4px -2px rgba(0,0,0,0.1)' }}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden sticky left-[48px] z-10`} style={{ boxShadow: '-1px 0 0 0 #e5e7eb, 2px 0 4px -2px rgba(0,0,0,0.1)' }}>
                       <div className="truncate flex items-center gap-1">
                         {(() => {
                           const isStale = kol.updated_at ?
@@ -3012,7 +2991,7 @@ export default function KOLsPage() {
                                 className="ml-1 opacity-40 hover:opacity-100 transition-opacity flex-shrink-0"
                                 title="Open KOL profile (deliverables + call logs)"
                               >
-                                <Maximize2 className="h-3 w-3 text-gray-600" />
+                                <Maximize2 className="h-3 w-3 text-ink-warm-700" />
                               </button>
                             </>
                           );
@@ -3021,47 +3000,47 @@ export default function KOLsPage() {
                   </TableCell>
                   )}
                   {visibleColumns.link && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                       <div className="truncate">{renderEditableCell(kol.link, 'link', kol.id, 'text')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.platform && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-visible`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-visible`}>
                     <div>{renderEditableCell(kol.platform, 'platform', kol.id, 'multiselect')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.followers && (
-                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                    <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                       <div className="truncate">{renderEditableCell(kol.followers, 'followers', kol.id, 'number')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.region && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-visible`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-visible`}>
                     <div>{renderEditableCell(kol.region, 'region', kol.id, 'select')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.creator_type && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-visible`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-visible`}>
                       <div>{renderEditableCell(kol.creator_type, 'creator_type', kol.id, 'multiselect')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.content_type && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-visible`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-visible`}>
                     <div>{renderEditableCell(kol.content_type, 'content_type', kol.id, 'multiselect')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.deliverables && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-visible`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-visible`}>
                       <div>{renderEditableCell(kol.deliverables, 'deliverables', kol.id, 'multiselect')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.pricing && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-visible`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-visible`}>
                     <div>{renderEditableCell(kol.pricing, 'pricing', kol.id, 'select')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.latest_cost && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                     <div className="truncate text-sm">
                       {latestCostMap.has(kol.id) ? (
                         <button
@@ -3085,17 +3064,17 @@ export default function KOLsPage() {
                   {visibleColumns.score && (() => {
                     const result = scoreMap.get(kol.id);
                     return (
-                      <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                      <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                         {result?.score != null ? (
                           <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-semibold text-gray-900">{result.score}</span>
+                            <span className="text-sm font-semibold text-ink-warm-900">{result.score}</span>
                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${tierForScore(result.score).classes}`}>
                               {tierForScore(result.score).label}
                             </span>
                           </div>
                         ) : (
                           <div
-                            className="text-xs text-gray-400"
+                            className="text-xs text-ink-warm-400"
                             title={result?.reason || "Score requires deliverables data."}
                           >
                             —
@@ -3109,7 +3088,7 @@ export default function KOLsPage() {
                       links to the campaign — quick pivot from "who is
                       this KOL" to "what work has she done with us." */}
                   {visibleColumns.projects && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                     <div className="flex flex-wrap gap-1 max-w-[260px]">
                       {(projectsMap.get(kol.id) || []).length > 0 ? (
                         (projectsMap.get(kol.id) || []).slice(0, 5).map((p, i) => (
@@ -3123,16 +3102,16 @@ export default function KOLsPage() {
                               {p.name}
                             </a>
                           ) : (
-                            <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700" title={p.name}>
+                            <span key={i} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-cream-100 text-ink-warm-700" title={p.name}>
                               {p.name}
                             </span>
                           )
                         ))
                       ) : (
-                        <span className="text-gray-400 text-xs">-</span>
+                        <span className="text-ink-warm-400 text-xs">-</span>
                       )}
                       {(projectsMap.get(kol.id) || []).length > 5 && (
-                        <span className="text-gray-500 text-[10px]" title={(projectsMap.get(kol.id) || []).slice(5).map(p => p.name).join(', ')}>
+                        <span className="text-ink-warm-500 text-[10px]" title={(projectsMap.get(kol.id) || []).slice(5).map(p => p.name).join(', ')}>
                           +{(projectsMap.get(kol.id) || []).length - 5}
                         </span>
                       )}
@@ -3140,7 +3119,7 @@ export default function KOLsPage() {
                   </TableCell>
                   )}
                   {visibleColumns.community && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                     <div className="flex items-center gap-2">
                       {renderEditableCell(kol.community, 'community', kol.id, 'boolean')}
                       {/* Show the community link inline when the toggle is
@@ -3151,7 +3130,7 @@ export default function KOLsPage() {
                           href={kol.community_link || undefined}
                           target="_blank"
                           rel="noreferrer"
-                          className={`text-xs underline truncate max-w-[120px] ${kol.community_link ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 pointer-events-none'}`}
+                          className={`text-xs underline truncate max-w-[120px] ${kol.community_link ? 'text-blue-600 hover:text-blue-800' : 'text-ink-warm-400 pointer-events-none'}`}
                           title={kol.community_link || 'No link set'}
                         >
                           {kol.community_link ? 'link' : '(no link)'}
@@ -3161,27 +3140,27 @@ export default function KOLsPage() {
                   </TableCell>
                   )}
                   {visibleColumns.group_chat && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                     <div className="truncate">{renderEditableCell(kol.group_chat, 'group_chat', kol.id, 'boolean')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.in_house && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 ${addingNewOptionForRow === kol.id ? 'overflow-visible w-80' : 'overflow-hidden w-56'}`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 ${addingNewOptionForRow === kol.id ? 'overflow-visible w-80' : 'overflow-hidden w-56'}`}>
                     <div className={addingNewOptionForRow === kol.id ? '' : 'truncate'}>{renderEditableCell(kol.in_house, 'in_house', kol.id, 'select')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.description && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2`}>
                       <div className="min-w-[300px] max-w-2xl whitespace-pre-wrap break-words">{renderEditableCell(kol.description, 'description', kol.id, 'text')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.wallet && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                       <div className="truncate">{renderEditableCell(kol.wallet, 'wallet', kol.id, 'text')}</div>
                   </TableCell>
                   )}
                   {visibleColumns.telegram && (
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                       {kolTelegramChats[kol.id] ? (
                         <a
                           href={`/crm/telegram?tab=kols`}
@@ -3193,11 +3172,11 @@ export default function KOLsPage() {
                           </span>
                         </a>
                       ) : (
-                        <span className="text-gray-400 text-xs">-</span>
+                        <span className="text-ink-warm-400 text-xs">-</span>
                       )}
                   </TableCell>
                   )}
-                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
+                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                     <div className="flex space-x-1">
                       <Button size="sm" variant="outline" onClick={() => handleDelete(kol.id)}>
                         <Trash2 className="h-3 w-3" />
@@ -3214,7 +3193,7 @@ export default function KOLsPage() {
       {/* Pagination Controls */}
       {paginationData.totalPages > 1 && (
         <div className="flex items-center justify-between mt-4 pb-14 px-4">
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-ink-warm-700">
             Showing {paginationData.startIndex + 1}-{Math.min(paginationData.endIndex, paginationData.totalItems)} of {paginationData.totalItems} KOLs
           </div>
           <div className="flex items-center gap-2">
@@ -3310,7 +3289,7 @@ export default function KOLsPage() {
           <DialogHeader>
             <DialogTitle>Archive KOL</DialogTitle>
           </DialogHeader>
-          <div className="text-sm text-gray-600 mt-2 mb-2">Are you sure you want to archive this KOL? You can restore it later from the Archive page.</div>
+          <div className="text-sm text-ink-warm-700 mt-2 mb-2">Are you sure you want to archive this KOL? You can restore it later from the Archive page.</div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
             <Button variant="destructive" onClick={async () => {
@@ -3341,7 +3320,7 @@ export default function KOLsPage() {
           <DialogHeader>
             <DialogTitle>Archive KOLs</DialogTitle>
           </DialogHeader>
-          <div className="text-sm text-gray-600 mt-2 mb-2">Are you sure you want to archive {selectedKOLs.length} KOL{selectedKOLs.length !== 1 ? 's' : ''}? You can restore them from the Archive page.</div>
+          <div className="text-sm text-ink-warm-700 mt-2 mb-2">Are you sure you want to archive {selectedKOLs.length} KOL{selectedKOLs.length !== 1 ? 's' : ''}? You can restore them from the Archive page.</div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)}>Cancel</Button>
             <Button variant="destructive" onClick={async () => {
@@ -3363,7 +3342,7 @@ export default function KOLsPage() {
       {/* Sticky Horizontal Scrollbar */}
       {stickyScrollbar && (
         <div
-          className="fixed bottom-4 bg-white border border-gray-200 shadow-lg z-40 flex items-center rounded-lg transition-opacity duration-300"
+          className="fixed bottom-4 bg-white border border-cream-200 shadow-lg z-40 flex items-center rounded-lg transition-opacity duration-300"
           style={{
             height: '32px',
             opacity: stickyScrollbar.opacity,
@@ -3404,6 +3383,23 @@ export default function KOLsPage() {
 // Memoized so React's reconciler treats every instance as the same
 // component type across re-renders (no remount on parent re-render).
 //
+/**
+ * FilterCountBadge — tight 16px brand-light circle that sits next to
+ * a column header when one or more filter values are active. Extracted
+ * from 11 identical inline spans (one per filterable column) so the
+ * chrome lives in one place: if we ever want to swap the pill style
+ * (e.g. neutral when 0, brand when ≥1), it changes in one spot
+ * instead of 11.
+ */
+function FilterCountBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="ml-1 bg-brand-light text-brand text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+      {count}
+    </span>
+  );
+}
+
 // Props mirror the two state values it depends on inside the page:
 //   - visibleColumns: which columns to render skeleton cells for
 //   - addingNewOptionForRow: drives the In-House column's width variant
@@ -3420,55 +3416,55 @@ const KOLTableSkeleton = React.memo(function KOLTableSkeleton({
     <div className="border rounded-lg overflow-auto">
       <Table className="min-w-max whitespace-nowrap">
         <TableHeader>
-          <TableRow className="bg-gray-50 border-b border-gray-200">
-            <TableHead className="bg-gray-50 text-center whitespace-nowrap sticky left-0 z-20" style={{ width: 48, minWidth: 48, maxWidth: 48 }}>#</TableHead>
-            {visibleColumns.name && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap sticky left-[48px] z-20" style={{ boxShadow: '-1px 0 0 0 #e5e7eb, 2px 0 4px -2px rgba(0,0,0,0.1)' }}>Name</TableHead>}
-            {visibleColumns.link && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Link</TableHead>}
-            {visibleColumns.platform && <TableHead className="bg-gray-50 border-r border-gray-200 whitespace-nowrap">Platform</TableHead>}
-            {visibleColumns.followers && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Followers</TableHead>}
-            {visibleColumns.region && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Region</TableHead>}
-            {visibleColumns.creator_type && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Creator Type</TableHead>}
-            {visibleColumns.content_type && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Content Type</TableHead>}
-            {visibleColumns.deliverables && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Deliverables</TableHead>}
-            {visibleColumns.pricing && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>}
-            {visibleColumns.latest_cost && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Pricing</TableHead>}
+          <TableRow className="bg-cream-50 hover:bg-cream-50 border-b border-cream-200">
+            <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-center whitespace-nowrap sticky left-0 z-20" style={{ width: 48, minWidth: 48, maxWidth: 48 }}>#</TableHead>
+            {visibleColumns.name && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 whitespace-nowrap sticky left-[48px] z-20" style={{ boxShadow: '-1px 0 0 0 #e5e7eb, 2px 0 4px -2px rgba(0,0,0,0.1)' }}>Name</TableHead>}
+            {visibleColumns.link && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 whitespace-nowrap">Link</TableHead>}
+            {visibleColumns.platform && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 whitespace-nowrap">Platform</TableHead>}
+            {visibleColumns.followers && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Followers</TableHead>}
+            {visibleColumns.region && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Region</TableHead>}
+            {visibleColumns.creator_type && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Creator Type</TableHead>}
+            {visibleColumns.content_type && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Content Type</TableHead>}
+            {visibleColumns.deliverables && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Deliverables</TableHead>}
+            {visibleColumns.pricing && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Pricing</TableHead>}
+            {visibleColumns.latest_cost && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Pricing</TableHead>}
             {/* Score + Projects added per May 2026 KOL overhaul spec.
                 Rating column removed (migration 071). Loading skeleton
                 mirrors the live table so columns don't reflow on load. */}
-            {visibleColumns.score && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Score</TableHead>}
-            {visibleColumns.projects && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Projects</TableHead>}
-            {visibleColumns.community && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Community Founder</TableHead>}
-            {visibleColumns.group_chat && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Group Chat</TableHead>}
-            {visibleColumns.in_house && <TableHead className={`bg-gray-50 border-r border-gray-200 select-none ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}>In-House</TableHead>}
-            {visibleColumns.description && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Notes</TableHead>}
-            {visibleColumns.wallet && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Wallet</TableHead>}
-            {visibleColumns.telegram && <TableHead className="bg-gray-50 border-r border-gray-200 select-none">Telegram</TableHead>}
-            <TableHead className="bg-gray-50 whitespace-nowrap">Actions</TableHead>
+            {visibleColumns.score && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Score</TableHead>}
+            {visibleColumns.projects && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Projects</TableHead>}
+            {visibleColumns.community && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Community Founder</TableHead>}
+            {visibleColumns.group_chat && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Group Chat</TableHead>}
+            {visibleColumns.in_house && <TableHead className={`bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}>In-House</TableHead>}
+            {visibleColumns.description && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Notes</TableHead>}
+            {visibleColumns.wallet && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Wallet</TableHead>}
+            {visibleColumns.telegram && <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 border-r border-cream-200 select-none">Telegram</TableHead>}
+            <TableHead className="bg-cream-50 py-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 whitespace-nowrap">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody className="bg-white">
           {Array.from({ length: 8 }).map((_, index) => (
-            <TableRow key={index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b border-gray-200`}>
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center w-12`}><Skeleton className="h-4 w-6 mx-auto" /></TableCell>
-              {visibleColumns.name && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.link && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.platform && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><div className="flex flex-nowrap gap-1 items-center w-full"><Skeleton className="h-5 w-5 rounded-full" /><Skeleton className="h-5 w-5 rounded-full" /></div></TableCell>}
-              {visibleColumns.followers && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.region && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-28`}><div className="flex items-center gap-1 w-full"><Skeleton className="h-4 w-4 rounded" /><Skeleton className="h-4 w-20" /></div></TableCell>}
-              {visibleColumns.creator_type && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
-              {visibleColumns.content_type && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-20 rounded-md" /></div></TableCell>}
-              {visibleColumns.deliverables && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-18 rounded-md" /><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-14 rounded-md" /></div></TableCell>}
-              {visibleColumns.pricing && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.latest_cost && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.score && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-12" /></TableCell>}
-              {visibleColumns.projects && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-40`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-5 w-16 rounded" /><Skeleton className="h-5 w-12 rounded" /></div></TableCell>}
-              {visibleColumns.community && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
-              {visibleColumns.group_chat && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
-              {visibleColumns.in_house && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
-              {visibleColumns.description && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.wallet && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
-              {visibleColumns.telegram && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
-              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden w-16`}><div className="flex space-x-1 w-full"><Skeleton className="h-8 w-8 rounded" /><Skeleton className="h-8 w-8 rounded" /></div></TableCell>
+            <TableRow key={index} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-b border-cream-200`}>
+              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-center w-12`}><Skeleton className="h-4 w-6 mx-auto" /></TableCell>
+              {visibleColumns.name && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-32`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.link && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.platform && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-24`}><div className="flex flex-nowrap gap-1 items-center w-full"><Skeleton className="h-5 w-5 rounded-full" /><Skeleton className="h-5 w-5 rounded-full" /></div></TableCell>}
+              {visibleColumns.followers && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.region && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-28`}><div className="flex items-center gap-1 w-full"><Skeleton className="h-4 w-4 rounded" /><Skeleton className="h-4 w-20" /></div></TableCell>}
+              {visibleColumns.creator_type && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
+              {visibleColumns.content_type && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-20 rounded-md" /></div></TableCell>}
+              {visibleColumns.deliverables && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-32`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-6 w-18 rounded-md" /><Skeleton className="h-6 w-16 rounded-md" /><Skeleton className="h-6 w-14 rounded-md" /></div></TableCell>}
+              {visibleColumns.pricing && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.latest_cost && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.score && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-20`}><Skeleton className="h-4 w-12" /></TableCell>}
+              {visibleColumns.projects && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-40`}><div className="flex flex-nowrap gap-1 w-full"><Skeleton className="h-5 w-16 rounded" /><Skeleton className="h-5 w-12 rounded" /></div></TableCell>}
+              {visibleColumns.community && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
+              {visibleColumns.group_chat && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-20`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
+              {visibleColumns.in_house && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden ${addingNewOptionForRow ? 'w-80' : 'w-56'}`}><Skeleton className="h-6 w-full rounded-full" /></TableCell>}
+              {visibleColumns.description && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.wallet && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-40`}><Skeleton className="h-4 w-full" /></TableCell>}
+              {visibleColumns.telegram && <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden w-24`}><Skeleton className="h-4 w-full" /></TableCell>}
+              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden w-16`}><div className="flex space-x-1 w-full"><Skeleton className="h-8 w-8 rounded" /><Skeleton className="h-8 w-8 rounded" /></div></TableCell>
             </TableRow>
           ))}
         </TableBody>

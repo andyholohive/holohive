@@ -43,6 +43,10 @@ import {
   ArrowLeft, Plus, Settings, Trash2, Copy, Star, StarOff, Pencil, ChevronUp, ChevronDown, Search, X, Lock, ListChecks,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -322,10 +326,9 @@ export default function ActionBoardTemplatesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header — matches the standard admin page pattern
-          (h2 + subtitle on the left, action buttons on the right).
-          Outer padding comes from Sidebar's <main className="p-6">. */}
-      <Link href="/clients" className="inline-flex items-center text-xs text-gray-500 hover:text-brand transition-colors w-fit">
+      {/* Back link sits above PageHeader per CLAUDE.md sub-route
+          back-button convention. */}
+      <Link href="/clients" className="inline-flex items-center text-xs text-ink-warm-500 hover:text-brand transition-colors w-fit">
         <ArrowLeft className="h-3 w-3 mr-1" />
         Back to Clients
       </Link>
@@ -333,6 +336,8 @@ export default function ActionBoardTemplatesPage() {
         icon={ListChecks}
         title="Action Board Templates"
         subtitle="Reusable milestone sets you can apply to any client's Action Board."
+        kicker="Templates · Action Board"
+        kickerDot="brand"
         actions={(
           <Button variant="brand" onClick={openNew}>
             <Plus className="h-4 w-4 mr-2" />
@@ -341,150 +346,210 @@ export default function ActionBoardTemplatesPage() {
         )}
       />
 
-      {/* Search bar */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-        <Input
-          placeholder="Search templates…"
-          className="pl-10 focus-brand"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+      {/* ── Templates ────────────────────────────────────────────────
+          Single SectionHeader + inline filter toolbar matches the
+          /clients & /team pattern. Search lives in the same row as
+          the section header counter for consistent toolbar density. */}
+      <div className="space-y-4">
+        <SectionHeader
+          label="Templates"
+          dot="brand"
+          counter={`${filteredTemplates.length} of ${templates.length}${searchTerm ? ' · filtered' : ''}`}
+          first
         />
-      </div>
 
-      {/* Table */}
-      <Card className="border-0 shadow-md rounded-xl overflow-hidden">
-        {loading ? (
-          <div className="p-12 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-200 border-t-brand mx-auto" />
-            <p className="text-sm text-gray-500 mt-3">Loading templates…</p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
+            <Input
+              placeholder="Search templates…"
+              className="pl-10 focus-brand"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-        ) : filteredTemplates.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <Settings className="h-5 w-5 text-gray-400" />
+        </div>
+
+        {/* Table card uses the default v11 Card chrome (rounded-[14px]
+            + warm hairline + inset top highlight) instead of the
+            previous border-0 shadow-md rounded-xl one-off. */}
+        <Card className="border-cream-200 overflow-hidden">
+          {loading ? (
+            // Structural skeleton — 5 rows shaped like real rows so the
+            // layout doesn't shift when data arrives. Replaces the
+            // spinner + "Loading templates…" text.
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-cream-50/80 hover:bg-cream-50/80">
+                  <TableHead className="py-2.5 px-5 w-[40px]"></TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Description</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Milestones</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Created</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right w-[200px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i} className="border-cream-100">
+                    <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-4 rounded-full" /></TableCell>
+                    <TableCell className="py-3.5 px-5"><Skeleton className="h-4 w-40" /></TableCell>
+                    <TableCell className="py-3.5 px-5"><Skeleton className="h-3 w-56" /></TableCell>
+                    <TableCell className="py-3.5 px-5 text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                    <TableCell className="py-3.5 px-5"><Skeleton className="h-3 w-20" /></TableCell>
+                    <TableCell className="py-3.5 px-5">
+                      <div className="flex items-center justify-end gap-1">
+                        <Skeleton className="h-7 w-7 rounded-md" />
+                        <Skeleton className="h-7 w-7 rounded-md" />
+                        <Skeleton className="h-7 w-7 rounded-md" />
+                        <Skeleton className="h-7 w-7 rounded-md" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : filteredTemplates.length === 0 ? (
+            <div className="p-8">
+              <EmptyState
+                icon={ListChecks}
+                title={searchTerm ? 'No templates match' : 'No templates yet'}
+                description={searchTerm
+                  ? 'Try widening your search or clearing the filter.'
+                  : 'Create your first reusable milestone set.'}
+              >
+                {!searchTerm && (
+                  <Button variant="brand" onClick={openNew}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Template
+                  </Button>
+                )}
+              </EmptyState>
             </div>
-            <p className="text-sm text-gray-500">
-              {searchTerm ? 'No templates match your search.' : 'No templates yet — create your first one.'}
-            </p>
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50">
-                <TableHead className="w-[40px]"></TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Milestones</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right w-[200px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredTemplates.map(t => (
-                <TableRow key={t.id} className="hover:bg-gray-50/50 transition-colors">
-                  <TableCell className="py-3">
-                    {t.is_default ? (
-                      <Star className="h-4 w-4 text-amber-500" fill="currentColor" />
-                    ) : (
-                      <StarOff className="h-4 w-4 text-gray-200" />
-                    )}
-                  </TableCell>
-                  <TableCell className="font-medium text-gray-900">
-                    {t.name}
-                    {t.is_default && (
-                      <Badge variant="secondary" className="ml-2 bg-amber-100 text-amber-800 text-[10px]">Default</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-gray-500 max-w-[280px] truncate" title={t.description || ''}>
-                    {t.description || '—'}
-                  </TableCell>
-                  <TableCell className="text-right font-semibold text-gray-900">
-                    {t.milestones.length}
-                  </TableCell>
-                  <TableCell className="text-sm text-gray-500">
-                    {t.created_at
-                      ? new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                      : '—'}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {!t.is_default && (
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-cream-50/80 hover:bg-cream-50/80">
+                  <TableHead className="py-2.5 px-5 w-[40px]"></TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Description</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Milestones</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Created</TableHead>
+                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right w-[200px]">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredTemplates.map(t => (
+                  <TableRow key={t.id} className="border-cream-100 row-accent">
+                    <TableCell className="py-3.5 px-5">
+                      {t.is_default ? (
+                        <Star className="h-4 w-4 text-amber-500" fill="currentColor" />
+                      ) : (
+                        <StarOff className="h-4 w-4 text-ink-warm-200" />
+                      )}
+                    </TableCell>
+                    <TableCell className="py-3.5 px-5 font-medium text-ink-warm-900">
+                      <div className="flex items-center gap-2">
+                        <span>{t.name}</span>
+                        {t.is_default && (
+                          <StatusBadge tone="warning" size="sm" bordered withDot>Default</StatusBadge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3.5 px-5 text-sm text-ink-warm-500 max-w-[280px] truncate" title={t.description || ''}>
+                      {t.description || '—'}
+                    </TableCell>
+                    <TableCell className="py-3.5 px-5 text-right tabular-nums font-semibold text-ink-warm-900">
+                      {t.milestones.length}
+                    </TableCell>
+                    <TableCell className="py-3.5 px-5 text-sm text-ink-warm-500 tabular-nums">
+                      {t.created_at
+                        ? new Date(t.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                        : '—'}
+                    </TableCell>
+                    <TableCell className="py-3.5 px-5 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {!t.is_default && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-ink-warm-900 hover:bg-cream-100"
+                            title="Set as default"
+                            onClick={() => handleSetDefault(t)}
+                          >
+                            <Star className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 w-7 p-0"
-                          title="Set as default"
-                          onClick={() => handleSetDefault(t)}
+                          className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-ink-warm-900 hover:bg-cream-100"
+                          title="Duplicate"
+                          onClick={() => handleDuplicate(t)}
                         >
-                          <Star className="h-3.5 w-3.5 text-gray-400" />
+                          <Copy className="h-3.5 w-3.5" />
                         </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0"
-                        title="Duplicate"
-                        onClick={() => handleDuplicate(t)}
-                      >
-                        <Copy className="h-3.5 w-3.5 text-gray-400" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0"
-                        title="Edit"
-                        onClick={() => openEdit(t)}
-                      >
-                        <Pencil className="h-3.5 w-3.5 text-gray-400" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 hover:bg-rose-50"
-                        title="Delete"
-                        onClick={() => setDeleteTarget(t)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-rose-500" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-ink-warm-900 hover:bg-cream-100"
+                          title="Edit"
+                          onClick={() => openEdit(t)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-rose-600 hover:bg-rose-50"
+                          title="Delete"
+                          onClick={() => setDeleteTarget(t)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </Card>
 
-      {/* Helper text */}
-      <p className="text-xs text-gray-500">
-        Templates marked as <Star className="h-3 w-3 text-amber-500 inline" fill="currentColor" /> default get auto-applied to new clients. Only one default at a time.
-      </p>
+        <p className="text-xs text-ink-warm-500">
+          Templates marked as <Star className="h-3 w-3 text-amber-500 inline" fill="currentColor" /> default get auto-applied to new clients. Only one default at a time.
+        </p>
+      </div>
 
-      {/* ── Editor dialog ──────────────────────────────────────────── */}
+      {/* ── Editor dialog ──────────────────────────────────────────────
+          v11 chrome — standard Card-radius DialogContent + flex-col +
+          inner-scroll body. The previous design had a v9-style
+          border-l-4 brand rail, a gradient icon box, and a fully-amber
+          "set as default" tile; all replaced with the cream/brand-soft
+          palette the rest of the app uses. */}
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden border-l-4 border-l-brand rounded-xl flex flex-col">
-          <DialogHeader className="pb-4 border-b border-gray-100 flex-shrink-0">
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
+          <DialogHeader className="pb-4 border-b border-cream-100 shrink-0">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-br from-brand to-[#2d6570] rounded-xl shadow-lg">
-                <Settings className="h-5 w-5 text-white" />
+              <div className="p-2 bg-brand-soft border border-brand-light rounded-md">
+                <Settings className="h-4 w-4 text-brand-deep" />
               </div>
               <div>
-                <DialogTitle className="text-xl font-bold text-gray-900">
+                <DialogTitle className="display-serif text-[19px] text-ink-warm-900 leading-none">
                   {editingId ? 'Edit Template' : 'New Template'}
                 </DialogTitle>
-                <DialogDescription className="text-xs text-gray-500 mt-1">
+                <DialogDescription className="text-xs text-ink-warm-500 mt-1.5">
                   Define a reusable set of milestones. Each milestone can have items split between <strong>Ours</strong> (Holo Hive) and <strong>Yours</strong> (client).
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
-          <div className="overflow-y-auto px-1 py-4 space-y-4 flex-1 min-h-0">
+          <div className="flex-1 overflow-y-auto px-1 py-4 space-y-4">
             {/* Name + Description */}
             <div className="space-y-3">
               <div>
-                <Label className="text-xs font-semibold text-gray-700">Template Name</Label>
+                <Label className="text-xs font-semibold text-ink-warm-700">Template Name</Label>
                 <Input
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
@@ -494,7 +559,7 @@ export default function ActionBoardTemplatesPage() {
                 />
               </div>
               <div>
-                <Label className="text-xs font-semibold text-gray-700">Description (optional)</Label>
+                <Label className="text-xs font-semibold text-ink-warm-700">Description (optional)</Label>
                 <Textarea
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
@@ -503,12 +568,14 @@ export default function ActionBoardTemplatesPage() {
                   rows={2}
                 />
               </div>
-              <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg p-3">
+              {/* Set-as-default tile — was fully-amber; now neutral cream
+                  with an amber Star icon carrying the warning semantic. */}
+              <div className="flex items-center justify-between rounded-[14px] border border-cream-200 bg-cream-50 p-3">
                 <div className="flex items-center gap-2">
-                  <Star className={`h-4 w-4 ${editIsDefault ? 'text-amber-500' : 'text-gray-300'}`} fill={editIsDefault ? 'currentColor' : 'none'} />
+                  <Star className={`h-4 w-4 ${editIsDefault ? 'text-amber-500' : 'text-ink-warm-300'}`} fill={editIsDefault ? 'currentColor' : 'none'} />
                   <div>
-                    <Label className="text-sm font-medium text-gray-900">Set as default</Label>
-                    <p className="text-xs text-gray-500">Will be applied automatically to new clients.</p>
+                    <Label className="text-sm font-medium text-ink-warm-900">Set as default</Label>
+                    <p className="text-xs text-ink-warm-500">Will be applied automatically to new clients.</p>
                   </div>
                 </div>
                 <Switch checked={editIsDefault} onCheckedChange={setEditIsDefault} />
@@ -516,11 +583,11 @@ export default function ActionBoardTemplatesPage() {
             </div>
 
             {/* Milestones list */}
-            <div className="border-t border-gray-100 pt-4">
+            <div className="border-t border-cream-100 pt-4">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <Label className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Milestones</Label>
-                  <p className="text-xs text-gray-500">{editMilestones.length} step{editMilestones.length === 1 ? '' : 's'} in this template</p>
+                  <Label className="text-[11px] mono uppercase tracking-[0.14em] text-ink-warm-500">Milestones</Label>
+                  <p className="text-xs text-ink-warm-500 mt-0.5">{editMilestones.length} step{editMilestones.length === 1 ? '' : 's'} in this template</p>
                 </div>
                 <Button variant="outline" size="sm" onClick={addMilestone}>
                   <Plus className="h-3.5 w-3.5 mr-1" /> Add Milestone
@@ -528,13 +595,15 @@ export default function ActionBoardTemplatesPage() {
               </div>
 
               {editMilestones.length === 0 ? (
-                <div className="text-center py-8 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-500">No milestones yet. Click "Add Milestone" to start.</p>
+                <div className="rounded-[14px] border border-cream-200 bg-cream-50 p-6 text-center">
+                  <p className="text-sm text-ink-warm-500">No milestones yet. Click &quot;Add Milestone&quot; to start.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {editMilestones.map((ms, idx) => (
-                    <div key={idx} className="border border-gray-200 rounded-lg p-3 bg-white">
+                    // Card primitive for each milestone row — matches the
+                    // v11 row chrome used in the KolProfileModal tabs.
+                    <Card key={idx} className="p-3">
                       {/* Milestone header */}
                       <div className="flex items-start gap-2 mb-3">
                         <div className="flex flex-col gap-0.5 mt-1">
@@ -542,7 +611,7 @@ export default function ActionBoardTemplatesPage() {
                             type="button"
                             onClick={() => moveMilestone(idx, 'up')}
                             disabled={idx === 0}
-                            className="text-gray-400 hover:text-gray-700 disabled:opacity-20"
+                            className="text-ink-warm-400 hover:text-ink-warm-700 disabled:opacity-20"
                           >
                             <ChevronUp className="h-3.5 w-3.5" />
                           </button>
@@ -550,12 +619,12 @@ export default function ActionBoardTemplatesPage() {
                             type="button"
                             onClick={() => moveMilestone(idx, 'down')}
                             disabled={idx === editMilestones.length - 1}
-                            className="text-gray-400 hover:text-gray-700 disabled:opacity-20"
+                            className="text-ink-warm-400 hover:text-ink-warm-700 disabled:opacity-20"
                           >
                             <ChevronDown className="h-3.5 w-3.5" />
                           </button>
                         </div>
-                        <span className="text-xs font-mono font-semibold text-gray-400 mt-1.5">{idx + 1}.</span>
+                        <span className="text-xs mono font-semibold text-ink-warm-400 mt-1.5 tabular-nums">{idx + 1}.</span>
                         <div className="flex-1 space-y-2">
                           <Input
                             value={ms.name}
@@ -573,10 +642,11 @@ export default function ActionBoardTemplatesPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-7 w-7 p-0 hover:bg-rose-50 mt-1"
+                          className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-rose-600 hover:bg-rose-50 mt-1"
                           onClick={() => removeMilestone(idx)}
+                          title="Remove milestone"
                         >
-                          <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
 
@@ -584,14 +654,17 @@ export default function ActionBoardTemplatesPage() {
                       <div className="ml-6 space-y-1.5">
                         {ms.items.map((it, itemIdx) => (
                           <div key={itemIdx} className="flex items-center gap-2">
-                            {/* Court toggle */}
+                            {/* Court toggle — Ours is brand-soft/brand-deep
+                                (Holo Hive's color), Yours is amber-tinted
+                                (client side). Previously Yours used the
+                                outside-palette bg-orange-100. */}
                             <button
                               type="button"
                               onClick={() => updateItem(idx, itemIdx, { court: it.court === 'ours' ? 'yours' : 'ours' })}
-                              className={`flex-shrink-0 px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-wide ${
+                              className={`flex-shrink-0 px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-wide border ${
                                 it.court === 'ours'
-                                  ? 'bg-brand/10 text-brand'
-                                  : 'bg-orange-100 text-orange-700'
+                                  ? 'bg-brand-soft text-brand-deep border-brand-light'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200'
                               }`}
                               title={it.court === 'ours' ? 'Click to toggle to Yours (client)' : 'Click to toggle to Ours (Holo Hive)'}
                             >
@@ -606,30 +679,31 @@ export default function ActionBoardTemplatesPage() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-7 w-7 p-0 hover:bg-rose-50 flex-shrink-0"
+                              className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-rose-600 hover:bg-rose-50 flex-shrink-0"
                               onClick={() => removeItem(idx, itemIdx)}
+                              title="Remove item"
                             >
-                              <X className="h-3 w-3 text-gray-400" />
+                              <X className="h-3 w-3" />
                             </Button>
                           </div>
                         ))}
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-xs h-7 text-gray-500 hover:text-brand"
+                          className="text-xs h-7 text-ink-warm-500 hover:text-brand"
                           onClick={() => addItem(idx)}
                         >
                           <Plus className="h-3 w-3 mr-1" /> Add item
                         </Button>
                       </div>
-                    </div>
+                    </Card>
                   ))}
                 </div>
               )}
             </div>
           </div>
 
-          <DialogFooter className="border-t border-gray-100 pt-4 flex-shrink-0">
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0 shrink-0">
             <Button variant="outline" onClick={() => setEditorOpen(false)}>Cancel</Button>
             <Button variant="brand" onClick={handleSave} disabled={saving || !editName.trim()}>
               {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Create Template'}
@@ -638,19 +712,22 @@ export default function ActionBoardTemplatesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Delete confirm dialog ──────────────────────────────────── */}
+      {/* ── Delete confirm dialog ──────────────────────────────────────
+          Standard v11 confirm — no left rail, no custom border radius.
+          Destructive intent reads from the Trash icon + variant="destructive"
+          button, not chrome paint. */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
-        <DialogContent className="sm:max-w-[400px] border-l-4 border-l-red-500 rounded-xl">
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
               <Trash2 className="h-4 w-4 text-rose-500" />
               Delete template?
             </DialogTitle>
-            <DialogDescription className="text-sm text-gray-600 pt-2">
+            <DialogDescription className="text-sm text-ink-warm-700 pt-2">
               <strong>{deleteTarget?.name}</strong> will be permanently deleted. Clients that previously had this template applied will keep their milestones — only the template itself is removed.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-2">
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
             <Button
               variant="destructive"

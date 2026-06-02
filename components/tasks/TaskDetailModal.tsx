@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -134,6 +135,12 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
     // sense (action items are scoped per client).
     client_action_item_id: '' as string,
     recurring_config: null as Record<string, any> | null,
+    // Dashboard v2: unplanned/reactive work — surfaced as a separate
+    // signal under Layer 1 (Internal Success). Counts up, not filtered.
+    is_ad_hoc: false,
+    // Dashboard v2: link task to an active initiative. Surfaces under
+    // Layer 1 Initiative Tracker as "N tasks linked".
+    linked_initiative: '' as string,
   });
 
   // [Action Board link] Items for the currently-selected client.
@@ -141,6 +148,17 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
   // client selected.
   type ActionItemOption = { id: string; text: string; is_done: boolean; milestone_name: string | null };
   const [actionItems, setActionItems] = useState<ActionItemOption[]>([]);
+
+  // Active initiatives for the linked_initiative dropdown.
+  type InitiativeOption = { id: string; name: string };
+  const [initiatives, setInitiatives] = useState<InitiativeOption[]>([]);
+  useEffect(() => {
+    if (!open) return;
+    fetch('/api/initiatives?status=active')
+      .then(r => r.ok ? r.json() : { initiatives: [] })
+      .then(j => setInitiatives((j.initiatives || []).map((i: any) => ({ id: i.id, name: i.name }))))
+      .catch(() => setInitiatives([]));
+  }, [open]);
 
   useEffect(() => {
     if (task) {
@@ -157,6 +175,8 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
         client_id: task.client_id || '',
         client_action_item_id: task.client_action_item_id || '',
         recurring_config: task.recurring_config || null,
+        is_ad_hoc: (task as any).is_ad_hoc || false,
+        linked_initiative: (task as any).linked_initiative || '',
       });
       // Check if this task has a linked deliverable
       DeliverableService.getDeliverableByTaskId(task.id).then(d => {
@@ -176,6 +196,8 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
         client_id: '',
         client_action_item_id: '',
         recurring_config: null,
+        is_ad_hoc: false,
+        linked_initiative: '',
       });
       setActiveDetailTab('details');
       setHasDeliverable(false);
@@ -251,6 +273,8 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
         status: form.status,
         priority: getComputedPriority(form.due_date, form.status),
         recurring_config: form.recurring_config || null,
+        is_ad_hoc: form.is_ad_hoc,
+        linked_initiative: form.linked_initiative || null,
       };
       // Only admins can change client assignment
       if (canEditClient) {
@@ -501,6 +525,42 @@ export function TaskDetailModal({ open, onOpenChange, task, teamMembers, clients
               {TASK_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Linked initiative — Dashboard v2: ties this task to a
+            strategic thread for Layer 1 rollups. */}
+        <div className="grid gap-2">
+          <Label>Linked Initiative <span className="text-xs text-gray-500">(optional)</span></Label>
+          <Select
+            value={form.linked_initiative || '_none'}
+            onValueChange={(v) => setForm({ ...form, linked_initiative: v === '_none' ? '' : v })}
+          >
+            <SelectTrigger className="focus-brand">
+              <SelectValue placeholder="Not linked" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_none">Not linked</SelectItem>
+              {initiatives.map(i => (
+                <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Ad-hoc flag — Dashboard v2: surfaces under Layer 1 as a
+            separate signal (counts up, not filtered). Use for fires,
+            surprise asks, unplanned threads. */}
+        <div className="flex items-start gap-3 px-1 py-2">
+          <Checkbox
+            id="task-is-ad-hoc"
+            checked={form.is_ad_hoc}
+            onCheckedChange={(checked) => setForm({ ...form, is_ad_hoc: !!checked })}
+            className="mt-0.5"
+          />
+          <Label htmlFor="task-is-ad-hoc" className="text-sm leading-tight cursor-pointer">
+            Ad-hoc work
+            <span className="block text-xs text-ink-500 mt-0.5">Unplanned / reactive. Surfaces on the priority dashboard.</span>
+          </Label>
         </div>
 
         <div className="grid grid-cols-2 gap-4">

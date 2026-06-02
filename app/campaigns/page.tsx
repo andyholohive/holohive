@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Search, Plus, Megaphone, Building2, DollarSign, Calendar as CalendarIcon, Trash2, Share2, Copy, ExternalLink, Archive, AlertTriangle, LayoutGrid, List, ChevronLeft, ChevronRight } from "lucide-react";
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/contexts/AuthContext";
@@ -458,48 +459,54 @@ export default function CampaignsPage() {
   const getStatusTone = (status: string): BadgeTone =>
     CAMPAIGN_STATUS_TONES[status] ?? 'neutral';
 
+  // Structural skeleton mirroring the new v11 campaign card 1:1.
+  // 40px logo tile + name + 2-icon hover cluster, status badge row,
+  // 3 KV info rows (Client / Budget / Dates), progress section with
+  // 2px bar + sub-text, pinned View Campaign button at bottom.
   const CampaignCardSkeleton = () => (
-    <Card className="transition-shadow h-full flex flex-col">
-      <CardHeader className="pb-4">
-        <div className="mb-3">
-          <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
-            <div className="flex items-center">
-              <Skeleton className="h-8 w-8 rounded-lg mr-2" />
-              <Skeleton className="h-5 w-48" />
-            </div>
+    <Card className="crd-hover h-full flex flex-col">
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <Skeleton className="h-10 w-10 rounded-md flex-shrink-0" />
+            <Skeleton className="h-5 w-32" />
           </div>
-          <Skeleton className="h-6 w-20 rounded-full" />
+          <div className="flex items-center gap-0.5 flex-shrink-0 opacity-60">
+            <Skeleton className="h-7 w-7 rounded-md" />
+            <Skeleton className="h-7 w-7 rounded-md" />
+          </div>
         </div>
-        <div className="space-y-2">
-          <div className="flex items-center text-sm text-gray-600">
-            <Skeleton className="h-4 w-4 mr-2" />
-            <Skeleton className="h-4 w-32" />
+        <div className="flex gap-2 flex-wrap">
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
+        <div className="mt-2 space-y-1.5">
+          <div className="flex items-center">
+            <Skeleton className="h-3.5 w-3.5 mr-2 rounded-sm" />
+            <Skeleton className="h-4 w-28" />
           </div>
-          <div className="flex items-center text-sm text-gray-600">
-            <Skeleton className="h-4 w-4 mr-2" />
-            <Skeleton className="h-4 w-24" />
+          <div className="flex items-center">
+            <Skeleton className="h-3.5 w-3.5 mr-2 rounded-sm" />
+            <Skeleton className="h-4 w-20" />
           </div>
-          <div className="flex items-center text-sm text-gray-600">
-            <Skeleton className="h-4 w-4 mr-2" />
+          <div className="flex items-center">
+            <Skeleton className="h-3.5 w-3.5 mr-2 rounded-sm" />
             <Skeleton className="h-4 w-36" />
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-4 border-t border-gray-100 flex flex-col flex-1">
-        <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-6 w-12 rounded-md" />
-        </div>
+      <CardContent className="pt-3 border-t border-cream-100 flex flex-col flex-1">
         <div className="mb-3">
-          <Skeleton className="h-3 w-32 mb-2" />
-          <div className="flex flex-wrap gap-1">
-            <Skeleton className="h-5 w-20 rounded-md" />
-            <Skeleton className="h-5 w-24 rounded-md" />
-            <Skeleton className="h-5 w-18 rounded-md" />
+          <div className="flex items-baseline justify-between mb-1.5">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-3 w-8" />
+          </div>
+          <Skeleton className="h-2 w-full rounded-full" />
+          <div className="mt-2 space-y-0.5">
+            <Skeleton className="h-3 w-40" />
+            <Skeleton className="h-3 w-32" />
           </div>
         </div>
-        <Skeleton className="h-8 w-full rounded mt-auto" />
-        <Skeleton className="h-8 w-full rounded mt-2" />
+        <Skeleton className="h-8 w-full rounded-md mt-auto" />
       </CardContent>
     </Card>
   );
@@ -510,6 +517,8 @@ export default function CampaignsPage() {
         <PageHeader
           title="Campaigns"
           subtitle="Track and manage your marketing campaigns"
+          kicker="Talent · Campaigns"
+          kickerDot="amber"
           actions={
             <Button variant="brand" onClick={() => setIsNewCampaignOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -517,34 +526,41 @@ export default function CampaignsPage() {
             </Button>
           }
         />
-        <div className="flex items-center space-x-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search campaigns by name or client..."
-              className="pl-10 focus-brand"
-              disabled
-            />
+        {/* ── Campaigns skeleton ──────────────────────────────────
+            Mirrors the loaded layout: SectionHeader + toolbar
+            (tabs left, search middle, view-mode toggle right) +
+            card grid. */}
+        <div className="space-y-4">
+          <div className="section-head first flex items-center gap-3">
+            <span className="dot bg-brand/30" aria-hidden />
+            <Skeleton className="h-3 w-24" />
+            <span className="flex-1 h-px bg-cream-200" aria-hidden />
+            <Skeleton className="h-3 w-32" />
           </div>
-        </div>
-        {/* Status Tabs and View Toggle Skeleton */}
-        <div className="flex items-center justify-between">
-          <div className="flex gap-2">
-            <Skeleton className="h-9 w-16 rounded-md" />
-            <Skeleton className="h-9 w-24 rounded-md" />
-            <Skeleton className="h-9 w-20 rounded-md" />
-            <Skeleton className="h-9 w-20 rounded-md" />
-            <Skeleton className="h-9 w-28 rounded-md" />
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex gap-1 p-1 rounded-md bg-cream-100 border border-cream-200">
+              <Skeleton className="h-8 w-14 rounded" />
+              <Skeleton className="h-8 w-24 rounded" />
+              <Skeleton className="h-8 w-20 rounded" />
+              <Skeleton className="h-8 w-20 rounded" />
+              <Skeleton className="h-8 w-28 rounded" />
+            </div>
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
+              <Input placeholder="Search campaigns by name or client..." className="pl-10 focus-brand" disabled />
+            </div>
+            <div className="ml-auto flex gap-1 p-1 rounded-md bg-cream-100 border border-cream-200">
+              <Skeleton className="h-8 w-10 rounded" />
+              <Skeleton className="h-8 w-10 rounded" />
+            </div>
           </div>
-          <div className="flex gap-1">
-            <Skeleton className="h-9 w-9 rounded-md" />
-            <Skeleton className="h-9 w-9 rounded-md" />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <CampaignCardSkeleton key={index} />
+            ))}
           </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <CampaignCardSkeleton key={index} />
-          ))}
         </div>
       </div>
     );
@@ -553,7 +569,7 @@ export default function CampaignsPage() {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Campaigns" subtitle="Track and manage your marketing campaigns" />
+        <PageHeader title="Campaigns" subtitle="Track and manage your marketing campaigns" kicker="Talent · Campaigns" kickerDot="amber" />
         <div className="text-center py-8">
           <p className="text-rose-600">{error}</p>
           <Button onClick={fetchCampaigns} variant="brand" className="mt-4">
@@ -569,6 +585,8 @@ export default function CampaignsPage() {
       <PageHeader
         title="Campaigns"
         subtitle="Track and manage your marketing campaigns"
+        kicker="Talent · Campaigns"
+        kickerDot="amber"
         actions={
           <Dialog open={isNewCampaignOpen} onOpenChange={setIsNewCampaignOpen}>
             <DialogTrigger asChild>
@@ -577,15 +595,17 @@ export default function CampaignsPage() {
                 New Campaign
               </Button>
             </DialogTrigger>
-                            <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-hidden">
+                            <DialogContent className="sm:max-w-[500px] max-h-[85vh] flex flex-col">
               <DialogHeader>
                 <DialogTitle>Create New Campaign</DialogTitle>
                 <DialogDescription>
                   Set up a new marketing campaign for your client.
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleCreateCampaign}>
-                <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
+              {/* flex-col flex-1 min-h-0 so the flex chain from
+                  DialogContent reaches the inner body div's flex-1. */}
+              <form onSubmit={handleCreateCampaign} className="flex flex-col flex-1 min-h-0">
+                <div className="grid gap-4 py-4 flex-1 overflow-y-auto px-1">
                   <div className="grid gap-2">
                     <Label htmlFor="client">Client <span className="text-rose-500">*</span></Label>
                     <Select value={newCampaign.client_id} onValueChange={(value) => setNewCampaign({ ...newCampaign, client_id: value })}>
@@ -622,7 +642,7 @@ export default function CampaignsPage() {
                           <SelectItem key={template.id} value={template.id}>
                             <div className="flex flex-col">
                               <span className="font-medium">{template.name}</span>
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs text-ink-warm-500">
                                 ${template.total_budget.toLocaleString()} • {template.region} • {template.usage_count || 0} uses
                               </span>
                             </div>
@@ -631,7 +651,7 @@ export default function CampaignsPage() {
                       </SelectContent>
                     </Select>
                     {selectedTemplate && selectedTemplate !== "none" && (
-                      <div className="text-xs text-gray-600 mt-1">
+                      <div className="text-xs text-ink-warm-700 mt-1">
                         Template applied! You can modify any fields below.
                       </div>
                     )}
@@ -793,11 +813,11 @@ export default function CampaignsPage() {
                     {selectedListId && (
                       <div className="border rounded-md p-2 max-h-56 overflow-y-auto">
                         {listKOLs.length === 0 ? (
-                          <div className="text-xs text-gray-500 px-1 py-2">No KOLs in this list.</div>
+                          <div className="text-xs text-ink-warm-500 px-1 py-2">No KOLs in this list.</div>
                         ) : (
                           <div className="space-y-2">
                             <div className="flex justify-between items-center pb-2 border-b">
-                              <span className="text-sm font-medium text-gray-700">
+                              <span className="text-sm font-medium text-ink-warm-700">
                                 {selectedKolIds.size} of {listKOLs.length} selected
                               </span>
                               <Button
@@ -832,8 +852,8 @@ export default function CampaignsPage() {
                                     }}
                                   />
                                   <div className="flex-1">
-                                    <div className="font-medium text-gray-900">{k.name}</div>
-                                    <div className="text-xs text-gray-600">
+                                    <div className="font-medium text-ink-warm-900">{k.name}</div>
+                                    <div className="text-xs text-ink-warm-700">
                                       {k.followers ? `${k.followers.toLocaleString()} followers` : '-'}
                                       {k.region ? ` • ${k.region}` : ''}
                                     </div>
@@ -909,7 +929,7 @@ export default function CampaignsPage() {
                   <div className="grid gap-2 mt-2">
                     <Label htmlFor="totalBudget">Total Budget <span className="text-rose-500">*</span></Label>
                     <div className="relative w-full">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-warm-500 pointer-events-none">$</span>
                       <Input
                         id="totalBudget"
                         type="text"
@@ -928,9 +948,9 @@ export default function CampaignsPage() {
                   </div>
                   <div className="grid gap-2">
                     <Label>Regional Budget Allocation</Label>
-                    <div className="bg-gray-50 border rounded p-3 text-sm text-gray-700 space-y-2">
+                    <div className="bg-cream-50 border rounded p-3 text-sm text-ink-warm-700 space-y-2">
                       {newCampaign.budgetAllocations.length === 0 && (
-                        <div className="text-gray-400 text-sm">No allocations yet.</div>
+                        <div className="text-ink-warm-400 text-sm">No allocations yet.</div>
                       )}
                       {newCampaign.budgetAllocations.map((alloc, idx) => {
                         const formattedAmount = alloc.amount
@@ -955,7 +975,7 @@ export default function CampaignsPage() {
                               </SelectContent>
                             </Select>
                             <div className="relative w-28">
-                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-warm-500 pointer-events-none">$</span>
                               <Input
                                 type="text"
                                 inputMode="numeric"
@@ -1005,7 +1025,7 @@ export default function CampaignsPage() {
                     </div>
                   </div>
                 </div>
-                <DialogFooter>
+                <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                   <Button type="button" variant="outline" onClick={() => setIsNewCampaignOpen(false)}>
                     Cancel
                   </Button>
@@ -1018,105 +1038,118 @@ export default function CampaignsPage() {
           </Dialog>
         }
       />
-      <div className="flex items-center space-x-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search campaigns by name or client..."
-            className="pl-10 focus-brand"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
-      {/* Status Tabs and View Toggle */}
-      <div className="flex items-center justify-between gap-4">
-        <Tabs value={statusFilter} onValueChange={setStatusFilter} className="flex-1">
-          <TabsList className="bg-gray-100 p-1 h-auto flex-wrap">
-            {/* Each tab shows a hover tooltip with the campaign names in
-                that status, so the manager can scan what's where without
-                clicking through. delayDuration kept short so it feels
-                responsive but doesn't fire on accidental fly-by hovers. */}
-            <TooltipProvider delayDuration={250}>
-              {/* activeBgClass / activeTextClass / countActiveClass split:
-                  we can't use Tailwind's data-[state=active]:... selector
-                  here because <TooltipTrigger asChild> overwrites Radix
-                  Tabs' data-state attribute with Tooltip's own. Derive
-                  active styling from the controlled statusFilter state
-                  instead — simpler and bypasses the data-state collision
-                  entirely. */}
-              {([
-                { value: 'all',       label: 'All',       activeText: 'text-gray-900',   inactiveText: 'text-gray-600',   countBg: 'bg-gray-200 text-gray-700' },
-                { value: 'Planning',  label: 'Planning',  activeText: 'text-blue-700',   inactiveText: 'text-gray-600',   countBg: 'bg-blue-100 text-blue-700' },
-                { value: 'Active',    label: 'Active',    activeText: 'text-brand',      inactiveText: 'text-gray-600',   countBg: 'bg-brand-light text-brand' },
-                { value: 'Paused',    label: 'Paused',    activeText: 'text-yellow-700', inactiveText: 'text-gray-600',   countBg: 'bg-yellow-100 text-yellow-700' },
-                { value: 'Completed', label: 'Completed', activeText: 'text-gray-700',   inactiveText: 'text-gray-600',   countBg: 'bg-gray-200 text-gray-700' },
-              ] as const).map((t) => {
-                const names = campaignsByStatus[t.value as keyof typeof campaignsByStatus];
-                const isActive = statusFilter === t.value;
-                return (
-                  <Tooltip key={t.value}>
-                    <TooltipTrigger asChild>
-                      <TabsTrigger
-                        value={t.value}
-                        className={`px-4 py-2 transition-colors ${
-                          isActive
-                            ? `bg-white shadow-sm ${t.activeText}`
-                            : `${t.inactiveText} hover:bg-gray-50`
-                        }`}
-                      >
-                        {t.label}
-                        <span className={`ml-2 text-xs px-2 py-0.5 rounded-full pointer-events-none ${t.countBg}`}>{names.length}</span>
-                      </TabsTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" align="start" className="max-w-xs p-0">
-                      {names.length === 0 ? (
-                        <div className="px-3 py-2 text-xs text-gray-500 italic">No campaigns</div>
-                      ) : (
-                        <div className="py-1.5 max-h-72 overflow-y-auto">
-                          <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider border-b border-gray-100">
-                            {names.length} {t.label.toLowerCase()} campaign{names.length === 1 ? '' : 's'}
+      {/* ── Campaigns ─────────────────────────────────────────────────
+          Single SectionHeader + toolbar (tabs left, search middle,
+          view-mode toggle right). Matches the /clients & /lists
+          chrome pattern. */}
+      <div className="space-y-4">
+        <SectionHeader
+          label="Campaigns"
+          dot="amber"
+          counter={`${filteredCampaigns.length} of ${statusCounts.all} campaign${statusCounts.all === 1 ? '' : 's'}${statusFilter !== 'all' ? ` · ${statusFilter.toLowerCase()}` : ''}`}
+          first
+        />
+
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Each tab shows a hover tooltip with the campaign names
+              in that status — handy for the manager to scan what's
+              where without clicking through. Tone palette aligned to
+              v11: Planning sky (info), Active brand, Paused amber
+              (warning), Completed emerald (success). */}
+          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+            <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200 flex-wrap">
+              <TooltipProvider delayDuration={250}>
+                {/* We can't use Tailwind's `data-[state=active]:...`
+                    here because <TooltipTrigger asChild> overwrites
+                    Radix Tabs' data-state attribute with Tooltip's
+                    own. Derive active styling from the controlled
+                    statusFilter state instead. */}
+                {([
+                  { value: 'all',       label: 'All',       activeText: 'text-ink-warm-900', countBg: 'bg-cream-200 text-ink-warm-700' },
+                  { value: 'Planning',  label: 'Planning',  activeText: 'text-sky-700',      countBg: 'bg-sky-100 text-sky-700' },
+                  { value: 'Active',    label: 'Active',    activeText: 'text-brand',        countBg: 'bg-brand-light text-brand' },
+                  { value: 'Paused',    label: 'Paused',    activeText: 'text-amber-700',    countBg: 'bg-amber-100 text-amber-800' },
+                  { value: 'Completed', label: 'Completed', activeText: 'text-emerald-700',  countBg: 'bg-emerald-100 text-emerald-800' },
+                ] as const).map((t) => {
+                  const names = campaignsByStatus[t.value as keyof typeof campaignsByStatus];
+                  const isActive = statusFilter === t.value;
+                  return (
+                    <Tooltip key={t.value}>
+                      <TooltipTrigger asChild>
+                        <TabsTrigger
+                          value={t.value}
+                          className={`px-4 py-2 transition-colors ${
+                            isActive
+                              ? `bg-white shadow-card ${t.activeText}`
+                              : 'text-ink-warm-700 hover:bg-cream-50'
+                          }`}
+                        >
+                          {t.label}
+                          <span className={`ml-2 text-xs px-2 py-0.5 rounded-full pointer-events-none ${t.countBg}`}>{names.length}</span>
+                        </TabsTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" align="start" className="max-w-xs p-0">
+                        {names.length === 0 ? (
+                          <div className="px-3 py-2 text-xs text-ink-warm-500 italic">No campaigns</div>
+                        ) : (
+                          <div className="py-1.5 max-h-72 overflow-y-auto">
+                            <div className="px-3 py-1 text-[10px] mono font-semibold text-ink-warm-400 uppercase tracking-[0.14em] border-b border-cream-100">
+                              {names.length} {t.label.toLowerCase()} campaign{names.length === 1 ? '' : 's'}
+                            </div>
+                            <ul className="text-xs">
+                              {/* Cap at 50 to keep the popover sane —
+                                  anyone with 50+ campaigns in a single
+                                  status should be filtering, not scanning. */}
+                              {names.slice(0, 50).map((n) => (
+                                <li key={n} className="px-3 py-1 truncate">{n}</li>
+                              ))}
+                              {names.length > 50 && (
+                                <li className="px-3 py-1 text-ink-warm-400 italic">…and {names.length - 50} more</li>
+                              )}
+                            </ul>
                           </div>
-                          <ul className="text-xs">
-                            {/* Cap at 50 to keep the popover sane —
-                                anyone with 50+ campaigns in a single
-                                status should be filtering, not scanning. */}
-                            {names.slice(0, 50).map((n) => (
-                              <li key={n} className="px-3 py-1 truncate">{n}</li>
-                            ))}
-                            {names.length > 50 && (
-                              <li className="px-3 py-1 text-gray-400 italic">…and {names.length - 50} more</li>
-                            )}
-                          </ul>
-                        </div>
-                      )}
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </TooltipProvider>
-          </TabsList>
-        </Tabs>
-        {/* View Toggle */}
-        <div className="flex bg-gray-100 p-1 rounded-lg">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`px-3 py-2 ${viewMode === 'card' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
-            onClick={() => setViewMode('card')}
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`px-3 py-2 ${viewMode === 'table' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
-            onClick={() => setViewMode('table')}
-          >
-            <List className="h-4 w-4" />
-          </Button>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </TooltipProvider>
+            </TabsList>
+          </Tabs>
+
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
+            <Input
+              placeholder="Search campaigns by name or client..."
+              className="pl-10 focus-brand"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {/* View-mode toggle — v11 chrome (cream-100 base + cream-200
+              border + shadow-card on active segment). */}
+          <div className="ml-auto flex bg-cream-100 p-1 rounded-md border border-cream-200">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-8 px-3 ${viewMode === 'card' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:bg-cream-200 hover:text-ink-warm-700'}`}
+              onClick={() => setViewMode('card')}
+              title="Card view"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-8 px-3 ${viewMode === 'table' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:bg-cream-200 hover:text-ink-warm-700'}`}
+              onClick={() => setViewMode('table')}
+              title="Table view"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-      </div>
       {filteredCampaigns.length === 0 ? (
         <EmptyState
           icon={Megaphone}
@@ -1133,131 +1166,147 @@ export default function CampaignsPage() {
         </EmptyState>
       ) : viewMode === "card" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {paginatedCampaigns.map((campaign) => (
-            <Card key={campaign.id} className="transition-shadow group h-full flex flex-col">
-              <CardHeader className="pb-4">
-                <div className="mb-3">
-                  <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
-                    <div className="flex items-center">
+          {paginatedCampaigns.map((campaign) => {
+            const counts = contentCounts[campaign.id];
+            const pct = counts && counts.total > 0 ? Math.round((counts.posted / counts.total) * 100) : 0;
+            return (
+              // v11 campaign card — same shape as /clients, /lists cards.
+              // Logo tile (client logo if set, else brand-soft Megaphone)
+              // + name + hover-action cluster (Share/Archive). Status
+              // badge below. Progress section in CardContent. View
+              // Campaign pinned via mt-auto.
+              <Card key={campaign.id} className="crd-hover group flex flex-col h-full">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       {campaign.client_logo_url ? (
-                        <img
-                          src={campaign.client_logo_url}
-                          alt={campaign.client_name || 'Client'}
-                          className="h-8 w-8 rounded-lg mr-2 object-cover"
-                        />
+                        <div className="w-10 h-10 rounded-md overflow-hidden bg-white border border-cream-200 flex-shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={campaign.client_logo_url}
+                            alt={campaign.client_name || 'Client'}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
                       ) : (
-                        <div className="bg-gray-100 p-1.5 rounded-lg mr-2">
-                          <Megaphone className="h-5 w-5 text-gray-600" />
+                        <div className="w-10 h-10 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center flex-shrink-0">
+                          <Megaphone className="h-5 w-5" />
                         </div>
                       )}
-                      {campaign.name}
+                      <span className="text-base font-semibold text-ink-warm-900 tracking-tight truncate min-w-0">{campaign.name}</span>
                     </div>
-                    <StatusBadge tone={getStatusTone(campaign.status)}>
+                    {/* Hover-action cluster — Share + Archive */}
+                    <div className="flex items-center gap-0.5 flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity duration-200">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); handleShareCampaign(campaign); }}
+                        className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-ink-warm-900 hover:bg-cream-100"
+                        title="Share campaign"
+                      >
+                        <Share2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => { e.stopPropagation(); handleArchiveCampaign(campaign); }}
+                        className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-amber-700 hover:bg-amber-50"
+                        title="Archive campaign"
+                      >
+                        <Archive className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                  {/* Status badge row */}
+                  <div className="flex gap-2 flex-wrap">
+                    <StatusBadge tone={getStatusTone(campaign.status)} size="sm" bordered withDot={campaign.status === 'Active' ? 'pulse' : true}>
                       {campaign.status}
                     </StatusBadge>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Building2 className="h-4 w-4 mr-2 text-gray-600" />
-                    <span className="text-gray-600">{campaign.client_name}</span>
+                  {/* KV info rows — Client, Budget, Dates */}
+                  <div className="mt-2 space-y-1.5">
+                    <div className="flex items-center text-sm text-ink-warm-700">
+                      <Building2 className="h-3.5 w-3.5 mr-2 text-ink-warm-400 flex-shrink-0" />
+                      <span className="truncate">{campaign.client_name}</span>
+                    </div>
+                    <div className="flex items-center text-sm text-ink-warm-700">
+                      <DollarSign className="h-3.5 w-3.5 mr-2 text-ink-warm-400 flex-shrink-0" />
+                      <span className="tabular-nums">{CampaignService.formatCurrency(campaign.total_budget)}</span>
+                    </div>
+                    <div className="flex items-center text-sm text-ink-warm-700">
+                      <CalendarIcon className="h-3.5 w-3.5 mr-2 text-ink-warm-400 flex-shrink-0" />
+                      <span className="tabular-nums">{formatDate(campaign.start_date)}{campaign.end_date ? ` – ${formatDate(campaign.end_date)}` : ' – TBD'}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <DollarSign className="h-4 w-4 mr-2 text-gray-600" />
-                    <span className="text-gray-600">{CampaignService.formatCurrency(campaign.total_budget)}</span>
+                </CardHeader>
+                <CardContent className="pt-3 border-t border-cream-100 flex flex-col flex-1">
+                  {/* Progress section — label + percentage + 2px brand
+                      bar. Matches the onboarding-progress pattern on
+                      the /clients card. */}
+                  <div className="mb-3">
+                    <div className="flex items-baseline justify-between text-sm mb-1.5">
+                      <span className="font-semibold text-ink-warm-700">Progress</span>
+                      <span className="text-xs text-ink-warm-500 tabular-nums">{pct}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-cream-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-brand transition-all duration-300"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 space-y-0.5 text-xs text-ink-warm-500">
+                      <div>
+                        {counts && counts.total > 0
+                          ? <><span className="tabular-nums">{counts.posted}</span> of <span className="tabular-nums">{counts.total}</span> content posted</>
+                          : 'No content yet'}
+                      </div>
+                      {counts && counts.total > 0 && (
+                        <div>
+                          <span className="tabular-nums">{paidContentCounts[campaign.id] || 0}</span> of <span className="tabular-nums">{counts.total}</span> content paid
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <CalendarIcon className="h-4 w-4 mr-2 text-gray-600" />
-                    <span className="text-gray-600">{formatDate(campaign.start_date)}{campaign.end_date ? ` - ${formatDate(campaign.end_date)}` : ' - TBD'}</span>
+                  {/* View Campaign — primary action, pinned at bottom */}
+                  <div className="mt-auto">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        if (!campaign.id) {
+                          console.error('Campaign ID is missing!', campaign);
+                          return;
+                        }
+                        router.push(`/campaigns/${campaign.slug || campaign.id}`);
+                      }}
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                      View Campaign
+                    </Button>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-4 border-t border-gray-100 flex flex-col flex-1">
-                <div className="mb-3">
-                  <div className="flex items-center justify-between text-sm text-gray-600 mb-1">
-                    <span>Campaign Progress</span>
-                    <span className="bg-gray-100 px-2 py-1 rounded-md text-gray-600 font-medium">
-                      {(() => {
-                        const counts = contentCounts[campaign.id];
-                        if (!counts || counts.total === 0) return '0%';
-                        const percentage = Math.round((counts.posted / counts.total) * 100);
-                        return `${percentage}%`;
-                      })()}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    {(() => {
-                      const counts = contentCounts[campaign.id];
-                      if (!counts || counts.total === 0) return 'No content yet';
-                      return `${counts.posted} of ${counts.total} content posted`;
-                    })()}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {(() => {
-                      const counts = contentCounts[campaign.id];
-                      if (!counts || counts.total === 0) return '';
-                      const paid = paidContentCounts[campaign.id] || 0;
-                      return `${paid} of ${counts.total} content paid`;
-                    })()}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full mt-auto"
-                  onClick={() => {
-                    console.log('Campaign clicked:', campaign.id, campaign);
-                    if (!campaign.id) {
-                      console.error('Campaign ID is missing!', campaign);
-                      return;
-                    }
-                    // Use slug for shorter URL if available
-                    router.push(`/campaigns/${campaign.slug || campaign.id}`);
-                  }}
-                >
-                  View Campaign
-                </Button>
-                <div className="flex gap-2 mt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => handleShareCampaign(campaign)}
-                  >
-                    <Share2 className="h-4 w-4 mr-2" />
-                    Share
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                    onClick={() => handleArchiveCampaign(campaign)}
-                  >
-                    <Archive className="h-4 w-4 mr-2" />
-                    Archive
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       ) : (
-        /* Table View */
-        <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+        /* Table View — v11 Card chrome + dashboard header typography. */
+        <Card className="border-cream-200 overflow-hidden">
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50">
-                <TableHead className="font-semibold">Campaign</TableHead>
-                <TableHead className="font-semibold">Client</TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
-                <TableHead className="font-semibold">Budget</TableHead>
-                <TableHead className="font-semibold">Dates</TableHead>
-                {/* [Campaign Live v1] Inline phase setter — same data the
-                    campaign detail form writes to (campaigns.current_phase).
-                    See app/public/portal/[id]/page.tsx for where it surfaces. */}
-                <TableHead className="font-semibold">Phase</TableHead>
-                <TableHead className="font-semibold">Progress</TableHead>
-                <TableHead className="font-semibold text-right">Actions</TableHead>
+              <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Campaign</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Client</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Status</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Budget</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Dates</TableHead>
+                {/* [Campaign Live v1] Inline phase setter — same data
+                    the campaign detail form writes to
+                    (campaigns.current_phase). See portal page. */}
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Phase</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Progress</TableHead>
+                <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1267,40 +1316,43 @@ export default function CampaignsPage() {
                 return (
                   <TableRow
                     key={campaign.id}
-                    className="cursor-pointer hover:bg-gray-50"
+                    className="border-cream-100 row-accent cursor-pointer"
                     onClick={() => router.push(`/campaigns/${campaign.slug || campaign.id}`)}
                   >
-                    <TableCell>
-                      <div className="flex items-center gap-2">
+                    <TableCell className="py-3.5 px-5">
+                      <div className="flex items-center gap-2.5">
                         {campaign.client_logo_url ? (
-                          <img
-                            src={campaign.client_logo_url}
-                            alt={campaign.client_name || 'Client'}
-                            className="h-7 w-7 rounded-lg object-cover"
-                          />
+                          <div className="w-7 h-7 rounded-md overflow-hidden bg-white border border-cream-200 flex-shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={campaign.client_logo_url}
+                              alt={campaign.client_name || 'Client'}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
                         ) : (
-                          <div className="bg-gray-100 p-1.5 rounded-lg">
-                            <Megaphone className="h-4 w-4 text-gray-600" />
+                          <div className="w-7 h-7 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center flex-shrink-0">
+                            <Megaphone className="h-4 w-4" />
                           </div>
                         )}
-                        <span className="font-medium text-gray-900">{campaign.name}</span>
+                        <span className="font-medium text-ink-warm-900 truncate">{campaign.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-gray-600">{campaign.client_name}</TableCell>
-                    <TableCell>
-                      <StatusBadge tone={getStatusTone(campaign.status)}>
+                    <TableCell className="py-3.5 px-5 text-ink-warm-700 truncate">{campaign.client_name}</TableCell>
+                    <TableCell className="py-3.5 px-5">
+                      <StatusBadge tone={getStatusTone(campaign.status)} size="sm" bordered withDot={campaign.status === 'Active' ? 'pulse' : true}>
                         {campaign.status}
                       </StatusBadge>
                     </TableCell>
-                    <TableCell className="text-gray-600">{CampaignService.formatCurrency(campaign.total_budget)}</TableCell>
-                    <TableCell className="text-gray-600 text-sm">
+                    <TableCell className="py-3.5 px-5 text-right text-ink-warm-700 tabular-nums">{CampaignService.formatCurrency(campaign.total_budget)}</TableCell>
+                    <TableCell className="py-3.5 px-5 text-ink-warm-700 text-sm tabular-nums">
                       {formatDate(campaign.start_date)}
-                      {campaign.end_date ? ` - ${formatDate(campaign.end_date)}` : ''}
+                      {campaign.end_date ? ` – ${formatDate(campaign.end_date)}` : ''}
                     </TableCell>
-                    {/* [Campaign Live v1] Inline Phase cell. stopPropagation
-                        prevents the row's onClick (navigates to detail) from
+                    {/* [Campaign Live v1] Inline Phase cell.
+                        stopPropagation prevents the row's onClick from
                         firing when the user opens the dropdown. */}
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+                    <TableCell className="py-3.5 px-5" onClick={(e) => e.stopPropagation()}>
                       <Select
                         value={campaign.current_phase ?? '__none__'}
                         onValueChange={(v) =>
@@ -1318,34 +1370,36 @@ export default function CampaignsPage() {
                         </SelectContent>
                       </Select>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-3.5 px-5">
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2 w-20">
+                        <div className="flex-1 bg-cream-100 rounded-full h-2 w-20 overflow-hidden">
                           <div
-                            className="h-2 bg-brand rounded-full"
+                            className="h-2 bg-brand rounded-full transition-all duration-300"
                             style={{ width: `${progress}%` }}
                           />
                         </div>
-                        <span className="text-xs text-gray-600 w-8">{progress}%</span>
+                        <span className="text-xs text-ink-warm-700 w-8 tabular-nums">{progress}%</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <TableCell className="py-3.5 px-5 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0"
+                          className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-ink-warm-900 hover:bg-cream-100"
                           onClick={() => handleShareCampaign(campaign)}
+                          title="Share campaign"
                         >
-                          <Share2 className="h-4 w-4" />
+                          <Share2 className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                          className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-amber-700 hover:bg-amber-50"
                           onClick={() => handleArchiveCampaign(campaign)}
+                          title="Archive campaign"
                         >
-                          <Archive className="h-4 w-4" />
+                          <Archive className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </TableCell>
@@ -1354,13 +1408,13 @@ export default function CampaignsPage() {
               })}
             </TableBody>
           </Table>
-        </div>
+        </Card>
       )}
 
       {/* Pagination */}
       {filteredCampaigns.length > itemsPerPage && (
         <div className="flex items-center justify-between pt-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-ink-warm-700">
             Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredCampaigns.length)} of {filteredCampaigns.length} campaigns
           </p>
           <div className="flex items-center gap-2">
@@ -1373,7 +1427,7 @@ export default function CampaignsPage() {
               <ChevronLeft className="h-4 w-4 mr-1" />
               Previous
             </Button>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-ink-warm-700">
               Page {currentPage} of {totalPages}
             </span>
             <Button
@@ -1388,6 +1442,7 @@ export default function CampaignsPage() {
           </div>
         </div>
       )}
+      </div>
 
       {/* Share Campaign Dialog */}
       <Dialog open={isShareCampaignOpen} onOpenChange={setIsShareCampaignOpen}>
@@ -1401,7 +1456,7 @@ export default function CampaignsPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Campaign Details</Label>
-              <div className="bg-gray-50 rounded-lg p-3 text-sm">
+              <div className="bg-cream-50 rounded-lg p-3 text-sm">
                 <div className="flex justify-between mb-2">
                   <span className="font-medium">Client:</span>
                   <span>{sharingCampaign?.client_name || 'Unknown'}</span>
@@ -1427,7 +1482,7 @@ export default function CampaignsPage() {
                   <span className="text-sm font-medium text-blue-900">Client Email:</span>
                   <span className="text-sm font-mono text-blue-700">{sharingCampaign?.client_email || 'N/A'}</span>
                 </div>
-                <p className="text-xs text-blue-600 mt-2">Use the client's email address as the password to access the public campaign view</p>
+                <p className="text-xs text-brand mt-2">Use the client's email address as the password to access the public campaign view</p>
               </div>
             </div>
             <div className="space-y-3">
@@ -1512,7 +1567,7 @@ export default function CampaignsPage() {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsShareCampaignOpen(false)}>
               Close
             </Button>
@@ -1524,7 +1579,7 @@ export default function CampaignsPage() {
       <Dialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-orange-600">
+            <DialogTitle className="flex items-center gap-2 text-amber-700">
               <AlertTriangle className="h-5 w-5" />
               Archive Campaign
             </DialogTitle>
@@ -1534,23 +1589,31 @@ export default function CampaignsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800">
-              <p>This will:</p>
-              <ul className="list-disc list-inside mt-1 space-y-1">
-                <li>Hide the campaign from the main campaigns list</li>
-                <li>Keep all campaign data intact</li>
-                <li>Allow restoration from the Archive page</li>
-              </ul>
+            {/* Cream callout tile + AlertTriangle for the warning
+                cue — matches the /team Telegram popover pattern. The
+                amber icon carries the "needs attention" semantic
+                without painting the whole tile in a non-v11 hue. */}
+            <div className="rounded-md bg-cream-50 border border-cream-200 p-3 text-sm text-ink-warm-700 flex items-start gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-ink-warm-900 font-medium">This will:</p>
+                <ul className="list-disc list-inside mt-1 space-y-1">
+                  <li>Hide the campaign from the main campaigns list</li>
+                  <li>Keep all campaign data intact</li>
+                  <li>Allow restoration from the Archive page</li>
+                </ul>
+              </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsArchiveDialogOpen(false)} disabled={isArchiving}>
               Cancel
             </Button>
             <Button
+              variant="brand"
               onClick={confirmArchiveCampaign}
               disabled={isArchiving}
-              className="bg-orange-600 hover:bg-orange-700 text-white"
+              className="bg-amber-600 hover:bg-amber-700 text-white shadow-none"
             >
               {isArchiving ? "Archiving..." : "Archive Campaign"}
             </Button>

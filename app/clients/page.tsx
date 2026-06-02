@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import mammoth from 'mammoth';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
+import { SectionHeader } from '@/components/ui/section-header';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge, type BadgeTone } from '@/components/ui/status-badge';
@@ -24,6 +25,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
 import { ClientService, ClientWithAccess } from '@/lib/clientService';
 import { FormService, FormWithStats } from '@/lib/formService';
+import MeetingActionItems from '@/components/clients/MeetingActionItems';
 import { UserService } from '@/lib/userService';
 import { supabase } from '@/lib/supabase';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -275,6 +277,9 @@ export default function ClientsPage() {
     whitelist_partner_id: null as string | null,
     logo_url: null as string | null,
     approved_domains: [] as string[],
+    // Dashboard v2: specialized engagement models (Impossible, Robonet, …)
+    // EXCLUDED from priority dashboard rollups so they don't skew KPIs.
+    is_ad_hoc: false,
   });
   const [domainInput, setDomainInput] = useState('');
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -1456,18 +1461,28 @@ export default function ClientsPage() {
       matchesPartner = client.is_whitelisted === true && client.whitelist_partner_id === partnerIdParam;
     }
 
+    // Ad-hoc is a cross-cutting flag (an ad-hoc client can be either
+    // active or inactive) — when the user picks the Ad-hoc tab we show
+    // every is_ad_hoc client regardless of active state, matching the
+    // mental model of "show me the ad-hoc bucket."
     const matchesStatus = statusFilter === 'all' ||
       (statusFilter === 'active' && client.is_active) ||
-      (statusFilter === 'inactive' && !client.is_active);
+      (statusFilter === 'inactive' && !client.is_active) ||
+      (statusFilter === 'adhoc' && !!(client as any).is_ad_hoc);
 
     return matchesSearch && matchesPartner && matchesStatus;
   });
 
-  // Count clients by status
+  // Count clients by status. Partner-filter scope respected throughout
+  // so the tab counts stay consistent with the filtered grid.
+  const inPartnerScope = (c: ClientWithStatus) => partnerIdParam
+    ? c.is_whitelisted && c.whitelist_partner_id === partnerIdParam
+    : true;
   const statusCounts = {
-    all: clientsWithStatus.filter(c => partnerIdParam ? c.is_whitelisted && c.whitelist_partner_id === partnerIdParam : true).length,
-    active: clientsWithStatus.filter(c => c.is_active && (partnerIdParam ? c.is_whitelisted && c.whitelist_partner_id === partnerIdParam : true)).length,
-    inactive: clientsWithStatus.filter(c => !c.is_active && (partnerIdParam ? c.is_whitelisted && c.whitelist_partner_id === partnerIdParam : true)).length,
+    all:      clientsWithStatus.filter(c => inPartnerScope(c)).length,
+    active:   clientsWithStatus.filter(c => c.is_active && inPartnerScope(c)).length,
+    inactive: clientsWithStatus.filter(c => !c.is_active && inPartnerScope(c)).length,
+    adhoc:    clientsWithStatus.filter(c => !!(c as any).is_ad_hoc && inPartnerScope(c)).length,
   };
   const handleEditClient = (client: ClientWithAccess) => {
     setEditingClient(client);
@@ -1483,6 +1498,7 @@ export default function ClientsPage() {
       whitelist_partner_id: client.whitelist_partner_id,
       logo_url: (client as any).logo_url || null,
       approved_domains: (client as any).approved_domains || [],
+      is_ad_hoc: (client as any).is_ad_hoc || false,
     });
     setDomainInput('');
     setLogoPreview((client as any).logo_url || null);
@@ -1508,6 +1524,7 @@ export default function ClientsPage() {
       whitelist_partner_id: null,
       logo_url: null,
       approved_domains: [],
+      is_ad_hoc: false,
     });
     setDomainInput('');
   };
@@ -1623,6 +1640,7 @@ export default function ClientsPage() {
           whitelist_partner_id: newClient.whitelist_partner_id,
           logo_url: logoUrl,
           approved_domains: newClient.approved_domains.length > 0 ? newClient.approved_domains : null,
+          is_ad_hoc: newClient.is_ad_hoc,
         } as any);
       } else {
         const client = await ClientService.createClient(
@@ -1636,9 +1654,14 @@ export default function ClientsPage() {
           newClient.whitelist_partner_id
         );
 
-        // Save approved_domains after client is created
-        if (client && newClient.approved_domains.length > 0) {
-          await ClientService.updateClient(client.id, { approved_domains: newClient.approved_domains } as any);
+        // Save approved_domains + is_ad_hoc after client is created
+        if (client) {
+          const extras: Record<string, any> = {};
+          if (newClient.approved_domains.length > 0) extras.approved_domains = newClient.approved_domains;
+          if (newClient.is_ad_hoc) extras.is_ad_hoc = true;
+          if (Object.keys(extras).length > 0) {
+            await ClientService.updateClient(client.id, extras as any);
+          }
         }
 
         // Upload logo after client is created
@@ -1746,54 +1769,63 @@ export default function ClientsPage() {
       setIsStartClientSubmitting(false);
     }
   };
+  // ClientCardSkeleton — structural skeleton mirroring the loaded
+  // card so the layout doesn't shift when data arrives. Every block
+  // here maps 1:1 to a real element in the loaded card below:
+  //   • logo tile (40px square)        • client name (text-base)
+  //   • hover-action cluster (3 × 28px squares, opacity-60)
+  //   • status badge row               • location row
+  //   • onboarding progress bar        • HQ-tasks chip
+  //   • View + Add Campaign buttons    • Portal row (Open/Edit/Visits)
   const ClientCardSkeleton = () => (
-    <Card className="transition-shadow">
-      <CardHeader className="pb-4">
-        <div className="mb-3">
-          <div className="flex items-center justify-between text-lg font-semibold text-gray-600 mb-2">
-            <div className="flex items-center">
-            <Skeleton className="h-8 w-8 rounded-lg mr-2" />
-            <Skeleton className="h-5 w-40" />
+    <Card className="crd-hover flex flex-col h-full">
+      <CardHeader className="pb-2">
+        <div>
+          {/* Logo + name + hover-action cluster (low opacity) */}
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <Skeleton className="h-10 w-10 rounded-md flex-shrink-0" />
+              <Skeleton className="h-5 w-32" />
             </div>
-            <Skeleton className="h-6 w-6 rounded" />
+            <div className="flex items-center gap-0.5 flex-shrink-0 opacity-60">
+              <Skeleton className="h-7 w-7 rounded-md" />
+              <Skeleton className="h-7 w-7 rounded-md" />
+              <Skeleton className="h-7 w-7 rounded-md" />
+            </div>
           </div>
-          <Skeleton className="h-6 w-16 rounded-full" />
-        </div>
-        <div className="space-y-2">
-          <div className="flex items-center text-sm text-gray-600">
-            <Skeleton className="h-4 w-4 mr-2" />
-            <Skeleton className="h-4 w-36" />
-          </div>
-          <div className="flex items-center text-sm text-gray-600 min-h-[20px]">
-            <Skeleton className="h-4 w-4 mr-2" />
-            <Skeleton className="h-4 w-28" />
+          {/* Status badge row — no empty location placeholder below,
+              matches the loaded card's conditional location row. */}
+          <div className="flex gap-2 flex-wrap">
+            <Skeleton className="h-5 w-16 rounded-full" />
           </div>
         </div>
       </CardHeader>
-      <CardContent className="pt-4 border-t border-gray-100">
-        <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
-          <Skeleton className="h-4 w-32" />
-        </div>
-        <div className="flex flex-col gap-1 mb-3">
-          {['Active', 'Planning', 'Paused', 'Completed'].map((status) => (
-            <div key={status} className="flex items-center justify-between text-sm text-gray-600">
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-5 w-5 rounded-full" />
-                <Skeleton className="h-4 w-16" />
-              </div>
-              <Skeleton className="h-7 w-7 rounded-md" />
+      <CardContent className="pt-3 border-t border-cream-100 flex flex-col flex-1">
+        {/* Onboarding progress block (or Week-N) + HQ tasks chip */}
+        <div className="space-y-3 mb-3">
+          <div>
+            <div className="flex items-baseline justify-between mb-1.5">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3 w-8" />
             </div>
-          ))}
+            <Skeleton className="h-2 w-full rounded-full" />
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Skeleton className="h-6 w-24 rounded-full" />
+          </div>
         </div>
-        <div className="flex gap-2">
-        <Skeleton className="h-8 w-full rounded" />
-          <Skeleton className="h-8 w-full rounded" />
+        {/* Campaign buttons row */}
+        <div className="flex gap-2 flex-wrap">
+          <Skeleton className="h-8 flex-1 min-w-[120px] rounded-md" />
+          <Skeleton className="h-8 flex-1 min-w-[120px] rounded-md" />
         </div>
-        <div className="mt-3 pt-3 border-t border-gray-100">
-          <Skeleton className="h-4 w-28 mb-2" />
-          <Skeleton className="h-3 w-full mb-1" />
-          <Skeleton className="h-3 w-3/4 mb-2" />
-          <Skeleton className="h-8 w-full rounded" />
+        {/* Portal row (Open / Edit / Visits) */}
+        <div className="mt-auto pt-3 border-t border-cream-100">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Skeleton className="h-8 flex-1 min-w-[110px] rounded-md" />
+            <Skeleton className="h-8 flex-1 min-w-[110px] rounded-md" />
+            <Skeleton className="h-8 flex-1 min-w-[110px] rounded-md" />
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -1820,39 +1852,59 @@ export default function ClientsPage() {
           <PageHeader
             title="Clients"
             subtitle="Manage your client relationships"
+            kicker="People · Engagements"
+            kickerDot="sky"
             actions={(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') ? (
               <>
-                <Button variant="brand" disabled>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Start Client
-                </Button>
+                {/* "Start Client" hidden 2026-06-02 — Add Client is now the
+                    primary CTA. State + Dialog left intact below for easy
+                    restore if/when the onboarding flow ships. */}
                 <Button variant="outline" disabled>
                   <Settings className="h-4 w-4 mr-2" />
                   Templates
                 </Button>
-                <Button variant="outline" disabled>
+                <Button variant="brand" disabled>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Client
                 </Button>
               </>
             ) : undefined}
           />
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input placeholder="Search clients by name, email, or location..." className="pl-10 focus-brand" disabled />
+
+          {/* ── Engagements skeleton ─────────────────────────────────
+              Mirrors the loaded layout exactly so nothing shifts when
+              data arrives: SectionHeader (label dot + counter) →
+              filter toolbar (tabs left + search right) → cards grid. */}
+          <div className="space-y-4">
+            {/* SectionHeader skeleton — small dot + label width + counter.
+                `.first` suppresses the top border so this matches the
+                Engagements SectionHeader in the loaded state. */}
+            <div className="section-head first flex items-center gap-3">
+              <span className="dot bg-brand/30" aria-hidden />
+              <Skeleton className="h-3 w-24" />
+              <span className="flex-1 h-px bg-cream-200" aria-hidden />
+              <Skeleton className="h-3 w-32" />
             </div>
-          </div>
-          {/* Status Tabs Skeleton */}
-          <div className="flex gap-2">
-            <Skeleton className="h-9 w-16 rounded-md" />
-            <Skeleton className="h-9 w-20 rounded-md" />
-            <Skeleton className="h-9 w-24 rounded-md" />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <ClientCardSkeleton key={index} />
-            ))}
+
+            {/* Filter toolbar skeleton — tabs on the left, search on the right */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex gap-1 p-1 rounded-md bg-cream-100 border border-cream-200">
+                <Skeleton className="h-8 w-14 rounded" />
+                <Skeleton className="h-8 w-20 rounded" />
+                <Skeleton className="h-8 w-20 rounded" />
+                <Skeleton className="h-8 w-20 rounded" />
+              </div>
+              <div className="relative flex-1 min-w-[220px] max-w-sm">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
+                <Input placeholder="Search clients by name, email, or location..." className="pl-10 focus-brand" disabled />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <ClientCardSkeleton key={index} />
+              ))}
+            </div>
           </div>
         </div>
       </ProtectedRoute>
@@ -1862,7 +1914,7 @@ export default function ClientsPage() {
     return (
       <ProtectedRoute>
         <div className="space-y-6">
-          <PageHeader title="Clients" subtitle="Manage your client relationships" />
+          <PageHeader title="Clients" subtitle="Manage your client relationships" kicker="People · Engagements" kickerDot="sky" />
           <div className="text-center py-8">
             <p className="text-rose-600">{error}</p>
             <Button variant="brand" onClick={fetchClients} className="mt-4">
@@ -1884,35 +1936,48 @@ export default function ClientsPage() {
             it in `flex items-center gap-2 flex-wrap`, matching the
             original hand-rolled wrapper. */}
         <PageHeader
-          title={filteredPartnerName ? `Clients - ${filteredPartnerName}` : 'Clients'}
+          title={filteredPartnerName ? `Clients · ${filteredPartnerName}` : 'Clients'}
           subtitle="Manage your client relationships"
+          kicker={filteredPartnerName ? `People · Partner · ${filteredPartnerName}` : 'People · Engagements'}
+          kickerDot="sky"
           actions={(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') ? (
             <>
+              {/* "Start Client" trigger hidden 2026-06-02 — Add Client is
+                  the primary CTA. Dialog tree below still wired to
+                  `isStartClientOpen` so the flow can be re-surfaced by
+                  re-enabling the DialogTrigger. */}
               <Dialog open={isStartClientOpen} onOpenChange={setIsStartClientOpen}>
+                {false && (
                 <DialogTrigger asChild>
                   <Button variant="brand">
                     <Plus className="h-4 w-4 mr-2" />
                     Start Client
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-hidden">
+                )}
+                {/* Flex-col Dialog so the body grows to fill space and
+                    DialogFooter stays pinned at the bottom regardless of
+                    viewport height. Previously DialogContent was 80vh +
+                    inner body 60vh — on short screens the 20vh footer
+                    gap collapsed and the action buttons clipped off. */}
+                <DialogContent className="sm:max-w-[800px] max-h-[85vh] flex flex-col">
                   <DialogHeader>
                     <DialogTitle>Start Client Onboarding</DialogTitle>
                     <DialogDescription>
                       Complete client onboarding and campaign setup in one workflow.
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="space-y-6 max-h-[60vh] overflow-y-auto px-3 pb-6">
+                  <div className="space-y-6 flex-1 overflow-y-auto px-1">
                     {/* Step Indicator */}
                     <div className="flex items-center justify-center mb-4 gap-2">
                       {startClientSections.map((label, idx) => (
-                        <div key={label} className={`px-3 py-1 rounded-full text-xs font-medium ${idx === startClientStep ? 'bg-brand text-white' : 'bg-gray-200 text-gray-600'}`}>{label}</div>
+                        <div key={label} className={`px-3 py-1 rounded-full text-xs font-medium ${idx === startClientStep ? 'bg-brand text-white' : 'bg-cream-200 text-ink-warm-700'}`}>{label}</div>
                       ))}
                     </div>
                     {/* Section rendering */}
                     {startClientStep === 0 && (
                       <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Section 1: Client Details</h3>
+                        <h3 className="text-lg font-semibold text-ink-warm-900 border-b pb-2">Section 1: Client Details</h3>
                         <div className="grid gap-4">
                           <div className="grid gap-2">
                             <Label htmlFor="companyName">
@@ -2006,7 +2071,7 @@ export default function ClientsPage() {
                     )}
                     {startClientStep === 1 && (
                       <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Section 2: Onboarding</h3>
+                        <h3 className="text-lg font-semibold text-ink-warm-900 border-b pb-2">Section 2: Onboarding</h3>
                         <div className="grid gap-4">
                           <div className="flex items-center space-x-2">
                             <Checkbox
@@ -2062,7 +2127,7 @@ export default function ClientsPage() {
                     )}
                     {startClientStep === 2 && (
                       <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Section 3: Campaign Details</h3>
+                        <h3 className="text-lg font-semibold text-ink-warm-900 border-b pb-2">Section 3: Campaign Details</h3>
                         <div className="grid gap-4">
                           <div className="grid gap-2">
                             <Label htmlFor="campaignName">
@@ -2267,9 +2332,9 @@ export default function ClientsPage() {
                          {/* Campaign Budget Allocation Section */}
                          <div className="grid gap-2">
                            <Label>Budget Allocation</Label>
-                           <div className="bg-gray-50 border rounded p-3 text-sm text-gray-700 space-y-2">
+                           <div className="bg-cream-50 border rounded p-3 text-sm text-ink-warm-700 space-y-2">
                              {startClientForm.budgetAllocations.length === 0 && (
-                               <div className="text-gray-400 text-sm">No allocations yet.</div>
+                               <div className="text-ink-warm-400 text-sm">No allocations yet.</div>
                              )}
                              {startClientForm.budgetAllocations.map((alloc, idx) => {
                                // Format the amount with commas for display
@@ -2296,7 +2361,7 @@ export default function ClientsPage() {
                                      </SelectContent>
                                    </Select>
                                    <div className="relative w-28">
-                                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-warm-500 pointer-events-none">$</span>
                                      <Input
                                        type="text"
                                        inputMode="numeric"
@@ -2379,7 +2444,7 @@ export default function ClientsPage() {
                     )}
                     {startClientStep === 3 && (
                       <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Section 4: Contracting Status</h3>
+                        <h3 className="text-lg font-semibold text-ink-warm-900 border-b pb-2">Section 4: Contracting Status</h3>
                         <div className="grid gap-4">
                           <div className="flex items-center space-x-2">
                             <Checkbox
@@ -2402,7 +2467,7 @@ export default function ClientsPage() {
                     )}
                     {startClientStep === 4 && (
                       <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Section 5: Support & Follow-Up</h3>
+                        <h3 className="text-lg font-semibold text-ink-warm-900 border-b pb-2">Section 5: Support & Follow-Up</h3>
                         <div className="grid gap-4">
                           <div className="flex items-center space-x-2">
                             <Checkbox
@@ -2443,7 +2508,7 @@ export default function ClientsPage() {
                       </div>
                     )}
                   </div>
-                    <DialogFooter>
+                    <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                       <Button type="button" variant="outline" onClick={() => setIsStartClientOpen(false)}>
                         Cancel
                       </Button>
@@ -2484,7 +2549,7 @@ export default function ClientsPage() {
                   actions so admins can hop straight to template CRUD
                   without going through a client's Action Board. */}
               <Link href="/clients/templates">
-                <Button variant="outline" className="hover:bg-gray-50">
+                <Button variant="outline" className="hover:bg-cream-50">
                   <Settings className="h-4 w-4 mr-2" />
                   Templates
                 </Button>
@@ -2497,20 +2562,23 @@ export default function ClientsPage() {
                 }
               }}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" className="hover:bg-gray-50">
+                  <Button variant="brand">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Client
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-hidden">
+                <DialogContent className="sm:max-w-[425px] max-h-[85vh] flex flex-col">
                   <DialogHeader>
                     <DialogTitle>{isEditMode ? 'Edit Client' : 'Add New Client'}</DialogTitle>
                     <DialogDescription>
                       {isEditMode ? 'Update the client information below.' : 'Create a new client to manage campaigns for.'}
                     </DialogDescription>
                   </DialogHeader>
-                  <form onSubmit={handleCreateClient}>
-                    <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
+                  {/* Form itself flex-col flex-1 so the body grid grows
+                      and the DialogFooter (also inside <form> for submit
+                      semantics) stays pinned at the bottom. */}
+                  <form onSubmit={handleCreateClient} className="flex flex-col flex-1 min-h-0">
+                    <div className="grid gap-4 py-4 flex-1 overflow-y-auto px-1">
                       <div className="grid gap-2">
                         <Label htmlFor="name">Company Name</Label>
                         <Input id="name" value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} placeholder="Enter company name" className="focus-brand" required />
@@ -2523,7 +2591,7 @@ export default function ClientsPage() {
                               <img
                                 src={logoPreview}
                                 alt="Logo preview"
-                                className="h-16 w-16 object-contain rounded-lg border border-gray-200"
+                                className="h-16 w-16 object-contain rounded-lg border border-cream-200"
                               />
                               <button
                                 type="button"
@@ -2534,8 +2602,8 @@ export default function ClientsPage() {
                               </button>
                             </div>
                           ) : (
-                            <div className="h-16 w-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center">
-                              <ImageIcon className="h-6 w-6 text-gray-400" />
+                            <div className="h-16 w-16 rounded-lg border-2 border-dashed border-cream-300 flex items-center justify-center">
+                              <ImageIcon className="h-6 w-6 text-ink-warm-400" />
                             </div>
                           )}
                           <div className="flex-1">
@@ -2548,12 +2616,12 @@ export default function ClientsPage() {
                             />
                             <label
                               htmlFor="logo-upload"
-                              className="inline-flex items-center px-3 py-2 text-sm border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
+                              className="inline-flex items-center px-3 py-2 text-sm border border-cream-300 rounded-md cursor-pointer hover:bg-cream-50"
                             >
                               <Upload className="h-4 w-4 mr-2" />
                               {logoPreview ? 'Change Logo' : 'Upload Logo'}
                             </label>
-                            <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 2MB</p>
+                            <p className="text-xs text-ink-warm-500 mt-1">PNG, JPG up to 2MB</p>
                           </div>
                         </div>
                       </div>
@@ -2582,6 +2650,20 @@ export default function ClientsPage() {
                             <SelectItem value="inactive">Inactive</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Engagement Model</Label>
+                        <div className="flex items-center space-x-3">
+                          <Checkbox
+                            id="is_ad_hoc"
+                            checked={newClient.is_ad_hoc}
+                            onCheckedChange={(checked) => setNewClient({ ...newClient, is_ad_hoc: !!checked })}
+                          />
+                          <Label htmlFor="is_ad_hoc" className="text-sm leading-tight">
+                            Ad-hoc engagement
+                            <span className="block text-xs text-ink-500 mt-0.5">Excludes this client from priority-dashboard rollups (KPIs, renewal alerts).</span>
+                          </Label>
+                        </div>
                       </div>
                       <div className="grid gap-2">
                         <Label>Whitelist Status</Label>
@@ -2616,7 +2698,7 @@ export default function ClientsPage() {
                       </div>
                       <div className="grid gap-2">
                         <Label>Approved Domains</Label>
-                        <p className="text-xs text-gray-500">Anyone with an email at these domains can access this client's campaigns.</p>
+                        <p className="text-xs text-ink-warm-500">Anyone with an email at these domains can access this client's campaigns.</p>
                         <div className="flex gap-2">
                           <Textarea
                             value={domainInput}
@@ -2631,9 +2713,13 @@ export default function ClientsPage() {
                         {newClient.approved_domains.length > 0 && (
                           <div className="flex flex-wrap gap-2 mt-1">
                             {newClient.approved_domains.map((domain, index) => (
+                              // Approved-domain chip — brand-soft tile +
+                              // brand-deep text to match the v11 palette.
+                              // Was bg-blue-50/text-blue-800 (outside the
+                              // 9-tone palette).
                               <div
                                 key={index}
-                                className="inline-flex items-center gap-1 px-3 py-1 bg-blue-50 text-blue-800 rounded-full text-sm"
+                                className="inline-flex items-center gap-1 px-3 py-1 bg-brand-soft text-brand-deep border border-brand-light rounded-full text-sm"
                               >
                                 <Globe className="h-3.5 w-3.5" />
                                 @{domain}
@@ -2645,7 +2731,7 @@ export default function ClientsPage() {
                                       approved_domains: newClient.approved_domains.filter((_, i) => i !== index),
                                     });
                                   }}
-                                  className="ml-1 text-blue-500 hover:text-blue-700"
+                                  className="ml-1 text-brand hover:text-brand-dark"
                                 >
                                   ×
                                 </button>
@@ -2655,7 +2741,7 @@ export default function ClientsPage() {
                         )}
                       </div>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                       <Button type="button" variant="outline" onClick={handleCloseClientModal}>
                         Cancel
                       </Button>
@@ -2680,39 +2766,68 @@ export default function ClientsPage() {
             </Button>
           )}
         </PageHeader>
-        <div className="flex items-center space-x-4">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input placeholder="Search clients by name, email, or location..." className="pl-10 focus-brand" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+
+        {/* ── Engagements ──────────────────────────────────────────────
+            Filters (search + status tabs) live under the same section
+            header as the cards — they're scoped to this list, not a
+            standalone "filter" surface. */}
+        <div className="space-y-4">
+          <SectionHeader
+            label="Engagements"
+            dot="brand"
+            counter={`${filteredClients.length} of ${statusCounts.all} client${statusCounts.all === 1 ? '' : 's'}${statusFilter !== 'all' ? ` · ${statusFilter}` : ''}`}
+            first
+          />
+
+          {/* Filter toolbar — status tabs on the left, search input to
+              their right. The tabs are the primary filter (most users
+              just want "Active"); search is the refine-within affordance. */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+              <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+                <TabsTrigger
+                  value="all"
+                  className="data-[state=active]:bg-white data-[state=active]:text-ink-warm-900 data-[state=active]:shadow-card px-4 py-2"
+                >
+                  All
+                  <span className="ml-2 text-xs bg-cream-200 data-[state=active]:bg-cream-100 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.all}</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="active"
+                  className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card px-4 py-2"
+                >
+                  Active
+                  <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.active}</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="inactive"
+                  className="data-[state=active]:bg-white data-[state=active]:text-ink-warm-700 data-[state=active]:shadow-card px-4 py-2"
+                >
+                  Inactive
+                  <span className="ml-2 text-xs bg-cream-200 text-ink-warm-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.inactive}</span>
+                </TabsTrigger>
+                {/* Ad-hoc — cross-cutting bucket of clients flagged
+                    `is_ad_hoc` (specialized / one-off engagements that
+                    sit outside the standard active/inactive rollup,
+                    e.g. Impossible, Robonet). Purple accent matches the
+                    Ad-hoc StatusBadge tone used on the dashboard so the
+                    color always reads as "this is the ad-hoc bucket." */}
+                <TabsTrigger
+                  value="adhoc"
+                  className="data-[state=active]:bg-white data-[state=active]:text-purple-700 data-[state=active]:shadow-card px-4 py-2"
+                >
+                  Ad-hoc
+                  <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.adhoc}</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
+              <Input placeholder="Search clients by name, email, or location..." className="pl-10 focus-brand" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            </div>
           </div>
-        </div>
-        {/* Status Tabs */}
-        <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full">
-          <TabsList className="bg-gray-100 p-1 h-auto">
-            <TabsTrigger
-              value="all"
-              className="data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm px-4 py-2"
-            >
-              All
-              <span className="ml-2 text-xs bg-gray-200 data-[state=active]:bg-gray-100 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.all}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="active"
-              className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-sm px-4 py-2"
-            >
-              Active
-              <span className="ml-2 text-xs bg-brand-light text-brand px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.active}</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="inactive"
-              className="data-[state=active]:bg-white data-[state=active]:text-gray-700 data-[state=active]:shadow-sm px-4 py-2"
-            >
-              Inactive
-              <span className="ml-2 text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full pointer-events-none">{statusCounts.inactive}</span>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredClients.length === 0 ? (
             <div className="col-span-full">
               <EmptyState
@@ -2736,34 +2851,37 @@ export default function ClientsPage() {
             filteredClients.map((client) => {
               const clientWithStatus = client as ClientWithStatus;
               return (
-                <Card key={client.id} className="transition-shadow group flex flex-col h-full">
-                  <CardHeader className="pb-4">
-                    <div className="mb-3">
+                <Card key={client.id} className="crd-hover group flex flex-col h-full">
+                  <CardHeader className="pb-2">
+                    <div>
                       {/* [Responsive cleanup, May 2026] flex-wrap + min-w-0
                           so a long client name or many linked accounts
                           push the hover-action buttons to a new line
                           instead of off the card. Action buttons
                           flex-shrink-0 so they never compress. */}
-                      <div className="flex items-start justify-between gap-2 text-lg font-semibold text-gray-600 mb-2 flex-wrap">
-                        <div className="flex items-center gap-2 min-w-0 flex-wrap flex-1">
+                      <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-wrap flex-1">
                           {(client as any).logo_url ? (
-                            <img
-                              src={(client as any).logo_url}
-                              alt={client.name}
-                              className="h-8 w-8 object-contain rounded-lg flex-shrink-0"
-                            />
+                            <div className="w-10 h-10 rounded-md overflow-hidden bg-white border border-cream-200 flex-shrink-0">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={(client as any).logo_url}
+                                alt={client.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
                           ) : (
-                            <div className="bg-gray-100 p-1.5 rounded-lg flex-shrink-0">
-                              <Building2 className="h-5 w-5 text-gray-600" />
+                            <div className="w-10 h-10 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center flex-shrink-0">
+                              <Building2 className="h-5 w-5" />
                             </div>
                           )}
-                          <span className="truncate min-w-0">{client.name}</span>
+                          <span className="text-base font-semibold text-ink-warm-900 tracking-tight truncate min-w-0">{client.name}</span>
                           {linkedAccounts[client.id] && linkedAccounts[client.id].length > 0 && (
                             linkedAccounts[client.id].map((account) => (
                               <Badge
                                 key={account.id}
                                 variant="outline"
-                                className="text-xs cursor-pointer hover:bg-gray-100 max-w-full"
+                                className="text-xs cursor-pointer hover:bg-cream-100 max-w-full"
                                 onClick={() => router.push('/crm/pipeline?tab=accounts')}
                               >
                                 <LinkIcon className="h-3 w-3 mr-1 flex-shrink-0" />
@@ -2773,15 +2891,39 @@ export default function ClientsPage() {
                           )}
                         </div>
                         {(userProfile?.role === 'admin' || userProfile?.role === 'super_admin') && (
-                          <div className="flex items-center space-x-1 flex-shrink-0">
-                            <Button variant="ghost" size="sm" onClick={() => openSharePortal(client)} className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2" title="Share portal">
-                              <Share2 className="h-4 w-4 text-gray-600" />
+                          // Hover-action cluster: low-opacity icons that
+                          // sharpen on card hover. Square 28px tiles per
+                          // CLAUDE.md inline icon convention; cream tile
+                          // on hover for the neutral pair, rose tile for
+                          // destructive. opacity-60 keeps them legible
+                          // without dominating the card at rest.
+                          <div className="flex items-center gap-0.5 flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity duration-200">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => { e.stopPropagation(); openSharePortal(client); }}
+                              className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-ink-warm-900 hover:bg-cream-100"
+                              title="Share portal"
+                            >
+                              <Share2 className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleEditClient(client)} className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 w-auto px-2" title="Edit client">
-                              <Edit className="h-4 w-4 text-gray-600" />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => { e.stopPropagation(); handleEditClient(client); }}
+                              className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-ink-warm-900 hover:bg-cream-100"
+                              title="Edit client"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => handleDeleteClient(client)} className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-rose-50 w-auto px-2" title="Delete client">
-                              <Trash2 className="h-4 w-4 text-rose-600" />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => { e.stopPropagation(); handleDeleteClient(client); }}
+                              className="h-7 w-7 p-0 rounded-md text-ink-warm-500 hover:text-rose-600 hover:bg-rose-50"
+                              title="Delete client"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
                         )}
@@ -2792,36 +2934,33 @@ export default function ClientsPage() {
                           badge keeps a single very-long partner name
                           inside the card. */}
                       <div className="flex gap-2 flex-wrap">
-                        <StatusBadge tone={client.is_active ? 'brand' : 'neutral'} className="flex-shrink-0">
+                        <StatusBadge tone={client.is_active ? 'brand' : 'neutral'} bordered withDot className="flex-shrink-0">
                           {client.is_active ? 'Active' : 'Inactive'}
                         </StatusBadge>
                         {client.is_whitelisted && (
-                          <StatusBadge tone="success" className="cursor-default pointer-events-none max-w-full">
+                          <StatusBadge tone="success" bordered withDot className="cursor-default pointer-events-none max-w-full">
                             <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
                             <span className="truncate">{client.whitelist_partner_name || 'Unknown Partner'}</span>
                           </StatusBadge>
                         )}
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      {/* Email row hidden per May 2026 client-card cleanup —
-                          it added vertical noise without ever being
-                          actionable on the card. Email is still
-                          accessible inside the Edit Portal modal / via
-                          search. */}
-                      <div className="flex items-center text-sm text-gray-600 min-h-[20px]">
-                        {client.location ? (
-                          <>
-                            <MapPin className="h-4 w-4 mr-2 text-gray-600" />
-                            <span className="text-gray-600">{client.location}</span>
-                          </>
-                        ) : (
-                          <div className="h-[20px]" />
-                        )}
+                    {/* Email row hidden per May 2026 client-card cleanup
+                        (still accessible in Edit Portal modal / search).
+                        Location row also conditional now — when a client
+                        has no location, the row collapses entirely instead
+                        of reserving an empty 20px placeholder, so the
+                        gap below the status badges stays tight. Card
+                        heights still align across the grid because the
+                        portal row uses `mt-auto`. */}
+                    {client.location && (
+                      <div className="mt-2 flex items-center text-sm text-ink-warm-700">
+                        <MapPin className="h-4 w-4 mr-2 text-ink-warm-700" />
+                        <span className="text-ink-warm-700">{client.location}</span>
                       </div>
-                    </div>
+                    )}
                   </CardHeader>
-                  <CardContent className="pt-4 border-t border-gray-100 flex flex-col flex-1">
+                  <CardContent className="pt-3 border-t border-cream-100 flex flex-col flex-1">
                     {/* Per May 2026 user feedback: replace the campaign-
                         status breakdown with onboarding progress + signals
                         the team actually scans for at a glance.
@@ -2864,13 +3003,13 @@ export default function ClientsPage() {
                             total > 0 ? (
                               <div>
                                 <div className="flex items-baseline justify-between text-sm mb-1.5">
-                                  <span className="font-semibold text-gray-700">
+                                  <span className="font-semibold text-ink-warm-700">
                                     Milestone {Math.min(completed + 1, total)} of {total}
-                                    {active && <span className="text-gray-500 font-normal"> — {active.name}</span>}
+                                    {active && <span className="text-ink-warm-500 font-normal"> — {active.name}</span>}
                                   </span>
-                                  <span className="text-xs text-gray-500">{pct}%</span>
+                                  <span className="text-xs text-ink-warm-500">{pct}%</span>
                                 </div>
-                                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div className="w-full h-2 bg-cream-100 rounded-full overflow-hidden">
                                   <div
                                     className="h-full bg-brand transition-all duration-300"
                                     style={{ width: `${pct}%` }}
@@ -2878,66 +3017,35 @@ export default function ClientsPage() {
                                 </div>
                               </div>
                             ) : (
-                              <div className="text-sm text-gray-400 italic">No milestones seeded yet.</div>
+                              <div className="text-sm text-ink-warm-400 italic">No milestones seeded yet.</div>
                             )
                           ) : (
                             <div className="flex items-baseline justify-between text-sm">
-                              <span className="font-semibold text-gray-700">
+                              <span className="font-semibold text-ink-warm-700">
                                 {weekN != null ? `Week ${weekN}` : 'Engagement live'}
                               </span>
                               {ctx?.start_date && (
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs text-ink-warm-500">
                                   Started {new Date(ctx.start_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                 </span>
                               )}
                             </div>
                           )}
 
-                          {/* Activity row: pending client tasks + HQ tasks + last visit */}
+                          {/* Activity row: HQ tasks only.
+                              "Waiting on client" badge + "Last visit" span
+                              hidden per 2026-06-02 product decision —
+                              kept their state intact for easy restore. */}
                           <div className="flex items-center gap-3 flex-wrap text-xs">
-                            {pendingClientTasks > 0 && (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-50 text-amber-700 font-medium">
-                                <Bell className="h-3 w-3" />
-                                {pendingClientTasks} waiting on client
-                                {/* Hover-info button explaining what counts
-                                    as "waiting on client". Placed inside
-                                    the badge so it travels with it visually. */}
-                                <TooltipProvider delayDuration={150}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        type="button"
-                                        className="ml-0.5 inline-flex items-center justify-center rounded-full hover:bg-amber-100 transition-colors"
-                                        onClick={(e) => e.stopPropagation()}
-                                        aria-label="What does this count?"
-                                      >
-                                        <Info className="h-3 w-3 text-amber-600/80" />
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="bottom" align="start" className="max-w-[260px] text-xs leading-relaxed">
-                                      Count of action-board items on the
-                                      <strong> client's side</strong> (the
-                                      "Yours" column) that are still open
-                                      across all milestones. Quick signal
-                                      to nudge the client when they're
-                                      blocking next steps.
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </span>
-                            )}
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); router.push(`/tasks?client=${client.id}`); }}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors font-medium"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-cream-100 text-ink-warm-700 hover:bg-cream-200 transition-colors font-medium"
                               title={openHqTasks > 0 ? `${openHqTasks} open HQ task${openHqTasks === 1 ? '' : 's'} — click to view` : 'No open HQ tasks — click to view all'}
                             >
                               <ListTodo className="h-3 w-3" />
                               {openHqTasks} HQ task{openHqTasks === 1 ? '' : 's'}
                             </button>
-                            <span className="text-gray-500" title={lastVisit ? new Date(lastVisit).toLocaleString() : 'Client has never opened the portal'}>
-                              · Last visit: {lastVisitLabel}
-                            </span>
                           </div>
                         </div>
                       );
@@ -2988,7 +3096,7 @@ export default function ClientsPage() {
                           single button label can't overflow
                         - px-2 (was default) shaves horizontal padding
                           so all three usually still fit at lg */}
-                    <div className="mt-auto pt-3 border-t border-gray-100">
+                    <div className="mt-auto pt-3 border-t border-cream-100">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Button
                           variant="outline"
@@ -3034,6 +3142,7 @@ export default function ClientsPage() {
               );
             })
           )}
+          </div>
         </div>
 
         {/* Archive Confirmation Dialog */}
@@ -3065,7 +3174,7 @@ export default function ClientsPage() {
             for UI snappiness; we can add pagination if anyone scrolls
             to the bottom. */}
         <Dialog open={!!accessLogModalClient} onOpenChange={(open) => { if (!open) setAccessLogModalClient(null); }}>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Eye className="h-4 w-4 text-brand" />
@@ -3075,14 +3184,15 @@ export default function ClientsPage() {
                 Who has accessed this client&apos;s public portal, when, and which allowlist rule let them in.
               </DialogDescription>
             </DialogHeader>
+            <div className="flex-1 overflow-y-auto px-1">
             {accessLogLoading ? (
               <div className="space-y-2 py-4">
                 {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
               </div>
             ) : accessLogRows.length === 0 ? (
-              <div className="py-8 text-center text-sm text-gray-500">
+              <div className="py-8 text-center text-sm text-ink-warm-500">
                 No portal visits recorded yet.
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-ink-warm-400 mt-1">
                   Share the portal link via the <Share2 className="inline h-3 w-3" /> icon to start tracking.
                 </p>
               </div>
@@ -3090,11 +3200,11 @@ export default function ClientsPage() {
               <div className="border rounded-lg overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-gray-50 hover:bg-gray-50">
-                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">When</TableHead>
-                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">Email</TableHead>
-                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">Via</TableHead>
-                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-gray-500">IP</TableHead>
+                    <TableRow className="bg-cream-50 hover:bg-cream-50">
+                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">When</TableHead>
+                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">Email</TableHead>
+                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">Via</TableHead>
+                      <TableHead className="h-9 px-3 py-2 text-xs font-medium uppercase tracking-wider text-ink-warm-500">IP</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -3115,15 +3225,15 @@ export default function ClientsPage() {
                         : row.authorized_via === 'cache' ? 'neutral'
                         : 'info';
                       return (
-                        <TableRow key={row.id} className="border-gray-100">
-                          <TableCell className="px-3 py-2 text-xs text-gray-600 whitespace-nowrap">
+                        <TableRow key={row.id} className="border-cream-100">
+                          <TableCell className="px-3 py-2 text-xs text-ink-warm-700 whitespace-nowrap">
                             {new Date(row.accessed_at).toLocaleString()}
                           </TableCell>
-                          <TableCell className="px-3 py-2 text-xs text-gray-900">{row.email}</TableCell>
+                          <TableCell className="px-3 py-2 text-xs text-ink-warm-900">{row.email}</TableCell>
                           <TableCell className="px-3 py-2">
-                            <StatusBadge tone={viaTone} size="sm">{viaLabel}</StatusBadge>
+                            <StatusBadge tone={viaTone} size="sm" bordered withDot>{viaLabel}</StatusBadge>
                           </TableCell>
-                          <TableCell className="px-3 py-2 text-xs text-gray-400 font-mono">
+                          <TableCell className="px-3 py-2 text-xs text-ink-warm-400 font-mono">
                             {row.ip_address || '—'}
                           </TableCell>
                         </TableRow>
@@ -3133,7 +3243,8 @@ export default function ClientsPage() {
                 </Table>
               </div>
             )}
-            <DialogFooter>
+            </div>
+            <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
               <Button variant="outline" onClick={() => setAccessLogModalClient(null)}>Close</Button>
             </DialogFooter>
           </DialogContent>
@@ -3195,7 +3306,7 @@ export default function ClientsPage() {
                   <div key={formSlugOrId} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label>{form.name}</Label>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-gray-400 hover:text-rose-500" onClick={() => setShareExtraForms(prev => prev.filter(s => s !== formSlugOrId))}>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-ink-warm-400 hover:text-rose-500" onClick={() => setShareExtraForms(prev => prev.filter(s => s !== formSlugOrId))}>
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
@@ -3237,7 +3348,7 @@ export default function ClientsPage() {
                   </Button>
                 );
               })()}
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-ink-warm-500">
                 Clients can access the portal using their registered email address ({clientToShare?.email}).
               </p>
             </div>
@@ -3245,24 +3356,27 @@ export default function ClientsPage() {
         </Dialog>
         {/* Meeting Notes Modal */}
         <Dialog open={!!meetingNotesModalClient} onOpenChange={(open) => { if (!open) { setMeetingNotesModalClient(null); setIsNoteFormOpen(false); setEditingNoteId(null); setDeletingNoteId(null); setIsDecisionFormOpen(false); setEditingDecisionId(null); setDeletingDecisionId(null); } }}>
-          <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-hidden">
+          <DialogContent className="sm:max-w-[800px] max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Notes & Decisions — {meetingNotesModalClient?.name}</DialogTitle>
               <DialogDescription>Manage meeting notes and decision log for this client.</DialogDescription>
             </DialogHeader>
-            <Tabs value={meetingNotesTab} onValueChange={setMeetingNotesTab}>
-              <TabsList className="bg-gray-100 p-1 mb-4">
+            {/* Tabs grow to fill the flex column so each TabsContent's
+                own overflow-y-auto becomes the single scroll surface,
+                instead of stacking against a fixed 55vh cap. */}
+            <Tabs value={meetingNotesTab} onValueChange={setMeetingNotesTab} className="flex-1 flex flex-col min-h-0">
+              <TabsList className="bg-cream-100 p-1 mb-4 shrink-0">
                 <TabsTrigger value="notes" className="data-[state=active]:bg-white px-4 py-2">Meeting Notes</TabsTrigger>
                 <TabsTrigger value="decisions" className="data-[state=active]:bg-white px-4 py-2">Decision Log</TabsTrigger>
               </TabsList>
-              <TabsContent value="decisions" className="space-y-4 max-h-[55vh] overflow-y-auto px-1 pb-4">
+              <TabsContent value="decisions" className="space-y-4 flex-1 overflow-y-auto px-1 pb-4">
                 {!isDecisionFormOpen && (
                   <Button variant="brand" size="sm" onClick={() => { setIsDecisionFormOpen(true); setEditingDecisionId(null); setDecisionForm({ decision_date: new Date(), summary: '' }); }}>
                     <Plus className="h-4 w-4 mr-1" /> Add Decision
                   </Button>
                 )}
                 {isDecisionFormOpen && (
-                  <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
+                  <div className="border rounded-lg p-4 space-y-3 bg-cream-50">
                     <div className="grid gap-2">
                       <Label>Date <span className="text-rose-500">*</span></Label>
                       <Popover>
@@ -3293,7 +3407,7 @@ export default function ClientsPage() {
                   <div key={dec.id} className="border rounded-lg p-3 bg-white">
                     {deletingDecisionId === dec.id ? (
                       <div className="space-y-2">
-                        <p className="text-sm text-gray-700">Delete this decision?</p>
+                        <p className="text-sm text-ink-warm-700">Delete this decision?</p>
                         <div className="flex gap-2">
                           <Button size="sm" variant="destructive" onClick={() => deleteDecision(dec.id)}>Delete</Button>
                           <Button size="sm" variant="outline" onClick={() => setDeletingDecisionId(null)}>Cancel</Button>
@@ -3302,11 +3416,11 @@ export default function ClientsPage() {
                     ) : (
                       <div className="flex items-start justify-between">
                         <div>
-                          <p className="text-xs text-gray-400">{new Date(dec.decision_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                          <p className="text-sm text-gray-700 mt-1">{dec.summary}</p>
+                          <p className="text-xs text-ink-warm-400">{new Date(dec.decision_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                          <p className="text-sm text-ink-warm-700 mt-1">{dec.summary}</p>
                         </div>
                         <div className="flex gap-1">
-                          <Button type="button" variant="ghost" size="sm" className="hover:bg-gray-100 w-auto px-2" onClick={() => { setEditingDecisionId(dec.id); setDecisionForm({ decision_date: new Date(dec.decision_date + 'T00:00:00'), summary: dec.summary }); setIsDecisionFormOpen(true); }}><Edit className="h-4 w-4 text-gray-600" /></Button>
+                          <Button type="button" variant="ghost" size="sm" className="hover:bg-cream-100 w-auto px-2" onClick={() => { setEditingDecisionId(dec.id); setDecisionForm({ decision_date: new Date(dec.decision_date + 'T00:00:00'), summary: dec.summary }); setIsDecisionFormOpen(true); }}><Edit className="h-4 w-4 text-ink-warm-700" /></Button>
                           <Button type="button" variant="ghost" size="sm" className="hover:bg-rose-50 w-auto px-2" onClick={() => setDeletingDecisionId(dec.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
                         </div>
                       </div>
@@ -3314,10 +3428,10 @@ export default function ClientsPage() {
                   </div>
                 ))}
                 {meetingNotesModalClient && (!clientDecisionLogs[meetingNotesModalClient.id] || clientDecisionLogs[meetingNotesModalClient.id].length === 0) && !isDecisionFormOpen && (
-                  <p className="text-sm text-gray-500 text-center py-4">No decisions logged yet.</p>
+                  <p className="text-sm text-ink-warm-500 text-center py-4">No decisions logged yet.</p>
                 )}
               </TabsContent>
-              <TabsContent value="notes" className="space-y-4 max-h-[55vh] overflow-y-auto px-1 pb-4">
+              <TabsContent value="notes" className="space-y-4 flex-1 overflow-y-auto px-1 pb-4">
               {!isNoteFormOpen && (
                 <div className="flex items-center gap-2">
                   <Button variant="brand" size="sm" onClick={() => openNoteForm()}>
@@ -3330,13 +3444,13 @@ export default function ClientsPage() {
                     disabled={isParsingDoc}
                   >
                     {isParsingDoc ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-1" />
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-ink-warm-700 mr-1" />
                     ) : (
                       <Upload className="h-4 w-4 mr-1" />
                     )}
                     Upload .docx
                   </Button>
-                  <span className="text-xs text-gray-400">Gemini meeting notes only</span>
+                  <span className="text-xs text-ink-warm-400">Gemini meeting notes only</span>
                 </div>
               )}
               <input
@@ -3347,9 +3461,9 @@ export default function ClientsPage() {
                 onChange={handleDocUpload}
               />
               {isNoteFormOpen && (
-                <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
+                <div className="border rounded-lg p-4 space-y-3 bg-cream-50">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">{editingNoteId ? 'Edit Note' : 'New Note'}</span>
+                    <span className="text-sm font-medium text-ink-warm-700">{editingNoteId ? 'Edit Note' : 'New Note'}</span>
                     <div className="flex items-center gap-2">
                       <Button
                         size="sm"
@@ -3359,13 +3473,13 @@ export default function ClientsPage() {
                         disabled={isParsingDoc}
                       >
                         {isParsingDoc ? (
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-600 mr-1" />
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-ink-warm-700 mr-1" />
                         ) : (
                           <Upload className="h-3 w-3 mr-1" />
                         )}
                         Upload .docx
                       </Button>
-                      <span className="text-[10px] text-gray-400">Gemini notes only</span>
+                      <span className="text-[10px] text-ink-warm-400">Gemini notes only</span>
                     </div>
                   </div>
                   <div className="grid gap-2">
@@ -3428,7 +3542,7 @@ export default function ClientsPage() {
                     </div>
                   </div>
                   <div className="grid gap-2">
-                    <Label>Action Items</Label>
+                    <Label>Action Items <span className="text-xs text-ink-warm-500 font-normal">(freeform notes)</span></Label>
                     <div className="meeting-note-editor-wrapper">
                       <ReactQuill
                         theme="snow"
@@ -3440,6 +3554,18 @@ export default function ClientsPage() {
                       />
                     </div>
                   </div>
+                  {/* Structured action items — only shown when editing an
+                      existing meeting note (needs a meeting_note_id to
+                      attach to). HH-side items auto-create HQ tasks via
+                      /api/meeting-action-items. */}
+                  {editingNoteId && (
+                    <MeetingActionItems
+                      meetingNoteId={editingNoteId}
+                      teamMembers={allUsers
+                        .filter((u: any) => u.role && u.role !== 'client' && u.role !== 'guest')
+                        .map((u: any) => ({ id: u.id, name: u.name }))}
+                    />
+                  )}
                   <div className="flex gap-2">
                     <Button variant="brand" size="sm" onClick={handleNoteFormSubmit} disabled={!meetingNoteForm.title.trim() || !meetingNoteForm.meeting_date}>
                       {editingNoteId ? 'Save' : 'Add'}
@@ -3452,7 +3578,7 @@ export default function ClientsPage() {
                 <div key={note.id} className="border rounded-lg p-3 bg-white">
                   {deletingNoteId === note.id ? (
                     <div className="space-y-2">
-                      <p className="text-sm text-gray-700">Delete "{note.title}"?</p>
+                      <p className="text-sm text-ink-warm-700">Delete "{note.title}"?</p>
                       <div className="flex gap-2">
                         <Button size="sm" variant="destructive" onClick={() => deleteMeetingNote(note.id)}>Delete</Button>
                         <Button size="sm" variant="outline" onClick={() => setDeletingNoteId(null)}>Cancel</Button>
@@ -3463,19 +3589,19 @@ export default function ClientsPage() {
                       <div className="flex items-start justify-between">
                         <div>
                           <p className="font-medium text-sm">{note.title}</p>
-                          <p className="text-xs text-gray-500">{new Date(note.meeting_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                          <p className="text-xs text-ink-warm-500">{new Date(note.meeting_date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                         </div>
                         <div className="flex gap-1">
-                          <Button type="button" variant="ghost" size="sm" className="hover:bg-gray-100 w-auto px-2" onClick={() => openNoteForm(note)} title="Edit note"><Edit className="h-4 w-4 text-gray-600" /></Button>
+                          <Button type="button" variant="ghost" size="sm" className="hover:bg-cream-100 w-auto px-2" onClick={() => openNoteForm(note)} title="Edit note"><Edit className="h-4 w-4 text-ink-warm-700" /></Button>
                           <Button type="button" variant="ghost" size="sm" className="hover:bg-rose-50 w-auto px-2" onClick={() => setDeletingNoteId(note.id)} title="Delete note"><Trash2 className="h-4 w-4 text-rose-600" /></Button>
                         </div>
                       </div>
-                      {note.attendees && <p className="text-xs text-gray-500 mt-1"><span className="font-medium">Attendees:</span> {note.attendees}</p>}
-                      {note.content && <div className="ql-snow mt-2"><div className="ql-editor !p-0 !text-sm !text-gray-600" dangerouslySetInnerHTML={{ __html: note.content }} /></div>}
+                      {note.attendees && <p className="text-xs text-ink-warm-500 mt-1"><span className="font-medium">Attendees:</span> {note.attendees}</p>}
+                      {note.content && <div className="ql-snow mt-2"><div className="ql-editor !p-0 !text-sm !text-ink-warm-700" dangerouslySetInnerHTML={{ __html: note.content }} /></div>}
                       {note.action_items && (
-                        <div className="mt-2 pt-2 border-t border-gray-100">
-                          <p className="text-xs font-medium text-gray-500 mb-1">Action Items:</p>
-                          <div className="ql-snow"><div className="ql-editor !p-0 !text-xs !text-gray-600" dangerouslySetInnerHTML={{ __html: note.action_items }} /></div>
+                        <div className="mt-2 pt-2 border-t border-cream-100">
+                          <p className="text-xs font-medium text-ink-warm-500 mb-1">Action Items:</p>
+                          <div className="ql-snow"><div className="ql-editor !p-0 !text-xs !text-ink-warm-700" dangerouslySetInnerHTML={{ __html: note.action_items }} /></div>
                         </div>
                       )}
                     </>
@@ -3483,7 +3609,7 @@ export default function ClientsPage() {
                 </div>
               ))}
               {meetingNotesModalClient && (!clientMeetingNotes[meetingNotesModalClient.id] || clientMeetingNotes[meetingNotesModalClient.id].length === 0) && !isNoteFormOpen && (
-                <p className="text-sm text-gray-500 text-center py-4">No meeting notes yet.</p>
+                <p className="text-sm text-ink-warm-500 text-center py-4">No meeting notes yet.</p>
               )}
               </TabsContent>
             </Tabs>
@@ -3492,7 +3618,7 @@ export default function ClientsPage() {
 
         {/* Client Context Modal */}
         <Dialog open={!!contextModalClient} onOpenChange={(open) => { if (!open) { setContextModalClient(null); setIsActionItemFormOpen(false); setEditingActionItemId(null); setDeletingActionItemId(null); } }}>
-          <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden">
+          <DialogContent className="sm:max-w-[700px] max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Client Context — {contextModalClient?.name}</DialogTitle>
               <DialogDescription>Manage engagement context and action board for this client.</DialogDescription>
@@ -3502,13 +3628,18 @@ export default function ClientsPage() {
               if (v === 'actionboard' && contextModalClient) {
                 seedMilestones(contextModalClient.id);
               }
-            }}>
-              <TabsList className="mb-3">
+            }} className="flex-1 flex flex-col min-h-0">
+              <TabsList className="mb-3 shrink-0">
                 <TabsTrigger value="context">Context</TabsTrigger>
                 <TabsTrigger value="actionboard">Action Board</TabsTrigger>
               </TabsList>
-              <TabsContent value="context">
-                <div className="space-y-4 max-h-[55vh] overflow-y-auto px-1 pb-4">
+              {/* Each tab is its own flex-col so the body scrolls and
+                  the action row stays pinned below it. Previously the
+                  DialogFooter sat INSIDE the scroll wrapper, so the
+                  Save button scrolled with the form body — easy to
+                  miss on a long form. */}
+              <TabsContent value="context" className="flex-1 flex flex-col min-h-0 mt-0">
+                <div className="space-y-4 flex-1 overflow-y-auto px-1 pb-4">
                   {/* [Phase edit in popup] Active Campaign banner —
                       shows the latest in-window campaign name + a
                       phase dropdown that maps 1:1 to the teal pill
@@ -3522,7 +3653,7 @@ export default function ClientsPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] font-semibold text-brand uppercase tracking-wider">Active Campaign</p>
-                        <p className="text-sm font-semibold text-gray-900 truncate" title={latestCampaign.name}>
+                        <p className="text-sm font-semibold text-ink-warm-900 truncate" title={latestCampaign.name}>
                           {latestCampaign.name}
                         </p>
                       </div>
@@ -3564,7 +3695,7 @@ export default function ClientsPage() {
                       )}
                     </div>
                     {contextModalClient && getLinkedCRMAccount(contextModalClient.id) ? (
-                      <div className="flex h-auto min-h-[80px] w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">{contextForm.scope || '—'}</div>
+                      <div className="flex h-auto min-h-[80px] w-full rounded-md border border-cream-200 bg-cream-50 px-3 py-2 text-sm text-ink-warm-700">{contextForm.scope || '—'}</div>
                     ) : (
                       <Textarea value={contextForm.scope} onChange={(e) => setContextForm({ ...contextForm, scope: e.target.value })} placeholder="Project description, regions, etc." className="focus-brand" rows={3} />
                     )}
@@ -3577,8 +3708,8 @@ export default function ClientsPage() {
                       )}
                     </div>
                     {contextModalClient && getLinkedCRMAccount(contextModalClient.id) ? (
-                      <div className="flex h-10 w-full items-center rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                        <CalendarIcon className="mr-2 h-4 w-4 text-gray-400" />
+                      <div className="flex h-10 w-full items-center rounded-md border border-cream-200 bg-cream-50 px-3 py-2 text-sm text-ink-warm-700">
+                        <CalendarIcon className="mr-2 h-4 w-4 text-ink-warm-400" />
                         {contextForm.start_date ? contextForm.start_date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                       </div>
                     ) : (
@@ -3639,7 +3770,7 @@ export default function ClientsPage() {
                               style={{ borderColor: '#e5e7eb', backgroundColor: 'white', color: selectedUsers.length > 0 ? '#111827' : '#9ca3af' }}
                             >
                               <span className="truncate">{triggerLabel}</span>
-                              <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0 ml-2" />
+                              <ChevronDown className="h-4 w-4 text-ink-warm-400 flex-shrink-0 ml-2" />
                             </Button>
                           </PopoverTrigger>
                           {/* Scroll on the PopoverContent itself — putting
@@ -3649,7 +3780,7 @@ export default function ClientsPage() {
                           <PopoverContent className="w-72 p-2 max-h-72 overflow-y-auto" align="start">
                             <div className="space-y-0.5">
                               {teamMembers.length === 0 && (
-                                <p className="text-xs text-gray-400 italic px-2 py-2">No active team members found.</p>
+                                <p className="text-xs text-ink-warm-400 italic px-2 py-2">No active team members found.</p>
                               )}
                               {teamMembers.map((u: any) => {
                                 const name = u.name || u.email;
@@ -3657,7 +3788,7 @@ export default function ClientsPage() {
                                 return (
                                   <label
                                     key={u.id}
-                                    className="flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-gray-100 cursor-pointer"
+                                    className="flex items-center gap-2 px-2 py-1.5 rounded text-sm hover:bg-cream-100 cursor-pointer"
                                   >
                                     <Checkbox
                                       checked={checked}
@@ -3684,7 +3815,7 @@ export default function ClientsPage() {
                                     />
                                     <span className="flex-1 min-w-0 truncate">{name}</span>
                                     {u.email && u.name && (
-                                      <span className="text-[10px] text-gray-400 truncate">{u.email}</span>
+                                      <span className="text-[10px] text-ink-warm-400 truncate">{u.email}</span>
                                     )}
                                   </label>
                                 );
@@ -3696,7 +3827,7 @@ export default function ClientsPage() {
                     })()}
                   </div>
                   <div className="border-t pt-4 mt-2">
-                    <p className="text-sm font-semibold text-gray-700 mb-3">Resource Links (shown in client portal)</p>
+                    <p className="text-sm font-semibold text-ink-warm-700 mb-3">Resource Links (shown in client portal)</p>
                     <div className="grid gap-3">
                       <div className="grid gap-1">
                         <Label className="text-xs">Telegram Group URL</Label>
@@ -3713,13 +3844,13 @@ export default function ClientsPage() {
                     </div>
                   </div>
                   {/* Portal Access & Features */}
-                  <div className="border rounded-lg p-3 bg-gray-50 space-y-3">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Portal Access & Features</p>
+                  <div className="border rounded-lg p-3 bg-cream-50 space-y-3">
+                    <p className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wider">Portal Access & Features</p>
 
                     {/* Approved Domains */}
                     <div>
-                      <p className="text-sm font-medium text-gray-900 mb-1">Approved Domains</p>
-                      <p className="text-xs text-gray-500 mb-2">Users with these email domains can access the portal, campaigns, and reports</p>
+                      <p className="text-sm font-medium text-ink-warm-900 mb-1">Approved Domains</p>
+                      <p className="text-xs text-ink-warm-500 mb-2">Users with these email domains can access the portal, campaigns, and reports</p>
                       <div className="flex gap-2 mb-2">
                         <Input
                           value={contextDomainInput}
@@ -3748,9 +3879,11 @@ export default function ClientsPage() {
                       {clientApprovedDomains.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
                           {clientApprovedDomains.map((domain, i) => (
-                            <span key={i} className="inline-flex items-center gap-1 bg-blue-50 text-blue-800 text-xs px-2 py-0.5 rounded-full">
+                            // Brand-soft chip — same palette as the other
+                            // approved-domain chip in Add Client (line ~2710).
+                            <span key={i} className="inline-flex items-center gap-1 bg-brand-soft text-brand-deep border border-brand-light text-xs px-2 py-0.5 rounded-full">
                               @{domain}
-                              <button onClick={() => setClientApprovedDomains(clientApprovedDomains.filter((_, j) => j !== i))} className="text-blue-500 cursor-pointer">×</button>
+                              <button onClick={() => setClientApprovedDomains(clientApprovedDomains.filter((_, j) => j !== i))} className="text-brand hover:text-brand-dark cursor-pointer">×</button>
                             </span>
                           ))}
                         </div>
@@ -3758,10 +3891,10 @@ export default function ClientsPage() {
                     </div>
 
                     {/* Mindshare Toggle */}
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                    <div className="flex items-center justify-between pt-2 border-t border-cream-200">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">Korean Mindshare Tracker</p>
-                        <p className="text-xs text-gray-500">Show mindshare analytics on the client portal</p>
+                        <p className="text-sm font-medium text-ink-warm-900">Korean Mindshare Tracker</p>
+                        <p className="text-xs text-ink-warm-500">Show mindshare analytics on the client portal</p>
                       </div>
                       <Switch
                         checked={contextModalClient ? (clientMindshareEnabled[contextModalClient.id] ?? false) : false}
@@ -3770,22 +3903,22 @@ export default function ClientsPage() {
                     </div>
                   </div>
                 </div>
-                <DialogFooter className="mt-4">
+                <DialogFooter className="border-t border-cream-100 pt-3 mt-0 shrink-0">
                   <Button variant="outline" onClick={() => setContextModalClient(null)}>Cancel</Button>
                   <Button variant="brand" onClick={handleContextSubmit}>Save Context</Button>
                 </DialogFooter>
               </TabsContent>
-              <TabsContent value="actionboard">
+              <TabsContent value="actionboard" className="flex-1 flex flex-col min-h-0 mt-0">
                 {(() => {
                   const milestones = contextModalClient ? (clientMilestones[contextModalClient.id] || []) : [];
                   const allItems = contextModalClient ? (clientActionItems[contextModalClient.id] || []) : [];
                   const completedCount = milestones.filter(m => m.status === 'complete').length;
 
                   const renderActionItem = (item: ActionItem) => (
-                    <div key={item.id} className={`p-2 rounded-lg ${item.is_hidden ? 'opacity-40' : ''} ${item.is_done ? 'bg-gray-50' : 'bg-white'} border`}>
+                    <div key={item.id} className={`p-2 rounded-lg ${item.is_hidden ? 'opacity-40' : ''} ${item.is_done ? 'bg-cream-50' : 'bg-white'} border`}>
                       {deletingActionItemId === item.id ? (
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600">Delete this item?</span>
+                          <span className="text-sm text-ink-warm-700">Delete this item?</span>
                           <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => deleteActionItem(item.id)}>Delete</Button>
                           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setDeletingActionItemId(null)}>Cancel</Button>
                         </div>
@@ -3793,7 +3926,7 @@ export default function ClientsPage() {
                         <>
                           <div className="flex items-center gap-2">
                             <Checkbox checked={item.is_done} onCheckedChange={() => toggleActionItemDone(item)} />
-                            <span className={`flex-1 text-sm ${item.is_done ? 'line-through text-gray-400' : 'text-gray-700'}`}>{item.text}</span>
+                            <span className={`flex-1 text-sm ${item.is_done ? 'line-through text-ink-warm-400' : 'text-ink-warm-700'}`}>{item.text}</span>
                             {/* [HQ Tasks ↔ Action Board link, May 2026]
                                 Linked HQ task count + click-through. Only
                                 renders when at least one HQ task points at
@@ -3815,16 +3948,16 @@ export default function ClientsPage() {
                                 {actionItemTaskCounts[item.id]} HQ task{actionItemTaskCounts[item.id] === 1 ? '' : 's'}
                               </button>
                             )}
-                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-gray-100" onClick={() => toggleActionItemHidden(item)}>
-                              {item.is_hidden ? <EyeOff className="h-3.5 w-3.5 text-gray-400" /> : <Eye className="h-3.5 w-3.5 text-gray-400" />}
+                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-cream-100" onClick={() => toggleActionItemHidden(item)}>
+                              {item.is_hidden ? <EyeOff className="h-3.5 w-3.5 text-ink-warm-400" /> : <Eye className="h-3.5 w-3.5 text-ink-warm-400" />}
                             </Button>
-                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-gray-100" onClick={() => {
+                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-cream-100" onClick={() => {
                               setEditingActionItemId(item.id);
                               setActionItemForm({ text: item.text, court: item.court, attachment_url: item.attachment_url || '', attachment_label: item.attachment_label || '' });
                               setActiveMilestoneId(item.milestone_id);
                               setIsActionItemFormOpen(true);
                             }}>
-                              <Pencil className="h-3.5 w-3.5 text-gray-400" />
+                              <Pencil className="h-3.5 w-3.5 text-ink-warm-400" />
                             </Button>
                             <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-rose-50" onClick={() => setDeletingActionItemId(item.id)}>
                               <Trash2 className="h-3.5 w-3.5 text-rose-400" />
@@ -3844,9 +3977,9 @@ export default function ClientsPage() {
                   );
 
                   return (
-                    <div className="max-h-[55vh] overflow-y-auto space-y-3 px-1 pb-2">
+                    <div className="flex-1 overflow-y-auto space-y-3 px-1 pb-2">
                       {/* Progress summary */}
-                      <div className="flex items-center justify-between text-sm text-gray-500 mb-1">
+                      <div className="flex items-center justify-between text-sm text-ink-warm-500 mb-1">
                         <span>{completedCount} of {milestones.length} milestones complete</span>
                         <div className="flex items-center gap-1.5">
                           {/* Apply template */}
@@ -3864,7 +3997,7 @@ export default function ClientsPage() {
                                   }
                                 }}>
                                   <span className="truncate">{t.name}</span>
-                                  {t.is_default && <span className="ml-auto text-[10px] text-gray-400">default</span>}
+                                  {t.is_default && <span className="ml-auto text-[10px] text-ink-warm-400">default</span>}
                                 </DropdownMenuItem>
                               ))}
                               {milestoneTemplates.length > 0 && <DropdownMenuSeparator />}
@@ -3877,7 +4010,7 @@ export default function ClientsPage() {
                                   a new tab so the Context popup stays open. */}
                               <DropdownMenuItem
                                 onClick={() => window.open('/clients/templates', '_blank')}
-                                className="text-gray-500"
+                                className="text-ink-warm-500"
                               >
                                 <Settings className="h-3.5 w-3.5 mr-2" /> Manage templates…
                               </DropdownMenuItem>
@@ -3889,11 +4022,13 @@ export default function ClientsPage() {
                         </div>
                       </div>
 
-                      {/* Save as template dialog */}
+                      {/* Save as template form — brand-soft tile matches
+                          the approved-domain chips and the rest of the v11
+                          "active accent" pattern. Was bg-blue-50. */}
                       {saveTemplateOpen && (
-                        <div className="border rounded-lg p-3 space-y-2 bg-blue-50">
-                          <p className="text-xs font-medium text-gray-700">Save current milestones as a reusable template</p>
-                          <Input value={saveTemplateName} onChange={(e) => setSaveTemplateName(e.target.value)} placeholder="Template name..." className="focus-brand" autoFocus />
+                        <div className="rounded-[14px] border border-brand-light p-3 space-y-2 bg-brand-soft">
+                          <p className="text-xs font-medium text-brand-deep">Save current milestones as a reusable template</p>
+                          <Input value={saveTemplateName} onChange={(e) => setSaveTemplateName(e.target.value)} placeholder="Template name..." className="focus-brand bg-white" autoFocus />
                           <div className="flex items-center gap-2">
                             <Button variant="brand" size="sm" disabled={!saveTemplateName.trim()} onClick={async () => {
                               if (contextModalClient) {
@@ -3911,14 +4046,17 @@ export default function ClientsPage() {
 
                       {/* Progress bar */}
                       {milestones.length > 0 && (
-                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-1.5 bg-cream-100 rounded-full overflow-hidden">
                           <div className="h-full bg-brand rounded-full transition-all duration-300" style={{ width: `${(completedCount / milestones.length) * 100}%` }} />
                         </div>
                       )}
 
-                      {/* Milestone form */}
+                      {/* Milestone form — v11 chrome (rounded-[14px] +
+                          cream hairline) to match the Card primitive
+                          radius and the rest of the modal's surface
+                          rhythm. */}
                       {isMilestoneFormOpen && (
-                        <div className="border rounded-lg p-3 space-y-2 bg-gray-50">
+                        <div className="rounded-[14px] border border-cream-200 p-3 space-y-2 bg-cream-50">
                           <Input value={milestoneForm.name} onChange={(e) => setMilestoneForm({ ...milestoneForm, name: e.target.value })} placeholder="Milestone name" className="focus-brand" autoFocus />
                           <Input value={milestoneForm.subtitle} onChange={(e) => setMilestoneForm({ ...milestoneForm, subtitle: e.target.value })} placeholder="Subtitle (optional)" className="focus-brand" />
                           <Input value={milestoneForm.status_message} onChange={(e) => setMilestoneForm({ ...milestoneForm, status_message: e.target.value })} placeholder="Status message for client (optional)" className="focus-brand" />
@@ -3937,9 +4075,9 @@ export default function ClientsPage() {
                         const yoursItems = msItems.filter(i => i.court === 'yours').sort((a, b) => a.display_order - b.display_order);
                         const oursItems = msItems.filter(i => i.court === 'ours').sort((a, b) => a.display_order - b.display_order);
                         const isExpanded = activeMilestoneId === ms.id;
-                        const statusColor = ms.status === 'complete' ? 'border-emerald-200 bg-emerald-50/30' : ms.status === 'active' ? 'border-brand bg-brand/5' : 'border-gray-200 bg-gray-50/50';
+                        const statusColor = ms.status === 'complete' ? 'border-emerald-200 bg-emerald-50/30' : ms.status === 'active' ? 'border-brand bg-brand/5' : 'border-cream-200 bg-cream-50/50';
                         const StatusIcon = ms.status === 'complete' ? CheckCircle : ms.status === 'active' ? Circle : Lock;
-                        const statusIconColor = ms.status === 'complete' ? 'text-emerald-500' : ms.status === 'active' ? 'text-brand' : 'text-gray-300';
+                        const statusIconColor = ms.status === 'complete' ? 'text-emerald-500' : ms.status === 'active' ? 'text-brand' : 'text-ink-warm-300';
                         const statusBadge: { label: string; tone: BadgeTone } = ms.status === 'complete'
                           ? { label: 'Complete', tone: 'success' }
                           : ms.status === 'active'
@@ -3956,21 +4094,21 @@ export default function ClientsPage() {
                               <StatusIcon className={`h-5 w-5 flex-shrink-0 ${statusIconColor}`} />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5">
-                                  <p className={`text-sm font-semibold ${ms.status === 'upcoming' ? 'text-gray-400' : 'text-gray-900'}`}>{ms.name}</p>
-                                  {!ms.is_visible && <EyeOff className="h-3 w-3 text-gray-400" />}
+                                  <p className={`text-sm font-semibold ${ms.status === 'upcoming' ? 'text-ink-warm-400' : 'text-ink-warm-900'}`}>{ms.name}</p>
+                                  {!ms.is_visible && <EyeOff className="h-3 w-3 text-ink-warm-400" />}
                                 </div>
-                                {ms.subtitle && <p className={`text-xs ${ms.status === 'upcoming' ? 'text-gray-300' : 'text-gray-500'}`}>{ms.subtitle}</p>}
+                                {ms.subtitle && <p className={`text-xs ${ms.status === 'upcoming' ? 'text-ink-warm-300' : 'text-ink-warm-500'}`}>{ms.subtitle}</p>}
                               </div>
-                              <StatusBadge tone={statusBadge.tone} size="sm">{statusBadge.label}</StatusBadge>
-                              {isExpanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+                              <StatusBadge tone={statusBadge.tone} size="sm" bordered withDot={statusBadge.tone === 'danger' ? 'pulse' : true}>{statusBadge.label}</StatusBadge>
+                              {isExpanded ? <ChevronUp className="h-4 w-4 text-ink-warm-400" /> : <ChevronDown className="h-4 w-4 text-ink-warm-400" />}
                             </div>
 
                             {/* Expanded content */}
                             {isExpanded && (
-                              <div className="px-3 pb-3 space-y-3 border-t border-gray-100">
+                              <div className="px-3 pb-3 space-y-3 border-t border-cream-100">
                                 {/* Status controls */}
                                 <div className="flex items-center gap-1.5 pt-2">
-                                  <span className="text-[10px] text-gray-500 mr-1">Status:</span>
+                                  <span className="text-[10px] text-ink-warm-500 mr-1">Status:</span>
                                   {(['complete', 'active', 'upcoming'] as const).map(s => (
                                     <Button
                                       key={s}
@@ -3984,14 +4122,14 @@ export default function ClientsPage() {
                                   ))}
                                   <div className="ml-auto flex gap-1">
                                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0" title={ms.is_visible ? 'Hide from portal' : 'Show on portal'} onClick={() => toggleMilestoneVisibility(ms.id, ms.is_visible)}>
-                                      {ms.is_visible ? <Eye className="h-3 w-3 text-gray-400" /> : <EyeOff className="h-3 w-3 text-gray-400" />}
+                                      {ms.is_visible ? <Eye className="h-3 w-3 text-ink-warm-400" /> : <EyeOff className="h-3 w-3 text-ink-warm-400" />}
                                     </Button>
                                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => {
                                       setEditingMilestoneId(ms.id);
                                       setMilestoneForm({ name: ms.name, subtitle: ms.subtitle || '', status_message: ms.status_message || '' });
                                       setIsMilestoneFormOpen(true);
                                     }}>
-                                      <Pencil className="h-3 w-3 text-gray-400" />
+                                      <Pencil className="h-3 w-3 text-ink-warm-400" />
                                     </Button>
                                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-rose-50" onClick={() => deleteMilestone(ms.id)}>
                                       <Trash2 className="h-3 w-3 text-rose-400" />
@@ -4011,12 +4149,12 @@ export default function ClientsPage() {
                                   <div>
                                     <p className="text-[10px] font-semibold text-brand uppercase tracking-wider mb-1.5">Holo Hive</p>
                                     <div className="space-y-1">{oursItems.map(renderActionItem)}</div>
-                                    {oursItems.length === 0 && <p className="text-xs text-gray-400 py-1">No items</p>}
+                                    {oursItems.length === 0 && <p className="text-xs text-ink-warm-400 py-1">No items</p>}
                                   </div>
                                   <div>
                                     <p className="text-[10px] font-semibold text-orange-600 uppercase tracking-wider mb-1.5">Your Tasks</p>
                                     <div className="space-y-1">{yoursItems.map(renderActionItem)}</div>
-                                    {yoursItems.length === 0 && <p className="text-xs text-gray-400 py-1">No items</p>}
+                                    {yoursItems.length === 0 && <p className="text-xs text-ink-warm-400 py-1">No items</p>}
                                   </div>
                                 </div>
 
@@ -4054,7 +4192,7 @@ export default function ClientsPage() {
                       })}
 
                       {milestones.length === 0 && !isMilestoneFormOpen && (
-                        <p className="text-sm text-gray-400 text-center py-4">No milestones yet. They will be auto-created when you first open this tab.</p>
+                        <p className="text-sm text-ink-warm-400 text-center py-4">No milestones yet. They will be auto-created when you first open this tab.</p>
                       )}
                     </div>
                   );
@@ -4066,19 +4204,19 @@ export default function ClientsPage() {
 
         {/* Weekly Updates Modal */}
         <Dialog open={!!weeklyModalClient} onOpenChange={(open) => { if (!open) { setWeeklyModalClient(null); setIsWeeklyFormOpen(false); setEditingWeeklyId(null); setDeletingWeeklyId(null); } }}>
-          <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden">
+          <DialogContent className="sm:max-w-[700px] max-h-[85vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Weekly Updates — {weeklyModalClient?.name}</DialogTitle>
               <DialogDescription>Manage weekly status updates for this client.</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto px-1 pb-4">
+            <div className="space-y-4 flex-1 overflow-y-auto px-1 pb-4">
               {!isWeeklyFormOpen && (
                 <Button variant="brand" size="sm" onClick={() => openWeeklyForm()}>
                   <Plus className="h-4 w-4 mr-1" /> Add Update
                 </Button>
               )}
               {isWeeklyFormOpen && (
-                <div className="border rounded-lg p-4 space-y-3 bg-gray-50">
+                <div className="border rounded-lg p-4 space-y-3 bg-cream-50">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="grid gap-2">
                       <Label>Week Of <span className="text-rose-500">*</span></Label>
@@ -4133,7 +4271,7 @@ export default function ClientsPage() {
                 <div key={update.id} className="border rounded-lg p-3 bg-white">
                   {deletingWeeklyId === update.id ? (
                     <div className="space-y-2">
-                      <p className="text-sm text-gray-700">Delete this update?</p>
+                      <p className="text-sm text-ink-warm-700">Delete this update?</p>
                       <div className="flex gap-2">
                         <Button size="sm" variant="destructive" onClick={() => deleteWeeklyUpdate(update.id)}>Delete</Button>
                         <Button size="sm" variant="outline" onClick={() => setDeletingWeeklyId(null)}>Cancel</Button>
@@ -4143,24 +4281,24 @@ export default function ClientsPage() {
                     <>
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <p className="text-xs text-gray-400">Week of {new Date(update.week_of + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                          <p className="text-xs text-ink-warm-400">Week of {new Date(update.week_of + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                           <p className="font-medium text-sm mt-1">{update.current_focus}</p>
                           {update.active_initiatives && (
-                            <div className="mt-2 text-xs text-gray-600">
+                            <div className="mt-2 text-xs text-ink-warm-700">
                               {update.active_initiatives.split('\n').map((item, i) => (
                                 <p key={i}>{item.startsWith('-') || item.startsWith('•') ? item : `• ${item}`}</p>
                               ))}
                             </div>
                           )}
                           {update.next_checkin && (
-                            <p className="text-xs text-gray-400 mt-2">Next check-in: {new Date(update.next_checkin + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                            <p className="text-xs text-ink-warm-400 mt-2">Next check-in: {new Date(update.next_checkin + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
                           )}
                           {update.open_questions && (
                             <p className="text-xs text-orange-600 mt-1 whitespace-pre-wrap">Open: {update.open_questions}</p>
                           )}
                         </div>
                         <div className="flex gap-1 flex-shrink-0">
-                          <Button type="button" variant="ghost" size="sm" className="hover:bg-gray-100 w-auto px-2" onClick={() => openWeeklyForm(update)}><Edit className="h-4 w-4 text-gray-600" /></Button>
+                          <Button type="button" variant="ghost" size="sm" className="hover:bg-cream-100 w-auto px-2" onClick={() => openWeeklyForm(update)}><Edit className="h-4 w-4 text-ink-warm-700" /></Button>
                           <Button type="button" variant="ghost" size="sm" className="hover:bg-rose-50 w-auto px-2" onClick={() => setDeletingWeeklyId(update.id)}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
                         </div>
                       </div>
@@ -4169,7 +4307,7 @@ export default function ClientsPage() {
                 </div>
               ))}
               {weeklyModalClient && (!clientWeeklyUpdates[weeklyModalClient.id] || clientWeeklyUpdates[weeklyModalClient.id].length === 0) && !isWeeklyFormOpen && (
-                <p className="text-sm text-gray-500 text-center py-4">No weekly updates yet.</p>
+                <p className="text-sm text-ink-warm-500 text-center py-4">No weekly updates yet.</p>
               )}
             </div>
           </DialogContent>

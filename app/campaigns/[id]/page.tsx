@@ -121,10 +121,10 @@ function DialogMultiSelect({
         >
           <div className="flex flex-wrap gap-1 items-center text-left flex-1 min-w-0">
             {selected.length === 0 ? (
-              <span className="text-gray-400">{placeholder}</span>
+              <span className="text-ink-warm-400">{placeholder}</span>
             ) : (
               selected.map((s) => (
-                <span key={s} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-700">
+                <span key={s} className="text-xs px-1.5 py-0.5 rounded bg-cream-100 text-ink-warm-700">
                   {s}
                 </span>
               ))
@@ -136,14 +136,14 @@ function DialogMultiSelect({
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <div className="max-h-64 overflow-auto py-1">
           {options.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-gray-400">No options</div>
+            <div className="px-3 py-2 text-sm text-ink-warm-400">No options</div>
           ) : (
             options.map((opt) => {
               const isSelected = selected.includes(opt);
               return (
                 <label
                   key={opt}
-                  className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer text-sm"
+                  className="flex items-center gap-2 px-3 py-1.5 hover:bg-cream-50 cursor-pointer text-sm"
                 >
                   <Checkbox
                     checked={isSelected}
@@ -622,7 +622,7 @@ const CampaignDetailsPage = () => {
         );
       case 'Facebook':
         return (
-          <svg className="h-4 w-4 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="h-4 w-4 text-brand" viewBox="0 0 24 24" fill="currentColor">
             <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
           </svg>
         );
@@ -650,7 +650,7 @@ const CampaignDetailsPage = () => {
       'Spaces': 'bg-pink-100 text-pink-800',
       'Newsletter': 'bg-slate-100 text-slate-800'
     };
-    return colorMap[type] || 'bg-gray-100 text-gray-800';
+    return colorMap[type] || 'bg-cream-100 text-ink-warm-700';
   };
 
   const getCreatorTypeColor = (creatorType: string) => {
@@ -662,7 +662,7 @@ const CampaignDetailsPage = () => {
       'Bridge Builder': 'bg-emerald-100 text-emerald-800',
       'Visionary': 'bg-indigo-100 text-indigo-800',
       'Onboarder': 'bg-teal-100 text-teal-800',
-      'General': 'bg-gray-100 text-gray-800',
+      'General': 'bg-cream-100 text-ink-warm-700',
       'Gaming': 'bg-pink-100 text-pink-800',
       'Crypto': 'bg-yellow-100 text-yellow-800',
       'Memecoin': 'bg-orange-100 text-orange-800',
@@ -673,7 +673,7 @@ const CampaignDetailsPage = () => {
       'Airdrop': 'bg-teal-100 text-teal-800',
       'Art': 'bg-pink-100 text-pink-800'
     };
-    return colorMap[creatorType] || 'bg-gray-100 text-gray-800';
+    return colorMap[creatorType] || 'bg-cream-100 text-ink-warm-700';
   };
 
   const getNewContentTypeColor = (contentType: string) => {
@@ -689,7 +689,7 @@ const CampaignDetailsPage = () => {
       'Bridge Builders': 'bg-teal-100 text-teal-800',
       'Visionaries': 'bg-cyan-100 text-cyan-800'
     };
-    return colorMap[contentType] || 'bg-gray-100 text-gray-800';
+    return colorMap[contentType] || 'bg-cream-100 text-ink-warm-700';
   };
 
   const getPricingColor = (pricing: string) => {
@@ -2733,7 +2733,7 @@ const CampaignDetailsPage = () => {
       case 'Interested': return 'bg-yellow-100 text-yellow-800';
       case 'Onboarded': return 'bg-orange-100 text-orange-800';
       case 'Concluded': return 'bg-emerald-100 text-emerald-800';
-      default: return 'bg-gray-100 text-gray-800';
+      default: return 'bg-cream-100 text-ink-warm-700';
     }
   };
 
@@ -2742,7 +2742,7 @@ const CampaignDetailsPage = () => {
       case 'scheduled': return 'bg-blue-100 text-blue-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'posted': return 'bg-emerald-100 text-emerald-800';
-      default: return 'bg-gray-100 text-gray-800';
+      default: return 'bg-cream-100 text-ink-warm-700';
     }
   };
 
@@ -2814,7 +2814,7 @@ const CampaignDetailsPage = () => {
   /** Tiny ▲/▼ glyph for the active column header. */
   const kolSortIndicator = (key: KolSortKey) => {
     if (kolSort.key !== key) return null;
-    return <span className="ml-0.5 text-[10px] text-gray-500">{kolSort.dir === 'asc' ? '▲' : '▼'}</span>;
+    return <span className="ml-0.5 text-[10px] text-ink-warm-500">{kolSort.dir === 'asc' ? '▲' : '▼'}</span>;
   };
 
   // ─── Master KOL edit dialog handlers ────────────────────────────────
@@ -3230,10 +3230,10 @@ const CampaignDetailsPage = () => {
         options = fieldOptions.platforms;
       } else if (field === 'type') {
         options = fieldOptions.deliverables;
-        getColorClass = () => value ? getContentTypeColor(value) : 'bg-gray-100 text-gray-800';
+        getColorClass = () => value ? getContentTypeColor(value) : 'bg-cream-100 text-ink-warm-700';
       } else if (field === 'status') {
         options = contentStatusOptions.map(o => o.value);
-        getColorClass = () => value ? getContentStatusColor(value) : 'bg-gray-100 text-gray-800';
+        getColorClass = () => value ? getContentStatusColor(value) : 'bg-cream-100 text-ink-warm-700';
       } else if (field === 'campaign_kols_id') {
         options = campaignKOLs.map(k => k.id);
       }
@@ -3301,7 +3301,7 @@ const CampaignDetailsPage = () => {
                 await moveToNextContentCell(content, field);
               }
             }}
-            className="w-full border-none shadow-none p-0 h-auto bg-transparent text-blue-600 focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
+            className="w-full border-none shadow-none p-0 h-auto bg-transparent text-brand focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
             style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
             autoFocus
           />
@@ -3317,7 +3317,7 @@ const CampaignDetailsPage = () => {
             title="Double-click to edit"
           >
           {value ? (
-            <a href={value} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline" onClick={e => e.stopPropagation()}>
+            <a href={value} target="_blank" rel="noopener noreferrer" className="text-brand hover:text-brand-dark underline" onClick={e => e.stopPropagation()}>
               <span>{value}</span>
             </a>
           ) : '-'}
@@ -3537,7 +3537,7 @@ const CampaignDetailsPage = () => {
 
       if (field === 'hh_status') {
         options = ['Curated', 'Contacted', 'Interested', 'Onboarded', 'Concluded'];
-        getColorClass = () => value ? getStatusColor(value) : 'bg-gray-100 text-gray-800';
+        getColorClass = () => value ? getStatusColor(value) : 'bg-cream-100 text-ink-warm-700';
       } else if (field === 'budget_type') {
         options = ['Token', 'Fiat', 'WL'];
       }
@@ -3685,14 +3685,14 @@ const CampaignDetailsPage = () => {
       // /campaigns/[id] is the 11k-line behemoth — structural refactor
       // is its own tracked follow-up (see FOLLOW-UP in CLAUDE.md).
       // lint-conventions: disable-next-line no-card-shell
-      <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
+      <div className="min-h-[calc(100vh-64px)] w-full bg-cream-50">
         <div className="w-full px-4">
           <div className="space-y-4">
             <div>
               <Skeleton className="h-8 w-32 mb-2" />
             </div>
             
-            <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
+            <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
               <div className="flex items-center gap-3 mb-4">
                 <Skeleton className="h-10 w-10 rounded-lg" />
                 <Skeleton className="h-8 w-64" />
@@ -3764,19 +3764,19 @@ const CampaignDetailsPage = () => {
   return (
     // /campaigns/[id] behemoth — structural refactor is a tracked follow-up.
     // lint-conventions: disable-next-line no-card-shell
-    <div className="min-h-[calc(100vh-64px)] w-full bg-gray-50">
+    <div className="min-h-[calc(100vh-64px)] w-full bg-cream-50">
       <div className="w-full">
         <div className="space-y-4">
           <div className="flex items-center justify-between relative">
             <Button
               variant="ghost"
-              className="py-2 px-3 rounded-md text-gray-600 hover:text-brand transition-colors mb-1 text-sm"
+              className="py-2 px-3 rounded-md text-ink-warm-700 hover:text-brand transition-colors mb-1 text-sm"
               onClick={() => router.back()}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />Back to Campaigns
             </Button>
             {campaign && (
-              <span className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-gray-900 mb-1 pointer-events-none">{campaign.name}</span>
+              <span className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-ink-warm-900 mb-1 pointer-events-none">{campaign.name}</span>
             )}
             <div className="flex items-center gap-2">
               {hasWarnings && (
@@ -3820,23 +3820,23 @@ const CampaignDetailsPage = () => {
             </TabsList>
             
             <TabsContent value="information" className="mt-4">
-              <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-              <CardHeader className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
+              <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
+              <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
                   {campaign.client_logo_url ? (
                     <img src={campaign.client_logo_url} alt={campaign.client_name || 'Client'} className="h-10 w-10 rounded-lg object-cover" />
                   ) : (
-                    <div className="bg-gray-100 p-2 rounded-lg"><Megaphone className="h-6 w-6 text-gray-600" /></div>
+                    <div className="bg-cream-100 p-2 rounded-lg"><Megaphone className="h-6 w-6 text-ink-warm-700" /></div>
                   )}
                   {editMode ? (
                       <Input
-                        className="text-2xl font-bold text-gray-900 focus-brand focus:ring-2 focus:ring-brand focus:border-brand"
+                        className="text-2xl font-bold text-ink-warm-900 focus-brand focus:ring-2 focus:ring-brand focus:border-brand"
                         style={{ borderColor: '#e5e7eb' }}
                         value={form?.name || ""}
                         onChange={e => handleChange("name", e.target.value)}
                       />
                   ) : (
-                    <h2 className="text-2xl font-bold text-gray-900">{campaign.name}</h2>
+                    <h2 className="text-2xl font-bold text-ink-warm-900">{campaign.name}</h2>
                   )}
                   {editMode ? (
                     <Select
@@ -3888,14 +3888,14 @@ const CampaignDetailsPage = () => {
                   <div className="flex items-center justify-between col-span-2">
                     {/* Campaign Updates Carousel */}
                     <div className="flex-1 max-w-md">
-                      <div className="text-sm font-medium text-gray-700 mb-2">Recent Updates</div>
+                      <div className="text-sm font-medium text-ink-warm-700 mb-2">Recent Updates</div>
                       {loadingUpdates ? (
                         <div className="flex items-center gap-2">
                           {/* Left Arrow Skeleton */}
                           <Skeleton className="h-8 w-8 rounded-full" />
                           
                           {/* Update Card Skeleton */}
-                          <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg p-3 min-h-[80px]">
+                          <div className="flex-1 bg-cream-50 border border-cream-200 rounded-lg p-3 min-h-[80px]">
                             <div className="space-y-2">
                               <Skeleton className="h-4 w-full" />
                               <Skeleton className="h-4 w-3/4" />
@@ -3907,7 +3907,7 @@ const CampaignDetailsPage = () => {
                           <Skeleton className="h-8 w-8 rounded-full" />
                         </div>
                       ) : campaignUpdates.length === 0 ? (
-                        <div className="text-sm text-gray-500 italic">No updates yet</div>
+                        <div className="text-sm text-ink-warm-500 italic">No updates yet</div>
                       ) : (
                         <>
                           <div className="flex items-center gap-2">
@@ -3916,7 +3916,7 @@ const CampaignDetailsPage = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 w-8 p-0 bg-white hover:bg-gray-50 border border-gray-200 rounded-full flex-shrink-0"
+                                className="h-8 w-8 p-0 bg-white hover:bg-cream-50 border border-cream-200 rounded-full flex-shrink-0"
                                 onClick={prevUpdate}
                               >
                                 <ChevronLeft className="h-4 w-4" />
@@ -3924,11 +3924,11 @@ const CampaignDetailsPage = () => {
                             )}
                             
                             {/* Update Card */}
-                            <div className="flex-1 bg-gray-50 border border-gray-200 rounded-lg p-3 min-h-[80px] relative">
-                              <div className="text-sm text-gray-900 mb-1">
+                            <div className="flex-1 bg-cream-50 border border-cream-200 rounded-lg p-3 min-h-[80px] relative">
+                              <div className="text-sm text-ink-warm-900 mb-1">
                                 {campaignUpdates[currentUpdateIndex]?.update_text}
                               </div>
-                              <div className="text-xs text-gray-500">
+                              <div className="text-xs text-ink-warm-500">
                                 {campaignUpdates[currentUpdateIndex] && new Date(campaignUpdates[currentUpdateIndex].created_at).toLocaleDateString('en-US', {
                                   year: 'numeric',
                                   month: 'short',
@@ -3943,7 +3943,7 @@ const CampaignDetailsPage = () => {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="absolute bottom-2 right-2 h-6 w-6 p-0 text-gray-400 hover:text-rose-500 hover:bg-rose-50"
+                                    className="absolute bottom-2 right-2 h-6 w-6 p-0 text-ink-warm-400 hover:text-rose-500 hover:bg-rose-50"
                                   >
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
@@ -3952,10 +3952,10 @@ const CampaignDetailsPage = () => {
                                   <DialogHeader>
                                     <DialogTitle>Confirm Delete</DialogTitle>
                                   </DialogHeader>
-                                  <div className="text-sm text-gray-600 mt-2 mb-2">
+                                  <div className="text-sm text-ink-warm-700 mt-2 mb-2">
                                     Are you sure you want to delete this update?
                                   </div>
-                                  <DialogFooter>
+                                  <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                                     <Button variant="outline" onClick={() => setIsDeleteUpdateDialogOpen(false)}>Cancel</Button>
                                     <Button 
                                       variant="destructive" 
@@ -4000,7 +4000,7 @@ const CampaignDetailsPage = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-8 w-8 p-0 bg-white hover:bg-gray-50 border border-gray-200 rounded-full flex-shrink-0"
+                                className="h-8 w-8 p-0 bg-white hover:bg-cream-50 border border-cream-200 rounded-full flex-shrink-0"
                                 onClick={nextUpdate}
                               >
                                 <ChevronRight className="h-4 w-4" />
@@ -4017,7 +4017,7 @@ const CampaignDetailsPage = () => {
                                   className={`w-2 h-2 rounded-full transition-colors ${
                                     index === currentUpdateIndex 
                                       ? 'bg-brand' 
-                                      : 'bg-gray-300 hover:bg-gray-400'
+                                      : 'bg-cream-300 hover:bg-cream-300'
                                   }`}
                                   onClick={() => setCurrentUpdateIndex(index)}
                                 />
@@ -4027,7 +4027,7 @@ const CampaignDetailsPage = () => {
                           
                           {/* Update Counter */}
                           {campaignUpdates.length > 1 && (
-                            <div className="text-xs text-gray-500 text-center mt-1">
+                            <div className="text-xs text-ink-warm-500 text-center mt-1">
                               {currentUpdateIndex + 1} of {campaignUpdates.length}
                             </div>
                           )}
@@ -4060,7 +4060,7 @@ const CampaignDetailsPage = () => {
                               />
                             </div>
                           </div>
-                          <DialogFooter>
+                          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                             <Button variant="outline" onClick={() => {
                               setIsAddUpdateDialogOpen(false);
                               setUpdateText('');
@@ -4131,12 +4131,12 @@ const CampaignDetailsPage = () => {
                   </div>
                 )}
                   {/* Campaign Overview Section */}
-                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                  <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="bg-brand p-2.5 rounded-lg">
                         <FileText className="h-5 w-5 text-white" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900">Campaign Overview</h3>
+                      <h3 className="text-lg font-semibold text-ink-warm-900">Campaign Overview</h3>
                     </div>
                     <div className="space-y-5">
                       {/* [May 2026 audit] Outline field hidden — Description
@@ -4144,12 +4144,12 @@ const CampaignDetailsPage = () => {
                           ground. Data + handler still wired so the save
                           payload preserves whatever was previously typed. */}
                       {false && (
-                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                      <div className="bg-white p-4 rounded-lg border border-cream-200">
                         <div className="flex items-center gap-2 mb-2">
-                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                          <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide">
                             Outline
                           </div>
-                          <Badge variant="outline" className="text-[10px] text-gray-500 border-gray-300">Internal</Badge>
+                          <Badge variant="outline" className="text-[10px] text-ink-warm-500 border-cream-300">Internal</Badge>
                         </div>
                         {editMode ? (
                           <Textarea
@@ -4161,13 +4161,13 @@ const CampaignDetailsPage = () => {
                             rows={3}
                           />
                         ) : (
-                          <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{campaign?.outline || <span className="text-gray-400 italic">No outline provided</span>}</div>
+                          <div className="text-sm text-ink-warm-700 leading-relaxed whitespace-pre-line">{campaign?.outline || <span className="text-ink-warm-400 italic">No outline provided</span>}</div>
                         )}
                       </div>
                       )}
-                      <div className="bg-white p-4 rounded-lg border border-gray-200">
+                      <div className="bg-white p-4 rounded-lg border border-cream-200">
                         <div className="flex items-center gap-2 mb-2">
-                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                          <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide">
                             Description
                           </div>
                           <Badge variant="outline" className="text-[10px] text-brand border-brand">Client-Facing</Badge>
@@ -4181,23 +4181,23 @@ const CampaignDetailsPage = () => {
                             rows={3}
                           />
                         ) : (
-                          <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{campaign.description || <span className="text-gray-400 italic">No description provided</span>}</div>
+                          <div className="text-sm text-ink-warm-700 leading-relaxed whitespace-pre-line">{campaign.description || <span className="text-ink-warm-400 italic">No description provided</span>}</div>
                         )}
                       </div>
                     </div>
                   </div>
 
                   {/* Timeline Section */}
-                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                  <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="bg-brand p-2.5 rounded-lg">
                         <CalendarIcon className="h-5 w-5 text-white" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900">Timeline</h3>
+                      <h3 className="text-lg font-semibold text-ink-warm-900">Timeline</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white p-4 rounded-lg border border-gray-200">
-                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Start Date</div>
+                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Start Date</div>
                         {editMode ? (
                       <Popover key="start-date-popover">
                         <PopoverTrigger asChild>
@@ -4222,11 +4222,11 @@ const CampaignDetailsPage = () => {
                         </PopoverContent>
                       </Popover>
                     ) : (
-                      <div className="text-lg font-semibold text-gray-900">{formatDate(campaign?.start_date)}</div>
+                      <div className="text-lg font-semibold text-ink-warm-900">{formatDate(campaign?.start_date)}</div>
                     )}
                   </div>
-                  <div className="bg-white p-4 rounded-lg border border-gray-200">
-                    <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">End Date</div>
+                  <div className="bg-white p-4 rounded-lg border border-cream-200">
+                    <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">End Date</div>
                     {editMode ? (
                       <Popover key="end-date-popover">
                         <PopoverTrigger asChild>
@@ -4252,11 +4252,11 @@ const CampaignDetailsPage = () => {
                         </PopoverContent>
                       </Popover>
                     ) : (
-                      <div className="text-lg font-semibold text-gray-900">{formatDate(campaign?.end_date)}</div>
+                      <div className="text-lg font-semibold text-ink-warm-900">{formatDate(campaign?.end_date)}</div>
                     )}
                   </div>
-                  <div className="bg-white p-4 rounded-lg border border-gray-200">
-                    <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
+                  <div className="bg-white p-4 rounded-lg border border-cream-200">
+                    <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2 flex items-center gap-2">
                       <MapPin className="h-3.5 w-3.5 text-brand" />
                       Region
                     </div>
@@ -4271,7 +4271,7 @@ const CampaignDetailsPage = () => {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <div className="text-lg font-semibold text-gray-900">{displayRegion(campaign?.region)}</div>
+                      <div className="text-lg font-semibold text-ink-warm-900">{displayRegion(campaign?.region)}</div>
                     )}
                   </div>
                   {/* [Phase edit relocation] Current Phase moved to the
@@ -4282,8 +4282,8 @@ const CampaignDetailsPage = () => {
                       under `false &&` so the data + handler logic is
                       preserved — flip to true to restore the field here. */}
                   {false && (
-                  <div className="bg-white p-4 rounded-lg border border-gray-200">
-                    <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2 flex items-center gap-2">
+                  <div className="bg-white p-4 rounded-lg border border-cream-200">
+                    <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2 flex items-center gap-2">
                       <Activity className="h-3.5 w-3.5 text-brand" />
                       Current Phase
                     </div>
@@ -4305,7 +4305,7 @@ const CampaignDetailsPage = () => {
                             ))}
                           </SelectContent>
                         </Select>
-                        <p className="text-[10px] text-gray-500 mt-1.5 leading-snug">
+                        <p className="text-[10px] text-ink-warm-500 mt-1.5 leading-snug">
                           Shown in the client portal hero once onboarding completes.
                         </p>
                       </>
@@ -4315,7 +4315,7 @@ const CampaignDetailsPage = () => {
                         {campaign?.current_phase}
                       </span>
                     ) : (
-                      <div className="text-sm text-gray-400 italic">Not set</div>
+                      <div className="text-sm text-ink-warm-400 italic">Not set</div>
                     )}
                   </div>
                   )}
@@ -4323,16 +4323,16 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Client Information Section */}
-                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                  <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="bg-brand p-2.5 rounded-lg">
                         <Building2 className="h-5 w-5 text-white" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900">Client Information</h3>
+                      <h3 className="text-lg font-semibold text-ink-warm-900">Client Information</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white p-4 rounded-lg border border-gray-200">
-                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Client</div>
+                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Client</div>
                         {editMode ? (
                           <Select value={form?.client_id || ""} onValueChange={value => handleChange("client_id", value)}>
                             <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand">
@@ -4359,8 +4359,8 @@ const CampaignDetailsPage = () => {
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-semibold text-gray-900">{clientName}</div>
-                                  {clientEmail && <div className="text-xs text-gray-500">{clientEmail}</div>}
+                                  <div className="font-semibold text-ink-warm-900">{clientName}</div>
+                                  {clientEmail && <div className="text-xs text-ink-warm-500">{clientEmail}</div>}
                                 </div>
                               </div>
                             );
@@ -4371,16 +4371,16 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Client Communication Section - Hidden */}
-                  {false && <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                  {false && <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="bg-brand p-2.5 rounded-lg">
                         <Phone className="h-5 w-5 text-white" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900">Client Communication</h3>
+                      <h3 className="text-lg font-semibold text-ink-warm-900">Client Communication</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white p-4 rounded-lg border border-gray-200">
-                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Intro Call</div>
+                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Intro Call</div>
                         {editMode ? (
                           <div className="flex items-center gap-2">
                             <Checkbox
@@ -4399,16 +4399,16 @@ const CampaignDetailsPage = () => {
                               </>
                             ) : (
                               <>
-                                <XCircle className="h-5 w-5 text-gray-400" />
-                                <span className="text-base font-medium text-gray-400">Not Held</span>
+                                <XCircle className="h-5 w-5 text-ink-warm-400" />
+                                <span className="text-base font-medium text-ink-warm-400">Not Held</span>
                               </>
                             )}
                           </div>
                         )}
                       </div>
                       {!!(editMode ? form?.intro_call : campaign?.intro_call) && (
-                        <div className="bg-white p-4 rounded-lg border border-gray-200">
-                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Intro Call Date</div>
+                        <div className="bg-white p-4 rounded-lg border border-cream-200">
+                          <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Intro Call Date</div>
                           {editMode ? (
                         <Popover key="intro-call-popover">
                           <PopoverTrigger asChild>
@@ -4433,12 +4433,12 @@ const CampaignDetailsPage = () => {
                           </PopoverContent>
                         </Popover>
                       ) : (
-                        <div className="text-base font-semibold text-gray-900">{campaign?.intro_call_date ? formatDate(campaign.intro_call_date) : '-'}</div>
+                        <div className="text-base font-semibold text-ink-warm-900">{campaign?.intro_call_date ? formatDate(campaign.intro_call_date) : '-'}</div>
                       )}
                         </div>
                       )}
-                      <div className="bg-white p-4 rounded-lg border border-gray-200">
-                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Proposal Sent</div>
+                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Proposal Sent</div>
                         {editMode ? (
                           <Checkbox id="proposal_sent" checked={!!form?.proposal_sent} onCheckedChange={checked => handleChange("proposal_sent", !!checked)} />
                         ) : (
@@ -4450,15 +4450,15 @@ const CampaignDetailsPage = () => {
                               </>
                             ) : (
                               <>
-                                <XCircle className="h-5 w-5 text-gray-400" />
-                                <span className="text-base font-medium text-gray-400">Not Sent</span>
+                                <XCircle className="h-5 w-5 text-ink-warm-400" />
+                                <span className="text-base font-medium text-ink-warm-400">Not Sent</span>
                               </>
                             )}
                           </div>
                         )}
                       </div>
-                      <div className="bg-white p-4 rounded-lg border border-gray-200">
-                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">NDA Signed</div>
+                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">NDA Signed</div>
                         {editMode ? (
                           <Checkbox id="nda_signed" checked={!!form?.nda_signed} onCheckedChange={checked => handleChange("nda_signed", !!checked)} />
                         ) : (
@@ -4470,8 +4470,8 @@ const CampaignDetailsPage = () => {
                               </>
                             ) : (
                               <>
-                                <XCircle className="h-5 w-5 text-gray-400" />
-                                <span className="text-base font-medium text-gray-400">Not Signed</span>
+                                <XCircle className="h-5 w-5 text-ink-warm-400" />
+                                <span className="text-base font-medium text-ink-warm-400">Not Signed</span>
                               </>
                             )}
                           </div>
@@ -4481,16 +4481,16 @@ const CampaignDetailsPage = () => {
                   </div>}
 
                   {/* Team & Management Section */}
-                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                  <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="bg-brand p-2.5 rounded-lg">
                         <Users className="h-5 w-5 text-white" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900">Team & Management</h3>
+                      <h3 className="text-lg font-semibold text-ink-warm-900">Team & Management</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white p-4 rounded-lg border border-gray-200">
-                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Manager</div>
+                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Manager</div>
                         {editMode ? (
                           <Select value={form?.manager || ""} onValueChange={value => handleChange("manager", value)}>
                             <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand">
@@ -4517,8 +4517,8 @@ const CampaignDetailsPage = () => {
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-semibold text-gray-900">{managerName}</div>
-                                  {manager?.email && <div className="text-xs text-gray-500">{manager.email}</div>}
+                                  <div className="font-semibold text-ink-warm-900">{managerName}</div>
+                                  {manager?.email && <div className="text-xs text-ink-warm-500">{manager.email}</div>}
                                 </div>
                               </div>
                             );
@@ -4530,8 +4530,8 @@ const CampaignDetailsPage = () => {
                           anywhere downstream. Form state + save still
                           plumbed so existing data isn't lost. */}
                       {false && (
-                      <div className="bg-white p-4 rounded-lg border border-gray-200">
-                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Call Support</div>
+                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Call Support</div>
                         {editMode ? (
                           <Checkbox id="call_support" checked={!!form?.call_support} onCheckedChange={checked => handleChange("call_support", !!checked)} />
                         ) : (
@@ -4543,8 +4543,8 @@ const CampaignDetailsPage = () => {
                               </>
                             ) : (
                               <>
-                                <XCircle className="h-5 w-5 text-gray-400" />
-                                <span className="text-base font-medium text-gray-400">Not Available</span>
+                                <XCircle className="h-5 w-5 text-ink-warm-400" />
+                                <span className="text-base font-medium text-ink-warm-400">Not Available</span>
                               </>
                             )}
                           </div>
@@ -4555,16 +4555,16 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Campaign Settings Section */}
-                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                  <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="bg-brand p-2.5 rounded-lg">
                         <BadgeCheck className="h-5 w-5 text-white" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900">Campaign Settings</h3>
+                      <h3 className="text-lg font-semibold text-ink-warm-900">Campaign Settings</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white p-4 rounded-lg border border-gray-200">
-                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Client Choosing KOLs</div>
+                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Client Choosing KOLs</div>
                         {editMode ? (
                           <Checkbox id="client_choosing_kols" checked={!!form?.client_choosing_kols} onCheckedChange={checked => handleChange("client_choosing_kols", !!checked)} />
                         ) : (
@@ -4576,15 +4576,15 @@ const CampaignDetailsPage = () => {
                               </>
                             ) : (
                               <>
-                                <XCircle className="h-5 w-5 text-gray-400" />
-                                <span className="text-base font-medium text-gray-400">Disabled</span>
+                                <XCircle className="h-5 w-5 text-ink-warm-400" />
+                                <span className="text-base font-medium text-ink-warm-400">Disabled</span>
                               </>
                             )}
                           </div>
                         )}
                       </div>
-                      <div className="bg-white p-4 rounded-lg border border-gray-200">
-                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Multi-Activation</div>
+                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Multi-Activation</div>
                         {editMode ? (
                           <Checkbox id="multi_activation" checked={!!form?.multi_activation} onCheckedChange={checked => handleChange("multi_activation", !!checked)} />
                         ) : (
@@ -4596,8 +4596,8 @@ const CampaignDetailsPage = () => {
                               </>
                             ) : (
                               <>
-                                <XCircle className="h-5 w-5 text-gray-400" />
-                                <span className="text-base font-medium text-gray-400">Disabled</span>
+                                <XCircle className="h-5 w-5 text-ink-warm-400" />
+                                <span className="text-base font-medium text-ink-warm-400">Disabled</span>
                               </>
                             )}
                           </div>
@@ -4607,15 +4607,15 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Approved Access Section */}
-                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                  <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="bg-brand p-2.5 rounded-lg">
                         <Users className="h-5 w-5 text-white" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900">Approved Access</h3>
+                      <h3 className="text-lg font-semibold text-ink-warm-900">Approved Access</h3>
                     </div>
-                    <div className="bg-white p-4 rounded-lg border border-gray-200">
-                      <p className="text-sm text-gray-600 mb-3">
+                    <div className="bg-white p-4 rounded-lg border border-cream-200">
+                      <p className="text-sm text-ink-warm-700 mb-3">
                         {editMode
                           ? 'Add email addresses or domains that are allowed to access the public campaign view (in addition to the client email and same-domain emails).'
                           : 'Email addresses and domains allowed to access the public campaign view (in addition to the client email and same-domain emails).'}
@@ -4659,7 +4659,7 @@ const CampaignDetailsPage = () => {
                             {emails.map((email: string, index: number) => (
                               <div
                                 key={`email-${index}`}
-                                className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm"
+                                className="inline-flex items-center gap-1 px-3 py-1 bg-cream-100 text-ink-warm-700 rounded-full text-sm"
                               >
                                 {email}
                                 {editMode && (
@@ -4669,7 +4669,7 @@ const CampaignDetailsPage = () => {
                                       const currentEmails = (form as any)?.approved_emails || [];
                                       handleChange('approved_emails' as any, currentEmails.filter((_: string, i: number) => i !== index));
                                     }}
-                                    className="ml-1 text-gray-500 hover:text-gray-700"
+                                    className="ml-1 text-ink-warm-500 hover:text-ink-warm-700"
                                   >
                                     ×
                                   </button>
@@ -4679,7 +4679,7 @@ const CampaignDetailsPage = () => {
                           </div>
                         ) : (
                           !editMode && (
-                            <p className="text-sm text-gray-400 italic">No approved emails or domains added yet.</p>
+                            <p className="text-sm text-ink-warm-400 italic">No approved emails or domains added yet.</p>
                           )
                         );
                       })()}
@@ -4687,22 +4687,22 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Budget Section */}
-                  <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                  <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="bg-brand p-2.5 rounded-lg">
                         <DollarSign className="h-5 w-5 text-white" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900">Budget</h3>
+                      <h3 className="text-lg font-semibold text-ink-warm-900">Budget</h3>
                     </div>
                     <div className="space-y-4">
                       {/* Budget Overview Card */}
-                      <div className="bg-white p-5 rounded-lg border border-gray-200">
+                      <div className="bg-white p-5 rounded-lg border border-cream-200">
                         <div className="grid grid-cols-2 gap-6 mb-4">
                           <div>
-                            <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Total Budget</div>
+                            <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Total Budget</div>
                             {editMode ? (
                               <div className="relative w-full">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-warm-500 pointer-events-none">$</span>
                                 <Input
                                   type="text"
                                   className="pl-6 w-full focus-brand focus:ring-2 focus:ring-brand focus:border-brand"
@@ -4717,21 +4717,21 @@ const CampaignDetailsPage = () => {
                                 />
                               </div>
                             ) : (
-                              <div className="text-2xl font-bold text-gray-900">{CampaignService.formatCurrency(campaign.total_budget)}</div>
+                              <div className="text-2xl font-bold text-ink-warm-900">{CampaignService.formatCurrency(campaign.total_budget)}</div>
                             )}
                           </div>
                           <div>
-                            <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Allocated</div>
+                            <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Allocated</div>
                             <div className="text-2xl font-bold text-brand">{CampaignService.formatCurrency(campaign.total_allocated || 0)}</div>
                           </div>
                         </div>
                         {/* Progress Bar */}
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-semibold text-gray-700">Budget Utilization</span>
-                            <span className="text-sm font-bold text-gray-900">{CampaignService.calculateBudgetUtilization(campaign.total_budget, campaign.total_allocated || 0)}%</span>
+                            <span className="text-xs font-semibold text-ink-warm-700">Budget Utilization</span>
+                            <span className="text-sm font-bold text-ink-warm-900">{CampaignService.calculateBudgetUtilization(campaign.total_budget, campaign.total_allocated || 0)}%</span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                          <div className="w-full bg-cream-200 rounded-full h-3 overflow-hidden">
                             <div
                               className="h-full bg-gradient-to-r from-brand to-[#2d6470] transition-all duration-300 rounded-full"
                               style={{ width: `${Math.min(CampaignService.calculateBudgetUtilization(campaign.total_budget, campaign.total_allocated || 0), 100)}%` }}
@@ -4741,8 +4741,8 @@ const CampaignDetailsPage = () => {
                       </div>
 
                       {/* Budget Type */}
-                      <div className="bg-white p-4 rounded-lg border border-gray-200">
-                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Budget Type</div>
+                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Budget Type</div>
                         {editMode ? (
                           <div className="flex gap-4">
                             {budgetTypeOptions.map(type => (
@@ -4770,15 +4770,15 @@ const CampaignDetailsPage = () => {
                                 <Badge key={type} variant="outline" className="capitalize text-brand border-brand">{type}</Badge>
                               ))
                             ) : (
-                              <span className="text-gray-400 italic">No budget types specified</span>
+                              <span className="text-ink-warm-400 italic">No budget types specified</span>
                             )}
                           </div>
                         )}
                       </div>
                     </div>
                     {editMode ? (
-                      <div className="mt-4 bg-white p-4 rounded-lg border border-gray-200">
-                        <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Regional Allocations</div>
+                      <div className="mt-4 bg-white p-4 rounded-lg border border-cream-200">
+                        <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Regional Allocations</div>
                         <div className="flex flex-col gap-2">
                       {allocations.map((alloc, idx) => (
                         <div key={alloc.id || idx} className="flex items-center gap-2">
@@ -4797,7 +4797,7 @@ const CampaignDetailsPage = () => {
                             </SelectContent>
                           </Select>
                           <div className="relative w-28">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-warm-500 pointer-events-none">$</span>
                             <Input
                               type="text"
                               inputMode="numeric"
@@ -4840,8 +4840,8 @@ const CampaignDetailsPage = () => {
                       </div>
                     ) : (
                       Array.isArray(campaign.budget_allocations) && campaign.budget_allocations.length > 0 && (
-                        <div className="mt-4 bg-white p-4 rounded-lg border border-gray-200">
-                          <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3">Regional Allocations</div>
+                        <div className="mt-4 bg-white p-4 rounded-lg border border-cream-200">
+                          <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Regional Allocations</div>
                           <div className="flex flex-wrap gap-2">
                             {campaign.budget_allocations.map((alloc: any) => (
                               <Badge key={alloc.id} variant="secondary" className="px-3 py-1.5 text-sm">
@@ -4867,13 +4867,13 @@ const CampaignDetailsPage = () => {
           </TabsContent>
 
           <TabsContent value="kols" className="mt-4">
-            <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-              <CardHeader className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
+            <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
+              <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="bg-gray-100 p-2 rounded-lg">
-                    <Users className="h-6 w-6 text-gray-600" />
+                  <div className="bg-cream-100 p-2 rounded-lg">
+                    <Users className="h-6 w-6 text-ink-warm-700" />
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900">KOL Dashboard</h2>
+                  <h2 className="text-2xl font-bold text-ink-warm-900">KOL Dashboard</h2>
                 </div>
                 <div className="flex items-center gap-3">
                   
@@ -4919,22 +4919,22 @@ const CampaignDetailsPage = () => {
                          <div className="border rounded-lg overflow-hidden mt-2">
                            <Table>
                              <TableHeader>
-                               <TableRow className="bg-gray-50">
-                                 <TableHead className="w-12">Select</TableHead>
-                                 <TableHead>Name</TableHead>
-                                 <TableHead>Followers</TableHead>
-                                 <TableHead>Region</TableHead>
-                                 <TableHead>Platform</TableHead>
-                                 <TableHead>Creator Type</TableHead>
-                                 <TableHead className="whitespace-nowrap">Content Type</TableHead>
-                                 <TableHead>Deliverables</TableHead>
-                                 <TableHead className="whitespace-nowrap">Pricing</TableHead>
+                               <TableRow className="bg-cream-50">
+                                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-12">Select</TableHead>
+                                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</TableHead>
+                                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Followers</TableHead>
+                                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Region</TableHead>
+                                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Platform</TableHead>
+                                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Creator Type</TableHead>
+                                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 whitespace-nowrap">Content Type</TableHead>
+                                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Deliverables</TableHead>
+                                 <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 whitespace-nowrap">Pricing</TableHead>
                                </TableRow>
                              </TableHeader>
                              <TableBody>
                                {filteredAvailableKOLs.length === 0 ? (
                                  <TableRow>
-                                   <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                                   <TableCell colSpan={9} className="text-center py-8 text-ink-warm-500">
                                      No KOLs found.
                                    </TableCell>
                                  </TableRow>
@@ -4967,7 +4967,7 @@ const CampaignDetailsPage = () => {
                                              href={kol.link || ''} 
                                              target="_blank" 
                                              rel="noopener noreferrer"
-                                             className="text-sm text-blue-600 hover:text-blue-800"
+                                             className="text-sm text-brand hover:text-brand-dark"
                                            >
                                              View Profile
                                            </a>
@@ -5095,7 +5095,7 @@ const CampaignDetailsPage = () => {
                              <div className="grid gap-2">
                                <Label htmlFor="payment-amount">Payment Amount (USD)</Label>
                                <div className="relative w-full">
-                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-warm-500 pointer-events-none">$</span>
                                  <Input
                                    id="payment-amount"
                                    type="number"
@@ -5159,7 +5159,7 @@ const CampaignDetailsPage = () => {
                          )}
                        </div>
                      </div>
-                     <DialogFooter>
+                     <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                        <Button variant="outline" onClick={() => setIsAddKOLsDialogOpen(false)}>
                          Cancel
                        </Button>
@@ -5224,11 +5224,11 @@ const CampaignDetailsPage = () => {
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <Users className="h-6 w-6 text-white" />
                             </div>
-                            <p className="text-sm text-gray-600">Total KOLs in Campaign</p>
+                            <p className="text-sm text-ink-warm-700">Total KOLs in Campaign</p>
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="text-2xl font-bold text-gray-900">
+                          <div className="text-2xl font-bold text-ink-warm-900">
                             {dashboardKOLs.length}
                           </div>
                         </CardContent>
@@ -5241,11 +5241,11 @@ const CampaignDetailsPage = () => {
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
-                            <p className="text-sm text-gray-600">Average Followers per KOL</p>
+                            <p className="text-sm text-ink-warm-700">Average Followers per KOL</p>
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="text-2xl font-bold text-gray-900">
+                          <div className="text-2xl font-bold text-ink-warm-900">
                             {(() => {
                               if (dashboardKOLs.length > 0) {
                                 const totalFollowers = dashboardKOLs.reduce((sum, kol) => sum + (kol.master_kol.followers || 0), 0);
@@ -5265,7 +5265,7 @@ const CampaignDetailsPage = () => {
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <Globe className="h-6 w-6 text-white" />
                             </div>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-ink-warm-700">
                               {(() => {
                                 const platforms = new Set();
                                 dashboardKOLs.forEach(kol => {
@@ -5279,7 +5279,7 @@ const CampaignDetailsPage = () => {
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="text-2xl font-bold text-gray-900">
+                          <div className="text-2xl font-bold text-ink-warm-900">
                             {(() => {
                               const platforms = new Set();
                               dashboardKOLs.forEach(kol => {
@@ -5300,7 +5300,7 @@ const CampaignDetailsPage = () => {
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <Flag className="h-6 w-6 text-white" />
                             </div>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-ink-warm-700">
                               {(() => {
                                 const regions = new Set();
                                 dashboardKOLs.forEach(kol => {
@@ -5314,7 +5314,7 @@ const CampaignDetailsPage = () => {
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="text-2xl font-bold text-gray-900">
+                          <div className="text-2xl font-bold text-ink-warm-900">
                             {(() => {
                               const regions = new Set();
                               dashboardKOLs.forEach(kol => {
@@ -5332,11 +5332,11 @@ const CampaignDetailsPage = () => {
                     {/* Charts Section */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* Platform Distribution Chart */}
-                      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                      <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-xl font-bold text-gray-900">Distribution of KOLs by Platform</h3>
-                            <p className="text-sm text-gray-500 mt-1">Breakdown of KOLs by social platform</p>
+                            <h3 className="text-xl font-bold text-ink-warm-900">Distribution of KOLs by Platform</h3>
+                            <p className="text-sm text-ink-warm-500 mt-1">Breakdown of KOLs by social platform</p>
                           </div>
                         </div>
                         <div className="h-96">
@@ -5430,11 +5430,11 @@ const CampaignDetailsPage = () => {
                       </div>
 
                       {/* Region Distribution Chart */}
-                      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                      <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-xl font-bold text-gray-900">KOLs by Region</h3>
-                            <p className="text-sm text-gray-500 mt-1">Geographic distribution of KOLs</p>
+                            <h3 className="text-xl font-bold text-ink-warm-900">KOLs by Region</h3>
+                            <p className="text-sm text-ink-warm-500 mt-1">Geographic distribution of KOLs</p>
                           </div>
                         </div>
                         <div className="h-96">
@@ -5520,13 +5520,13 @@ const CampaignDetailsPage = () => {
                   <>
                 {/* Active/Hidden Tab Switcher */}
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="inline-flex items-center rounded-lg border border-gray-200 p-1 bg-gray-50">
+                  <div className="inline-flex items-center rounded-lg border border-cream-200 p-1 bg-cream-50">
                     <button
                       onClick={() => setKolVisibilityTab('active')}
                       className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                         kolVisibilityTab === 'active'
-                          ? 'bg-white text-gray-900 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
+                          ? 'bg-white text-ink-warm-900 shadow-sm'
+                          : 'text-ink-warm-700 hover:text-ink-warm-900'
                       }`}
                     >
                       Active ({campaignKOLs.filter(k => !k.hidden).length})
@@ -5535,8 +5535,8 @@ const CampaignDetailsPage = () => {
                       onClick={() => setKolVisibilityTab('hidden')}
                       className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                         kolVisibilityTab === 'hidden'
-                          ? 'bg-white text-gray-900 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
+                          ? 'bg-white text-ink-warm-900 shadow-sm'
+                          : 'text-ink-warm-700 hover:text-ink-warm-900'
                       }`}
                     >
                       Hidden ({campaignKOLs.filter(k => k.hidden === true).length})
@@ -5546,7 +5546,7 @@ const CampaignDetailsPage = () => {
 
                 <div className="flex items-center justify-between mb-2">
                   <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
                     <Input
                       placeholder="Search KOLs by name, region, or status..."
                       className="pl-10 focus-brand"
@@ -5557,14 +5557,14 @@ const CampaignDetailsPage = () => {
                 </div>
                 {selectedKOLs.length > 0 && (
                 <div className="mb-6 mt-6">
-                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                  <div className="bg-white border border-cream-200 rounded-lg p-6 shadow-sm">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                      <span className="text-sm font-semibold text-gray-700">{selectedKOLs.length} KOL{selectedKOLs.length !== 1 ? 's' : ''} selected</span>
+                      <div className="w-2 h-2 bg-cream-500 rounded-full"></div>
+                      <span className="text-sm font-semibold text-ink-warm-700">{selectedKOLs.length} KOL{selectedKOLs.length !== 1 ? 's' : ''} selected</span>
                     </div>
-                    <div className="h-4 w-px bg-gray-300"></div>
-                    <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
+                    <div className="h-4 w-px bg-cream-300"></div>
+                    <span className="text-xs text-ink-warm-700 font-medium">Bulk Edit Fields</span>
                   </div>
                   <div className="flex flex-wrap items-end gap-4">
                     <div className="flex flex-col items-end justify-end">
@@ -5572,7 +5572,7 @@ const CampaignDetailsPage = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                        className="text-ink-warm-700 border-cream-300 hover:bg-cream-50"
                         onClick={() => {
                           const allIds = filteredKOLs.map(kol => kol.id);
                           if (allIds.every(id => selectedKOLs.includes(id))) {
@@ -5586,7 +5586,7 @@ const CampaignDetailsPage = () => {
                       </Button>
                     </div>
                     <div className="min-w-[120px] flex flex-col items-end justify-end">
-                      <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Status</span>
+                      <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Status</span>
                       <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                         <Select value={bulkStatus || ''} onValueChange={(value: string) => setBulkStatus(value as CampaignKOLWithDetails['hh_status'] | "") }>
                           <SelectTrigger
@@ -5682,7 +5682,7 @@ const CampaignDetailsPage = () => {
                         </Button>
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500 font-medium ml-auto whitespace-nowrap">
+                    <div className="text-xs text-ink-warm-500 font-medium ml-auto whitespace-nowrap">
                       {selectedKOLs.length > 0 && `${selectedKOLs.length} item${selectedKOLs.length !== 1 ? 's' : ''} selected`}
                     </div>
                   </div>
@@ -5694,13 +5694,13 @@ const CampaignDetailsPage = () => {
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-gray-50">
-                          <TableHead>KOL</TableHead>
-                          <TableHead>Followers</TableHead>
-                          <TableHead>Region</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Notes</TableHead>
-                          <TableHead>Actions</TableHead>
+                        <TableRow className="bg-cream-50">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">KOL</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Followers</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Region</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Status</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Notes</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -5736,10 +5736,10 @@ const CampaignDetailsPage = () => {
                     </Table>
                   </div>
                 ) : campaignKOLs.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Users className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <div className="text-center py-8 text-ink-warm-500">
+                    <Users className="h-12 w-12 mx-auto mb-4 text-ink-warm-300" />
                     <p className="text-lg font-medium mb-2">No KOLs assigned yet</p>
-                    <p className="text-sm text-gray-400">Add KOLs to this campaign to get started.</p>
+                    <p className="text-sm text-ink-warm-400">Add KOLs to this campaign to get started.</p>
                   </div>
                 ) : (
                   <div ref={kolTableRef} className="border rounded-lg" style={{ position: 'relative', overflow: 'auto', overflowX: 'auto', overflowY: 'auto' }}>
@@ -5750,8 +5750,8 @@ const CampaignDetailsPage = () => {
                       whiteSpace: 'nowrap'
                     }} suppressHydrationWarning>
                       <TableHeader>
-                        <TableRow className="bg-gray-50 border-b border-gray-200">
-                          <TableHead className="sticky left-0 z-20 bg-gray-50 text-center whitespace-nowrap group cursor-pointer hover:bg-gray-100 transition-colors px-4" style={{ minWidth: '60px', width: '60px', boxShadow: 'inset -1px 0 0 0 #d1d5db' }} onClick={() => {
+                        <TableRow className="bg-cream-50 border-b border-cream-200">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 sticky left-0 z-20 bg-cream-50 text-center whitespace-nowrap group cursor-pointer hover:bg-cream-100 transition-colors px-4" style={{ minWidth: '60px', width: '60px', boxShadow: 'inset -1px 0 0 0 #d1d5db' }} onClick={() => {
                             const allIds = filteredKOLs.map(kol => kol.id);
                             if (allIds.every(id => selectedKOLs.includes(id))) {
                               setSelectedKOLs(prev => prev.filter(id => !allIds.includes(id)));
@@ -5765,7 +5765,7 @@ const CampaignDetailsPage = () => {
                               checked={filteredKOLs.length > 0 && filteredKOLs.every(kol => selectedKOLs.includes(kol.id))}
                             />
                           </TableHead>
-                          <TableHead className="sticky bg-gray-50 text-left select-none z-20" style={{ left: '60px', boxShadow: 'inset -1px 0 0 0 #d1d5db' }}>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 sticky bg-cream-50 text-left select-none z-20" style={{ left: '60px', boxShadow: 'inset -1px 0 0 0 #d1d5db' }}>
                             <button
                               type="button"
                               onClick={() => toggleKolSort('name')}
@@ -5775,7 +5775,7 @@ const CampaignDetailsPage = () => {
                               KOL{kolSortIndicator('name')}
                             </button>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 group">
                               <button type="button" onClick={() => toggleKolSort('platform')} className="hover:underline inline-flex items-center" title="Sort by platform">
                                 Platform{kolSortIndicator('platform')}
@@ -5788,11 +5788,11 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Platform</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Platform</div>
                                     {['X','Telegram','YouTube','Facebook','TikTok'].map((platform) => (
                                       <div
                                         key={platform}
-                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                         onClick={() => {
                                           const newPlatforms = kolFilters.platform.includes(platform)
                                             ? kolFilters.platform.filter(p => p !== platform)
@@ -5826,7 +5826,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 group">
                               <button type="button" onClick={() => toggleKolSort('followers')} className="hover:underline inline-flex items-center" title="Sort by followers">
                                 Followers{kolSortIndicator('followers')}
@@ -5839,7 +5839,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Followers</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Followers</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={kolFilters.followers_operator}
@@ -5882,7 +5882,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 group">
                               <button type="button" onClick={() => toggleKolSort('region')} className="hover:underline inline-flex items-center" title="Sort by region">
                                 Region{kolSortIndicator('region')}
@@ -5895,11 +5895,11 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Region</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Region</div>
                                     {['Vietnam','Turkey','SEA','Philippines','Korea','Global','China','Brazil'].map((region) => (
                                       <div
                                         key={region}
-                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                         onClick={() => {
                                           const newRegions = kolFilters.region.includes(region)
                                             ? kolFilters.region.filter(r => r !== region)
@@ -5934,7 +5934,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 group">
                               <button type="button" onClick={() => toggleKolSort('creator_type')} className="hover:underline inline-flex items-center" title="Sort by creator type">
                                 Creator Type{kolSortIndicator('creator_type')}
@@ -5947,11 +5947,11 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Creator Type</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Creator Type</div>
                                     {['Nano','Micro','Mid-Tier','Macro','Mega'].map((creatorType) => (
                                       <div
                                         key={creatorType}
-                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                         onClick={() => {
                                           const newCreatorTypes = kolFilters.creator_type.includes(creatorType)
                                             ? kolFilters.creator_type.filter(ct => ct !== creatorType)
@@ -5983,7 +5983,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 group">
                               <button type="button" onClick={() => toggleKolSort('hh_status')} className="hover:underline inline-flex items-center" title="Sort by status">
                                 Status{kolSortIndicator('hh_status')}
@@ -5996,11 +5996,11 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Status</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Status</div>
                                     {['Curated','Contacted','Interested','Onboarded','Concluded'].map((status) => (
                                       <div
                                         key={status}
-                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                         onClick={() => {
                                           const newStatuses = kolFilters.hh_status.includes(status)
                                             ? kolFilters.hh_status.filter(s => s !== status)
@@ -6035,9 +6035,9 @@ const CampaignDetailsPage = () => {
                             </div>
                           </TableHead>
                           {/* Paid column hidden
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
-                              <span>Paid <span className="text-gray-500 text-xs">(Internal)</span></span>
+                              <span>Paid <span className="text-ink-warm-500 text-xs">(Internal)</span></span>
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button className="opacity-50 group-hover:opacity-100 transition-opacity">
@@ -6046,7 +6046,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Paid (USD)</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Paid (USD)</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={kolFilters.paid_operator}
@@ -6090,20 +6090,20 @@ const CampaignDetailsPage = () => {
                             </div>
                           </TableHead>
                           */}
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Notes</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Add Content</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content</TableHead>
-                          <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Notes</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Add Content</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Content</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 select-none">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody className="bg-white">
                         {filteredKOLs.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={12} className="text-center py-12">
-                              <div className="flex flex-col items-center justify-center text-gray-500">
-                                <Users className="h-12 w-12 mb-4 text-gray-300" />
+                              <div className="flex flex-col items-center justify-center text-ink-warm-500">
+                                <Users className="h-12 w-12 mb-4 text-ink-warm-300" />
                                 <p className="text-lg font-medium mb-2">No KOLs match your filters</p>
-                                <p className="text-sm text-gray-400 mb-4">Try adjusting your filter criteria</p>
+                                <p className="text-sm text-ink-warm-400 mb-4">Try adjusting your filter criteria</p>
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -6132,8 +6132,8 @@ const CampaignDetailsPage = () => {
                         ) : (
                           sortedKOLs.map((campaignKOL, index) => {
                           return (
-                            <TableRow key={campaignKOL.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
-                              <TableCell className={`sticky left-0 z-10 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} px-4 py-2 overflow-hidden text-center text-gray-600 group`} style={{ verticalAlign: 'middle', minWidth: '60px', width: '60px', boxShadow: 'inset -1px 0 0 0 #d1d5db' }}>
+                            <TableRow key={campaignKOL.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-cream-100 transition-colors border-b border-cream-200`}>
+                              <TableCell className={`sticky left-0 z-10 ${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} px-4 py-2 overflow-hidden text-center text-ink-warm-700 group`} style={{ verticalAlign: 'middle', minWidth: '60px', width: '60px', boxShadow: 'inset -1px 0 0 0 #d1d5db' }}>
                                 <div className="flex items-center justify-center w-full h-full">
                                   {selectedKOLs.includes(campaignKOL.id) ? (
                                     <Checkbox
@@ -6160,7 +6160,7 @@ const CampaignDetailsPage = () => {
                                 </div>
                               </TableCell>
                               <TableCell
-                                className={getCellClassName(`sticky z-10 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden text-gray-600 group cursor-pointer`, 'kols', campaignKOL.id, 'name')}
+                                className={getCellClassName(`sticky z-10 ${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden text-ink-warm-700 group cursor-pointer`, 'kols', campaignKOL.id, 'name')}
                                 style={{ left: '60px', verticalAlign: 'middle', fontWeight: 'bold', width: '20%', boxShadow: 'inset -1px 0 0 0 #d1d5db' }}
                                 onClick={() => handleCellSelect('kols', campaignKOL.id, 'name', campaignKOL.master_kol.name)}
                               >
@@ -6173,7 +6173,7 @@ const CampaignDetailsPage = () => {
                                   <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); openMasterKolEditDialog(campaignKOL.master_kol as unknown as MasterKOL); }}
-                                    className="ml-1.5 inline-flex items-center justify-center h-5 w-5 rounded text-gray-400 hover:text-brand hover:bg-brand-light/40 transition-colors"
+                                    className="ml-1.5 inline-flex items-center justify-center h-5 w-5 rounded text-ink-warm-400 hover:text-brand hover:bg-brand-light/40 transition-colors"
                                     title="Edit KOL info"
                                   >
                                     <Edit className="h-3 w-3" />
@@ -6192,7 +6192,7 @@ const CampaignDetailsPage = () => {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                 <MultiSelect
                                   options={fieldOptions?.platforms || []}
                                   selected={campaignKOL.master_kol.platform || []}
@@ -6229,7 +6229,7 @@ const CampaignDetailsPage = () => {
                                       ) : (
                                         <span className="flex items-center text-xs font-semibold text-black">Select</span>
                                       )}
-                                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                       </svg>
                                     </div>
@@ -6237,7 +6237,7 @@ const CampaignDetailsPage = () => {
                                 />
                               </TableCell>
                                   <TableCell
-                                    className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'followers')}
+                                    className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'followers')}
                                     onClick={() => {
                                       if (editingCell?.row !== campaignKOL.id || editingCell?.field !== 'followers') {
                                         handleCellSelect('kols', campaignKOL.id, 'followers', campaignKOL.master_kol.followers);
@@ -6281,7 +6281,7 @@ const CampaignDetailsPage = () => {
                                       campaignKOL.master_kol.followers ? KOLService.formatFollowers(campaignKOL.master_kol.followers) : '-'
                                     )}
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                 <MultiSelect
                                   options={fieldOptions?.regions || []}
                                   selected={campaignKOL.master_kol.region ? [campaignKOL.master_kol.region] : []}
@@ -6316,14 +6316,14 @@ const CampaignDetailsPage = () => {
                                       ) : (
                                         <span className="flex items-center text-xs font-semibold text-black">Select</span>
                                       )}
-                                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                       </svg>
                                     </div>
                                   }
                                 />
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                 <MultiSelect
                                   options={fieldOptions?.creatorTypes || []}
                                   selected={campaignKOL.master_kol.creator_type || []}
@@ -6360,14 +6360,14 @@ const CampaignDetailsPage = () => {
                                       ) : (
                                         <span className="flex items-center text-xs font-semibold text-black">Select</span>
                                       )}
-                                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                       </svg>
                                     </div>
                                   }
                                 />
                               </TableCell>
-                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                  <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                 <Select
                                   value={campaignKOL.hh_status} 
                                   onValueChange={(value) => handleUpdateKOLStatus(campaignKOL.id, value as any)}
@@ -6387,16 +6387,16 @@ const CampaignDetailsPage = () => {
                               </TableCell>
                                   {/* Paid cell hidden
                                   <TableCell
-                                    className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'paid')}
+                                    className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'paid')}
                                     onClick={() => handleCellSelect('kols', campaignKOL.id, 'paid', campaignKOL.paid)}
                                   >
                                     <div className="truncate min-h-[32px] flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.paid?.toString()}>
-                                      {campaignKOL.paid != null ? `$${campaignKOL.paid.toLocaleString()}` : <span className="text-gray-400 italic">No payments</span>}
+                                      {campaignKOL.paid != null ? `$${campaignKOL.paid.toLocaleString()}` : <span className="text-ink-warm-400 italic">No payments</span>}
                                     </div>
                                   </TableCell>
                                   */}
                                   <TableCell
-                                    className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 align-middle overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'notes')}
+                                    className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 align-middle overflow-hidden cursor-pointer`, 'kols', campaignKOL.id, 'notes')}
                                     style={{ width: '20%' }}
                                     onClick={() => {
                                       if (editingNotesId !== campaignKOL.id) {
@@ -6420,11 +6420,11 @@ const CampaignDetailsPage = () => {
                                   />
                                 ) : (
                                       <div className="truncate min-h-[32px] flex items-center px-1 py-1" style={{ minHeight: 32 }} title={campaignKOL.notes || ''}>
-                                    {campaignKOL.notes || <span className="text-gray-400 italic">Double-click to add notes</span>}
+                                    {campaignKOL.notes || <span className="text-ink-warm-400 italic">Double-click to add notes</span>}
                                   </div>
                                 )}
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                 <div className="flex flex-wrap gap-1 items-center">
                                   {(() => {
                                     // Get all content types for this KOL
@@ -6449,7 +6449,7 @@ const CampaignDetailsPage = () => {
                                         'Review': 'bg-yellow-100 text-yellow-800',
                                         'Thread': 'bg-indigo-100 text-indigo-800',
                                       };
-                                      return colors[type] || 'bg-gray-100 text-gray-800';
+                                      return colors[type] || 'bg-cream-100 text-ink-warm-700';
                                     };
 
                                     return Object.entries(typeCounts).map(([type, count], idx) => (
@@ -6472,16 +6472,16 @@ const CampaignDetailsPage = () => {
                                       <Button
                                         size="sm"
                                         variant="ghost"
-                                        className="h-6 w-6 p-0 hover:bg-gray-200"
+                                        className="h-6 w-6 p-0 hover:bg-cream-200"
                                       >
-                                        <Plus className="h-4 w-4 text-gray-600" />
+                                        <Plus className="h-4 w-4 text-ink-warm-700" />
                                       </Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[220px] p-3" align="start">
                                       <div className="space-y-3">
-                                        <div className="text-xs font-semibold text-gray-600">Add Contents</div>
+                                        <div className="text-xs font-semibold text-ink-warm-700">Add Contents</div>
                                         <div className="flex items-center gap-2">
-                                          <span className="text-sm text-gray-600">Count:</span>
+                                          <span className="text-sm text-ink-warm-700">Count:</span>
                                           <Input
                                             type="number"
                                             min={1}
@@ -6491,12 +6491,12 @@ const CampaignDetailsPage = () => {
                                             className="w-16 h-8 text-center focus-brand"
                                           />
                                         </div>
-                                        <div className="text-xs font-semibold text-gray-600">Select Type</div>
+                                        <div className="text-xs font-semibold text-ink-warm-700">Select Type</div>
                                         <div className="space-y-1">
                                           {fieldOptions.deliverables.map((type) => (
                                             <div
                                               key={type}
-                                              className="px-3 py-2 text-sm hover:bg-gray-100 cursor-pointer rounded flex items-center justify-between"
+                                              className="px-3 py-2 text-sm hover:bg-cream-100 cursor-pointer rounded flex items-center justify-between"
                                               onClick={async () => {
                                                 const count = quickAddContentCount;
                                                 // Auto-set platform from KOL's first platform
@@ -6604,7 +6604,7 @@ const CampaignDetailsPage = () => {
                                             >
                                               <span>{type}</span>
                                               {quickAddContentCount > 1 && (
-                                                <span className="text-xs text-gray-400">×{quickAddContentCount}</span>
+                                                <span className="text-xs text-ink-warm-400">×{quickAddContentCount}</span>
                                               )}
                                             </div>
                                           ))}
@@ -6614,12 +6614,12 @@ const CampaignDetailsPage = () => {
                                   </Popover>
                                 </div>
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center`}>
-                                <div className="font-medium text-gray-900">
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-center`}>
+                                <div className="font-medium text-ink-warm-900">
                                   {contents.filter(content => content.campaign_kols_id === campaignKOL.id).length}
                                 </div>
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                 <div className="flex space-x-1">
                                   <Button
                                     size="sm"
@@ -6671,11 +6671,11 @@ const CampaignDetailsPage = () => {
                   <>
                     {/* Filters Section */}
                     <div className="mb-4">
-                      <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                      <div className="bg-white border border-cream-200 rounded-lg p-6 shadow-sm">
                         <div className="flex flex-wrap items-end gap-2">
                           {/* Platform Filter */}
                           <div className="min-w-[120px] flex flex-col items-end justify-end">
-                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Platform</span>
+                            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Platform</span>
                             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                               <MultiSelect
                                 options={['X','Telegram','YouTube','Facebook','TikTok']}
@@ -6687,7 +6687,7 @@ const CampaignDetailsPage = () => {
                                     {kolFilters.platform.length > 0 ? (
                                       <>
                                         {kolFilters.platform.map(item => (
-                                          <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 flex items-center">
+                                          <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-cream-100 text-ink-warm-700 flex items-center">
                                             {getPlatformIcon(item)}
                                           </span>
                                         ))}
@@ -6695,7 +6695,7 @@ const CampaignDetailsPage = () => {
                                     ) : (
                                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
                                     )}
-                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                     </svg>
                                   </div>
@@ -6705,7 +6705,7 @@ const CampaignDetailsPage = () => {
                           </div>
                           {/* Region Filter */}
                           <div className="min-w-[100px] flex flex-col items-end justify-end">
-                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Region</span>
+                            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Region</span>
                             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                               <MultiSelect
                                 options={['Vietnam','Turkey','SEA','Philippines','Korea','Global','China','Brazil']}
@@ -6732,7 +6732,7 @@ const CampaignDetailsPage = () => {
                                     ) : (
                                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
                                     )}
-                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                     </svg>
                                   </div>
@@ -6742,7 +6742,7 @@ const CampaignDetailsPage = () => {
                           </div>
                           {/* Creator Type Filter */}
                           <div className="min-w-[120px] flex flex-col items-end justify-end">
-                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Creator Type</span>
+                            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Creator Type</span>
                             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                               <MultiSelect
                                 options={['Micro Influencer','KOL','Celebrity']}
@@ -6760,7 +6760,7 @@ const CampaignDetailsPage = () => {
                                     ) : (
                                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
                                     )}
-                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                     </svg>
                                   </div>
@@ -6770,7 +6770,7 @@ const CampaignDetailsPage = () => {
                           </div>
                           {/* Content Type Filter */}
                           <div className="min-w-[120px] flex flex-col items-end justify-end">
-                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Content Type</span>
+                            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Content Type</span>
                             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                               <MultiSelect
                                 options={['Meme','News','Trading','Deep Dive','Meme/Cultural Narrative','Drama Queen','Sceptics','Technical Educator','Bridge Builders','Visionaries']}
@@ -6788,7 +6788,7 @@ const CampaignDetailsPage = () => {
                                     ) : (
                                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
                                     )}
-                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                     </svg>
                                   </div>
@@ -6798,7 +6798,7 @@ const CampaignDetailsPage = () => {
                           </div>
                           {/* Status Filter */}
                           <div className="min-w-[100px] flex flex-col items-end justify-end">
-                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Status</span>
+                            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Status</span>
                             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                               <MultiSelect
                                 options={['Curated','Contacted','Interested','Onboarded','Concluded']}
@@ -6816,7 +6816,7 @@ const CampaignDetailsPage = () => {
                                     ) : (
                                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
                                     )}
-                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                     </svg>
                                   </div>
@@ -6826,7 +6826,7 @@ const CampaignDetailsPage = () => {
                           </div>
                           {/* Budget Type Filter */}
                           <div className="min-w-[100px] flex flex-col items-end justify-end">
-                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Budget Type</span>
+                            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Budget Type</span>
                             <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                               <MultiSelect
                                 options={['Token','Fiat','WL']}
@@ -6838,13 +6838,13 @@ const CampaignDetailsPage = () => {
                                     {kolFilters.budget_type.length > 0 ? (
                                       <>
                                         {kolFilters.budget_type.map(item => (
-                                          <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 flex-shrink-0 mr-1">{item}</span>
+                                          <span key={item} className="px-2 py-1 rounded-md text-xs font-medium bg-cream-100 text-ink-warm-700 flex-shrink-0 mr-1">{item}</span>
                                         ))}
                                       </>
                                     ) : (
                                       <span className="flex items-center text-xs font-semibold text-black">Select</span>
                                     )}
-                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="h-3 w-3 ml-1 flex-shrink-0 text-ink-warm-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                     </svg>
                                   </div>
@@ -6854,7 +6854,7 @@ const CampaignDetailsPage = () => {
                           </div>
                           {/* Followers Filter */}
                           <div className="min-w-[130px] flex flex-col items-end justify-end">
-                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Followers</span>
+                            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Followers</span>
                             <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
                               <Select
                                 value={kolFilters.followers_operator}
@@ -6879,7 +6879,7 @@ const CampaignDetailsPage = () => {
                           </div>
                           {/* Budget Filter */}
                           <div className="min-w-[130px] flex flex-col items-end justify-end">
-                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Budget</span>
+                            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Budget</span>
                             <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
                               <Select
                                 value={kolFilters.budget_operator}
@@ -6904,7 +6904,7 @@ const CampaignDetailsPage = () => {
                           </div>
                           {/* Paid Filter - hidden
                           <div className="min-w-[130px] flex flex-col items-end justify-end">
-                            <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Paid (USD)</span>
+                            <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Paid (USD)</span>
                             <div className="w-full flex items-center gap-1 h-7 min-h-[28px] justify-start">
                               <Select
                                 value={kolFilters.paid_operator}
@@ -6971,8 +6971,8 @@ const CampaignDetailsPage = () => {
                               </span>
                             </div>
                             <div className="mb-2">
-                              <h3 className="font-semibold text-gray-900 text-lg">{campaignKOL.master_kol.name}</h3>
-                              <p className="text-sm text-gray-500">{campaignKOL.master_kol.region || 'No region'}</p>
+                              <h3 className="font-semibold text-ink-warm-900 text-lg">{campaignKOL.master_kol.name}</h3>
+                              <p className="text-sm text-ink-warm-500">{campaignKOL.master_kol.region || 'No region'}</p>
                             </div>
                             <div className="flex items-center space-x-2">
                               {(campaignKOL.master_kol.platform || []).map((platform: string) => (
@@ -6986,15 +6986,15 @@ const CampaignDetailsPage = () => {
                         <CardContent className="space-y-3">
                           {/* Followers */}
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Followers</span>
-                            <span className="font-medium text-gray-900">
+                            <span className="text-sm text-ink-warm-700">Followers</span>
+                            <span className="font-medium text-ink-warm-900">
                               {campaignKOL.master_kol.followers ? KOLService.formatFollowers(campaignKOL.master_kol.followers) : '-'}
                             </span>
                           </div>
 
                           {/* Status */}
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Status</span>
+                            <span className="text-sm text-ink-warm-700">Status</span>
                             <Badge className={getStatusColor(campaignKOL.hh_status)}>
                               {campaignKOL.hh_status || 'No status'}
                             </Badge>
@@ -7002,8 +7002,8 @@ const CampaignDetailsPage = () => {
 
                           {/* Paid Amount - hidden
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Paid</span>
-                            <span className="font-medium text-gray-900">
+                            <span className="text-sm text-ink-warm-700">Paid</span>
+                            <span className="font-medium text-ink-warm-900">
                               {campaignKOL.paid ? `$${campaignKOL.paid}` : '-'}
                             </span>
                           </div>
@@ -7011,8 +7011,8 @@ const CampaignDetailsPage = () => {
 
                           {/* Content Count */}
                           <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600">Content</span>
-                            <span className="font-medium text-gray-900">
+                            <span className="text-sm text-ink-warm-700">Content</span>
+                            <span className="font-medium text-ink-warm-900">
                               {contents.filter(content => content.campaign_kols_id === campaignKOL.id).length}
                             </span>
                           </div>
@@ -7020,8 +7020,8 @@ const CampaignDetailsPage = () => {
                           {/* Wallet */}
                           {campaignKOL.wallet && (
                             <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-600">Wallet</span>
-                              <span className="font-medium text-gray-900 truncate" title={campaignKOL.wallet}>
+                              <span className="text-sm text-ink-warm-700">Wallet</span>
+                              <span className="font-medium text-ink-warm-900 truncate" title={campaignKOL.wallet}>
                                 {campaignKOL.wallet}
                               </span>
                             </div>
@@ -7029,20 +7029,20 @@ const CampaignDetailsPage = () => {
 
                           {/* Notes */}
                           {campaignKOL.notes && (
-                            <div className="pt-2 border-t border-gray-100">
-                              <span className="text-sm text-gray-600">Notes</span>
-                              <p className="text-sm text-gray-900 mt-1 line-clamp-2">{campaignKOL.notes}</p>
+                            <div className="pt-2 border-t border-cream-100">
+                              <span className="text-sm text-ink-warm-700">Notes</span>
+                              <p className="text-sm text-ink-warm-900 mt-1 line-clamp-2">{campaignKOL.notes}</p>
                             </div>
                           )}
 
                           {/* Profile Link */}
                           {campaignKOL.master_kol.link && (
-                            <div className="pt-2 border-t border-gray-100">
+                            <div className="pt-2 border-t border-cream-100">
                               <a 
                                 href={campaignKOL.master_kol.link} 
                                 target="_blank" 
                                 rel="noopener noreferrer"
-                                className="text-sm text-blue-600 hover:text-blue-800 underline"
+                                className="text-sm text-brand hover:text-brand-dark underline"
                               >
                                 View Profile →
                               </a>
@@ -7059,11 +7059,11 @@ const CampaignDetailsPage = () => {
           </TabsContent>
           
           <TabsContent value="contents" className="mt-4">
-            <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-              <CardHeader className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
+            <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
+              <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="bg-gray-100 p-2 rounded-lg"><FileText className="h-6 w-6 text-gray-600" /></div>
-                  <h2 className="text-2xl font-bold text-gray-900">Content Dashboard</h2>
+                  <div className="bg-cream-100 p-2 rounded-lg"><FileText className="h-6 w-6 text-ink-warm-700" /></div>
+                  <h2 className="text-2xl font-bold text-ink-warm-900">Content Dashboard</h2>
                 </div>
                 <div className="flex items-center">
                   <Dialog open={false} onOpenChange={setIsAddContentsDialogOpen}>
@@ -7100,7 +7100,7 @@ const CampaignDetailsPage = () => {
                       <DialogHeader>
                         <DialogTitle>Add Content</DialogTitle>
                       </DialogHeader>
-                      <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
+                      <div className="grid gap-4 py-4 flex-1 overflow-y-auto px-1">
                         <div className="grid gap-2">
                           <Label className="mb-1 block">KOL</Label>
                           <Select
@@ -7276,7 +7276,7 @@ const CampaignDetailsPage = () => {
                           </div>
                         </div>
                       </div>
-                      <DialogFooter>
+                      <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                         <Button variant="outline" onClick={() => setIsAddContentsDialogOpen(false)}>Cancel</Button>
                         <Button variant="brand" disabled={ !addContentData.campaign_kols_id || !addContentData.activation_date || !addContentData.content_link || !addContentData.platform || !addContentData.type || !addContentData.status || isAddingContent } onClick={async () => {
                             setIsAddingContent(true);
@@ -7479,7 +7479,7 @@ const CampaignDetailsPage = () => {
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-ink-warm-700">
                               {(() => {
                                 const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
                                 return totalImpressions === 1 ? 'Total Impression' : 'Total Impressions';
@@ -7488,7 +7488,7 @@ const CampaignDetailsPage = () => {
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="text-2xl font-bold text-gray-900">
+                          <div className="text-2xl font-bold text-ink-warm-900">
                             {(() => {
                               const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
                               return totalImpressions.toLocaleString();
@@ -7504,7 +7504,7 @@ const CampaignDetailsPage = () => {
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-ink-warm-700">
                               {(() => {
                                 const totalComments = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
                                 return totalComments === 1 ? 'Total Comment' : 'Total Comments';
@@ -7513,7 +7513,7 @@ const CampaignDetailsPage = () => {
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="text-2xl font-bold text-gray-900">
+                          <div className="text-2xl font-bold text-ink-warm-900">
                             {(() => {
                               const totalComments = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
                               return totalComments.toLocaleString();
@@ -7529,7 +7529,7 @@ const CampaignDetailsPage = () => {
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-ink-warm-700">
                               {(() => {
                                 const totalRetweets = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
                                 return totalRetweets === 1 ? 'Total Retweet' : 'Total Retweets';
@@ -7538,7 +7538,7 @@ const CampaignDetailsPage = () => {
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="text-2xl font-bold text-gray-900">
+                          <div className="text-2xl font-bold text-ink-warm-900">
                             {(() => {
                               const totalRetweets = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
                               return totalRetweets.toLocaleString();
@@ -7554,7 +7554,7 @@ const CampaignDetailsPage = () => {
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-ink-warm-700">
                               {(() => {
                                 const totalLikes = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
                                 return totalLikes === 1 ? 'Total Like' : 'Total Likes';
@@ -7563,7 +7563,7 @@ const CampaignDetailsPage = () => {
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="text-2xl font-bold text-gray-900">
+                          <div className="text-2xl font-bold text-ink-warm-900">
                             {(() => {
                               const totalLikes = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
                               return totalLikes.toLocaleString();
@@ -7579,7 +7579,7 @@ const CampaignDetailsPage = () => {
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-ink-warm-700">
                               {(() => {
                                 const totalEngagements = contents.reduce((sum, content) =>
                                   sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
@@ -7589,7 +7589,7 @@ const CampaignDetailsPage = () => {
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="text-2xl font-bold text-gray-900">
+                          <div className="text-2xl font-bold text-ink-warm-900">
                             {(() => {
                               const totalEngagements = contents.reduce((sum, content) =>
                                 sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
@@ -7606,7 +7606,7 @@ const CampaignDetailsPage = () => {
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
                               <BarChart3 className="h-6 w-6 text-white" />
                             </div>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-ink-warm-700">
                               {(() => {
                                 const totalBookmarks = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
                                 return totalBookmarks === 1 ? 'Total Bookmark' : 'Total Bookmarks';
@@ -7615,7 +7615,7 @@ const CampaignDetailsPage = () => {
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="text-2xl font-bold text-gray-900">
+                          <div className="text-2xl font-bold text-ink-warm-900">
                             {(() => {
                               const totalBookmarks = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
                               return totalBookmarks.toLocaleString();
@@ -7628,10 +7628,10 @@ const CampaignDetailsPage = () => {
                     {/* Average Engagement Rate */}
                     <Card className="hover:shadow-lg transition-shadow duration-200">
                       <CardHeader>
-                        <CardTitle className="text-lg font-semibold text-gray-900">Average Engagement Rate</CardTitle>
+                        <CardTitle className="text-lg font-semibold text-ink-warm-900">Average Engagement Rate</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-3xl font-bold text-gray-900">
+                        <div className="text-3xl font-bold text-ink-warm-900">
                           {(() => {
                             const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
                             const totalEngagements = contents.reduce((sum, content) =>
@@ -7640,17 +7640,17 @@ const CampaignDetailsPage = () => {
                             return `${engagementRate.toFixed(2)}%`;
                           })()}
                         </div>
-                        <p className="text-sm text-gray-600 mt-1">Engagement Rate = (Likes + Comments + Retweets + Bookmarks) / Impressions</p>
+                        <p className="text-sm text-ink-warm-700 mt-1">Engagement Rate = (Likes + Comments + Retweets + Bookmarks) / Impressions</p>
                       </CardContent>
                     </Card>
 
                     {/* Charts Section */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* Total Impressions */}
-                      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                      <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-xl font-bold text-gray-900">Total Impressions</h3>
+                            <h3 className="text-xl font-bold text-ink-warm-900">Total Impressions</h3>
                           </div>
                         </div>
                         <div className="h-96">
@@ -7722,10 +7722,10 @@ const CampaignDetailsPage = () => {
                       </div>
 
                       {/* Impressions by Platform */}
-                      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                      <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-xl font-bold text-gray-900">Impressions by Platform</h3>
+                            <h3 className="text-xl font-bold text-ink-warm-900">Impressions by Platform</h3>
                           </div>
                         </div>
                         <div className="h-96">
@@ -7823,7 +7823,7 @@ const CampaignDetailsPage = () => {
                   <>
                 <div className="flex items-center justify-between mb-2 gap-3">
                   <div className="relative flex-1 max-w-sm">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
                     <Input
                       placeholder="Search Contents by KOL, platform, or status..."
                       className="pl-10 focus-brand"
@@ -7833,7 +7833,7 @@ const CampaignDetailsPage = () => {
                   </div>
                   {/* Sort Menu */}
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-500">Sort by:</span>
+                    <span className="text-sm text-ink-warm-500">Sort by:</span>
                     <Select
                       value={contentSort.field}
                       onValueChange={(value: typeof contentSort.field) => setContentSort(prev => ({ ...prev, field: value }))}
@@ -7875,14 +7875,14 @@ const CampaignDetailsPage = () => {
                 </div>
                 {selectedContents.length > 0 && (
                 <div className="mb-6 mt-6">
-                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                  <div className="bg-white border border-cream-200 rounded-lg p-6 shadow-sm">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                        <span className="text-sm font-semibold text-gray-700">{selectedContents.length} Content{selectedContents.length !== 1 ? 's' : ''} selected</span>
+                        <div className="w-2 h-2 bg-cream-500 rounded-full"></div>
+                        <span className="text-sm font-semibold text-ink-warm-700">{selectedContents.length} Content{selectedContents.length !== 1 ? 's' : ''} selected</span>
                       </div>
-                      <div className="h-4 w-px bg-gray-300"></div>
-                      <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
+                      <div className="h-4 w-px bg-cream-300"></div>
+                      <span className="text-xs text-ink-warm-700 font-medium">Bulk Edit Fields</span>
                     </div>
                     <div className="flex flex-wrap items-end gap-4">
                       <div className="flex flex-col items-end justify-end">
@@ -7890,14 +7890,14 @@ const CampaignDetailsPage = () => {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                          className="text-ink-warm-700 border-cream-300 hover:bg-cream-50"
                           onClick={handleSelectAllContents}
                         >
                           {filteredContents.length > 0 && filteredContents.every(content => selectedContents.includes(content.id)) ? 'Deselect All' : 'Select All'}
                         </Button>
                       </div>
                       <div className="min-w-[120px] flex flex-col items-end justify-end">
-                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Platform</span>
+                        <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Platform</span>
                         <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                           <Select value={bulkContentPlatform} onValueChange={v => setBulkContentPlatform(v)}>
                             <SelectTrigger
@@ -7915,7 +7915,7 @@ const CampaignDetailsPage = () => {
                         </div>
                       </div>
                       <div className="min-w-[120px] flex flex-col items-end justify-end">
-                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Type</span>
+                        <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Type</span>
                         <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                           <Select value={bulkContentType} onValueChange={v => setBulkContentType(v)}>
                             <SelectTrigger
@@ -7933,7 +7933,7 @@ const CampaignDetailsPage = () => {
                         </div>
                       </div>
                       <div className="min-w-[120px] flex flex-col items-end justify-end">
-                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Status</span>
+                        <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Status</span>
                         <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                           <Select value={bulkContentStatus} onValueChange={v => setBulkContentStatus(v)}>
                             <SelectTrigger
@@ -7951,7 +7951,7 @@ const CampaignDetailsPage = () => {
                         </div>
                       </div>
                       <div className="min-w-[140px] flex flex-col items-end justify-end">
-                        <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Activation Date</span>
+                        <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Activation Date</span>
                         <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                           <Popover>
                             <PopoverTrigger asChild>
@@ -7997,7 +7997,7 @@ const CampaignDetailsPage = () => {
                           </Button>
                         </div>
                       </div>
-                      <div className="text-xs text-gray-500 font-medium ml-auto whitespace-nowrap">
+                      <div className="text-xs text-ink-warm-500 font-medium ml-auto whitespace-nowrap">
                         {selectedContents.length > 0 && `${selectedContents.length} item${selectedContents.length !== 1 ? 's' : ''} selected`}
                       </div>
                     </div>
@@ -8008,15 +8008,15 @@ const CampaignDetailsPage = () => {
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-gray-50 border-b border-gray-200">
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap">#</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">KOL</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Platform</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Type</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Status</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Activation Date</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content Link</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                        <TableRow className="bg-cream-50 border-b border-cream-200">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap">#</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-left select-none">KOL</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Platform</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Type</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Status</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Activation Date</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Content Link</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Impressions</span>
                               <Popover>
@@ -8027,7 +8027,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Impressions</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Impressions</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.impressions_operator}
@@ -8070,7 +8070,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Likes</span>
                               <Popover>
@@ -8081,7 +8081,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Likes</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Likes</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.likes_operator}
@@ -8124,7 +8124,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Retweets</span>
                               <Popover>
@@ -8135,7 +8135,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Retweets</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Retweets</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.retweets_operator}
@@ -8178,7 +8178,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Comments</span>
                               <Popover>
@@ -8189,7 +8189,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Comments</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Comments</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.comments_operator}
@@ -8232,7 +8232,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Bookmarks</span>
                               <Popover>
@@ -8243,7 +8243,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Bookmarks</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Bookmarks</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.bookmarks_operator}
@@ -8286,8 +8286,8 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none" style={{ minWidth: '150px' }}>Notes</TableHead>
-                          <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none" style={{ minWidth: '150px' }}>Notes</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 select-none">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -8302,25 +8302,25 @@ const CampaignDetailsPage = () => {
                     </Table>
                   </div>
                 ) : contents.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <div className="text-center py-8 text-ink-warm-500">
+                    <FileText className="h-12 w-12 mx-auto mb-4 text-ink-warm-300" />
                     <p className="text-lg font-medium mb-2">No content created yet</p>
-                    <p className="text-sm text-gray-400">Content created for this campaign will appear here.</p>
+                    <p className="text-sm text-ink-warm-400">Content created for this campaign will appear here.</p>
                   </div>
                 ) : (
                   <div ref={contentTableRef} className="border rounded-lg" style={{ overflow: 'auto', overflowX: 'auto', overflowY: 'auto' }}>
                     <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                       <TableHeader>
-                        <TableRow className="bg-gray-50 border-b border-gray-200">
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap group cursor-pointer hover:bg-gray-100 transition-colors px-4" style={{ minWidth: '60px', width: '60px' }} onClick={handleSelectAllContents}>
+                        <TableRow className="bg-cream-50 border-b border-cream-200">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap group cursor-pointer hover:bg-cream-100 transition-colors px-4" style={{ minWidth: '60px', width: '60px' }} onClick={handleSelectAllContents}>
                             <span className="group-hover:hidden">#</span>
                             <Checkbox
                               className="hidden group-hover:inline-flex"
                               checked={filteredContents.length > 0 && filteredContents.every(content => selectedContents.includes(content.id))}
                             />
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">KOL</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-left select-none">KOL</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Platform</span>
                               <Popover>
@@ -8331,11 +8331,11 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Platform</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Platform</div>
                                     {['X','Telegram','YouTube','Facebook','TikTok'].map((platform) => (
                                       <div
                                         key={platform}
-                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                         onClick={() => {
                                           const newPlatforms = contentFilters.platform.includes(platform)
                                             ? contentFilters.platform.filter(p => p !== platform)
@@ -8369,7 +8369,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Type</span>
                               <Popover>
@@ -8380,11 +8380,11 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Type</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Type</div>
                                     {['Video','Thread','Post','Story','Reel','Short'].map((type) => (
                                       <div
                                         key={type}
-                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                         onClick={() => {
                                           const newTypes = contentFilters.type.includes(type)
                                             ? contentFilters.type.filter(t => t !== type)
@@ -8416,7 +8416,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Status</span>
                               <Popover>
@@ -8427,11 +8427,11 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Status</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Status</div>
                                     {contentStatusOptions.map((option) => (
                                       <div
                                         key={option.value}
-                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                        className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                         onClick={() => {
                                           const newStatuses = contentFilters.status.includes(option.value)
                                             ? contentFilters.status.filter(s => s !== option.value)
@@ -8463,9 +8463,9 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Activation Date</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">Content Link</TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Activation Date</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Content Link</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Impressions</span>
                               <Popover>
@@ -8476,7 +8476,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Impressions</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Impressions</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.impressions_operator}
@@ -8519,7 +8519,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Likes</span>
                               <Popover>
@@ -8530,7 +8530,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Likes</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Likes</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.likes_operator}
@@ -8573,7 +8573,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Retweets</span>
                               <Popover>
@@ -8584,7 +8584,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Retweets</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Retweets</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.retweets_operator}
@@ -8627,7 +8627,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Comments</span>
                               <Popover>
@@ -8638,7 +8638,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Comments</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Comments</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.comments_operator}
@@ -8681,7 +8681,7 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                             <div className="flex items-center gap-1 cursor-pointer group">
                               <span>Bookmarks</span>
                               <Popover>
@@ -8692,7 +8692,7 @@ const CampaignDetailsPage = () => {
                                 </PopoverTrigger>
                                 <PopoverContent className="w-[200px] p-0" align="start">
                                   <div className="p-3">
-                                    <div className="text-xs font-semibold text-gray-600 mb-2">Filter Bookmarks</div>
+                                    <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Bookmarks</div>
                                     <div className="flex items-center gap-2 mb-2">
                                       <Select
                                         value={contentFilters.bookmarks_operator}
@@ -8735,18 +8735,18 @@ const CampaignDetailsPage = () => {
                               )}
                             </div>
                           </TableHead>
-                          <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none" style={{ minWidth: '150px' }}>Notes</TableHead>
-                          <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none" style={{ minWidth: '150px' }}>Notes</TableHead>
+                          <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 select-none">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody className="bg-white">
                         {filteredContents.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={14} className="text-center py-12">
-                              <div className="flex flex-col items-center justify-center text-gray-500">
-                                <FileText className="h-12 w-12 mb-4 text-gray-300" />
+                              <div className="flex flex-col items-center justify-center text-ink-warm-500">
+                                <FileText className="h-12 w-12 mb-4 text-ink-warm-300" />
                                 <p className="text-lg font-medium mb-2">No content matches your filters</p>
-                                <p className="text-sm text-gray-400 mb-4">Try adjusting your filter criteria</p>
+                                <p className="text-sm text-ink-warm-400 mb-4">Try adjusting your filter criteria</p>
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -8778,8 +8778,8 @@ const CampaignDetailsPage = () => {
                           filteredContents.map((content, index) => {
                           const kol = campaignKOLs.find(k => k.id === content.campaign_kols_id);
                           return (
-                            <TableRow key={content.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 px-4 py-2 overflow-hidden text-center text-gray-600 group`} style={{ verticalAlign: 'middle', minWidth: '60px', width: '60px' }}>
+                            <TableRow key={content.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-cream-100 transition-colors border-b border-cream-200`}>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 px-4 py-2 overflow-hidden text-center text-ink-warm-700 group`} style={{ verticalAlign: 'middle', minWidth: '60px', width: '60px' }}>
                                 <div className="flex items-center justify-center w-full h-full">
                                   {selectedContents.includes(content.id) ? (
                                     <Checkbox
@@ -8805,22 +8805,22 @@ const CampaignDetailsPage = () => {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-gray-600 group`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-ink-warm-700 group`} style={{ verticalAlign: 'middle', fontWeight: 'bold', width: '20%' }}>
                                 <div className="flex items-center w-full h-full">
                                   {renderEditableContentCell(content.campaign_kols_id, 'campaign_kols_id', content)}
                                 </div>
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                 {renderEditableContentCell(content.platform, 'platform', content)}
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                 {renderEditableContentCell(content.type, 'type', content)}
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                 {renderEditableContentCell(content.status, 'status', content)}
                               </TableCell>
                               <TableCell
-                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'activation_date')}
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'activation_date')}
                                 onClick={(e) => {
                                   // Don't select if clicking on input during edit
                                   if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'activation_date') {
@@ -8831,7 +8831,7 @@ const CampaignDetailsPage = () => {
                                 {renderEditableContentCell(content.activation_date, 'activation_date', content)}
                               </TableCell>
                               <TableCell
-                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'content_link')}
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'content_link')}
                                 onClick={(e) => {
                                   if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'content_link') {
                                     handleCellSelect('contents', content.id, 'content_link', content.content_link);
@@ -8841,7 +8841,7 @@ const CampaignDetailsPage = () => {
                                 {renderEditableContentCell(content.content_link, 'content_link', content)}
                               </TableCell>
                               <TableCell
-                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'impressions')}
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'impressions')}
                                 onClick={(e) => {
                                   if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'impressions') {
                                     handleCellSelect('contents', content.id, 'impressions', content.impressions);
@@ -8851,7 +8851,7 @@ const CampaignDetailsPage = () => {
                                 {renderEditableContentCell(content.impressions, 'impressions', content)}
                               </TableCell>
                               <TableCell
-                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'likes')}
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'likes')}
                                 onClick={(e) => {
                                   if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'likes') {
                                     handleCellSelect('contents', content.id, 'likes', content.likes);
@@ -8861,7 +8861,7 @@ const CampaignDetailsPage = () => {
                                 {renderEditableContentCell(content.likes, 'likes', content)}
                               </TableCell>
                               <TableCell
-                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'retweets')}
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'retweets')}
                                 onClick={(e) => {
                                   if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'retweets') {
                                     handleCellSelect('contents', content.id, 'retweets', content.retweets);
@@ -8871,7 +8871,7 @@ const CampaignDetailsPage = () => {
                                 {renderEditableContentCell(content.retweets, 'retweets', content)}
                               </TableCell>
                               <TableCell
-                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'comments')}
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'comments')}
                                 onClick={(e) => {
                                   if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'comments') {
                                     handleCellSelect('contents', content.id, 'comments', content.comments);
@@ -8881,7 +8881,7 @@ const CampaignDetailsPage = () => {
                                 {renderEditableContentCell(content.comments, 'comments', content)}
                               </TableCell>
                               <TableCell
-                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'bookmarks')}
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'bookmarks')}
                                 onClick={(e) => {
                                   if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'bookmarks') {
                                     handleCellSelect('contents', content.id, 'bookmarks', content.bookmarks);
@@ -8891,7 +8891,7 @@ const CampaignDetailsPage = () => {
                                 {renderEditableContentCell(content.bookmarks, 'bookmarks', content)}
                               </TableCell>
                               <TableCell
-                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'notes')}
+                                className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'contents', content.id, 'notes')}
                                 onClick={(e) => {
                                   if (editingContentCell?.contentId !== content.id || editingContentCell?.field !== 'notes') {
                                     handleCellSelect('contents', content.id, 'notes', content.notes);
@@ -8900,7 +8900,7 @@ const CampaignDetailsPage = () => {
                               >
                                 {renderEditableContentCell(content.notes, 'notes', content)}
                               </TableCell>
-                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
+                              <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                 <Button size="sm" variant="outline" onClick={() => { setContentToDelete(content); setShowDeleteDialog(true); }}>
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
@@ -8921,13 +8921,13 @@ const CampaignDetailsPage = () => {
 
           {/* Budget Tab */}
           <TabsContent value="payments" className="mt-4">
-            <div className="w-full bg-white border border-gray-200 shadow-sm p-6">
-              <CardHeader className="pb-6 border-b border-gray-100 flex flex-row items-center justify-between">
+            <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
+              <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="bg-gray-100 p-2 rounded-lg">
-                    <DollarSign className="h-6 w-6 text-gray-600" />
+                  <div className="bg-cream-100 p-2 rounded-lg">
+                    <DollarSign className="h-6 w-6 text-ink-warm-700" />
                   </div>
-                  <h2 className="text-2xl font-bold text-gray-900">Budget Management</h2>
+                  <h2 className="text-2xl font-bold text-ink-warm-900">Budget Management</h2>
                 </div>
                 <div className="flex items-center gap-3">
                   <Button
@@ -8945,10 +8945,10 @@ const CampaignDetailsPage = () => {
                         Record Payment
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden">
+                    <DialogContent className="max-w-6xl max-h-[85vh] flex flex-col">
                       <DialogHeader>
                         <DialogTitle>Record Payment(s)</DialogTitle>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="text-sm text-ink-warm-500 mt-1">
                           {paymentType === 'kol' ? 'Select one or more KOLs and enter payment details for each' : 'Record a non-KOL expense or payment'}
                         </p>
                       </DialogHeader>
@@ -8973,7 +8973,7 @@ const CampaignDetailsPage = () => {
                         </Button>
                       </div>
 
-                      <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
+                      <div className="grid gap-4 py-4 flex-1 overflow-y-auto px-1">
                         {paymentType === 'kol' ? (
                         <>
                         <div className="grid gap-2">
@@ -8982,7 +8982,7 @@ const CampaignDetailsPage = () => {
                             {campaignKOLs.map((kol) => (
                               <div
                                 key={kol.id}
-                                className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded"
+                                className="flex items-center space-x-3 p-2 hover:bg-cream-50 rounded"
                               >
                                 <Checkbox
                                   checked={selectedKOLsForPayment.includes(kol.id)}
@@ -9028,14 +9028,14 @@ const CampaignDetailsPage = () => {
                                 <span className="font-medium flex-1">
                                   {kol.master_kol.name}
                                   {latestCostMap.get(kol.master_kol?.id) != null && latestCostMap.get(kol.master_kol?.id)! > 0 && (
-                                    <span className="ml-2 text-xs text-gray-500">
+                                    <span className="ml-2 text-xs text-ink-warm-500">
                                       (Latest: ${latestCostMap.get(kol.master_kol?.id)?.toLocaleString()})
                                     </span>
                                   )}
                                 </span>
                                 {selectedKOLsForPayment.includes(kol.id) && (
                                   <div className="flex items-center gap-2">
-                                    <Label className="text-xs text-gray-600 whitespace-nowrap">Payments:</Label>
+                                    <Label className="text-xs text-ink-warm-700 whitespace-nowrap">Payments:</Label>
                                     <Input
                                       type="number"
                                       min="1"
@@ -9087,13 +9087,13 @@ const CampaignDetailsPage = () => {
                                 <div key={kolId} className="space-y-4">
                                   <div className="flex items-center gap-2 pb-2 border-b">
                                     <h4 className="font-semibold text-md text-brand">{kol.master_kol.name}</h4>
-                                    <span className="text-sm text-gray-500">({numberOfPayments} payment{numberOfPayments > 1 ? 's' : ''})</span>
+                                    <span className="text-sm text-ink-warm-500">({numberOfPayments} payment{numberOfPayments > 1 ? 's' : ''})</span>
                                   </div>
 
                                   {payments.map((payment, paymentIndex) => (
-                                    <div key={paymentIndex} className="border rounded-lg p-4 space-y-4 bg-gray-50">
+                                    <div key={paymentIndex} className="border rounded-lg p-4 space-y-4 bg-cream-50">
                                       {numberOfPayments > 1 && (
-                                        <div className="text-sm font-medium text-gray-700 border-b pb-2">
+                                        <div className="text-sm font-medium text-ink-warm-700 border-b pb-2">
                                           Payment {paymentIndex + 1} of {numberOfPayments}
                                         </div>
                                       )}
@@ -9102,7 +9102,7 @@ const CampaignDetailsPage = () => {
                                         <div className="grid gap-2">
                                           <Label>Amount (USD) <RequiredAsterisk /></Label>
                                       <div className="relative w-full">
-                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-warm-500 pointer-events-none">$</span>
                                         <Input
                                           type="text"
                                           inputMode="numeric"
@@ -9208,7 +9208,7 @@ const CampaignDetailsPage = () => {
                                             {(() => {
                                               const selectedIds = Array.isArray(payment.content_id) ? payment.content_id : (payment.content_id ? [payment.content_id] : []);
                                               if (selectedIds.length === 0) {
-                                                return <span className="text-gray-400">Select content</span>;
+                                                return <span className="text-ink-warm-400">Select content</span>;
                                               }
                                               const selectedContents = contents.filter(c => selectedIds.includes(c.id));
                                               return (
@@ -9291,7 +9291,7 @@ const CampaignDetailsPage = () => {
                             <div className="grid gap-2">
                               <Label>Amount (USD) <RequiredAsterisk /></Label>
                               <div className="relative w-full">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-warm-500 pointer-events-none">$</span>
                                 <Input
                                   type="text"
                                   inputMode="numeric"
@@ -9396,7 +9396,7 @@ const CampaignDetailsPage = () => {
                         </div>
                         )}
                       </div>
-                      <DialogFooter>
+                      <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
                         <Button variant="outline" onClick={() => {
                           setIsAddingPayment(false);
                           setSelectedKOLsForPayment([]);
@@ -9452,7 +9452,7 @@ const CampaignDetailsPage = () => {
                   <>
                     <div className="flex items-center gap-3 mb-2">
                       <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-ink-warm-400" />
                         <Input
                           placeholder="Search Payments by KOL, method, or notes..."
                           className="pl-10 focus-brand"
@@ -9477,14 +9477,14 @@ const CampaignDetailsPage = () => {
                     </div>
                 {selectedPayments.length > 0 && (
                 <div className="mb-6 mt-6">
-                  <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                  <div className="bg-white border border-cream-200 rounded-lg p-6 shadow-sm">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
-                      <span className="text-sm font-semibold text-gray-700">{selectedPayments.length} Payment{selectedPayments.length !== 1 ? 's' : ''} selected</span>
+                      <div className="w-2 h-2 bg-cream-500 rounded-full"></div>
+                      <span className="text-sm font-semibold text-ink-warm-700">{selectedPayments.length} Payment{selectedPayments.length !== 1 ? 's' : ''} selected</span>
                     </div>
-                    <div className="h-4 w-px bg-gray-300"></div>
-                    <span className="text-xs text-gray-600 font-medium">Bulk Edit Fields</span>
+                    <div className="h-4 w-px bg-cream-300"></div>
+                    <span className="text-xs text-ink-warm-700 font-medium">Bulk Edit Fields</span>
                   </div>
                   <div className="flex flex-wrap items-end gap-4">
                     <div className="flex flex-col items-end justify-end">
@@ -9492,7 +9492,7 @@ const CampaignDetailsPage = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                        className="text-ink-warm-700 border-cream-300 hover:bg-cream-50"
                         onClick={handleSelectAllPayments}
                       >
                         {(() => {
@@ -9512,7 +9512,7 @@ const CampaignDetailsPage = () => {
                       </Button>
                     </div>
                     <div className="min-w-[120px] flex flex-col items-end justify-end">
-                      <span className="text-xs text-gray-600 font-semibold mb-1 self-start">Payment Method</span>
+                      <span className="text-xs text-ink-warm-700 font-semibold mb-1 self-start">Payment Method</span>
                       <div className="w-full flex items-center h-7 min-h-[28px] justify-start">
                         <Select value={bulkPaymentMethod || ''} onValueChange={v => setBulkPaymentMethod(v)}>
                           <SelectTrigger
@@ -9553,7 +9553,7 @@ const CampaignDetailsPage = () => {
                         </Button>
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500 font-medium ml-auto whitespace-nowrap">
+                    <div className="text-xs text-ink-warm-500 font-medium ml-auto whitespace-nowrap">
                       {selectedPayments.length > 0 && `${selectedPayments.length} item${selectedPayments.length !== 1 ? 's' : ''} selected`}
                     </div>
                   </div>
@@ -9575,17 +9575,17 @@ const CampaignDetailsPage = () => {
                 ) : (
                   <div className="space-y-4">
                     {payments.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <DollarSign className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                      <div className="text-center py-8 text-ink-warm-500">
+                        <DollarSign className="h-12 w-12 mx-auto mb-4 text-ink-warm-300" />
                         <p className="text-lg font-medium mb-2">No payments recorded</p>
-                        <p className="text-sm text-gray-400">Payments recorded for this campaign will appear here.</p>
+                        <p className="text-sm text-ink-warm-400">Payments recorded for this campaign will appear here.</p>
                       </div>
                     ) : (
                       <div ref={paymentTableRef} className="border rounded-lg" style={{ overflow: 'auto', overflowX: 'auto', overflowY: 'auto' }}>
                         <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                           <TableHeader>
-                            <TableRow className="bg-gray-50 border-b border-gray-200">
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-center whitespace-nowrap group cursor-pointer hover:bg-gray-100 transition-colors" onClick={handleSelectAllPayments}>
+                            <TableRow className="bg-cream-50 border-b border-cream-200">
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap group cursor-pointer hover:bg-cream-100 transition-colors" onClick={handleSelectAllPayments}>
                                 <span className="group-hover:hidden">#</span>
                                 <Checkbox
                                   className="hidden group-hover:inline-flex"
@@ -9595,12 +9595,12 @@ const CampaignDetailsPage = () => {
                                   })()}
                                 />
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 text-left select-none">
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-left select-none">
                                 <div className="flex items-center gap-1 group">
                                   <button
                                     type="button"
                                     onClick={() => togglePaymentSort('kol')}
-                                    className="flex items-center gap-1 hover:text-gray-900"
+                                    className="flex items-center gap-1 hover:text-ink-warm-900"
                                     title="Sort by KOL name"
                                   >
                                     <span>KOL</span>
@@ -9620,12 +9620,12 @@ const CampaignDetailsPage = () => {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[250px] p-0" align="start">
                                       <div className="p-3">
-                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter KOL</div>
+                                        <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter KOL</div>
                                         <div className="max-h-48 overflow-y-auto space-y-1">
                                           {campaignKOLs.map((kol) => (
                                             <div
                                               key={kol.id}
-                                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                              className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                               onClick={() => {
                                                 const newKolIds = paymentFilters.kol_ids.includes(kol.id)
                                                   ? paymentFilters.kol_ids.filter(id => id !== kol.id)
@@ -9658,11 +9658,11 @@ const CampaignDetailsPage = () => {
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                                 <button
                                   type="button"
                                   onClick={() => togglePaymentSort('wallet')}
-                                  className="flex items-center gap-1 group hover:text-gray-900"
+                                  className="flex items-center gap-1 group hover:text-ink-warm-900"
                                   title="Sort by wallet address"
                                 >
                                   <span>Wallet</span>
@@ -9675,12 +9675,12 @@ const CampaignDetailsPage = () => {
                                   )}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                                 <div className="flex items-center gap-1 group">
                                   <button
                                     type="button"
                                     onClick={() => togglePaymentSort('amount')}
-                                    className="flex items-center gap-1 hover:text-gray-900"
+                                    className="flex items-center gap-1 hover:text-ink-warm-900"
                                     title="Sort by amount"
                                   >
                                     <span>Amount</span>
@@ -9700,7 +9700,7 @@ const CampaignDetailsPage = () => {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[200px] p-0" align="start">
                                       <div className="p-3">
-                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Amount (USD)</div>
+                                        <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Amount (USD)</div>
                                         <div className="flex items-center gap-2 mb-2">
                                           <Select
                                             value={paymentFilters.amount_operator}
@@ -9743,11 +9743,11 @@ const CampaignDetailsPage = () => {
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                                 <button
                                   type="button"
                                   onClick={() => togglePaymentSort('date')}
-                                  className="flex items-center gap-1 group hover:text-gray-900"
+                                  className="flex items-center gap-1 group hover:text-ink-warm-900"
                                   title="Sort by payment date (unpaid rows sort last)"
                                 >
                                   <span>Payment Date</span>
@@ -9760,12 +9760,12 @@ const CampaignDetailsPage = () => {
                                   )}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                                 <div className="flex items-center gap-1 group">
                                   <button
                                     type="button"
                                     onClick={() => togglePaymentSort('method')}
-                                    className="flex items-center gap-1 hover:text-gray-900"
+                                    className="flex items-center gap-1 hover:text-ink-warm-900"
                                     title="Sort by payment method"
                                   >
                                     <span>Method</span>
@@ -9785,11 +9785,11 @@ const CampaignDetailsPage = () => {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[200px] p-0" align="start">
                                       <div className="p-3">
-                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Method</div>
+                                        <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Method</div>
                                         {['Token', 'Fiat', 'WL'].map((method) => (
                                           <div
                                             key={method}
-                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                            className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                             onClick={() => {
                                               const newMethods = paymentFilters.payment_methods.includes(method)
                                                 ? paymentFilters.payment_methods.filter(m => m !== method)
@@ -9821,12 +9821,12 @@ const CampaignDetailsPage = () => {
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                                 <div className="flex items-center gap-1 group">
                                   <button
                                     type="button"
                                     onClick={() => togglePaymentSort('content')}
-                                    className="flex items-center gap-1 hover:text-gray-900"
+                                    className="flex items-center gap-1 hover:text-ink-warm-900"
                                     title="Sort by linked content count"
                                   >
                                     <span>Content</span>
@@ -9846,9 +9846,9 @@ const CampaignDetailsPage = () => {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-[200px] p-0" align="start">
                                       <div className="p-3">
-                                        <div className="text-xs font-semibold text-gray-600 mb-2">Filter Content</div>
+                                        <div className="text-xs font-semibold text-ink-warm-700 mb-2">Filter Content</div>
                                         <div
-                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                           onClick={() => {
                                             setPaymentFilters(prev => ({
                                               ...prev,
@@ -9860,7 +9860,7 @@ const CampaignDetailsPage = () => {
                                           <span className="text-sm">Has content linked</span>
                                         </div>
                                         <div
-                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-gray-100 cursor-pointer"
+                                          className="flex items-center space-x-2 py-1.5 px-2 rounded hover:bg-cream-100 cursor-pointer"
                                           onClick={() => {
                                             setPaymentFilters(prev => ({
                                               ...prev,
@@ -9891,11 +9891,11 @@ const CampaignDetailsPage = () => {
                                   )}
                                 </div>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 border-r border-gray-200 select-none">
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">
                                 <button
                                   type="button"
                                   onClick={() => togglePaymentSort('notes')}
-                                  className="flex items-center gap-1 group hover:text-gray-900"
+                                  className="flex items-center gap-1 group hover:text-ink-warm-900"
                                   title="Sort by notes"
                                 >
                                   <span>Notes</span>
@@ -9908,13 +9908,13 @@ const CampaignDetailsPage = () => {
                                   )}
                                 </button>
                               </TableHead>
-                              <TableHead className="relative bg-gray-50 select-none">Actions</TableHead>
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 select-none">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody className="bg-white">
                             {getFilteredPayments().map((payment, index) => (
-                              <TableRow key={payment.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-gray-100 transition-colors border-b border-gray-200`}>
-                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-center text-gray-600 group`} style={{ verticalAlign: 'middle' }}>
+                              <TableRow key={payment.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-cream-100 transition-colors border-b border-cream-200`}>
+                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-center text-ink-warm-700 group`} style={{ verticalAlign: 'middle' }}>
                                   <div className="flex items-center justify-center w-full h-full">
                                     {selectedPayments.includes(payment.id) ? (
                                       <Checkbox
@@ -9941,7 +9941,7 @@ const CampaignDetailsPage = () => {
                                   </div>
                                 </TableCell>
                                 <TableCell
-                                  className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden text-gray-600 cursor-pointer`, 'payments', payment.id, 'kol_name')}
+                                  className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-ink-warm-700 cursor-pointer`, 'payments', payment.id, 'kol_name')}
                                   style={{ verticalAlign: 'middle', fontWeight: 'bold' }}
                                   onClick={() => {
                                     const displayName = payment.campaign_kol_id
@@ -9986,7 +9986,7 @@ const CampaignDetailsPage = () => {
                                   </div>
                                 </TableCell>
                                 <TableCell
-                                  className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`}
+                                  className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`}
                                   onClick={() => {
                                     if (payment.campaign_kol_id) {
                                       // For KOL payments - edit master KOL wallet
@@ -10028,7 +10028,7 @@ const CampaignDetailsPage = () => {
                                     ) : (
                                       <div className="flex items-center gap-1">
                                         <div className="truncate flex-1" title={campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet ?? undefined}>
-                                          {campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet || <span className="text-gray-400 italic">No wallet</span>}
+                                          {campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet || <span className="text-ink-warm-400 italic">No wallet</span>}
                                         </div>
                                         {campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.wallet && (
                                           <button
@@ -10040,10 +10040,10 @@ const CampaignDetailsPage = () => {
                                                 toast({ title: 'Copied', description: 'Wallet address copied to clipboard' });
                                               }
                                             }}
-                                            className="p-1 hover:bg-gray-200 rounded flex-shrink-0"
+                                            className="p-1 hover:bg-cream-200 rounded flex-shrink-0"
                                             title="Copy wallet address"
                                           >
-                                            <Copy className="h-3 w-3 text-gray-500" />
+                                            <Copy className="h-3 w-3 text-ink-warm-500" />
                                           </button>
                                         )}
                                       </div>
@@ -10067,7 +10067,7 @@ const CampaignDetailsPage = () => {
                                     ) : (
                                       <div className="flex items-center gap-1">
                                         <div className="truncate flex-1" title={payment.wallet ?? undefined}>
-                                          {payment.wallet || <span className="text-gray-400 italic">No wallet</span>}
+                                          {payment.wallet || <span className="text-ink-warm-400 italic">No wallet</span>}
                                         </div>
                                         {payment.wallet && (
                                           <button
@@ -10076,10 +10076,10 @@ const CampaignDetailsPage = () => {
                                               navigator.clipboard.writeText(payment.wallet!);
                                               toast({ title: 'Copied', description: 'Wallet address copied to clipboard' });
                                             }}
-                                            className="p-1 hover:bg-gray-200 rounded flex-shrink-0"
+                                            className="p-1 hover:bg-cream-200 rounded flex-shrink-0"
                                             title="Copy wallet address"
                                           >
-                                            <Copy className="h-3 w-3 text-gray-500" />
+                                            <Copy className="h-3 w-3 text-ink-warm-500" />
                                           </button>
                                         )}
                                       </div>
@@ -10087,7 +10087,7 @@ const CampaignDetailsPage = () => {
                                   )}
                                 </TableCell>
                                 <TableCell
-                                  className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'payments', payment.id, 'amount')}
+                                  className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'payments', payment.id, 'amount')}
                                   onClick={() => {
                                     if (editingPaymentCell?.paymentId !== payment.id || editingPaymentCell?.field !== 'amount') {
                                       handleCellSelect('payments', payment.id, 'amount', payment.amount);
@@ -10097,7 +10097,7 @@ const CampaignDetailsPage = () => {
                                   {renderEditablePaymentCell(payment.amount, 'amount', payment)}
                                 </TableCell>
                                 <TableCell
-                                  className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'payments', payment.id, 'payment_date')}
+                                  className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'payments', payment.id, 'payment_date')}
                                   onClick={() => {
                                     if (editingPaymentCell?.paymentId !== payment.id || editingPaymentCell?.field !== 'payment_date') {
                                       handleCellSelect('payments', payment.id, 'payment_date', payment.payment_date);
@@ -10106,10 +10106,10 @@ const CampaignDetailsPage = () => {
                                 >
                                   {renderEditablePaymentCell(payment.payment_date, 'payment_date', payment)}
                                 </TableCell>
-                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                   {renderEditablePaymentCell(payment.payment_method, 'payment_method', payment)}
                                 </TableCell>
-                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden`}>
+                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden`}>
                                   {payment.campaign_kol_id ? (
                                   <MultiSelect
                                     options={contents
@@ -10147,7 +10147,7 @@ const CampaignDetailsPage = () => {
                                         {(() => {
                                           const contentIds = Array.isArray(payment.content_id) ? payment.content_id : (payment.content_id ? [payment.content_id] : []);
                                           if (contentIds.length === 0) {
-                                            return <span className="text-gray-400 italic">No content linked</span>;
+                                            return <span className="text-ink-warm-400 italic">No content linked</span>;
                                           }
                                           if (contentIds.length === 1) {
                                             const content = contents.find(c => c.id === contentIds[0]);
@@ -10166,11 +10166,11 @@ const CampaignDetailsPage = () => {
                                     }}
                                   />
                                   ) : (
-                                    <span className="text-gray-400 italic">N/A</span>
+                                    <span className="text-ink-warm-400 italic">N/A</span>
                                   )}
                                 </TableCell>
                                 <TableCell
-                                  className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-r border-gray-200 p-2 overflow-hidden cursor-pointer`, 'payments', payment.id, 'notes')}
+                                  className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden cursor-pointer`, 'payments', payment.id, 'notes')}
                                   onClick={() => {
                                     if (editingPaymentCell?.paymentId !== payment.id || editingPaymentCell?.field !== 'notes') {
                                       handleCellSelect('payments', payment.id, 'notes', payment.notes);
@@ -10179,7 +10179,7 @@ const CampaignDetailsPage = () => {
                                 >
                                   {renderEditablePaymentCell(payment.notes, 'notes', payment)}
                                 </TableCell>
-                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'} p-2 overflow-hidden`}>
+                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} p-2 overflow-hidden`}>
                                   <div className="flex items-center gap-2">
                                     <Button size="sm" variant="outline" onClick={() => handleEditPayment(payment)}>
                                       <Edit className="h-3 w-3" />
@@ -10205,15 +10205,15 @@ const CampaignDetailsPage = () => {
                   <div className="space-y-8">
                     {/* Budget Overview Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-200">
+                      <div className="bg-gradient-to-br from-cream-50 to-cream-100 p-6 rounded-xl border border-cream-100 shadow-sm hover:shadow-md transition-shadow duration-200">
                         <div className="flex items-center justify-between mb-3">
-                          <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total Budget</div>
-                          <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+                          <div className="text-sm font-semibold text-ink-warm-700 uppercase tracking-wide">Total Budget</div>
+                          <div className="w-3 h-3 rounded-full bg-cream-300"></div>
                         </div>
-                        <div className="text-3xl font-bold text-gray-900 mb-1">
+                        <div className="text-3xl font-bold text-ink-warm-900 mb-1">
                           {CampaignService.formatCurrency(campaign.total_budget)}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-ink-warm-500">
                           {campaign.budget_allocations && campaign.budget_allocations.length > 0 
                             ? `${campaign.budget_allocations.length} regions allocated`
                             : 'Campaign allocation'
@@ -10228,7 +10228,7 @@ const CampaignDetailsPage = () => {
                         <div className="text-3xl font-bold text-blue-900 mb-1">
                           {CampaignService.formatCurrency(payments.reduce((sum, payment) => sum + (payment.amount || 0), 0))}
                         </div>
-                        <div className="text-xs text-blue-600">
+                        <div className="text-xs text-brand">
                           {((payments.reduce((sum, payment) => sum + (payment.amount || 0), 0) / campaign.total_budget) * 100).toFixed(1)}% of total budget
                         </div>
                       </div>
@@ -10248,8 +10248,8 @@ const CampaignDetailsPage = () => {
 
                     {/* Regional Budget Summary */}
                     {campaign.budget_allocations && campaign.budget_allocations.length > 0 && (
-                      <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Regional Budget Summary</h3>
+                      <div className="bg-white p-6 rounded-xl border border-cream-100 shadow-sm">
+                        <h3 className="text-lg font-semibold text-ink-warm-900 mb-4">Regional Budget Summary</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {campaign.budget_allocations.map((alloc: any) => {
                             // Helper function to map regions to APAC/Global
@@ -10277,29 +10277,29 @@ const CampaignDetailsPage = () => {
                             const utilization = (actualPayments / alloc.allocated_budget) * 100;
                             
                             return (
-                              <div key={alloc.region} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                              <div key={alloc.region} className="bg-cream-50 p-4 rounded-lg border border-cream-200">
                                 <div className="flex items-center justify-between mb-2">
-                                  <div className="text-sm font-semibold text-gray-700">
+                                  <div className="text-sm font-semibold text-ink-warm-700">
                                     {alloc.region === 'apac' ? 'APAC' : alloc.region === 'global' ? 'Global' : alloc.region}
                                   </div>
-                                  <div className="text-xs text-gray-500">{utilization.toFixed(1)}% used</div>
+                                  <div className="text-xs text-ink-warm-500">{utilization.toFixed(1)}% used</div>
                                 </div>
                                 <div className="space-y-1">
                                   <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Regional Budget:</span>
+                                    <span className="text-ink-warm-700">Regional Budget:</span>
                                     <span className="font-medium">{CampaignService.formatCurrency(alloc.allocated_budget)}</span>
                                   </div>
                                   <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Actual Payments:</span>
-                                    <span className="font-medium text-blue-600">{CampaignService.formatCurrency(actualPayments)}</span>
+                                    <span className="text-ink-warm-700">Actual Payments:</span>
+                                    <span className="font-medium text-brand">{CampaignService.formatCurrency(actualPayments)}</span>
                                   </div>
                                   <div className="flex justify-between text-xs">
-                                    <span className="text-gray-600">Remaining:</span>
+                                    <span className="text-ink-warm-700">Remaining:</span>
                                     <span className="font-medium text-emerald-600">{CampaignService.formatCurrency(remaining)}</span>
                                   </div>
                                 </div>
                                 <div className="mt-3">
-                                  <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div className="w-full bg-cream-200 rounded-full h-2">
                                     <div 
                                       className="bg-brand h-2 rounded-full transition-all duration-300" 
                                       style={{ width: `${Math.min(utilization, 100)}%` }}
@@ -10314,24 +10314,24 @@ const CampaignDetailsPage = () => {
                     )}
 
                     {/* Budget Overview Chart */}
-                    <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                    <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                       <div className="flex items-center justify-between mb-6">
                         <div>
-                          <h3 className="text-xl font-bold text-gray-900">Budget Overview</h3>
-                          <p className="text-sm text-gray-500 mt-1">Comparison of total budget vs actual payments</p>
+                          <h3 className="text-xl font-bold text-ink-warm-900">Budget Overview</h3>
+                          <p className="text-sm text-ink-warm-500 mt-1">Comparison of total budget vs actual payments</p>
                         </div>
                         <div className="flex items-center space-x-4 text-xs">
                           <div className="flex items-center space-x-2">
-                            <div className="w-3 h-3 rounded bg-gray-400"></div>
-                            <span className="text-gray-600 font-medium">Total</span>
+                            <div className="w-3 h-3 rounded bg-cream-300"></div>
+                            <span className="text-ink-warm-700 font-medium">Total</span>
                           </div>
                           <div className="flex items-center space-x-2">
                             <div className="w-3 h-3 rounded bg-brand"></div>
-                            <span className="text-gray-600 font-medium">Payments</span>
+                            <span className="text-ink-warm-700 font-medium">Payments</span>
                           </div>
                           <div className="flex items-center space-x-2">
                             <div className="w-3 h-3 rounded bg-emerald-500"></div>
-                            <span className="text-gray-600 font-medium">Remaining</span>
+                            <span className="text-ink-warm-700 font-medium">Remaining</span>
                           </div>
                         </div>
                       </div>
@@ -10386,24 +10386,24 @@ const CampaignDetailsPage = () => {
 
                     {/* Regional Budget Allocation */}
                     {campaign.budget_allocations && campaign.budget_allocations.length > 0 && (
-                      <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                      <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-xl font-bold text-gray-900">Regional Budget Allocation</h3>
-                            <p className="text-sm text-gray-500 mt-1">Budget distribution across regions</p>
+                            <h3 className="text-xl font-bold text-ink-warm-900">Regional Budget Allocation</h3>
+                            <p className="text-sm text-ink-warm-500 mt-1">Budget distribution across regions</p>
                           </div>
                           <div className="flex items-center space-x-4 text-xs">
                             <div className="flex items-center space-x-2">
-                              <div className="w-3 h-3 rounded bg-gray-400"></div>
-                              <span className="text-gray-600 font-medium">Regional Budget</span>
+                              <div className="w-3 h-3 rounded bg-cream-300"></div>
+                              <span className="text-ink-warm-700 font-medium">Regional Budget</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <div className="w-3 h-3 rounded bg-brand"></div>
-                              <span className="text-gray-600 font-medium">Payments Made</span>
+                              <span className="text-ink-warm-700 font-medium">Payments Made</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <div className="w-3 h-3 rounded bg-emerald-500"></div>
-                              <span className="text-gray-600 font-medium">Remaining</span>
+                              <span className="text-ink-warm-700 font-medium">Remaining</span>
                             </div>
                           </div>
                         </div>
@@ -10494,24 +10494,24 @@ const CampaignDetailsPage = () => {
                     {payments.length > 0 && (
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Payment Methods Distribution */}
-                        <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                        <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                           <div className="flex items-center justify-between mb-6">
                             <div>
-                              <h3 className="text-xl font-bold text-gray-900">Payment Methods Distribution</h3>
-                              <p className="text-sm text-gray-500 mt-1">Breakdown of payments by method</p>
+                              <h3 className="text-xl font-bold text-ink-warm-900">Payment Methods Distribution</h3>
+                              <p className="text-sm text-ink-warm-500 mt-1">Breakdown of payments by method</p>
                             </div>
                             <div className="flex items-center space-x-4 text-xs">
                               <div className="flex items-center space-x-2">
                                 <div className="w-3 h-3 rounded bg-[#8b5cf6]"></div>
-                                <span className="text-gray-600 font-medium">Token</span>
+                                <span className="text-ink-warm-700 font-medium">Token</span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <div className="w-3 h-3 rounded bg-[#f59e0b]"></div>
-                                <span className="text-gray-600 font-medium">Fiat</span>
+                                <span className="text-ink-warm-700 font-medium">Fiat</span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <div className="w-3 h-3 rounded bg-[#10b981]"></div>
-                                <span className="text-gray-600 font-medium">WL</span>
+                                <span className="text-ink-warm-700 font-medium">WL</span>
                               </div>
                             </div>
                           </div>
@@ -10600,24 +10600,24 @@ const CampaignDetailsPage = () => {
                         </div>
 
                         {/* Payment Timeline Chart */}
-                        <div className="bg-white p-8 rounded-xl border border-gray-100 shadow-sm">
+                        <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
                           <div className="flex items-center justify-between mb-6">
                             <div>
-                              <h3 className="text-xl font-bold text-gray-900">Payment Timeline</h3>
-                              <p className="text-sm text-gray-500 mt-1">Payment amounts over time by method</p>
+                              <h3 className="text-xl font-bold text-ink-warm-900">Payment Timeline</h3>
+                              <p className="text-sm text-ink-warm-500 mt-1">Payment amounts over time by method</p>
                             </div>
                             <div className="flex items-center space-x-4 text-xs">
                               <div className="flex items-center space-x-2">
                                 <div className="w-3 h-3 rounded bg-[#8b5cf6]"></div>
-                                <span className="text-gray-600 font-medium">Token</span>
+                                <span className="text-ink-warm-700 font-medium">Token</span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <div className="w-3 h-3 rounded bg-[#f59e0b]"></div>
-                                <span className="text-gray-600 font-medium">Fiat</span>
+                                <span className="text-ink-warm-700 font-medium">Fiat</span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <div className="w-3 h-3 rounded bg-[#10b981]"></div>
-                                <span className="text-gray-600 font-medium">WL</span>
+                                <span className="text-ink-warm-700 font-medium">WL</span>
                               </div>
                             </div>
                           </div>
@@ -10721,7 +10721,7 @@ const CampaignDetailsPage = () => {
       {/* Sticky Horizontal Scrollbar */}
       {stickyScrollbar && (
         <div
-          className="fixed bottom-4 bg-white border border-gray-200 shadow-lg z-40 flex items-center rounded-lg transition-opacity duration-300"
+          className="fixed bottom-4 bg-white border border-cream-200 shadow-lg z-40 flex items-center rounded-lg transition-opacity duration-300"
           style={{
             height: '32px',
             opacity: stickyScrollbar.opacity,
@@ -10772,7 +10772,7 @@ const CampaignDetailsPage = () => {
             }) : [];
             return (
               <>
-                <div className="text-sm text-gray-600 mt-2 mb-2">Are you sure you want to delete this content?</div>
+                <div className="text-sm text-ink-warm-700 mt-2 mb-2">Are you sure you want to delete this content?</div>
                 {linkedPayments.length > 0 && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
                     <p className="font-medium text-amber-800 flex items-center gap-1.5">
@@ -10787,7 +10787,7 @@ const CampaignDetailsPage = () => {
               </>
             );
           })()}
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
             <Button variant="destructive" onClick={async () => {
               setShowDeleteDialog(false);
@@ -10837,8 +10837,8 @@ const CampaignDetailsPage = () => {
           <DialogHeader>
             <DialogTitle>Confirm Delete</DialogTitle>
           </DialogHeader>
-          <div className="text-sm text-gray-600 mt-2 mb-2">Are you sure you want to delete this payment?</div>
-          <DialogFooter>
+          <div className="text-sm text-ink-warm-700 mt-2 mb-2">Are you sure you want to delete this payment?</div>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setShowPaymentDeleteDialog(false)}>Cancel</Button>
             <Button variant="destructive" onClick={async () => {
               setShowPaymentDeleteDialog(false);
@@ -10872,10 +10872,10 @@ const CampaignDetailsPage = () => {
           <DialogHeader>
             <DialogTitle>Confirm Delete</DialogTitle>
           </DialogHeader>
-          <div className="text-sm text-gray-600 mt-2 mb-2">
+          <div className="text-sm text-ink-warm-700 mt-2 mb-2">
             Are you sure you want to delete {kolsToDelete.length} KOL{kolsToDelete.length !== 1 ? 's' : ''}?
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setShowKOLDeleteDialog(false)}>Cancel</Button>
             <Button variant="destructive" onClick={async () => {
               setShowKOLDeleteDialog(false);
@@ -10918,7 +10918,7 @@ const CampaignDetailsPage = () => {
             });
             return (
               <>
-                <div className="text-sm text-gray-600 mt-2 mb-2">Are you sure you want to delete {selectedContents.length} content item{selectedContents.length !== 1 ? 's' : ''}?</div>
+                <div className="text-sm text-ink-warm-700 mt-2 mb-2">Are you sure you want to delete {selectedContents.length} content item{selectedContents.length !== 1 ? 's' : ''}?</div>
                 {linkedPayments.length > 0 && (
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
                     <p className="font-medium text-amber-800 flex items-center gap-1.5">
@@ -10933,7 +10933,7 @@ const CampaignDetailsPage = () => {
               </>
             );
           })()}
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)}>Cancel</Button>
             <Button variant="destructive" onClick={async () => {
               setShowBulkDeleteDialog(false);
@@ -10999,7 +10999,7 @@ const CampaignDetailsPage = () => {
               </div>
             );
           })()}
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setShowBulkDeletePaymentsDialog(false)}>
               Cancel
             </Button>
@@ -11018,11 +11018,11 @@ const CampaignDetailsPage = () => {
 
       {/* Edit Payment Dialog */}
       <Dialog open={isEditingPayment} onOpenChange={setIsEditingPayment}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
+        <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Edit Payment</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-3 pb-6">
+          <div className="grid gap-4 py-4 flex-1 overflow-y-auto px-1">
             <div className="grid gap-2">
               <Label htmlFor="edit-kol">KOL</Label>
               <Select
@@ -11044,7 +11044,7 @@ const CampaignDetailsPage = () => {
             <div className="grid gap-2">
               <Label htmlFor="edit-amount">Amount (USD)</Label>
               <div className="relative w-full">
-                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-warm-500 pointer-events-none">$</span>
                 <Input
                   id="edit-amount"
                   type="text"
@@ -11126,7 +11126,7 @@ const CampaignDetailsPage = () => {
                     {(() => {
                       const selectedIds = Array.isArray(newPaymentData.content_id) ? newPaymentData.content_id : (newPaymentData.content_id && newPaymentData.content_id !== 'none' ? [newPaymentData.content_id] : []);
                       if (selectedIds.length === 0) {
-                        return <span className="text-gray-400">Select content</span>;
+                        return <span className="text-ink-warm-400">Select content</span>;
                       }
                       const selectedContents = contents.filter(c => selectedIds.includes(c.id));
                       return (
@@ -11166,7 +11166,7 @@ const CampaignDetailsPage = () => {
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsEditingPayment(false)}>
               Cancel
             </Button>
@@ -11189,7 +11189,7 @@ const CampaignDetailsPage = () => {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Campaign Details</Label>
-              <div className="bg-gray-50 rounded-lg p-3 text-sm">
+              <div className="bg-cream-50 rounded-lg p-3 text-sm">
                 <div className="flex justify-between mb-2">
                   <span className="font-medium">Client:</span>
                   <span>{campaign?.client_name || 'Unknown'}</span>
@@ -11215,7 +11215,7 @@ const CampaignDetailsPage = () => {
                   <span className="text-sm font-medium text-blue-900">Client Email:</span>
                   <span className="text-sm font-mono text-blue-700">{campaign?.client_email || 'N/A'}</span>
                 </div>
-                <p className="text-xs text-blue-600 mt-2">Use the client's email address as the password to access the public campaign view</p>
+                <p className="text-xs text-brand mt-2">Use the client's email address as the password to access the public campaign view</p>
               </div>
             </div>
             <div className="space-y-3">
@@ -11348,14 +11348,14 @@ const CampaignDetailsPage = () => {
                   setActiveTab(item.tab);
                   setIsWarningsOpen(false);
                 }}
-                className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-amber-500 hover:bg-amber-50 transition-colors group"
+                className="w-full text-left p-3 rounded-lg border border-cream-200 hover:border-amber-500 hover:bg-amber-50 transition-colors group"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <AlertTriangle className="h-4 w-4 text-amber-500" />
                     <div>
-                      <p className="font-medium text-gray-900 group-hover:text-amber-700">{item.label}</p>
-                      <p className="text-sm text-gray-500 capitalize">
+                      <p className="font-medium text-ink-warm-900 group-hover:text-amber-700">{item.label}</p>
+                      <p className="text-sm text-ink-warm-500 capitalize">
                         {item.tab === 'information' ? 'Information' :
                          item.tab === 'kols' ? 'KOL Dashboard' :
                          item.tab === 'contents' ? 'Content Dashboard' :
@@ -11364,7 +11364,7 @@ const CampaignDetailsPage = () => {
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-amber-500" />
+                  <ChevronRight className="h-4 w-4 text-ink-warm-400 group-hover:text-amber-500" />
                 </div>
               </button>
             ))}
@@ -11374,7 +11374,7 @@ const CampaignDetailsPage = () => {
 
       {/* Email Views Dialog */}
       <Dialog open={isEmailViewsDialogOpen} onOpenChange={setIsEmailViewsDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden">
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5" />
@@ -11390,24 +11390,24 @@ const CampaignDetailsPage = () => {
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand"></div>
               </div>
             ) : emailViews.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <Eye className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+              <div className="text-center py-8 text-ink-warm-500">
+                <Eye className="h-12 w-12 mx-auto mb-4 text-ink-warm-300" />
                 <p>No email views recorded yet.</p>
                 <p className="text-sm mt-2">Views will appear here when users access the campaign via the public link.</p>
               </div>
             ) : (
               <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                <div className="text-sm text-gray-500 mb-3">
+                <div className="text-sm text-ink-warm-500 mb-3">
                   {emailViews.length} view{emailViews.length !== 1 ? 's' : ''} recorded
                 </div>
                 {emailViews.map((view) => (
                   <div
                     key={view.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    className="flex items-center justify-between p-3 bg-cream-50 rounded-lg hover:bg-cream-100 transition-colors"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{view.email}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="font-medium text-ink-warm-900 truncate">{view.email}</p>
+                      <p className="text-xs text-ink-warm-500">
                         {new Date(view.viewed_at).toLocaleString('en-US', {
                           year: 'numeric',
                           month: 'short',
@@ -11422,7 +11422,7 @@ const CampaignDetailsPage = () => {
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => setIsEmailViewsDialogOpen(false)}>
               Close
             </Button>
@@ -11440,9 +11440,9 @@ const CampaignDetailsPage = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <div className="bg-gray-50 rounded-lg p-4 space-y-2 overflow-hidden">
+            <div className="bg-cream-50 rounded-lg p-4 space-y-2 overflow-hidden">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600">{isEditingPaymentMessage ? 'Edit message:' : 'Message preview:'}</p>
+                <p className="text-sm text-ink-warm-700">{isEditingPaymentMessage ? 'Edit message:' : 'Message preview:'}</p>
                 {!isEditingPaymentMessage && (
                   <button
                     type="button"
@@ -11462,13 +11462,13 @@ const CampaignDetailsPage = () => {
                   autoFocus
                 />
               ) : (
-                <p className="font-medium text-gray-900 break-words whitespace-pre-line">
+                <p className="font-medium text-ink-warm-900 break-words whitespace-pre-line">
                   {paymentNotificationMessage}
                 </p>
               )}
             </div>
             {pendingPaymentNotification?.chatTitle && (
-              <p className="text-xs text-gray-500 mt-2 break-words">
+              <p className="text-xs text-ink-warm-500 mt-2 break-words">
                 Will be sent to: {pendingPaymentNotification.chatTitle}
               </p>
             )}
@@ -11801,7 +11801,7 @@ const CampaignDetailsPage = () => {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
             <Button variant="outline" onClick={() => { setEditingMasterKol(null); setMasterKolForm({}); }}>
               Cancel
             </Button>
