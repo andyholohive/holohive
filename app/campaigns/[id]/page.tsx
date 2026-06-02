@@ -22,7 +22,11 @@ import {
   BRAND_HEX,
   BRAND_DARK_HEX,
   formatDateLocal,
+  formatDateForInput,
+  formatDateLong as formatDate,
   formatDisplayDate,
+  displayRegion,
+  parseDate,
   getRegionIcon,
   getPlatformIcon,
   getContentTypeColor,
@@ -1168,11 +1172,9 @@ const CampaignDetailsPage = () => {
     }
   };
 
-  // Add local utility functions
-  const formatDate = (dateString: string | undefined | null, fallback: string = "TBD") => {
-    if (!dateString) return fallback;
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
+  // `formatDate` now imported from `@/lib/campaignHelpers` (aliased
+  // from `formatDateLong` to keep the existing 8 callsites working
+  // unchanged).
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "Active":
@@ -1272,27 +1274,8 @@ const CampaignDetailsPage = () => {
     }
   };
 
-  // Helper for parsing and formatting date strings for input/calendar
-  const parseDate = (dateString: string | undefined | null) => {
-    if (!dateString) return undefined;
-    // Accepts YYYY-MM-DD or ISO string
-    const d = new Date(dateString);
-    return isNaN(d.getTime()) ? undefined : d;
-  };
-  const formatDateForInput = (date: Date | undefined) => {
-    if (!date) return "";
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-  // Helper to display region as APAC, Global, or capitalized
-  const displayRegion = (region: string | null | undefined) => {
-    if (!region) return '-';
-    if (region.toLowerCase() === 'apac') return 'APAC';
-    if (region.toLowerCase() === 'global') return 'Global';
-    return region.charAt(0).toUpperCase() + region.slice(1);
-  };
+  // `parseDate`, `formatDateForInput`, `displayRegion` now imported
+  // from `@/lib/campaignHelpers` (same implementations).
 
   // Remove columnWidths, isResizing, resizingColumn
   // Remove all style={{ width: ... }}, minWidth, maxWidth from TableHead and TableCell
