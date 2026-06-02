@@ -48,10 +48,40 @@ export class CampaignKOLService {
         master_kol:master_kols(*)
       `)
       .eq('campaign_id', campaignId)
+      // Hide soft-deleted rows from the default active-roster path.
+      // Use `getCampaignKOLsWithDeleted` when you need the full set
+      // (e.g. the Budget tab's payment-name lookup, where you want
+      // to keep showing "Alice (removed)" instead of "Unknown KOL").
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching campaign KOLs:', error);
+      throw new Error('Failed to fetch campaign KOLs');
+    }
+
+    return (data || []) as CampaignKOLWithDetails[];
+  }
+
+  /**
+   * Like `getCampaignKOLs` but includes soft-deleted rows. Used by
+   * the Budget tab's payment table so a payment to a since-removed
+   * KOL still shows the KOL's name (with a "(removed)" suffix)
+   * instead of "Unknown KOL". Don't use this on writable surfaces —
+   * deleted rows should stay out of the editable roster.
+   */
+  static async getCampaignKOLsWithDeleted(campaignId: string): Promise<CampaignKOLWithDetails[]> {
+    const { data, error } = await supabase
+      .from('campaign_kols')
+      .select(`
+        *,
+        master_kol:master_kols(*)
+      `)
+      .eq('campaign_id', campaignId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching campaign KOLs (incl. deleted):', error);
       throw new Error('Failed to fetch campaign KOLs');
     }
 
@@ -94,10 +124,26 @@ export class CampaignKOLService {
     return data as CampaignKOL;
   }
 
+  /**
+   * Soft-delete a campaign_kol row. Switched from hard `.delete()` on
+   * 2026-06-02 because the FK on payments.campaign_kol_id is
+   * ON DELETE CASCADE — a hard delete was destroying the payment
+   * audit trail AND the page's React state for `payments` wasn't
+   * being refetched, so the Budget table kept showing orphan
+   * payment rows with "Unknown KOL" in the name column. Soft-delete
+   * preserves both: the payments stay intact, and the Budget table's
+   * lookup via `getCampaignKOLsWithDeleted` can still resolve the
+   * KOL's name (we render it with a "(removed)" suffix so it's
+   * obvious the KOL is no longer on the campaign).
+   */
   static async deleteCampaignKOL(id: string): Promise<void> {
+    // Cast because `deleted_at` was added to the table on 2026-06-02
+    // but the generated supabase types haven't been regenerated yet
+    // (typegen runs as a separate step). Remove the cast once
+    // `lib/database.types.ts` includes the column.
     const { error } = await supabase
       .from('campaign_kols')
-      .delete()
+      .update({ deleted_at: new Date().toISOString() } as any)
       .eq('id', id);
 
     if (error) {

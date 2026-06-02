@@ -222,6 +222,14 @@ const CampaignDetailsPage = () => {
   const [campaignKOLs, setCampaignKOLs] = useState<any[]>([]);
   const [availableKOLs, setAvailableKOLs] = useState<any[]>([]);
   const [loadingKOLs, setLoadingKOLs] = useState(false);
+
+  // Lookup for the Budget tab's payment table — `Map<campaign_kol_id,
+  // { name, removed }>`. Includes soft-deleted KOLs so historical
+  // payments still show the KOL's name (with a "(removed)" suffix)
+  // instead of "Unknown KOL". Refreshed whenever the active roster
+  // is refreshed (delete, add, status change) so the budget table
+  // updates in lockstep with the KOL Dashboard.
+  const [paymentKolNameLookup, setPaymentKolNameLookup] = useState<Map<string, { name: string; removed: boolean }>>(new Map());
   const [searchTerm, setSearchTerm] = useState('');
   const [kolFilters, setKolFilters] = useState({
     platform: [] as string[],
@@ -1004,7 +1012,15 @@ const CampaignDetailsPage = () => {
     if (!campaign) return;
     try {
       setLoadingKOLs(true);
-      const kols = await CampaignKOLService.getCampaignKOLs(campaign.id);
+      // Two queries in parallel: the active roster (filtered by
+      // deleted_at IS NULL) for everywhere else, and the full set
+      // (including soft-deleted rows) for the Budget tab's payment
+      // name lookup. Fetching both here keeps the two views in
+      // lockstep after any add/delete/status change.
+      const [kols, allKols] = await Promise.all([
+        CampaignKOLService.getCampaignKOLs(campaign.id),
+        CampaignKOLService.getCampaignKOLsWithDeleted(campaign.id),
+      ]);
       // If payments are loaded, map paid from sums; else set directly
       if (payments && payments.length > 0) {
         const sums = computePaymentSums(payments);
@@ -1012,6 +1028,16 @@ const CampaignDetailsPage = () => {
       } else {
       setCampaignKOLs(kols);
       }
+      // Build the payment-name lookup. Each campaign_kol id maps to
+      // { name, removed } so the Budget table can render
+      // "Alice" or "Alice (removed)" as appropriate.
+      const lookup = new Map<string, { name: string; removed: boolean }>();
+      for (const k of allKols as any[]) {
+        const name = k.master_kol?.name || 'Unknown KOL';
+        const removed = !!k.deleted_at;
+        lookup.set(k.id, { name, removed });
+      }
+      setPaymentKolNameLookup(lookup);
     } catch (error) {
       console.error('Error fetching campaign KOLs:', error);
     } finally {
@@ -2130,11 +2156,14 @@ const CampaignDetailsPage = () => {
     // CSV headers
     const headers = ['Name', 'Wallet', 'Amount (USD)', 'Payment Date', 'Payment Method', 'Transaction ID', 'Content', 'Notes'];
 
-    // Build CSV rows
+    // Build CSV rows. Use the soft-delete-aware lookup so historical
+    // payments to since-removed KOLs export with the real name +
+    // "(removed)" suffix instead of "Unknown KOL".
     const rows = filteredPayments.map(payment => {
       const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
+      const lookupEntry = payment.campaign_kol_id ? paymentKolNameLookup.get(payment.campaign_kol_id) : undefined;
       const name = payment.campaign_kol_id
-        ? (kol?.master_kol?.name || 'Unknown KOL')
+        ? (lookupEntry ? (lookupEntry.removed ? `${lookupEntry.name} (removed)` : lookupEntry.name) : 'Unknown KOL')
         : (payment.recipient_name || 'Unknown');
       const wallet = payment.campaign_kol_id
         ? (kol?.master_kol?.wallet || '')
@@ -8529,16 +8558,35 @@ const CampaignDetailsPage = () => {
                                   className={getCellClassName(`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-ink-warm-700 cursor-pointer`, 'payments', payment.id, 'kol_name')}
                                   style={{ verticalAlign: 'middle', fontWeight: 'bold' }}
                                   onClick={() => {
+                                    // Use the lookup so the cell name on the selected-cell tooltip
+                                    // includes "(removed)" when applicable. Falls back to
+                                    // recipient_name for Other Expense payments.
+                                    const lookupEntry = payment.campaign_kol_id ? paymentKolNameLookup.get(payment.campaign_kol_id) : undefined;
                                     const displayName = payment.campaign_kol_id
-                                      ? campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.name || 'Unknown KOL'
+                                      ? (lookupEntry ? (lookupEntry.removed ? `${lookupEntry.name} (removed)` : lookupEntry.name) : 'Unknown KOL')
                                       : payment.recipient_name || 'Unknown';
                                     handleCellSelect('payments', payment.id, 'kol_name', displayName);
                                   }}
                                 >
                                   <div className="flex items-center w-full h-full gap-2 flex-wrap">
-                                    {payment.campaign_kol_id ? (
-                                      campaignKOLs.find(kol => kol.id === payment.campaign_kol_id)?.master_kol?.name || 'Unknown KOL'
-                                    ) : (
+                                    {payment.campaign_kol_id ? (() => {
+                                      // Look up the KOL name via the soft-delete-aware
+                                      // lookup map so historical payments to since-removed
+                                      // KOLs still show the right name with a "(removed)"
+                                      // suffix instead of "Unknown KOL".
+                                      const entry = paymentKolNameLookup.get(payment.campaign_kol_id);
+                                      if (!entry) return 'Unknown KOL';
+                                      return (
+                                        <>
+                                          <span>{entry.name}</span>
+                                          {entry.removed && (
+                                            <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500 italic pointer-events-none">
+                                              (removed)
+                                            </span>
+                                          )}
+                                        </>
+                                      );
+                                    })() : (
                                       <>
                                         <span>{payment.recipient_name || 'Unknown'}</span>
                                         <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded pointer-events-none">
