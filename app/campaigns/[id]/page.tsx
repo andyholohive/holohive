@@ -12,6 +12,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 // import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { RequiredAsterisk } from "@/components/ui/required-asterisk";
+import { KpiCard } from "@/components/ui/kpi-card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -610,7 +611,7 @@ const CampaignDetailsPage = () => {
         return <span className="font-bold text-black text-sm">𝕏</span>;
       case 'Telegram':
         return (
-          <svg className="h-4 w-4 text-blue-500" viewBox="0 0 24 24" fill="currentColor">
+          <svg className="h-4 w-4 text-brand" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.13-.31-1.09-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
           </svg>
         );
@@ -639,12 +640,12 @@ const CampaignDetailsPage = () => {
 
   const getContentTypeColor = (type: string) => {
     const colorMap: { [key: string]: string } = {
-      'Post': 'bg-blue-100 text-blue-800',
+      'Post': 'bg-sky-100 text-sky-800',
       'Video': 'bg-rose-100 text-rose-800',
       'Article': 'bg-emerald-100 text-emerald-800',
       'AMA': 'bg-purple-100 text-purple-800',
-      'Ambassadorship': 'bg-orange-100 text-orange-800',
-      'Alpha': 'bg-yellow-100 text-yellow-800',
+      'Ambassadorship': 'bg-amber-100 text-amber-800',
+      'Alpha': 'bg-amber-100 text-amber-800',
       'QRT': 'bg-cyan-100 text-cyan-800',
       'Thread': 'bg-teal-100 text-teal-800',
       'Spaces': 'bg-pink-100 text-pink-800',
@@ -657,18 +658,18 @@ const CampaignDetailsPage = () => {
     const colorMap: { [key: string]: string } = {
       'Native (Meme/Culture)': 'bg-purple-100 text-purple-800',
       'Drama-Forward': 'bg-rose-100 text-rose-800',
-      'Skeptic': 'bg-orange-100 text-orange-800',
-      'Educator': 'bg-blue-100 text-blue-800',
+      'Skeptic': 'bg-amber-100 text-amber-800',
+      'Educator': 'bg-sky-100 text-sky-800',
       'Bridge Builder': 'bg-emerald-100 text-emerald-800',
       'Visionary': 'bg-indigo-100 text-indigo-800',
       'Onboarder': 'bg-teal-100 text-teal-800',
       'General': 'bg-cream-100 text-ink-warm-700',
       'Gaming': 'bg-pink-100 text-pink-800',
-      'Crypto': 'bg-yellow-100 text-yellow-800',
-      'Memecoin': 'bg-orange-100 text-orange-800',
+      'Crypto': 'bg-amber-100 text-amber-800',
+      'Memecoin': 'bg-amber-100 text-amber-800',
       'NFT': 'bg-purple-100 text-purple-800',
       'Trading': 'bg-emerald-100 text-emerald-800',
-      'AI': 'bg-blue-100 text-blue-800',
+      'AI': 'bg-sky-100 text-sky-800',
       'Research': 'bg-indigo-100 text-indigo-800',
       'Airdrop': 'bg-teal-100 text-teal-800',
       'Art': 'bg-pink-100 text-pink-800'
@@ -678,13 +679,13 @@ const CampaignDetailsPage = () => {
 
   const getNewContentTypeColor = (contentType: string) => {
     const colorMap: { [key: string]: string } = {
-      'Meme': 'bg-yellow-100 text-yellow-800',
-      'News': 'bg-blue-100 text-blue-800',
+      'Meme': 'bg-amber-100 text-amber-800',
+      'News': 'bg-sky-100 text-sky-800',
       'Trading': 'bg-emerald-100 text-emerald-800',
       'Deep Dive': 'bg-purple-100 text-purple-800',
       'Meme/Cultural Narrative': 'bg-pink-100 text-pink-800',
       'Drama Queen': 'bg-rose-100 text-rose-800',
-      'Sceptics': 'bg-orange-100 text-orange-800',
+      'Sceptics': 'bg-amber-100 text-amber-800',
       'Technical Educator': 'bg-indigo-100 text-indigo-800',
       'Bridge Builders': 'bg-teal-100 text-teal-800',
       'Visionaries': 'bg-cyan-100 text-cyan-800'
@@ -695,13 +696,13 @@ const CampaignDetailsPage = () => {
   const getPricingColor = (pricing: string) => {
     const colorMap: { [key: string]: string } = {
       '<$200': 'bg-emerald-100 text-emerald-800',
-      '$200-500': 'bg-yellow-100 text-yellow-800',
-      '$500-1K': 'bg-orange-100 text-orange-800',
+      '$200-500': 'bg-amber-100 text-amber-800',
+      '$500-1K': 'bg-amber-100 text-amber-800',
       '$1K-2K': 'bg-rose-100 text-rose-800',
       '$2K-3K': 'bg-purple-100 text-purple-800',
       '>$3K': 'bg-pink-100 text-pink-800'
     };
-    return colorMap[pricing] || 'bg-blue-100 text-blue-800';
+    return colorMap[pricing] || 'bg-sky-100 text-sky-800';
   };
 
   const budgetTypeOptions = ["Token", "Fiat", "WL"];
@@ -1683,11 +1684,11 @@ const CampaignDetailsPage = () => {
         );
       case "Planning":
         return (
-          <span className="inline-flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blue-500"><FileText className="h-3 w-3 text-white" strokeWidth={2} /></span>Planning</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-sky-500"><FileText className="h-3 w-3 text-white" strokeWidth={2} /></span>Planning</span>
         );
       case "Paused":
         return (
-          <span className="inline-flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-yellow-500"><PauseCircle className="h-3 w-3 text-white" strokeWidth={2} /></span>Paused</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500"><PauseCircle className="h-3 w-3 text-white" strokeWidth={2} /></span>Paused</span>
         );
       case "Completed":
         return (
@@ -2728,10 +2729,10 @@ const CampaignDetailsPage = () => {
   // Add a getStatusColor helper:
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Curated': return 'bg-blue-100 text-blue-800';
+      case 'Curated': return 'bg-sky-100 text-sky-800';
       case 'Contacted': return 'bg-purple-100 text-purple-800';
-      case 'Interested': return 'bg-yellow-100 text-yellow-800';
-      case 'Onboarded': return 'bg-orange-100 text-orange-800';
+      case 'Interested': return 'bg-amber-100 text-amber-800';
+      case 'Onboarded': return 'bg-amber-100 text-amber-800';
       case 'Concluded': return 'bg-emerald-100 text-emerald-800';
       default: return 'bg-cream-100 text-ink-warm-700';
     }
@@ -2739,8 +2740,8 @@ const CampaignDetailsPage = () => {
 
   const getContentStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return 'bg-blue-100 text-blue-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'scheduled': return 'bg-sky-100 text-sky-800';
+      case 'pending': return 'bg-amber-100 text-amber-800';
       case 'posted': return 'bg-emerald-100 text-emerald-800';
       default: return 'bg-cream-100 text-ink-warm-700';
     }
@@ -2898,7 +2899,7 @@ const CampaignDetailsPage = () => {
   // Helper to get cell styling based on state
   const getCellClassName = (baseClass: string, table: string, rowId: string, field: string) => {
     if (isCellSelected(table, rowId, field)) {
-      return `${baseClass} ring-2 ring-blue-500 bg-blue-50`;
+      return `${baseClass} ring-2 ring-blue-500 bg-sky-50`;
     } else if (isCellCopied(table, rowId, field)) {
       return `${baseClass} ring-2 ring-dashed ring-emerald-500 bg-emerald-50`;
     }
@@ -3688,16 +3689,38 @@ const CampaignDetailsPage = () => {
       <div className="min-h-[calc(100vh-64px)] w-full bg-cream-50">
         <div className="w-full px-4">
           <div className="space-y-4">
-            <div>
-              <Skeleton className="h-8 w-32 mb-2" />
-            </div>
-            
-            <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <Skeleton className="h-10 w-10 rounded-lg" />
-                <Skeleton className="h-8 w-64" />
+            {/* Back link skeleton */}
+            <Skeleton className="h-7 w-32" />
+
+            {/* Header skeleton — kicker + serif title + action cluster */}
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500/40" />
+                  <Skeleton className="h-3 w-40" />
+                </div>
+                <Skeleton className="h-7 w-72" />
               </div>
-              
+              <div className="flex items-center gap-2 shrink-0">
+                <Skeleton className="h-9 w-32 rounded-md" />
+                <Skeleton className="h-9 w-20 rounded-md" />
+              </div>
+            </div>
+
+            {/* TabsList skeleton */}
+            <div className="grid w-full grid-cols-5 gap-1 p-1 rounded-md bg-cream-100 border border-cream-200">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 rounded" />
+              ))}
+            </div>
+
+            {/* Information panel skeleton — Card-shape, KV grid */}
+            <div className="w-full bg-white border border-cream-200 shadow-card rounded-[14px] p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Skeleton className="h-10 w-10 rounded-md" />
+                <Skeleton className="h-7 w-64" />
+              </div>
+
               <div className="grid grid-cols-2 gap-6 text-sm">
                 <div className="space-y-4">
                   <div>
@@ -3767,24 +3790,47 @@ const CampaignDetailsPage = () => {
     <div className="min-h-[calc(100vh-64px)] w-full bg-cream-50">
       <div className="w-full">
         <div className="space-y-4">
-          <div className="flex items-center justify-between relative">
-            <Button
-              variant="ghost"
-              className="py-2 px-3 rounded-md text-ink-warm-700 hover:text-brand transition-colors mb-1 text-sm"
-              onClick={() => router.back()}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />Back to Campaigns
-            </Button>
-            {campaign && (
-              <span className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold text-ink-warm-900 mb-1 pointer-events-none">{campaign.name}</span>
-            )}
-            <div className="flex items-center gap-2">
+          {/* v11 page header — back link above (per sub-route
+              convention), editorial display-serif title with kicker
+              chip, action cluster on the right. The previous layout
+              centered the title via absolute positioning; the new
+              flex layout keeps the back link left + actions right
+              and lets the title sit naturally in the middle with
+              the kicker line above it for chapter context. */}
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="-ml-2 h-7 w-fit text-xs text-ink-warm-500 hover:text-brand"
+          >
+            <button onClick={() => router.back()}>
+              <ArrowLeft className="h-3 w-3 mr-1" />
+              Back to Campaigns
+            </button>
+          </Button>
+
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="min-w-0 flex-1">
+              {/* Kicker line — chapter context */}
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <span className="text-[10px] mono uppercase tracking-[0.18em] text-ink-warm-500 truncate">
+                  Talent · Campaign{campaign?.client_name ? ` · ${campaign.client_name}` : ''}
+                </span>
+              </div>
+              {campaign && (
+                <h1 className="display-serif text-[28px] text-ink-warm-900 leading-tight truncate">
+                  {campaign.name}
+                </h1>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
               {hasWarnings && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setIsWarningsOpen(true)}
-                  className="border-amber-500 text-amber-600 hover:bg-amber-50 hover:text-amber-600"
+                  className="border-amber-300 text-amber-700 hover:bg-amber-50 hover:text-amber-800"
                 >
                   <AlertTriangle className="h-4 w-4 mr-2" />
                   {missingFields.length} Warning{missingFields.length !== 1 ? 's' : ''}
@@ -3809,18 +3855,22 @@ const CampaignDetailsPage = () => {
               </Button>
             </div>
           </div>
-          
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="information">Information</TabsTrigger>
-              <TabsTrigger value="kols">KOL Dashboard</TabsTrigger>
-              <TabsTrigger value="contents">Content Dashboard</TabsTrigger>
-                  <TabsTrigger value="payments">Budget</TabsTrigger>
-                  <TabsTrigger value="report">Report</TabsTrigger>
+            {/* v11 tab chrome — cream-100 base + warm hairline +
+                active-state shadow-card so the lift matches every
+                other tabbed surface (KolProfileModal, /clients
+                modals, dashboard tabs). */}
+            <TabsList className="grid w-full grid-cols-5 bg-cream-100 p-1 h-auto border border-cream-200">
+              <TabsTrigger value="information" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Information</TabsTrigger>
+              <TabsTrigger value="kols" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">KOL Dashboard</TabsTrigger>
+              <TabsTrigger value="contents" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Content Dashboard</TabsTrigger>
+              <TabsTrigger value="payments" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Budget</TabsTrigger>
+              <TabsTrigger value="report" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Report</TabsTrigger>
             </TabsList>
             
             <TabsContent value="information" className="mt-4">
-              <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
+              <div className="w-full bg-white border border-cream-200 shadow-card rounded-[14px] p-6">
               <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
                   {campaign.client_logo_url ? (
@@ -4144,7 +4194,7 @@ const CampaignDetailsPage = () => {
                           ground. Data + handler still wired so the save
                           payload preserves whatever was previously typed. */}
                       {false && (
-                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                      <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide">
                             Outline
@@ -4165,7 +4215,7 @@ const CampaignDetailsPage = () => {
                         )}
                       </div>
                       )}
-                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                      <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="flex items-center gap-2 mb-2">
                           <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide">
                             Description
@@ -4196,7 +4246,7 @@ const CampaignDetailsPage = () => {
                       <h3 className="text-lg font-semibold text-ink-warm-900">Timeline</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                      <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Start Date</div>
                         {editMode ? (
                       <Popover key="start-date-popover">
@@ -4225,7 +4275,7 @@ const CampaignDetailsPage = () => {
                       <div className="text-lg font-semibold text-ink-warm-900">{formatDate(campaign?.start_date)}</div>
                     )}
                   </div>
-                  <div className="bg-white p-4 rounded-lg border border-cream-200">
+                  <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                     <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">End Date</div>
                     {editMode ? (
                       <Popover key="end-date-popover">
@@ -4255,7 +4305,7 @@ const CampaignDetailsPage = () => {
                       <div className="text-lg font-semibold text-ink-warm-900">{formatDate(campaign?.end_date)}</div>
                     )}
                   </div>
-                  <div className="bg-white p-4 rounded-lg border border-cream-200">
+                  <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                     <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2 flex items-center gap-2">
                       <MapPin className="h-3.5 w-3.5 text-brand" />
                       Region
@@ -4282,7 +4332,7 @@ const CampaignDetailsPage = () => {
                       under `false &&` so the data + handler logic is
                       preserved — flip to true to restore the field here. */}
                   {false && (
-                  <div className="bg-white p-4 rounded-lg border border-cream-200">
+                  <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                     <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2 flex items-center gap-2">
                       <Activity className="h-3.5 w-3.5 text-brand" />
                       Current Phase
@@ -4331,7 +4381,7 @@ const CampaignDetailsPage = () => {
                       <h3 className="text-lg font-semibold text-ink-warm-900">Client Information</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                      <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Client</div>
                         {editMode ? (
                           <Select value={form?.client_id || ""} onValueChange={value => handleChange("client_id", value)}>
@@ -4379,7 +4429,7 @@ const CampaignDetailsPage = () => {
                       <h3 className="text-lg font-semibold text-ink-warm-900">Client Communication</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                      <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Intro Call</div>
                         {editMode ? (
                           <div className="flex items-center gap-2">
@@ -4407,7 +4457,7 @@ const CampaignDetailsPage = () => {
                         )}
                       </div>
                       {!!(editMode ? form?.intro_call : campaign?.intro_call) && (
-                        <div className="bg-white p-4 rounded-lg border border-cream-200">
+                        <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                           <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Intro Call Date</div>
                           {editMode ? (
                         <Popover key="intro-call-popover">
@@ -4437,7 +4487,7 @@ const CampaignDetailsPage = () => {
                       )}
                         </div>
                       )}
-                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                      <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Proposal Sent</div>
                         {editMode ? (
                           <Checkbox id="proposal_sent" checked={!!form?.proposal_sent} onCheckedChange={checked => handleChange("proposal_sent", !!checked)} />
@@ -4457,7 +4507,7 @@ const CampaignDetailsPage = () => {
                           </div>
                         )}
                       </div>
-                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                      <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">NDA Signed</div>
                         {editMode ? (
                           <Checkbox id="nda_signed" checked={!!form?.nda_signed} onCheckedChange={checked => handleChange("nda_signed", !!checked)} />
@@ -4489,7 +4539,7 @@ const CampaignDetailsPage = () => {
                       <h3 className="text-lg font-semibold text-ink-warm-900">Team & Management</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                      <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Manager</div>
                         {editMode ? (
                           <Select value={form?.manager || ""} onValueChange={value => handleChange("manager", value)}>
@@ -4530,7 +4580,7 @@ const CampaignDetailsPage = () => {
                           anywhere downstream. Form state + save still
                           plumbed so existing data isn't lost. */}
                       {false && (
-                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                      <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Call Support</div>
                         {editMode ? (
                           <Checkbox id="call_support" checked={!!form?.call_support} onCheckedChange={checked => handleChange("call_support", !!checked)} />
@@ -4563,7 +4613,7 @@ const CampaignDetailsPage = () => {
                       <h3 className="text-lg font-semibold text-ink-warm-900">Campaign Settings</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                      <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Client Choosing KOLs</div>
                         {editMode ? (
                           <Checkbox id="client_choosing_kols" checked={!!form?.client_choosing_kols} onCheckedChange={checked => handleChange("client_choosing_kols", !!checked)} />
@@ -4583,7 +4633,7 @@ const CampaignDetailsPage = () => {
                           </div>
                         )}
                       </div>
-                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                      <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-2">Multi-Activation</div>
                         {editMode ? (
                           <Checkbox id="multi_activation" checked={!!form?.multi_activation} onCheckedChange={checked => handleChange("multi_activation", !!checked)} />
@@ -4614,7 +4664,7 @@ const CampaignDetailsPage = () => {
                       </div>
                       <h3 className="text-lg font-semibold text-ink-warm-900">Approved Access</h3>
                     </div>
-                    <div className="bg-white p-4 rounded-lg border border-cream-200">
+                    <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                       <p className="text-sm text-ink-warm-700 mb-3">
                         {editMode
                           ? 'Add email addresses or domains that are allowed to access the public campaign view (in addition to the client email and same-domain emails).'
@@ -4741,7 +4791,7 @@ const CampaignDetailsPage = () => {
                       </div>
 
                       {/* Budget Type */}
-                      <div className="bg-white p-4 rounded-lg border border-cream-200">
+                      <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Budget Type</div>
                         {editMode ? (
                           <div className="flex gap-4">
@@ -4777,7 +4827,7 @@ const CampaignDetailsPage = () => {
                       </div>
                     </div>
                     {editMode ? (
-                      <div className="mt-4 bg-white p-4 rounded-lg border border-cream-200">
+                      <div className="mt-4 bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Regional Allocations</div>
                         <div className="flex flex-col gap-2">
                       {allocations.map((alloc, idx) => (
@@ -4840,7 +4890,7 @@ const CampaignDetailsPage = () => {
                       </div>
                     ) : (
                       Array.isArray(campaign.budget_allocations) && campaign.budget_allocations.length > 0 && (
-                        <div className="mt-4 bg-white p-4 rounded-lg border border-cream-200">
+                        <div className="mt-4 bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                           <div className="text-xs font-semibold text-ink-warm-700 uppercase tracking-wide mb-3">Regional Allocations</div>
                           <div className="flex flex-wrap gap-2">
                             {campaign.budget_allocations.map((alloc: any) => (
@@ -4867,7 +4917,7 @@ const CampaignDetailsPage = () => {
           </TabsContent>
 
           <TabsContent value="kols" className="mt-4">
-            <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
+            <div className="w-full bg-white border border-cream-200 shadow-card rounded-[14px] p-6">
               <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="bg-cream-100 p-2 rounded-lg">
@@ -5218,7 +5268,7 @@ const CampaignDetailsPage = () => {
                     {/* Overview Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                       {/* Total KOLs in Campaign */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                      <Card className="crd-hover">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
@@ -5235,7 +5285,7 @@ const CampaignDetailsPage = () => {
                       </Card>
 
                       {/* Average Followers per KOL */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                      <Card className="crd-hover">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
@@ -5259,7 +5309,7 @@ const CampaignDetailsPage = () => {
                       </Card>
 
                       {/* Distribution of KOLs by Platform */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                      <Card className="crd-hover">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
@@ -5294,7 +5344,7 @@ const CampaignDetailsPage = () => {
                       </Card>
 
                       {/* KOLs by Region */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                      <Card className="crd-hover">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
@@ -5332,7 +5382,7 @@ const CampaignDetailsPage = () => {
                     {/* Charts Section */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* Platform Distribution Chart */}
-                      <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
+                      <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="flex items-center justify-between mb-6">
                           <div>
                             <h3 className="text-xl font-bold text-ink-warm-900">Distribution of KOLs by Platform</h3>
@@ -5430,7 +5480,7 @@ const CampaignDetailsPage = () => {
                       </div>
 
                       {/* Region Distribution Chart */}
-                      <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
+                      <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="flex items-center justify-between mb-6">
                           <div>
                             <h3 className="text-xl font-bold text-ink-warm-900">KOLs by Region</h3>
@@ -6440,13 +6490,13 @@ const CampaignDetailsPage = () => {
                                     // Different colors for different content types
                                     const getContentColor = (type: string) => {
                                       const colors: {[key: string]: string} = {
-                                        'Post': 'bg-blue-100 text-blue-800',
+                                        'Post': 'bg-sky-100 text-sky-800',
                                         'Tweet': 'bg-cyan-100 text-cyan-800',
                                         'Story': 'bg-purple-100 text-purple-800',
                                         'Reel': 'bg-pink-100 text-pink-800',
                                         'Video': 'bg-rose-100 text-rose-800',
                                         'Article': 'bg-emerald-100 text-emerald-800',
-                                        'Review': 'bg-yellow-100 text-yellow-800',
+                                        'Review': 'bg-amber-100 text-amber-800',
                                         'Thread': 'bg-indigo-100 text-indigo-800',
                                       };
                                       return colors[type] || 'bg-cream-100 text-ink-warm-700';
@@ -6962,7 +7012,7 @@ const CampaignDetailsPage = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredKOLs.map((campaignKOL) => (
-                      <Card key={campaignKOL.id} className="hover:shadow-lg transition-shadow duration-200">
+                      <Card key={campaignKOL.id} className="crd-hover">
                         <CardHeader className="pb-4">
                           <div className="flex flex-col items-center text-center">
                             <div className="w-16 h-16 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center mb-3">
@@ -7059,7 +7109,7 @@ const CampaignDetailsPage = () => {
           </TabsContent>
           
           <TabsContent value="contents" className="mt-4">
-            <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
+            <div className="w-full bg-white border border-cream-200 shadow-card rounded-[14px] p-6">
               <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="bg-cream-100 p-2 rounded-lg"><FileText className="h-6 w-6 text-ink-warm-700" /></div>
@@ -7473,7 +7523,7 @@ const CampaignDetailsPage = () => {
                     {/* Metrics Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {/* Total Impressions */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                      <Card className="crd-hover">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
@@ -7498,7 +7548,7 @@ const CampaignDetailsPage = () => {
                       </Card>
 
                       {/* Total Comments */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                      <Card className="crd-hover">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
@@ -7523,7 +7573,7 @@ const CampaignDetailsPage = () => {
                       </Card>
 
                       {/* Total Retweets */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                      <Card className="crd-hover">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
@@ -7548,7 +7598,7 @@ const CampaignDetailsPage = () => {
                       </Card>
 
                       {/* Total Likes */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                      <Card className="crd-hover">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
@@ -7573,7 +7623,7 @@ const CampaignDetailsPage = () => {
                       </Card>
 
                       {/* Total Engagements */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                      <Card className="crd-hover">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
@@ -7600,7 +7650,7 @@ const CampaignDetailsPage = () => {
                       </Card>
 
                       {/* Total Bookmarks */}
-                      <Card className="hover:shadow-lg transition-shadow duration-200">
+                      <Card className="crd-hover">
                         <CardHeader className="pb-3">
                           <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
@@ -7626,7 +7676,7 @@ const CampaignDetailsPage = () => {
                     </div>
 
                     {/* Average Engagement Rate */}
-                    <Card className="hover:shadow-lg transition-shadow duration-200">
+                    <Card className="crd-hover">
                       <CardHeader>
                         <CardTitle className="text-lg font-semibold text-ink-warm-900">Average Engagement Rate</CardTitle>
                       </CardHeader>
@@ -7647,7 +7697,7 @@ const CampaignDetailsPage = () => {
                     {/* Charts Section */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* Total Impressions */}
-                      <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
+                      <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="flex items-center justify-between mb-6">
                           <div>
                             <h3 className="text-xl font-bold text-ink-warm-900">Total Impressions</h3>
@@ -7722,7 +7772,7 @@ const CampaignDetailsPage = () => {
                       </div>
 
                       {/* Impressions by Platform */}
-                      <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
+                      <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="flex items-center justify-between mb-6">
                           <div>
                             <h3 className="text-xl font-bold text-ink-warm-900">Impressions by Platform</h3>
@@ -8921,7 +8971,7 @@ const CampaignDetailsPage = () => {
 
           {/* Budget Tab */}
           <TabsContent value="payments" className="mt-4">
-            <div className="w-full bg-white border border-cream-200 shadow-sm p-6">
+            <div className="w-full bg-white border border-cream-200 shadow-card rounded-[14px] p-6">
               <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="bg-cream-100 p-2 rounded-lg">
@@ -9956,7 +10006,7 @@ const CampaignDetailsPage = () => {
                                     ) : (
                                       <>
                                         <span>{payment.recipient_name || 'Unknown'}</span>
-                                        <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded pointer-events-none">
+                                        <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded pointer-events-none">
                                           Expense
                                         </span>
                                       </>
@@ -10203,52 +10253,47 @@ const CampaignDetailsPage = () => {
                 {/* Graph View */}
                 {paymentViewMode === 'graph' && (
                   <div className="space-y-8">
-                    {/* Budget Overview Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-gradient-to-br from-cream-50 to-cream-100 p-6 rounded-xl border border-cream-100 shadow-sm hover:shadow-md transition-shadow duration-200">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="text-sm font-semibold text-ink-warm-700 uppercase tracking-wide">Total Budget</div>
-                          <div className="w-3 h-3 rounded-full bg-cream-300"></div>
+                    {/* Budget Overview KPIs — Total / Paid / Remaining.
+                        Converted from inline gradient tiles to the shared
+                        KpiCard primitive so this hero strip reads with
+                        the same rhythm as /dashboard, /lists, /analytics. */}
+                    {(() => {
+                      const paid = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+                      const remaining = campaign.total_budget - paid;
+                      const paidPct = campaign.total_budget > 0 ? (paid / campaign.total_budget) * 100 : 0;
+                      const remainPct = campaign.total_budget > 0 ? (remaining / campaign.total_budget) * 100 : 0;
+                      return (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <KpiCard
+                            icon={DollarSign}
+                            label="Total Budget"
+                            value={CampaignService.formatCurrency(campaign.total_budget)}
+                            sub={campaign.budget_allocations && campaign.budget_allocations.length > 0
+                              ? `${campaign.budget_allocations.length} regions allocated`
+                              : 'Campaign allocation'}
+                            accent="brand"
+                          />
+                          <KpiCard
+                            icon={CreditCard}
+                            label="Payments"
+                            value={CampaignService.formatCurrency(paid)}
+                            sub={`${paidPct.toFixed(1)}% of total budget`}
+                            accent="sky"
+                          />
+                          <KpiCard
+                            icon={CheckCircle2}
+                            label="Remaining"
+                            value={CampaignService.formatCurrency(remaining)}
+                            sub={`${remainPct.toFixed(1)}% available`}
+                            accent="emerald"
+                          />
                         </div>
-                        <div className="text-3xl font-bold text-ink-warm-900 mb-1">
-                          {CampaignService.formatCurrency(campaign.total_budget)}
-                        </div>
-                        <div className="text-xs text-ink-warm-500">
-                          {campaign.budget_allocations && campaign.budget_allocations.length > 0 
-                            ? `${campaign.budget_allocations.length} regions allocated`
-                            : 'Campaign allocation'
-                          }
-                        </div>
-                      </div>
-                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border border-blue-100 shadow-sm hover:shadow-md transition-shadow duration-200">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Payments</div>
-                          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                        </div>
-                        <div className="text-3xl font-bold text-blue-900 mb-1">
-                          {CampaignService.formatCurrency(payments.reduce((sum, payment) => sum + (payment.amount || 0), 0))}
-                        </div>
-                        <div className="text-xs text-brand">
-                          {((payments.reduce((sum, payment) => sum + (payment.amount || 0), 0) / campaign.total_budget) * 100).toFixed(1)}% of total budget
-                        </div>
-                      </div>
-                      <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-6 rounded-xl border border-emerald-100 shadow-sm hover:shadow-md transition-shadow duration-200">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="text-sm font-semibold text-emerald-700 uppercase tracking-wide">Remaining</div>
-                          <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                        </div>
-                        <div className="text-3xl font-bold text-emerald-900 mb-1">
-                          {CampaignService.formatCurrency(campaign.total_budget - payments.reduce((sum, payment) => sum + (payment.amount || 0), 0))}
-                        </div>
-                        <div className="text-xs text-emerald-600">
-                          {(((campaign.total_budget - payments.reduce((sum, payment) => sum + (payment.amount || 0), 0)) / campaign.total_budget) * 100).toFixed(1)}% available
-                        </div>
-                      </div>
-                    </div>
+                      );
+                    })()}
 
                     {/* Regional Budget Summary */}
                     {campaign.budget_allocations && campaign.budget_allocations.length > 0 && (
-                      <div className="bg-white p-6 rounded-xl border border-cream-100 shadow-sm">
+                      <div className="bg-white p-6 rounded-[14px] border border-cream-200 shadow-card">
                         <h3 className="text-lg font-semibold text-ink-warm-900 mb-4">Regional Budget Summary</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {campaign.budget_allocations.map((alloc: any) => {
@@ -10314,7 +10359,7 @@ const CampaignDetailsPage = () => {
                     )}
 
                     {/* Budget Overview Chart */}
-                    <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
+                    <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                       <div className="flex items-center justify-between mb-6">
                         <div>
                           <h3 className="text-xl font-bold text-ink-warm-900">Budget Overview</h3>
@@ -10386,7 +10431,7 @@ const CampaignDetailsPage = () => {
 
                     {/* Regional Budget Allocation */}
                     {campaign.budget_allocations && campaign.budget_allocations.length > 0 && (
-                      <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
+                      <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="flex items-center justify-between mb-6">
                           <div>
                             <h3 className="text-xl font-bold text-ink-warm-900">Regional Budget Allocation</h3>
@@ -10494,7 +10539,7 @@ const CampaignDetailsPage = () => {
                     {payments.length > 0 && (
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Payment Methods Distribution */}
-                        <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
+                        <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                           <div className="flex items-center justify-between mb-6">
                             <div>
                               <h3 className="text-xl font-bold text-ink-warm-900">Payment Methods Distribution</h3>
@@ -10600,7 +10645,7 @@ const CampaignDetailsPage = () => {
                         </div>
 
                         {/* Payment Timeline Chart */}
-                        <div className="bg-white p-8 rounded-xl border border-cream-100 shadow-sm">
+                        <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                           <div className="flex items-center justify-between mb-6">
                             <div>
                               <h3 className="text-xl font-bold text-ink-warm-900">Payment Timeline</h3>
@@ -11210,10 +11255,10 @@ const CampaignDetailsPage = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="public-password">Password for Public View</Label>
-              <div className="bg-blue-50 rounded-lg p-3 text-sm border border-blue-200">
+              <div className="bg-sky-50 rounded-lg p-3 text-sm border border-sky-200">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-blue-900">Client Email:</span>
-                  <span className="text-sm font-mono text-blue-700">{campaign?.client_email || 'N/A'}</span>
+                  <span className="text-sm font-medium text-sky-900">Client Email:</span>
+                  <span className="text-sm font-mono text-sky-700">{campaign?.client_email || 'N/A'}</span>
                 </div>
                 <p className="text-xs text-brand mt-2">Use the client's email address as the password to access the public campaign view</p>
               </div>
