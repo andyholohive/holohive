@@ -41,6 +41,7 @@ import { BudgetOverview } from "@/components/campaign/BudgetOverview";
 import { BudgetTableView } from "@/components/campaign/BudgetTableView";
 import { ContentDashboardOverview } from "@/components/campaign/ContentDashboardOverview";
 import { ContentDashboardTableView } from "@/components/campaign/ContentDashboardTableView";
+import { MasterKolEditDialog } from "@/components/campaign/MasterKolEditDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserService } from "@/lib/userService";
 import { KOLService, MasterKOL } from "@/lib/kolService";
@@ -119,79 +120,6 @@ function compareKolByColumn(a: any, b: any, key: KolSortKey): number {
   return String(A).localeCompare(String(B));
 }
 
-/**
- * Compact multiselect for use inside Dialogs. Popover + Checkbox list,
- * shows selected items as small badges on the trigger. Self-contained
- * so it can ship alongside the master KOL edit dialog without pulling
- * in the more complex portal-rendered MultiSelect from /kols.
- */
-function DialogMultiSelect({
-  selected,
-  options,
-  onChange,
-  placeholder = 'Select...',
-}: {
-  selected: string[];
-  options: string[];
-  onChange: (next: string[]) => void;
-  placeholder?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between font-normal h-auto min-h-9 py-1.5"
-        >
-          <div className="flex flex-wrap gap-1 items-center text-left flex-1 min-w-0">
-            {selected.length === 0 ? (
-              <span className="text-ink-warm-400">{placeholder}</span>
-            ) : (
-              selected.map((s) => (
-                <span key={s} className="text-xs px-1.5 py-0.5 rounded bg-cream-100 text-ink-warm-700">
-                  {s}
-                </span>
-              ))
-            )}
-          </div>
-          <ChevronDown className="h-4 w-4 shrink-0 opacity-50 ml-2" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-        <div className="max-h-64 overflow-auto py-1">
-          {options.length === 0 ? (
-            <div className="px-3 py-2 text-sm text-ink-warm-400">No options</div>
-          ) : (
-            options.map((opt) => {
-              const isSelected = selected.includes(opt);
-              return (
-                <label
-                  key={opt}
-                  className="flex items-center gap-2 px-3 py-1.5 hover:bg-cream-50 cursor-pointer text-sm"
-                >
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={() => {
-                      onChange(
-                        isSelected
-                          ? selected.filter((s) => s !== opt)
-                          : [...selected, opt],
-                      );
-                    }}
-                  />
-                  <span>{opt}</span>
-                </label>
-              );
-            })
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 // [Campaign Live v1] Preset phases for the Current Phase dropdown on the
 // campaign edit form. Backed by campaigns.current_phase (mig 078). Order
@@ -269,8 +197,7 @@ const CampaignDetailsPage = () => {
   // a KOL name in the table view). Edits the underlying master_kols row,
   // not the campaign-specific overlay — same data shown on /kols.
   const [editingMasterKol, setEditingMasterKol] = useState<MasterKOL | null>(null);
-  const [masterKolForm, setMasterKolForm] = useState<Partial<MasterKOL>>({});
-  const [savingMasterKol, setSavingMasterKol] = useState(false);
+  // `masterKolForm`/`savingMasterKol` moved into <MasterKolEditDialog>.
 
   // `kolSort`, `editingCell`, `editingValue` moved into
   // <KolDashboardTableView> on 2026-06-02.
@@ -1777,57 +1704,12 @@ const CampaignDetailsPage = () => {
   // `toggleKolSort` / `kolSortIndicator` moved into
   // <KolDashboardTableView> on 2026-06-02.
 
-  // ─── Master KOL edit dialog handlers ────────────────────────────────
-
+  // ─── Master KOL edit dialog trigger ────────────────────────────
+  // Form state + save handler live in <MasterKolEditDialog> since
+  // 2026-06-02. The page just sets `editingMasterKol`, the dialog
+  // populates its own form on the kol-prop change.
   const openMasterKolEditDialog = (kol: MasterKOL) => {
     setEditingMasterKol(kol);
-    setMasterKolForm({
-      name: kol.name,
-      link: kol.link,
-      platform: kol.platform || [],
-      followers: kol.followers,
-      region: kol.region,
-      community: kol.community ?? false,
-      deliverables: kol.deliverables || [],
-      creator_type: kol.creator_type || [],
-      content_type: kol.content_type || [],
-      niche: kol.niche || [],
-      pricing: kol.pricing,
-      // tier and rating fields removed (migration 071).
-      in_house: kol.in_house,
-      description: kol.description,
-      wallet: kol.wallet,
-    });
-  };
-
-  const handleSaveMasterKol = async () => {
-    if (!editingMasterKol) return;
-    if (!masterKolForm.name?.trim()) {
-      toast({ title: 'Name is required', variant: 'destructive' });
-      return;
-    }
-    setSavingMasterKol(true);
-    try {
-      const updated = await KOLService.updateKOL({
-        id: editingMasterKol.id,
-        ...masterKolForm,
-      } as any);
-      // Mirror the change into local campaignKOLs so the table reflects
-      // immediately without a full refetch.
-      setCampaignKOLs(prev => prev.map(ck =>
-        ck.master_kol.id === editingMasterKol.id
-          ? { ...ck, master_kol: { ...ck.master_kol, ...updated } }
-          : ck
-      ));
-      toast({ title: 'KOL updated', description: updated.name });
-      setEditingMasterKol(null);
-      setMasterKolForm({});
-    } catch (err: any) {
-      console.error('Error updating master KOL:', err);
-      toast({ title: 'Save failed', description: err?.message || 'Failed to update KOL', variant: 'destructive' });
-    } finally {
-      setSavingMasterKol(false);
-    }
   };
 
   // `formatDateLocal` + `formatDisplayDate` moved to `lib/campaignHelpers.tsx`.
@@ -4371,193 +4253,15 @@ const CampaignDetailsPage = () => {
         />
       )}
 
-      {/* Master KOL Edit Dialog — opened by the pencil next to a KOL
-          name in the table view. Edits the underlying master_kols row,
-          which is the same data shown on /kols. Mirrors the dialog
-          layout used elsewhere in the app for consistency. */}
-      <Dialog open={!!editingMasterKol} onOpenChange={(open) => { if (!open) { setEditingMasterKol(null); setMasterKolForm({}); } }}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Edit KOL</DialogTitle>
-            <DialogDescription>
-              Update the master KOL info — changes apply everywhere this KOL is referenced.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto px-1 grid gap-4 py-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="mk-name">Name <RequiredAsterisk /></Label>
-                <Input
-                  id="mk-name"
-                  value={masterKolForm.name || ''}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, name: e.target.value }))}
-                  className="focus-brand"
-                />
-              </div>
-
-              <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="mk-link">Profile Link</Label>
-                <Input
-                  id="mk-link"
-                  value={masterKolForm.link || ''}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, link: e.target.value || null }))}
-                  placeholder="https://..."
-                  className="focus-brand"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="mk-followers">Followers</Label>
-                <Input
-                  id="mk-followers"
-                  type="number"
-                  value={masterKolForm.followers ?? ''}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, followers: e.target.value ? Number(e.target.value) : null }))}
-                  className="focus-brand"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="mk-region">Region</Label>
-                <Select
-                  value={masterKolForm.region || ''}
-                  onValueChange={(v) => setMasterKolForm(f => ({ ...f, region: v || null }))}
-                >
-                  <SelectTrigger id="mk-region" className="focus-brand">
-                    <SelectValue placeholder="Select region" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(fieldOptions?.regions || []).map((r: string) => (
-                      <SelectItem key={r} value={r}>{r}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="mk-pricing">Pricing</Label>
-                <Select
-                  value={masterKolForm.pricing || ''}
-                  onValueChange={(v) => setMasterKolForm(f => ({ ...f, pricing: v || null }))}
-                >
-                  <SelectTrigger id="mk-pricing" className="focus-brand">
-                    <SelectValue placeholder="Select pricing" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {((fieldOptions as any)?.pricingTiers || []).map((p: string) => (
-                      <SelectItem key={p} value={p}>{p}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Tier select removed — column dropped in migration 071.
-                  Phase 3 will surface the auto-derived Score badge here. */}
-
-              <div className="space-y-1.5 col-span-2">
-                <Label>Platforms</Label>
-                <DialogMultiSelect
-                  selected={masterKolForm.platform || []}
-                  options={fieldOptions?.platforms || []}
-                  onChange={(next) => setMasterKolForm(f => ({ ...f, platform: next }))}
-                  placeholder="Select platforms..."
-                />
-              </div>
-
-              <div className="space-y-1.5 col-span-2">
-                <Label>Niches</Label>
-                <DialogMultiSelect
-                  selected={masterKolForm.niche || []}
-                  options={fieldOptions?.niches || []}
-                  onChange={(next) => setMasterKolForm(f => ({ ...f, niche: next }))}
-                  placeholder="Select niches..."
-                />
-              </div>
-
-              <div className="space-y-1.5 col-span-2">
-                <Label>Creator Type</Label>
-                <DialogMultiSelect
-                  selected={masterKolForm.creator_type || []}
-                  options={fieldOptions?.creatorTypes || []}
-                  onChange={(next) => setMasterKolForm(f => ({ ...f, creator_type: next }))}
-                  placeholder="Select creator types..."
-                />
-              </div>
-
-              <div className="space-y-1.5 col-span-2">
-                <Label>Content Type</Label>
-                <DialogMultiSelect
-                  selected={masterKolForm.content_type || []}
-                  options={fieldOptions?.contentTypes || []}
-                  onChange={(next) => setMasterKolForm(f => ({ ...f, content_type: next }))}
-                  placeholder="Select content types..."
-                />
-              </div>
-
-              <div className="space-y-1.5 col-span-2">
-                <Label>Deliverables</Label>
-                <DialogMultiSelect
-                  selected={masterKolForm.deliverables || []}
-                  options={fieldOptions?.deliverables || []}
-                  onChange={(next) => setMasterKolForm(f => ({ ...f, deliverables: next }))}
-                  placeholder="Select deliverables..."
-                />
-              </div>
-
-              {/* Rating input removed — column dropped in migration 071. */}
-
-              <div className="space-y-1.5">
-                <Label htmlFor="mk-in-house">In-House</Label>
-                <Input
-                  id="mk-in-house"
-                  value={masterKolForm.in_house || ''}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, in_house: e.target.value || null }))}
-                  className="focus-brand"
-                />
-              </div>
-
-              <div className="flex items-center gap-3 col-span-2 py-1">
-                <Switch
-                  checked={!!masterKolForm.community}
-                  onCheckedChange={(v) => setMasterKolForm(f => ({ ...f, community: v }))}
-                />
-                <Label className="cursor-pointer">Community KOL</Label>
-              </div>
-
-              <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="mk-wallet">Wallet</Label>
-                <Input
-                  id="mk-wallet"
-                  value={masterKolForm.wallet || ''}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, wallet: e.target.value || null }))}
-                  className="focus-brand"
-                />
-              </div>
-
-              <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="mk-description">Description</Label>
-                <Textarea
-                  id="mk-description"
-                  value={masterKolForm.description || ''}
-                  onChange={(e) => setMasterKolForm(f => ({ ...f, description: e.target.value || null }))}
-                  rows={3}
-                  className="focus-brand"
-                />
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
-            <Button variant="outline" onClick={() => { setEditingMasterKol(null); setMasterKolForm({}); }}>
-              Cancel
-            </Button>
-            <Button variant="brand" onClick={handleSaveMasterKol} disabled={savingMasterKol}>
-              {savingMasterKol ? 'Saving...' : 'Save Changes'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Master KOL Edit Dialog moved into
+          `components/campaign/MasterKolEditDialog.tsx` on
+          2026-06-02. Page only owns `editingMasterKol` (which doubles
+          as the open/null flag); the dialog owns form state +
+          save handler internally. */}
+      <MasterKolEditDialog
+        kol={editingMasterKol}
+        onClose={() => setEditingMasterKol(null)}
+      />
 
     </div>
     </CampaignDetailProvider>
