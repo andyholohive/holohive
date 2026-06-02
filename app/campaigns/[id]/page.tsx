@@ -13,6 +13,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { RequiredAsterisk } from "@/components/ui/required-asterisk";
 import { KpiCard } from "@/components/ui/kpi-card";
+import { StatusBadge, type BadgeTone } from "@/components/ui/status-badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -51,6 +52,17 @@ type KolSortKey =
  *
  * Mirrored in app/public/campaigns/[id]/page.tsx — keep both in sync.
  */
+/**
+ * Brand-teal hex constants for SVG / inline-CSS surfaces that can't
+ * accept a Tailwind class (recharts `stroke`/`fill`, scrollbar colors,
+ * `react-day-picker` `modifiersStyles`). Mirrors the `brand` tokens in
+ * `tailwind.config.ts` — keep these in sync if the brand palette ever
+ * shifts. Prefer `bg-brand` / `text-brand` over these constants
+ * everywhere a className is acceptable.
+ */
+const BRAND_HEX = '#3e8692';      // brand.DEFAULT
+const BRAND_DARK_HEX = '#2d6470'; // brand.dark
+
 const KOL_STATUS_ORDER = ['Curated', 'Contacted', 'Interested', 'Onboarded', 'Concluded'] as const;
 const statusOrderIndex = (s: string | null | undefined): number => {
   if (!s) return KOL_STATUS_ORDER.length; // unknown → end
@@ -2643,8 +2655,7 @@ const CampaignDetailsPage = () => {
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand w-full"
-              style={{ borderColor: "#e5e7eb", backgroundColor: "white", color: value ? "#111827" : "#9ca3af" }}
+              className={`focus-brand justify-start text-left font-normal h-9 w-full ${value ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
               {value ? formatDisplayDate(value) : "Select payment date"}
@@ -2765,6 +2776,17 @@ const CampaignDetailsPage = () => {
       case 'Concluded': return 'bg-emerald-100 text-emerald-800';
       default: return 'bg-cream-100 text-ink-warm-700';
     }
+  };
+
+  // v11 tone map for `<StatusBadge>` — used by the KOL cards-view
+  // chrome (and any new surface that wants the centralized palette
+  // instead of the older hex-bg `getStatusColor` helper above).
+  const KOL_STATUS_TONES: Record<string, BadgeTone> = {
+    Curated:    'info',
+    Contacted:  'purple',
+    Interested: 'warning',
+    Onboarded:  'warning',
+    Concluded:  'success',
   };
 
   const getContentStatusColor = (status: string) => {
@@ -3362,8 +3384,7 @@ const CampaignDetailsPage = () => {
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand w-full"
-              style={{ borderColor: "#e5e7eb", backgroundColor: "white", color: value ? "#111827" : "#9ca3af" }}
+              className={`focus-brand justify-start text-left font-normal h-9 w-full ${value ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
               {value ? formatDisplayDate(value) : "Select activation date"}
@@ -3884,11 +3905,7 @@ const CampaignDetailsPage = () => {
                 </div>
               ) : (
                 <div
-                  className="w-14 h-14 rounded-xl text-white flex items-center justify-center text-xl font-semibold shrink-0"
-                  style={{
-                    background: 'linear-gradient(135deg, #3e8692 0%, #2d6470 100%)',
-                    boxShadow: '0 1px 0 rgba(255,255,255,0.20) inset, 0 -1px 0 rgba(20,40,45,0.12) inset, 0 1px 2px rgba(20,40,45,0.20)',
-                  }}
+                  className="w-14 h-14 rounded-xl text-white flex items-center justify-center text-xl font-semibold shrink-0 bg-gradient-to-br from-brand to-brand-dark shadow-btn-brand"
                   aria-hidden
                 >
                   {(campaign?.name || campaign?.client_name || 'C').charAt(0).toUpperCase()}
@@ -4496,8 +4513,7 @@ const CampaignDetailsPage = () => {
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
-                            style={{ borderColor: "#e5e7eb", backgroundColor: "white", color: form?.start_date ? "#111827" : "#9ca3af" }}
+                            className={`focus-brand justify-start text-left font-normal h-9 ${form?.start_date ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {form?.start_date ? formatDate(form.start_date) : "Select start date"}
@@ -4515,7 +4531,7 @@ const CampaignDetailsPage = () => {
                         </PopoverContent>
                       </Popover>
                     ) : (
-                      <div className="text-lg font-semibold text-ink-warm-900">{formatDate(campaign?.start_date)}</div>
+                      <div className="display-serif text-[17px] text-ink-warm-900 leading-tight">{formatDate(campaign?.start_date)}</div>
                     )}
                   </div>
                   <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
@@ -4525,8 +4541,7 @@ const CampaignDetailsPage = () => {
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
-                            className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
-                            style={{ borderColor: "#e5e7eb", backgroundColor: "white", color: form?.end_date ? "#111827" : "#9ca3af" }}
+                            className={`focus-brand justify-start text-left font-normal h-9 ${form?.end_date ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {form?.end_date ? formatDate(form.end_date) : "Select end date"}
@@ -4545,7 +4560,7 @@ const CampaignDetailsPage = () => {
                         </PopoverContent>
                       </Popover>
                     ) : (
-                      <div className="text-lg font-semibold text-ink-warm-900">{formatDate(campaign?.end_date)}</div>
+                      <div className="display-serif text-[17px] text-ink-warm-900 leading-tight">{formatDate(campaign?.end_date)}</div>
                     )}
                   </div>
                   <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
@@ -4571,7 +4586,7 @@ const CampaignDetailsPage = () => {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <div className="text-lg font-semibold text-ink-warm-900">{displayRegion(campaign?.region)}</div>
+                      <div className="display-serif text-[17px] text-ink-warm-900 leading-tight">{displayRegion(campaign?.region)}</div>
                     )}
                   </div>
                   {/* [Phase edit relocation] Current Phase moved to the
@@ -4654,7 +4669,7 @@ const CampaignDetailsPage = () => {
                               <div className="flex items-center gap-3">
                                 <Avatar className="h-10 w-10">
                                   {clientLogoUrl && <AvatarImage src={clientLogoUrl} alt={clientName} className="object-cover" />}
-                                  <AvatarFallback className="bg-brand text-white font-semibold">
+                                  <AvatarFallback className="bg-brand-soft text-brand-deep border border-brand-light font-semibold">
                                     {initials}
                                   </AvatarFallback>
                                 </Avatar>
@@ -4714,8 +4729,7 @@ const CampaignDetailsPage = () => {
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
-                              className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
-                              style={{ borderColor: "#e5e7eb", backgroundColor: "white", color: form?.intro_call_date ? "#111827" : "#9ca3af" }}
+                              className={`focus-brand justify-start text-left font-normal h-9 ${form?.intro_call_date ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
                               {form?.intro_call_date ? formatDate(form.intro_call_date) : "Select intro call date"}
@@ -4812,7 +4826,7 @@ const CampaignDetailsPage = () => {
                               <div className="flex items-center gap-3">
                                 <Avatar className="h-10 w-10">
                                   {managerPhotoUrl && <AvatarImage src={managerPhotoUrl} alt={managerName} className="object-cover" />}
-                                  <AvatarFallback className="bg-brand text-white font-semibold">
+                                  <AvatarFallback className="bg-brand-soft text-brand-deep border border-brand-light font-semibold">
                                     {initials}
                                   </AvatarFallback>
                                 </Avatar>
@@ -5017,12 +5031,12 @@ const CampaignDetailsPage = () => {
                                 />
                               </div>
                             ) : (
-                              <div className="text-2xl font-bold text-ink-warm-900">{CampaignService.formatCurrency(campaign.total_budget)}</div>
+                              <div className="display-serif text-[28px] font-semibold text-ink-warm-900 tabular-nums leading-tight" style={{ letterSpacing: '-0.03em' }}>{CampaignService.formatCurrency(campaign.total_budget)}</div>
                             )}
                           </div>
                           <div>
                             <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Allocated</div>
-                            <div className="text-2xl font-bold text-brand">{CampaignService.formatCurrency(campaign.total_allocated || 0)}</div>
+                            <div className="display-serif text-[28px] font-semibold text-brand tabular-nums leading-tight" style={{ letterSpacing: '-0.03em' }}>{CampaignService.formatCurrency(campaign.total_allocated || 0)}</div>
                           </div>
                         </div>
                         {/* Progress Bar */}
@@ -5033,7 +5047,7 @@ const CampaignDetailsPage = () => {
                           </div>
                           <div className="w-full bg-cream-200 rounded-full h-3 overflow-hidden">
                             <div
-                              className="h-full bg-gradient-to-r from-brand to-[#2d6470] transition-all duration-300 rounded-full"
+                              className="h-full bg-gradient-to-r from-brand to-brand-dark transition-all duration-300 rounded-full"
                               style={{ width: `${Math.min(CampaignService.calculateBudgetUtilization(campaign.total_budget, campaign.total_allocated || 0), 100)}%` }}
                             ></div>
                           </div>
@@ -5231,7 +5245,7 @@ const CampaignDetailsPage = () => {
                          >
                            {filteredAvailableKOLs.length > 0 && filteredAvailableKOLs.every(kol => newKOLData.selectedKOLs.includes(kol.id)) ? 'Deselect All' : 'Select All'}
                          </Button>
-                         <div className="border rounded-lg overflow-hidden mt-2">
+                         <div className="border border-cream-200 rounded-[14px] overflow-hidden mt-2 shadow-card">
                            <Table>
                              <TableHeader>
                                <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
@@ -5400,7 +5414,7 @@ const CampaignDetailsPage = () => {
                              checked={newKOLData.createPayment}
                              onCheckedChange={(checked) => setNewKOLData(prev => ({ ...prev, createPayment: !!checked }))}
                            />
-                           <Label htmlFor="create-payment" className="cursor-pointer font-semibold">
+                           <Label htmlFor="create-payment" className="cursor-pointer text-sm font-medium text-ink-warm-900">
                              Create initial payment record for selected KOLs
                            </Label>
                          </div>
@@ -5428,8 +5442,7 @@ const CampaignDetailsPage = () => {
                                  <PopoverTrigger asChild>
                                    <Button
                                      variant="outline"
-                                     className="focus-brand justify-start text-left font-normal"
-                                     style={{ borderColor: "#e5e7eb", backgroundColor: "white" }}
+                                     className={`focus-brand justify-start text-left font-normal h-9 ${newKOLData.payment_date ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
                                    >
                                      <CalendarIcon className="mr-2 h-4 w-4" />
                                      {newKOLData.payment_date ? formatDisplayDate(newKOLData.payment_date) : "Select payment date"}
@@ -5624,7 +5637,7 @@ const CampaignDetailsPage = () => {
                                     }
                                   });
                                   return Object.entries(platformCounts).map(([platform, count], index) => {
-                                    let color = '#3e8692'; // Default teal
+                                    let color = BRAND_HEX; // Default teal
                                     if (platform === 'X') color = '#000000'; // Black for X
                                     else if (platform === 'Telegram') color = '#0088cc'; // Telegram blue
                                     
@@ -5700,7 +5713,7 @@ const CampaignDetailsPage = () => {
                                     }
                                   });
                                   return Object.entries(regionCounts).map(([region, count], index) => {
-                                    let color = '#3e8692'; // Default teal
+                                    let color = BRAND_HEX; // Default teal
                                     if (region === 'China') color = '#de2910'; // Chinese red
                                     else if (region === 'Korea') color = '#cd2e3a'; // Korean red
                                     else if (region === 'Vietnam') color = '#da251d'; // Vietnamese red
@@ -7153,96 +7166,111 @@ const CampaignDetailsPage = () => {
                     })()}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredKOLs.map((campaignKOL) => (
-                      <Card key={campaignKOL.id} className="crd-hover">
-                        <CardHeader className="pb-4">
+                    {filteredKOLs.map((campaignKOL) => {
+                      const initials = (campaignKOL.master_kol.name || '?')
+                        .split(' ')
+                        .map((w: string) => w.charAt(0).toUpperCase())
+                        .join('')
+                        .slice(0, 2);
+                      const tone: BadgeTone = campaignKOL.hh_status
+                        ? (KOL_STATUS_TONES[campaignKOL.hh_status] ?? 'neutral')
+                        : 'neutral';
+                      const contentCount = contents.filter(
+                        content => content.campaign_kols_id === campaignKOL.id,
+                      ).length;
+                      return (
+                      <Card key={campaignKOL.id} className="crd-hover flex flex-col h-full">
+                        <CardHeader className="pb-2">
                           <div className="flex flex-col items-center text-center">
-                            <div className="w-16 h-16 bg-gradient-to-br from-brand to-[#2d6470] rounded-full flex items-center justify-center mb-3">
-                              <span className="text-white font-bold text-xl">
-                                {campaignKOL.master_kol.name.charAt(0).toUpperCase()}
-                              </span>
+                            {/* v11 avatar tile — square-rounded brand-soft
+                                chip with a hairline border, matching the
+                                /clients & /team pattern. Drops the old
+                                circular gradient. */}
+                            <div className="w-14 h-14 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center mb-3 font-semibold text-base">
+                              {initials}
                             </div>
-                            <div className="mb-2">
-                              <h3 className="font-semibold text-ink-warm-900 text-lg">{campaignKOL.master_kol.name}</h3>
-                              <p className="text-sm text-ink-warm-500">{campaignKOL.master_kol.region || 'No region'}</p>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              {(campaignKOL.master_kol.platform || []).map((platform: string) => (
-                                <span key={platform} className="flex items-center justify-center h-6 w-6" title={platform}>
-                                  {getPlatformIcon(platform)}
+                            <h3 className="display-serif text-base font-semibold text-ink-warm-900 tracking-tight">
+                              {campaignKOL.master_kol.name}
+                            </h3>
+                            <p className="text-xs text-ink-warm-500 mt-0.5">
+                              {campaignKOL.master_kol.region || 'No region'}
+                            </p>
+                            <div className="mt-2 flex items-center gap-2">
+                              <StatusBadge tone={tone} size="sm" bordered>
+                                {campaignKOL.hh_status || 'No status'}
+                              </StatusBadge>
+                              {(campaignKOL.master_kol.platform || []).length > 0 && (
+                                <span className="flex items-center gap-1 text-ink-warm-500">
+                                  {(campaignKOL.master_kol.platform || []).map((platform: string) => (
+                                    <span
+                                      key={platform}
+                                      className="flex items-center justify-center h-4 w-4"
+                                      title={platform}
+                                    >
+                                      {getPlatformIcon(platform)}
+                                    </span>
+                                  ))}
                                 </span>
-                              ))}
+                              )}
                             </div>
                           </div>
                         </CardHeader>
-                        <CardContent className="space-y-3">
-                          {/* Followers */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-ink-warm-700">Followers</span>
-                            <span className="font-medium text-ink-warm-900">
-                              {campaignKOL.master_kol.followers ? KOLService.formatFollowers(campaignKOL.master_kol.followers) : '-'}
-                            </span>
-                          </div>
-
-                          {/* Status */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-ink-warm-700">Status</span>
-                            <Badge className={getStatusColor(campaignKOL.hh_status)}>
-                              {campaignKOL.hh_status || 'No status'}
-                            </Badge>
-                          </div>
-
-                          {/* Paid Amount - hidden
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-ink-warm-700">Paid</span>
-                            <span className="font-medium text-ink-warm-900">
-                              {campaignKOL.paid ? `$${campaignKOL.paid}` : '-'}
-                            </span>
-                          </div>
-                          */}
-
-                          {/* Content Count */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-ink-warm-700">Content</span>
-                            <span className="font-medium text-ink-warm-900">
-                              {contents.filter(content => content.campaign_kols_id === campaignKOL.id).length}
-                            </span>
-                          </div>
-
-                          {/* Wallet */}
-                          {campaignKOL.wallet && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-ink-warm-700">Wallet</span>
-                              <span className="font-medium text-ink-warm-900 truncate" title={campaignKOL.wallet}>
-                                {campaignKOL.wallet}
+                        <CardContent className="pt-3 border-t border-cream-100 flex flex-col flex-1">
+                          <div className="space-y-2.5">
+                            {/* Followers */}
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500">Followers</span>
+                              <span className="font-medium text-ink-warm-900 tabular-nums">
+                                {campaignKOL.master_kol.followers ? KOLService.formatFollowers(campaignKOL.master_kol.followers) : '—'}
                               </span>
                             </div>
-                          )}
+
+                            {/* Content Count */}
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500">Content</span>
+                              <span className="font-medium text-ink-warm-900 tabular-nums">
+                                {contentCount}
+                              </span>
+                            </div>
+
+                            {/* Wallet */}
+                            {campaignKOL.wallet && (
+                              <div className="flex items-center justify-between text-sm gap-2">
+                                <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500 shrink-0">Wallet</span>
+                                <span className="font-medium text-ink-warm-900 truncate mono text-xs" title={campaignKOL.wallet}>
+                                  {campaignKOL.wallet}
+                                </span>
+                              </div>
+                            )}
+                          </div>
 
                           {/* Notes */}
                           {campaignKOL.notes && (
-                            <div className="pt-2 border-t border-cream-100">
-                              <span className="text-sm text-ink-warm-700">Notes</span>
+                            <div className="mt-3 pt-3 border-t border-cream-100">
+                              <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500">Notes</span>
                               <p className="text-sm text-ink-warm-900 mt-1 line-clamp-2">{campaignKOL.notes}</p>
                             </div>
                           )}
 
-                          {/* Profile Link */}
+                          {/* Profile Link — pinned to bottom so action
+                              row aligns across cards in the grid. */}
                           {campaignKOL.master_kol.link && (
-                            <div className="pt-2 border-t border-cream-100">
-                              <a 
-                                href={campaignKOL.master_kol.link} 
-                                target="_blank" 
+                            <div className="mt-auto pt-3 border-t border-cream-100">
+                              <a
+                                href={campaignKOL.master_kol.link}
+                                target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-sm text-brand hover:text-brand-dark underline"
+                                className="inline-flex items-center gap-1 text-xs text-brand hover:text-brand-dark mono"
                               >
-                                View Profile →
+                                View Profile
+                                <ExternalLink className="h-3 w-3" />
                               </a>
                             </div>
                           )}
                         </CardContent>
                       </Card>
-                    ))}
+                      );
+                    })}
                     </div>
                   </>
                 )}
@@ -7298,7 +7326,7 @@ const CampaignDetailsPage = () => {
                         Add Content
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
+                    <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
                       <DialogHeader>
                         <DialogTitle>Add Content</DialogTitle>
                       </DialogHeader>
@@ -7331,12 +7359,7 @@ const CampaignDetailsPage = () => {
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
-                                className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
-                                style={{
-                                  borderColor: "#e5e7eb",
-                                  backgroundColor: "white",
-                                  color: addContentData.activation_date ? "#111827" : "#9ca3af"
-                                }}
+                                className={`focus-brand justify-start text-left font-normal h-9 ${addContentData.activation_date ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                 {addContentData.activation_date ? formatDisplayDate(addContentData.activation_date) : "Select activation date"}
@@ -7676,163 +7699,6 @@ const CampaignDetailsPage = () => {
                         </div>
                       );
                     })()}
-                    {/* Legacy metrics cards retained behind a flag.
-                        The KpiCard strip above carries the same data. */}
-                    {false && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {/* Total Impressions */}
-                      <Card className="crd-hover">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                              <BarChart3 className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="text-sm text-ink-warm-700">
-                              {(() => {
-                                const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
-                                return totalImpressions === 1 ? 'Total Impression' : 'Total Impressions';
-                              })()}
-                            </p>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-ink-warm-900">
-                            {(() => {
-                              const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
-                              return totalImpressions.toLocaleString();
-                            })()}
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Total Comments */}
-                      <Card className="crd-hover">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                              <BarChart3 className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="text-sm text-ink-warm-700">
-                              {(() => {
-                                const totalComments = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
-                                return totalComments === 1 ? 'Total Comment' : 'Total Comments';
-                              })()}
-                            </p>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-ink-warm-900">
-                            {(() => {
-                              const totalComments = contents.reduce((sum, content) => sum + (content.comments || 0), 0);
-                              return totalComments.toLocaleString();
-                            })()}
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Total Retweets */}
-                      <Card className="crd-hover">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                              <BarChart3 className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="text-sm text-ink-warm-700">
-                              {(() => {
-                                const totalRetweets = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
-                                return totalRetweets === 1 ? 'Total Retweet' : 'Total Retweets';
-                              })()}
-                            </p>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-ink-warm-900">
-                            {(() => {
-                              const totalRetweets = contents.reduce((sum, content) => sum + (content.retweets || 0), 0);
-                              return totalRetweets.toLocaleString();
-                            })()}
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Total Likes */}
-                      <Card className="crd-hover">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                              <BarChart3 className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="text-sm text-ink-warm-700">
-                              {(() => {
-                                const totalLikes = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
-                                return totalLikes === 1 ? 'Total Like' : 'Total Likes';
-                              })()}
-                            </p>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-ink-warm-900">
-                            {(() => {
-                              const totalLikes = contents.reduce((sum, content) => sum + (content.likes || 0), 0);
-                              return totalLikes.toLocaleString();
-                            })()}
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Total Engagements */}
-                      <Card className="crd-hover">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                              <BarChart3 className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="text-sm text-ink-warm-700">
-                              {(() => {
-                                const totalEngagements = contents.reduce((sum, content) =>
-                                  sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
-                                return totalEngagements === 1 ? 'Total Engagement' : 'Total Engagements';
-                              })()}
-                            </p>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-ink-warm-900">
-                            {(() => {
-                              const totalEngagements = contents.reduce((sum, content) =>
-                                sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
-                              return totalEngagements.toLocaleString();
-                            })()}
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Total Bookmarks */}
-                      <Card className="crd-hover">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                              <BarChart3 className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="text-sm text-ink-warm-700">
-                              {(() => {
-                                const totalBookmarks = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
-                                return totalBookmarks === 1 ? 'Total Bookmark' : 'Total Bookmarks';
-                              })()}
-                            </p>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-ink-warm-900">
-                            {(() => {
-                              const totalBookmarks = contents.reduce((sum, content) => sum + (content.bookmarks || 0), 0);
-                              return totalBookmarks.toLocaleString();
-                            })()}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                    )}
 
                     {/* Average Engagement Rate — single-stat panel
                         styled the same way as the inner Card primitives
@@ -7926,9 +7792,9 @@ const CampaignDetailsPage = () => {
                               <Line
                                 type="monotone"
                                 dataKey="impressions"
-                                stroke="#3e8692"
+                                stroke={BRAND_HEX}
                                 strokeWidth={3}
-                                dot={{ fill: '#3e8692', strokeWidth: 2, r: 4 }}
+                                dot={{ fill: BRAND_HEX, strokeWidth: 2, r: 4 }}
                               />
                             </LineChart>
                           </ResponsiveContainer>
@@ -8000,7 +7866,10 @@ const CampaignDetailsPage = () => {
                                     return acc;
                                   }, {} as Record<string, number>);
 
-                                  const colors = ['#3e8692', '#2d6470', '#1e4a5a', '#0f2d3a'];
+                                  // Brand-teal gradient ramp — start at
+                                  // brand, step down through brand-dark
+                                  // toward the brand-deep ink anchor.
+                                  const colors = [BRAND_HEX, BRAND_DARK_HEX, '#1e4a5a', '#0f2d3a'];
                                   return Object.entries(platformImpressions).map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
                                   ));
@@ -9201,7 +9070,7 @@ const CampaignDetailsPage = () => {
                         <>
                         <div className="grid gap-2">
                           <Label htmlFor="kol-select">Select KOLs</Label>
-                          <div className="border rounded-lg p-3 max-h-64 overflow-y-auto space-y-2">
+                          <div className="border border-cream-200 rounded-[14px] p-3 max-h-64 overflow-y-auto space-y-2 bg-cream-50/30">
                             {campaignKOLs.map((kol) => (
                               <div
                                 key={kol.id}
@@ -9297,7 +9166,7 @@ const CampaignDetailsPage = () => {
                         {/* Payment details for each selected KOL */}
                         {selectedKOLsForPayment.length > 0 && (
                           <div className="space-y-6 border-t pt-4">
-                            <h3 className="font-semibold text-lg">Payment Details</h3>
+                            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Payment Details</h3>
                             {selectedKOLsForPayment.map((kolId) => {
                               const kol = campaignKOLs.find(k => k.id === kolId);
                               if (!kol) return null;
@@ -9308,15 +9177,15 @@ const CampaignDetailsPage = () => {
 
                               return (
                                 <div key={kolId} className="space-y-4">
-                                  <div className="flex items-center gap-2 pb-2 border-b">
-                                    <h4 className="font-semibold text-md text-brand">{kol.master_kol.name}</h4>
+                                  <div className="flex items-center gap-2 pb-2 border-b border-cream-200">
+                                    <h4 className="display-serif text-[15px] text-brand-deep leading-tight">{kol.master_kol.name}</h4>
                                     <span className="text-sm text-ink-warm-500">({numberOfPayments} payment{numberOfPayments > 1 ? 's' : ''})</span>
                                   </div>
 
                                   {payments.map((payment, paymentIndex) => (
-                                    <div key={paymentIndex} className="border rounded-lg p-4 space-y-4 bg-cream-50">
+                                    <div key={paymentIndex} className="border border-cream-200 rounded-[14px] p-4 space-y-4 bg-cream-50/60 shadow-card">
                                       {numberOfPayments > 1 && (
-                                        <div className="text-sm font-medium text-ink-warm-700 border-b pb-2">
+                                        <div className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500 border-b border-cream-200 pb-2">
                                           Payment {paymentIndex + 1} of {numberOfPayments}
                                         </div>
                                       )}
@@ -9354,12 +9223,7 @@ const CampaignDetailsPage = () => {
                                         <PopoverTrigger asChild>
                                           <Button
                                             variant="outline"
-                                            className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
-                                            style={{
-                                              borderColor: "#e5e7eb",
-                                              backgroundColor: "white",
-                                              color: payment.payment_date ? "#111827" : "#9ca3af"
-                                            }}
+                                            className={`focus-brand justify-start text-left font-normal h-9 ${payment.payment_date ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
                                           >
                                             <CalendarIcon className="mr-2 h-4 w-4" />
                                             {payment.payment_date ? formatDisplayDate(payment.payment_date) : "Select payment date"}
@@ -9536,12 +9400,7 @@ const CampaignDetailsPage = () => {
                                 <PopoverTrigger asChild>
                                   <Button
                                     variant="outline"
-                                    className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
-                                    style={{
-                                      borderColor: "#e5e7eb",
-                                      backgroundColor: "white",
-                                      color: nonKOLPayment.payment_date ? "#111827" : "#9ca3af"
-                                    }}
+                                    className={`focus-brand justify-start text-left font-normal h-9 ${nonKOLPayment.payment_date ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
                                   >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
                                     {nonKOLPayment.payment_date ? formatDisplayDate(nonKOLPayment.payment_date) : "Select payment date"}
@@ -10577,7 +10436,7 @@ const CampaignDetailsPage = () => {
                               labelFormatter={() => ''}
                             />
                             <Bar dataKey="total" fill="#9ca3af" name="total" radius={[8, 8, 8, 8]} />
-                            <Bar dataKey="allocated" fill="#3e8692" name="allocated" radius={[8, 8, 8, 8]} />
+                            <Bar dataKey="allocated" fill={BRAND_HEX} name="allocated" radius={[8, 8, 8, 8]} />
                             <Bar dataKey="remaining" fill="#10b981" name="remaining" radius={[8, 8, 8, 8]} />
                           </BarChart>
                         </ResponsiveContainer>
@@ -10682,7 +10541,7 @@ const CampaignDetailsPage = () => {
                                 }}
                               />
                               <Bar dataKey="allocated" fill="#9ca3af" name="allocated" radius={[8, 8, 8, 8]} />
-                              <Bar dataKey="payments" fill="#3e8692" name="payments" radius={[8, 8, 8, 8]} />
+                              <Bar dataKey="payments" fill={BRAND_HEX} name="payments" radius={[8, 8, 8, 8]} />
                               <Bar dataKey="remaining" fill="#10b981" name="remaining" radius={[8, 8, 8, 8]} />
                             </BarChart>
                           </ResponsiveContainer>
@@ -10933,7 +10792,7 @@ const CampaignDetailsPage = () => {
               width: '100%',
               height: '100%',
               scrollbarWidth: 'thin',
-              scrollbarColor: '#3e8692 #f3f4f6'
+              scrollbarColor: `${BRAND_HEX} #f3f4f6`
             }}
             onScroll={(e) => {
               const scrollLeft = e.currentTarget.scrollLeft;
@@ -11263,12 +11122,7 @@ const CampaignDetailsPage = () => {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="focus-brand justify-start text-left font-normal focus:ring-2 focus:ring-brand focus:border-brand"
-                    style={{
-                      borderColor: "#e5e7eb",
-                      backgroundColor: "white",
-                      color: newPaymentData.payment_date ? "#111827" : "#9ca3af"
-                    }}
+                    className={`focus-brand justify-start text-left font-normal h-9 ${newPaymentData.payment_date ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
                     {newPaymentData.payment_date ? formatDisplayDate(newPaymentData.payment_date) : "Select payment date"}
