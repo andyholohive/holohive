@@ -53,6 +53,10 @@
       "schedule": "0 8 * * *"
     },
     {
+      "path": "/api/cron/dashboard-escalations",
+      "schedule": "0 8 * * *"
+    },
+    {
       "path": "/api/cron/generate-expense-instances",
       "schedule": "30 0 * * *"
     }
