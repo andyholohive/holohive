@@ -31,6 +31,7 @@ import {
 import { CampaignDetailProvider } from "@/contexts/CampaignDetailContext";
 import { AddKOLsDialog } from "@/components/campaign/AddKOLsDialog";
 import { MultiSelect } from "@/components/campaign/MultiSelect";
+import { RecordPaymentDialog, type RecordPaymentDialogHandle } from "@/components/campaign/RecordPaymentDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserService } from "@/lib/userService";
 import { KOLService, MasterKOL } from "@/lib/kolService";
@@ -326,6 +327,11 @@ const CampaignDetailsPage = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
+  // Imperative handle to the extracted RecordPaymentDialog so the
+  // page-level pricing-suggestion sub-dialog can push an accepted
+  // amount back into the dialog's internal form state (the dialog
+  // owns `multiKOLPayments`; the page can't reach it directly).
+  const recordPaymentDialogRef = useRef<RecordPaymentDialogHandle>(null);
   const [isEditingPayment, setIsEditingPayment] = useState(false);
   const [editingPayment, setEditingPayment] = useState<any>(null);
   const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
@@ -348,32 +354,10 @@ const CampaignDetailsPage = () => {
     notes: ''
   });
 
-  // Multi-KOL payment state
-  const [selectedKOLsForPayment, setSelectedKOLsForPayment] = useState<string[]>([]);
-  const [multiKOLPayments, setMultiKOLPayments] = useState<{[kolId: string]: {
-    number_of_payments: number;
-    payments: Array<{
-      amount: number;
-      payment_date: string;
-      payment_method: string;
-      content_id: string;
-      transaction_id: string;
-      notes: string;
-    }>;
-  }}>({});
-
-  // Non-KOL payment state
-  const [paymentType, setPaymentType] = useState<'kol' | 'other'>('kol');
-  const [nonKOLPayment, setNonKOLPayment] = useState({
-    recipient_name: '',
-    payment_category: 'other' as 'operational' | 'other',
-    amount: 0,
-    payment_date: '',
-    payment_method: 'Fiat',
-    transaction_id: '',
-    wallet: '',
-    notes: ''
-  });
+  // `selectedKOLsForPayment`, `multiKOLPayments`, `paymentType`,
+  // `nonKOLPayment` moved into <RecordPaymentDialog> on 2026-06-02.
+  // The dialog owns its own form state internally; the page only
+  // owns `isAddingPayment` (the open/close flag).
 
   // Payment filters state
   const [paymentFilters, setPaymentFilters] = useState({
@@ -1779,77 +1763,28 @@ const CampaignDetailsPage = () => {
     }
   };
 
-  // Handle payment date selection with notification option
-  const handlePaymentDateSelect = (
-    date: Date | undefined,
-    kolId: string,
-    paymentIndex: number,
-    payment: any
-  ) => {
-    if (!date) {
-      // Just clear the date if no date selected
-      setMultiKOLPayments(prev => {
-        const newPayments = [...(prev[kolId]?.payments || [])];
-        newPayments[paymentIndex] = { ...newPayments[paymentIndex], payment_date: '' };
-        return { ...prev, [kolId]: { ...prev[kolId], payments: newPayments } };
-      });
-      return;
-    }
+  // `handlePaymentDateSelect` moved into <RecordPaymentDialog>.
+  // The dialog reads `kolTelegramChats` from context and fires
+  // the confirmation sub-dialog via `triggerPaymentNotification`
+  // (below) when the KOL has a linked TG chat + wallet + amount.
 
-    // Find the KOL and check for telegram chat
-    const kol = campaignKOLs.find(k => k.id === kolId);
-    const masterKolId = kol?.master_kol?.id;
-    const telegramChat = masterKolId ? kolTelegramChats[masterKolId] : null;
-    const wallet = kol?.master_kol?.wallet;
-    const amount = payment.amount;
-
-    console.log('[Payment Date] KOL:', kol?.master_kol?.name, 'masterKolId:', masterKolId, 'telegramChat:', telegramChat, 'wallet:', wallet, 'amount:', amount);
-    console.log('[Payment Date] All telegram chats:', kolTelegramChats);
-
-    // Always set the date first
-    setMultiKOLPayments(prev => {
-      const newPayments = [...(prev[kolId]?.payments || [])];
-      newPayments[paymentIndex] = { ...newPayments[paymentIndex], payment_date: formatDateLocal(date) };
-      return { ...prev, [kolId]: { ...prev[kolId], payments: newPayments } };
-    });
-
-    // Check conditions for showing notification dialog
-    if (!telegramChat) {
-      toast({
-        title: 'No Telegram chat linked',
-        description: `${kol?.master_kol?.name || 'This KOL'} doesn't have a linked Telegram chat`,
-      });
-      return;
-    }
-
-    if (!wallet) {
-      toast({
-        title: 'No wallet address',
-        description: `${kol?.master_kol?.name || 'This KOL'} doesn't have a wallet address set`,
-      });
-      return;
-    }
-
-    if (!amount || amount <= 0) {
-      toast({
-        title: 'No payment amount',
-        description: 'Please enter a payment amount first',
-      });
-      return;
-    }
-
-    // Show confirmation dialog
-    setPendingPaymentNotification({
-      kolId,
-      kolName: kol?.master_kol?.name || 'Unknown KOL',
-      paymentIndex,
-      amount,
-      wallet,
-      chatId: telegramChat.chat_id,
-      chatTitle: telegramChat.title,
-      date
-    });
-    setPaymentNotificationMessage(`$${amount.toLocaleString()} has been deposited to ${wallet}!\n\nThanks for being part of the Holo Hive network 🙌`);
+  // ── Trigger the Payment Notification confirmation sub-dialog.
+  //    Exposed via context so the (extracted) RecordPaymentDialog
+  //    can fire this side-effect without owning the notification
+  //    sub-dialog state itself. Mirrors the inline logic that used
+  //    to live at the bottom of `handlePaymentDateSelect`.
+  const triggerPaymentNotification = (opts: {
+    kolId: string;
+    kolName: string;
+    paymentIndex: number;
+    amount: number;
+    wallet: string;
+    chatId: string;
+    chatTitle: string | null;
+    date: Date;
+  }) => {
+    setPendingPaymentNotification(opts);
+    setPaymentNotificationMessage(`$${opts.amount.toLocaleString()} has been deposited to ${opts.wallet}!\n\nThanks for being part of the Holo Hive network 🙌`);
     setIsEditingPaymentMessage(false);
     setPaymentNotifyDialogOpen(true);
   };
@@ -1986,142 +1921,10 @@ const CampaignDetailsPage = () => {
     }
   };
 
-  const handleAddMultiKOLPayments = async () => {
-    if (selectedKOLsForPayment.length === 0) {
-      toast({ title: "Error", description: "Please select at least one KOL.", variant: "destructive" });
-      return;
-    }
-
-    // Validate that all selected KOLs have payment data
-    const missingData = selectedKOLsForPayment.filter(kolId => {
-      const kolData = multiKOLPayments[kolId];
-      if (!kolData || !kolData.payments) return true;
-      return kolData.payments.some(p => !p.amount || p.amount <= 0);
-    });
-
-    if (missingData.length > 0) {
-      toast({ title: "Error", description: "Please fill in amount for all payments.", variant: "destructive" });
-      return;
-    }
-
-    try {
-      // Create payments for all selected KOLs
-      const paymentInserts = selectedKOLsForPayment.flatMap(kolId => {
-        const kolData = multiKOLPayments[kolId];
-        if (!kolData || !kolData.payments) return [];
-
-        // Create a payment record for each payment in the array
-        return kolData.payments.map((payment, index) => ({
-          campaign_id: campaign?.id,
-          campaign_kol_id: kolId,
-          amount: payment.amount,
-          payment_date: payment.payment_date || new Date().toISOString().split('T')[0],
-          payment_method: payment.payment_method || 'Token',
-          content_id: (() => {
-            // Handle array of content IDs
-            if (Array.isArray(payment.content_id)) {
-              return payment.content_id.length > 0 ? payment.content_id : null;
-            }
-            // Handle legacy single content_id
-            return payment.content_id === 'none' ? null : (payment.content_id ? [payment.content_id] : null);
-          })(),
-          transaction_id: payment.transaction_id || null,
-          notes: payment.notes || null
-        }));
-      });
-
-      const { data, error } = await supabase
-        .from('payments')
-        .insert(paymentInserts)
-        .select();
-
-      if (error) throw error;
-
-      // Update each KOL's paid amount
-      for (const kolId of selectedKOLsForPayment) {
-        const kolData = multiKOLPayments[kolId];
-        if (!kolData || !kolData.payments) continue;
-
-        const currentKol = campaignKOLs.find(kol => kol.id === kolId);
-        const currentPaid = currentKol?.paid || 0;
-        const totalAmount = kolData.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
-        const newPaid = currentPaid + totalAmount;
-
-        await supabase
-          .from('campaign_kols')
-          .update({ paid: newPaid })
-          .eq('id', kolId);
-
-        setCampaignKOLs(prev => prev.map(kol =>
-          kol.id === kolId ? { ...kol, paid: newPaid } : kol
-        ));
-      }
-
-      // Refetch payments
-      fetchPayments();
-
-      // Reset state
-      setSelectedKOLsForPayment([]);
-      setMultiKOLPayments({});
-      setIsAddingPayment(false);
-      toast({ title: "Success", description: `${paymentInserts.length} payment record(s) created for ${selectedKOLsForPayment.length} KOL(s).` });
-    } catch (err) {
-      console.error('Error adding payments:', err);
-      toast({ title: "Error", description: "Failed to record payments.", variant: "destructive" });
-    }
-  };
-
-  const handleAddNonKOLPayment = async () => {
-    if (!nonKOLPayment.recipient_name.trim()) {
-      toast({ title: "Error", description: "Please enter a recipient name.", variant: "destructive" });
-      return;
-    }
-    if (!nonKOLPayment.amount || nonKOLPayment.amount <= 0) {
-      toast({ title: "Error", description: "Please enter a valid amount.", variant: "destructive" });
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('payments')
-        .insert({
-          campaign_id: campaign?.id,
-          campaign_kol_id: null,
-          recipient_name: nonKOLPayment.recipient_name.trim(),
-          payment_category: nonKOLPayment.payment_category,
-          amount: nonKOLPayment.amount,
-          payment_date: nonKOLPayment.payment_date || new Date().toISOString().split('T')[0],
-          payment_method: nonKOLPayment.payment_method || 'Token',
-          transaction_id: nonKOLPayment.transaction_id || null,
-          wallet: nonKOLPayment.wallet || null,
-          notes: nonKOLPayment.notes || null
-        })
-        .select();
-
-      if (error) throw error;
-
-      // Refetch payments
-      fetchPayments();
-
-      // Reset state
-      setNonKOLPayment({
-        recipient_name: '',
-        payment_category: 'other',
-        amount: 0,
-        payment_date: new Date().toISOString().split('T')[0],
-        payment_method: 'Fiat',
-        transaction_id: '',
-        wallet: '',
-        notes: ''
-      });
-      setPaymentType('kol');
-      setIsAddingPayment(false);
-      toast({ title: "Success", description: "Non-KOL payment recorded successfully." });
-    } catch (err) {
-      console.error('Error adding non-KOL payment:', err);
-      toast({ title: "Error", description: "Failed to record payment.", variant: "destructive" });
-    }
-  };
+  // `handleAddMultiKOLPayments` + `handleAddNonKOLPayment` moved into
+  // <RecordPaymentDialog>. Both supabase inserts now live in that
+  // component, which calls `fetchPayments` + `setCampaignKOLs`
+  // (KOL-payment paid-total update) via the campaign-detail context.
 
   const handleDeletePayment = async (paymentId: string) => {
     try {
@@ -3613,10 +3416,12 @@ const CampaignDetailsPage = () => {
       payments, setPayments,
       availableKOLs,
       latestCostMap,
+      kolTelegramChats,
       fetchCampaignKOLs,
       fetchAvailableKOLs,
       fetchPayments,
       setPricingSuggestionDialog,
+      triggerPaymentNotification,
       toast,
     }}>
     <div className="space-y-4">
@@ -8164,482 +7969,16 @@ const CampaignDetailsPage = () => {
                     <Download className="h-4 w-4 mr-2" />
                     Export CSV
                   </Button>
-                  <Dialog open={isAddingPayment} onOpenChange={setIsAddingPayment}>
-                    <DialogTrigger asChild>
-                      <Button variant="brand" size="sm">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Record Payment
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-6xl max-h-[85vh] flex flex-col">
-                      <DialogHeader>
-                        <DialogTitle>Record Payment(s)</DialogTitle>
-                        <p className="text-sm text-ink-warm-500 mt-1">
-                          {paymentType === 'kol' ? 'Select one or more KOLs and enter payment details for each' : 'Record a non-KOL expense or payment'}
-                        </p>
-                      </DialogHeader>
-
-                      {/* Payment Type Toggle */}
-                      <div className="flex gap-2 mb-2">
-                        <Button
-                          type="button"
-                          variant={paymentType === 'kol' ? 'brand' : 'outline'}
-                          size="sm"
-                          onClick={() => setPaymentType('kol')}
-                        >
-                          KOL Payment
-                        </Button>
-                        <Button
-                          type="button"
-                          variant={paymentType === 'other' ? 'brand' : 'outline'}
-                          size="sm"
-                          onClick={() => setPaymentType('other')}
-                        >
-                          Other Expense
-                        </Button>
-                      </div>
-
-                      <div className="grid gap-4 py-4 flex-1 overflow-y-auto px-1">
-                        {paymentType === 'kol' ? (
-                        <>
-                        <div className="grid gap-2">
-                          <Label htmlFor="kol-select">Select KOLs</Label>
-                          <div className="border border-cream-200 rounded-[14px] p-3 max-h-64 overflow-y-auto space-y-2 bg-cream-50/30">
-                            {campaignKOLs.map((kol) => (
-                              <div
-                                key={kol.id}
-                                className="flex items-center space-x-3 p-2 hover:bg-cream-50 rounded"
-                              >
-                                <Checkbox
-                                  checked={selectedKOLsForPayment.includes(kol.id)}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      setSelectedKOLsForPayment(prev => [...prev, kol.id]);
-                                      setMultiKOLPayments(prev => ({
-                                        ...prev,
-                                        [kol.id]: {
-                                          number_of_payments: 1,
-                                          payments: [{
-                                            amount: 0,
-                                            payment_date: '',
-                                            payment_method: 'Fiat',
-                                            content_id: 'none',
-                                            transaction_id: '',
-                                            notes: ''
-                                          }]
-                                        }
-                                      }));
-                                      // Check if this KOL has a latest cost and show suggestion dialog
-                                      const masterKolId = kol.master_kol?.id;
-                                      const latestCost = masterKolId ? latestCostMap.get(masterKolId) : undefined;
-                                      if (latestCost && latestCost > 0) {
-                                        setPricingSuggestionDialog({
-                                          open: true,
-                                          kolId: kol.id,
-                                          kolName: kol.master_kol?.name || 'Unknown',
-                                          masterKolId: masterKolId,
-                                          latestCost: latestCost,
-                                          paymentIndex: 0,
-                                          mode: 'payment-dialog'
-                                        });
-                                      }
-                                    } else {
-                                      setSelectedKOLsForPayment(prev => prev.filter(id => id !== kol.id));
-                                      const newPayments = { ...multiKOLPayments };
-                                      delete newPayments[kol.id];
-                                      setMultiKOLPayments(newPayments);
-                                    }
-                                  }}
-                                />
-                                <span className="font-medium flex-1">
-                                  {kol.master_kol.name}
-                                  {latestCostMap.get(kol.master_kol?.id) != null && latestCostMap.get(kol.master_kol?.id)! > 0 && (
-                                    <span className="ml-2 text-xs text-ink-warm-500">
-                                      (Latest: ${latestCostMap.get(kol.master_kol?.id)?.toLocaleString()})
-                                    </span>
-                                  )}
-                                </span>
-                                {selectedKOLsForPayment.includes(kol.id) && (
-                                  <div className="flex items-center gap-2">
-                                    <Label className="text-xs text-ink-warm-700 whitespace-nowrap">Payments:</Label>
-                                    <Input
-                                      type="number"
-                                      min="1"
-                                      className="w-16 h-8 text-xs"
-                                      value={multiKOLPayments[kol.id]?.number_of_payments || 1}
-                                      onClick={(e) => e.stopPropagation()}
-                                      onChange={(e) => {
-                                        const num = Math.max(1, parseInt(e.target.value) || 1);
-                                        setMultiKOLPayments(prev => {
-                                          const currentPayments = prev[kol.id]?.payments || [];
-                                          const newPayments = Array.from({ length: num }, (_, i) => {
-                                            // Keep existing payment data if available, otherwise create new
-                                            return currentPayments[i] || {
-                                              amount: 0,
-                                              payment_date: '',
-                                              payment_method: 'Fiat',
-                                              content_id: 'none',
-                                              transaction_id: '',
-                                              notes: ''
-                                            };
-                                          });
-                                          return {
-                                            ...prev,
-                                            [kol.id]: { number_of_payments: num, payments: newPayments }
-                                          };
-                                        });
-                                      }}
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Payment details for each selected KOL */}
-                        {selectedKOLsForPayment.length > 0 && (
-                          <div className="space-y-6 border-t pt-4">
-                            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Payment Details</h3>
-                            {selectedKOLsForPayment.map((kolId) => {
-                              const kol = campaignKOLs.find(k => k.id === kolId);
-                              if (!kol) return null;
-                              const kolData = multiKOLPayments[kolId];
-                              if (!kolData) return null;
-                              const numberOfPayments = kolData.number_of_payments || 1;
-                              const payments = kolData.payments || [];
-
-                              return (
-                                <div key={kolId} className="space-y-4">
-                                  <div className="flex items-center gap-2 pb-2 border-b border-cream-200">
-                                    <h4 className="display-serif text-[15px] text-brand-deep leading-tight">{kol.master_kol.name}</h4>
-                                    <span className="text-sm text-ink-warm-500">({numberOfPayments} payment{numberOfPayments > 1 ? 's' : ''})</span>
-                                  </div>
-
-                                  {payments.map((payment, paymentIndex) => (
-                                    <div key={paymentIndex} className="border border-cream-200 rounded-[14px] p-4 space-y-4 bg-cream-50/60 shadow-card">
-                                      {numberOfPayments > 1 && (
-                                        <div className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500 border-b border-cream-200 pb-2">
-                                          Payment {paymentIndex + 1} of {numberOfPayments}
-                                        </div>
-                                      )}
-
-                                      <div className="grid grid-cols-2 gap-4">
-                                        <div className="grid gap-2">
-                                          <Label>Amount (USD) <RequiredAsterisk /></Label>
-                                      <div className="relative w-full">
-                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-warm-500 pointer-events-none">$</span>
-                                        <Input
-                                          type="text"
-                                          inputMode="numeric"
-                                          pattern="[0-9,]*"
-                                          className="focus-brand pl-6 w-full"
-                                          value={payment.amount ? Number(payment.amount).toLocaleString('en-US') : ''}
-                                          onChange={(e) => {
-                                            const raw = e.target.value.replace(/[^0-9]/g, '');
-                                            setMultiKOLPayments(prev => {
-                                              const newPayments = [...(prev[kolId]?.payments || [])];
-                                              newPayments[paymentIndex] = { ...newPayments[paymentIndex], amount: parseFloat(raw) || 0 };
-                                              return {
-                                                ...prev,
-                                                [kolId]: { ...prev[kolId], payments: newPayments }
-                                              };
-                                            });
-                                          }}
-                                          placeholder="Enter amount"
-                                        />
-                                      </div>
-                                    </div>
-
-                                    <div className="grid gap-2">
-                                      <Label>Payment Date</Label>
-                                      <Popover>
-                                        <PopoverTrigger asChild>
-                                          <Button
-                                            variant="outline"
-                                            className={`focus-brand justify-start text-left font-normal h-9 ${payment.payment_date ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
-                                          >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {payment.payment_date ? formatDisplayDate(payment.payment_date) : "Select payment date"}
-                                          </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="!bg-white border shadow-md w-auto p-0 z-50" align="start">
-                                          <CalendarComponent
-                                            mode="single"
-                                            selected={payment.payment_date ? new Date(payment.payment_date) : undefined}
-                                            onSelect={date => handlePaymentDateSelect(date, kolId, paymentIndex, payment)}
-                                            initialFocus
-                                            classNames={{
-                                              day_selected: "text-white hover:text-white focus:text-white",
-                                            }}
-                                            modifiersStyles={{
-                                              selected: { backgroundColor: "#3e8692" }
-                                            }}
-                                          />
-                                        </PopoverContent>
-                                      </Popover>
-                                    </div>
-
-                                    <div className="grid gap-2">
-                                      <Label>Payment Method</Label>
-                                      <Select
-                                        value={payment.payment_method || 'Token'}
-                                        onValueChange={(value) => {
-                                          setMultiKOLPayments(prev => {
-                                            const newPayments = [...(prev[kolId]?.payments || [])];
-                                            newPayments[paymentIndex] = { ...newPayments[paymentIndex], payment_method: value };
-                                            return {
-                                              ...prev,
-                                              [kolId]: { ...prev[kolId], payments: newPayments }
-                                            };
-                                          });
-                                        }}
-                                      >
-                                        <SelectTrigger className="focus-brand">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="Token">Token</SelectItem>
-                                          <SelectItem value="Fiat">Fiat</SelectItem>
-                                          <SelectItem value="WL">WL</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-
-                                    <div className="grid gap-2">
-                                      <Label>Content</Label>
-                                      <MultiSelect
-                                        options={contents
-                                          .filter(content => content.campaign_kols_id === kolId)
-                                          .map(content => content.id)}
-                                        selected={Array.isArray(payment.content_id) ? payment.content_id : (payment.content_id ? [payment.content_id] : [])}
-                                        onSelectedChange={(selectedIds) => {
-                                          setMultiKOLPayments(prev => {
-                                            const newPayments = [...(prev[kolId]?.payments || [])];
-                                            newPayments[paymentIndex] = { ...newPayments[paymentIndex], content_id: selectedIds };
-                                            return {
-                                              ...prev,
-                                              [kolId]: { ...prev[kolId], payments: newPayments }
-                                            };
-                                          });
-                                        }}
-                                        className="focus-brand"
-                                        triggerContent={
-                                          <div>
-                                            {(() => {
-                                              const selectedIds = Array.isArray(payment.content_id) ? payment.content_id : (payment.content_id ? [payment.content_id] : []);
-                                              if (selectedIds.length === 0) {
-                                                return <span className="text-ink-warm-400">Select content</span>;
-                                              }
-                                              const selectedContents = contents.filter(c => selectedIds.includes(c.id));
-                                              return (
-                                                <span className="text-sm">
-                                                  {selectedContents.length} content{selectedContents.length !== 1 ? 's' : ''} selected
-                                                </span>
-                                              );
-                                            })()}
-                                          </div>
-                                        }
-                                        renderOption={(contentId) => {
-                                          const content = contents.find(c => c.id === contentId);
-                                          if (!content) return contentId;
-                                          return `${content.type || 'Content'} - ${content.platform || 'Unknown'}${content.activation_date ? ` (${formatDisplayDate(content.activation_date)})` : ''}`;
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <div className="grid gap-2">
-                                    <Label>Transaction ID (Optional)</Label>
-                                    <Input
-                                      value={payment.transaction_id || ''}
-                                      onChange={(e) => {
-                                        setMultiKOLPayments(prev => {
-                                          const newPayments = [...(prev[kolId]?.payments || [])];
-                                          newPayments[paymentIndex] = { ...newPayments[paymentIndex], transaction_id: e.target.value };
-                                          return {
-                                            ...prev,
-                                            [kolId]: { ...prev[kolId], payments: newPayments }
-                                          };
-                                        });
-                                      }}
-                                      placeholder="Enter transaction ID"
-                                      className="focus-brand"
-                                    />
-                                  </div>
-
-                                  <div className="grid gap-2">
-                                    <Label>Notes (Optional)</Label>
-                                    <Textarea
-                                      value={payment.notes || ''}
-                                      onChange={(e) => {
-                                        setMultiKOLPayments(prev => {
-                                          const newPayments = [...(prev[kolId]?.payments || [])];
-                                          newPayments[paymentIndex] = { ...newPayments[paymentIndex], notes: e.target.value };
-                                          return {
-                                            ...prev,
-                                            [kolId]: { ...prev[kolId], payments: newPayments }
-                                          };
-                                        });
-                                      }}
-                                      placeholder="Add any notes about this payment"
-                                      rows={2}
-                                      className="focus-brand"
-                                    />
-                                  </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                        </>
-                        ) : (
-                        /* Non-KOL Payment Form */
-                        <div className="space-y-4">
-                          <div className="grid gap-2">
-                            <Label>Recipient Name <RequiredAsterisk /></Label>
-                            <Input
-                              placeholder="e.g., Venue Rental, Equipment, Agency Fee"
-                              value={nonKOLPayment.recipient_name}
-                              onChange={(e) => setNonKOLPayment(prev => ({ ...prev, recipient_name: e.target.value }))}
-                              className="focus-brand"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                              <Label>Amount (USD) <RequiredAsterisk /></Label>
-                              <div className="relative w-full">
-                                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-warm-500 pointer-events-none">$</span>
-                                <Input
-                                  type="text"
-                                  inputMode="numeric"
-                                  pattern="[0-9,]*"
-                                  className="focus-brand pl-6 w-full"
-                                  value={nonKOLPayment.amount ? Number(nonKOLPayment.amount).toLocaleString('en-US') : ''}
-                                  onChange={(e) => {
-                                    const raw = e.target.value.replace(/[^0-9]/g, '');
-                                    setNonKOLPayment(prev => ({ ...prev, amount: parseFloat(raw) || 0 }));
-                                  }}
-                                  placeholder="Enter amount"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="grid gap-2">
-                              <Label>Payment Date</Label>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    className={`focus-brand justify-start text-left font-normal h-9 ${nonKOLPayment.payment_date ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
-                                  >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {nonKOLPayment.payment_date ? formatDisplayDate(nonKOLPayment.payment_date) : "Select payment date"}
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="!bg-white border shadow-md w-auto p-0 z-50" align="start">
-                                  <CalendarComponent
-                                    mode="single"
-                                    selected={nonKOLPayment.payment_date ? new Date(nonKOLPayment.payment_date) : undefined}
-                                    onSelect={date => {
-                                      setNonKOLPayment(prev => ({ ...prev, payment_date: date ? formatDateLocal(date) : '' }));
-                                    }}
-                                    initialFocus
-                                    classNames={{
-                                      day_selected: "text-white hover:text-white focus:text-white",
-                                    }}
-                                    modifiersStyles={{
-                                      selected: { backgroundColor: "#3e8692" }
-                                    }}
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                              <Label>Payment Method</Label>
-                              <Select
-                                value={nonKOLPayment.payment_method}
-                                onValueChange={(value) => setNonKOLPayment(prev => ({ ...prev, payment_method: value }))}
-                              >
-                                <SelectTrigger className="focus-brand">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Token">Token</SelectItem>
-                                  <SelectItem value="Fiat">Fiat</SelectItem>
-                                  <SelectItem value="WL">WL</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            <div className="grid gap-2">
-                              <Label>Transaction ID</Label>
-                              <Input
-                                placeholder="Optional"
-                                value={nonKOLPayment.transaction_id}
-                                onChange={(e) => setNonKOLPayment(prev => ({ ...prev, transaction_id: e.target.value }))}
-                                className="focus-brand"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid gap-2">
-                            <Label>Wallet</Label>
-                            <Input
-                              placeholder="Optional wallet address"
-                              value={nonKOLPayment.wallet}
-                              onChange={(e) => setNonKOLPayment(prev => ({ ...prev, wallet: e.target.value }))}
-                              className="focus-brand"
-                            />
-                          </div>
-
-                          <div className="grid gap-2">
-                            <Label>Notes</Label>
-                            <Textarea
-                              placeholder="Optional notes"
-                              value={nonKOLPayment.notes}
-                              onChange={(e) => setNonKOLPayment(prev => ({ ...prev, notes: e.target.value }))}
-                              rows={2}
-                              className="focus-brand"
-                            />
-                          </div>
-                        </div>
-                        )}
-                      </div>
-                      <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
-                        <Button variant="outline" onClick={() => {
-                          setIsAddingPayment(false);
-                          setSelectedKOLsForPayment([]);
-                          setMultiKOLPayments({});
-                          setPaymentType('kol');
-                          setNonKOLPayment({
-                            recipient_name: '',
-                            payment_category: 'other',
-                            amount: 0,
-                            payment_date: '',
-                            payment_method: 'Fiat',
-                            transaction_id: '',
-                            wallet: '',
-                            notes: ''
-                          });
-                        }}>
-                          Cancel
-                        </Button>
-                        <Button variant="brand" onClick={paymentType === 'kol' ? handleAddMultiKOLPayments : handleAddNonKOLPayment} disabled={paymentType === 'kol' ? selectedKOLsForPayment.length === 0 : !nonKOLPayment.recipient_name.trim() || !nonKOLPayment.amount}>
-                          {paymentType === 'kol'
-                            ? `Record ${selectedKOLsForPayment.length > 0 ? `${selectedKOLsForPayment.length} Payment${selectedKOLsForPayment.length > 1 ? 's' : ''}` : 'Payment'}`
-                            : 'Record Expense'
-                          }
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
+                  {/* Record Payment trigger — dialog body lives in
+                      `components/campaign/RecordPaymentDialog.tsx`
+                      since the 2026-06-02 structural pass. The button
+                      stays here so it remains part of the Budget tab
+                      toolbar layout. */}
+                  <Button variant="brand" size="sm" onClick={() => setIsAddingPayment(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Record Payment
+                  </Button>
+                  <RecordPaymentDialog ref={recordPaymentDialogRef} open={isAddingPayment} onOpenChange={setIsAddingPayment} />
                   </div>
               </div>
               <CardContent className="pt-0 px-0">
@@ -10726,20 +10065,10 @@ const CampaignDetailsPage = () => {
                   const { kolId, latestCost, paymentIndex, paymentIds, mode } = pricingSuggestionDialog;
 
                   if (mode === 'payment-dialog') {
-                    // Update the payment form in the dialog
-                    setMultiKOLPayments(prev => {
-                      const currentPayments = [...(prev[kolId]?.payments || [])];
-                      if (currentPayments[paymentIndex]) {
-                        currentPayments[paymentIndex] = {
-                          ...currentPayments[paymentIndex],
-                          amount: latestCost
-                        };
-                      }
-                      return {
-                        ...prev,
-                        [kolId]: { ...prev[kolId], payments: currentPayments }
-                      };
-                    });
+                    // Push the accepted amount back into the Record
+                    // Payment dialog's internal form via its imperative
+                    // handle. The dialog owns `multiKOLPayments`.
+                    recordPaymentDialogRef.current?.applyPricingSuggestion(kolId, paymentIndex, latestCost);
                   } else if (mode === 'content-created' && paymentIds && paymentIds.length > 0) {
                     // Update the payments in the database
                     try {

@@ -38,6 +38,27 @@ export type PricingSuggestionDialogState = {
   mode: 'payment-dialog' | 'content-created';
 } | null;
 
+/** Telegram chat metadata, keyed by master_kol.id. */
+export type KolTelegramChat = { chat_id: string; title: string | null };
+
+/**
+ * Arguments to `triggerPaymentNotification` — the side-effect the
+ * Record Payment dialog fires when the user picks a payment date on
+ * a KOL that has a linked Telegram chat + wallet + non-zero amount.
+ * The page owns the actual notification confirmation sub-dialog and
+ * uses these args to populate it.
+ */
+export type PaymentNotificationTriggerOpts = {
+  kolId: string;
+  kolName: string;
+  paymentIndex: number;
+  amount: number;
+  wallet: string;
+  chatId: string;
+  chatTitle: string | null;
+  date: Date;
+};
+
 /** Toast caller — kept loose to match the project's `useToast` hook. */
 type ToastFn = (opts: {
   title: string;
@@ -73,6 +94,16 @@ interface CampaignDetailContextType {
   // ─── Pricing-suggestion sub-dialog (used by Record Payment +
   //     Add Content + the inline cost field on the KOL table) ────
   setPricingSuggestionDialog: React.Dispatch<React.SetStateAction<PricingSuggestionDialogState>>;
+
+  // ─── Telegram chats keyed by master_kol.id; consumed by the
+  //     Record Payment dialog's `handlePaymentDateSelect` flow. ──
+  kolTelegramChats: Record<string, KolTelegramChat>;
+
+  // ─── Side-effect: open the Payment Notification confirmation
+  //     sub-dialog (rendered on the page). Called by the Record
+  //     Payment dialog after a date is picked, when the KOL has a
+  //     linked Telegram chat + wallet + non-zero amount. ─────────
+  triggerPaymentNotification: (opts: PaymentNotificationTriggerOpts) => void;
 
   // ─── Notifications ─────────────────────────────────────────────
   toast: ToastFn;
