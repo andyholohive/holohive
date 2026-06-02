@@ -263,17 +263,25 @@ export default function Sidebar({ children }: SidebarProps) {
   }) => {
     if (!force && hiddenSet.has(href)) return null;
     const isActive = pathname.startsWith(href);
+    // [v11 design system, 2026-06-01]
+    // - Active:  brand-soft bg + brand-deep text + 3px brand left rail
+    //   (`.accent-l-brand`). Replaces the flat `bg-brand text-white` fill
+    //   — softer, "you are here" without shouting.
+    // - Inactive: quiet cream hover + ink-warm-700 text.
+    // - Density: 13px text, 15px icons, h-8 row height — matches v11 mockup.
+    const activeClass = isActive
+      ? 'bg-brand-soft text-brand-deep accent-l-brand font-semibold'
+      : 'hover:bg-cream-100 text-ink-warm-700';
     return (
       <Link href={href} legacyBehavior>
         <Button
           asChild
-          variant={isActive ? 'default' : 'ghost'}
-          className={`w-full ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start'}`}
-          style={isActive ? { backgroundColor: '#3e8692', color: 'white' } : {}}
+          variant="ghost"
+          className={`w-full h-8 text-[13px] font-medium transition-colors ${isSidebarCollapsed ? 'justify-center px-0' : 'justify-start px-2.5'} ${activeClass}`}
           title={isSidebarCollapsed ? label : undefined}
         >
           <span data-nav-active={isActive ? 'true' : undefined}>
-            <Icon className={`h-4 w-4 ${!isSidebarCollapsed ? 'mr-2' : ''}`} />
+            <Icon className={`h-[15px] w-[15px] ${!isSidebarCollapsed ? 'mr-2.5' : ''}`} />
             {!isSidebarCollapsed && label}
           </span>
         </Button>
@@ -349,6 +357,42 @@ export default function Sidebar({ children }: SidebarProps) {
    *  items, matching the old SectionDivider behavior. Per-section
    *  collapse only applies in expanded mode where there's a header to
    *  click. */
+  /**
+   * v11 (2026-06-01): CollapsibleSection treatment — replaces the
+   * icon + horizontal divider + chevron pattern with a colored dot +
+   * uppercase label. Pulled directly from the v11 mockup sidebar.
+   *
+   * - Dot color is derived from `id` via SECTION_HUES — keeps each
+   *   section visually scannable (People sky, CRM violet, Workspace amber).
+   * - Label is derived from `id` via SECTION_LABELS — these are the
+   *   real section names the user sees in the sidebar.
+   * - Click anywhere on the row toggles collapse; chevron rotates.
+   * - Icons-only collapsed mode (lg:w-16) hides labels and renders the
+   *   children directly with no header at all (same as before).
+   */
+  const SECTION_LABELS: Record<string, string> = {
+    bookmarks: 'Bookmarks',
+    people: 'People',
+    kols: 'KOLs',
+    crm: 'CRM',
+    workspace: 'Workspace',
+    communication: 'Communication',
+    documents: 'Documents',
+    admin: 'Admin',
+    finance: 'Finance',
+  };
+  const SECTION_HUES: Record<string, string> = {
+    bookmarks: 'bg-amber-500',
+    people: 'bg-sky-500',
+    kols: 'bg-violet-500',
+    crm: 'bg-violet-500',
+    workspace: 'bg-amber-500',
+    communication: 'bg-emerald-500',
+    documents: 'bg-sky-500',
+    admin: 'bg-rose-500',
+    finance: 'bg-emerald-500',
+  };
+
   const CollapsibleSection = ({
     id,
     icon: Icon,
@@ -363,91 +407,55 @@ export default function Sidebar({ children }: SidebarProps) {
       return <div className="space-y-2">{children}</div>;
     }
     const isCollapsed = !!collapsedSections[id];
+    const label = SECTION_LABELS[id] || id.replace(/[-_]/g, ' ');
+    const hue = SECTION_HUES[id] || 'bg-ink-warm-300';
     return (
-      <div className="space-y-2">
+      <div className="space-y-1">
         <button
           type="button"
           onClick={() => toggleSection(id)}
-          className="w-full flex items-center space-x-2 group hover:opacity-80"
+          className="w-full flex items-center gap-2 px-2 py-1 group hover:opacity-80"
           title={isCollapsed ? 'Expand section' : 'Collapse section'}
         >
-          <Icon className="h-4 w-4 text-gray-400" />
-          <div className="flex-1 h-px bg-gray-200"></div>
+          <span className={`inline-block w-1.5 h-1.5 rounded-full ${hue} shrink-0`} />
+          <span className="text-[10px] font-semibold uppercase text-ink-warm-700 tracking-[0.18em] leading-none">
+            {label}
+          </span>
+          <div className="flex-1" />
           <ChevronDown
-            className={`h-3 w-3 text-gray-400 transition-transform duration-200 ${
-              isCollapsed ? '-rotate-90' : ''
-            }`}
+            className={`h-3 w-3 text-ink-warm-400 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
           />
         </button>
-        {!isCollapsed && children}
+        {!isCollapsed && <div className="space-y-1">{children}</div>}
       </div>
     );
   };
 
   return (
-    <div className="h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-2 flex-shrink-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* [Mobile, May 2026] Hamburger — opens the sidebar as a
-                slide-in panel on mobile only. Hidden on lg+ where the
-                docked sidebar is always visible. 44×44 tap target. */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="lg:hidden h-10 w-10 p-0 -ml-2"
-              onClick={() => setIsMobileSidebarOpen(true)}
-              aria-label="Open navigation"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-            <div className="flex items-center">
-              <Image src="/images/logo.png" alt="Logo" width={36} height={36} />
-              <span className="ml-2 text-xl font-semibold text-gray-800">Holo Hive</span>
-              {latestVersion && (
-                <Badge
-                  variant="secondary"
-                  className="ml-2 cursor-pointer bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
-                  onClick={() => setIsChangelogOpen(true)}
-                >
-                  v{latestVersion}
-                </Badge>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center space-x-4">
-              <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="h-8 w-8 p-0 rounded-full hover:bg-transparent active:bg-transparent focus:bg-transparent focus-visible:ring-0 data-[state=open]:bg-transparent"
-                >
-                  <Avatar className="h-8 w-8">
-                    {userProfile?.profile_photo_url ? (
-                      <AvatarImage src={userProfile.profile_photo_url} alt={userProfile?.name || userProfile?.email || 'User'} />
-                    ) : null}
-                    <AvatarFallback className="bg-gray-200 text-gray-800 text-xs font-semibold">
-                      {getUserInitials()}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => router.push('/settings')}>
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={signOut}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </header>
+    <div className="h-screen bg-cream-100 flex flex-col">
+      {/* v11 (2026-06-01): topbar consolidated INTO the sidebar on desktop.
+          On MOBILE only (`lg:hidden`), a thin 48px topbar strip houses the
+          hamburger so it sits in flow above content — fixes the overlay
+          issue where a floating button covered the PageHeader at narrow
+          widths.
+
+          - Desktop (lg+):    no topbar; sidebar's own header rail has the logo.
+          - Mobile:           48px topbar with hamburger + condensed wordmark. */}
+      <div className="lg:hidden flex-shrink-0 h-12 bg-cream-50/85 backdrop-blur-md border-b border-cream-200 px-3 flex items-center gap-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-10 w-10 p-0 -ml-1"
+          onClick={() => setIsMobileSidebarOpen(true)}
+          aria-label="Open navigation"
+        >
+          <Menu className="h-5 w-5 text-ink-warm-700" />
+        </Button>
+        <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
+          <Image src="/images/logo.png" alt="Holo Hive logo" width={24} height={24} />
+          <span className="text-sm font-semibold text-ink-warm-900 tracking-tight truncate">Holo Hive</span>
+        </Link>
+      </div>
       <div className="flex flex-1 overflow-hidden relative">
         {/* [Mobile, May 2026] Backdrop overlay — only renders when the
             mobile sidebar is open. Click outside to close. Hidden on
@@ -465,21 +473,41 @@ export default function Sidebar({ children }: SidebarProps) {
         <aside
           className={`
             ${isSidebarCollapsed ? 'lg:w-16' : 'lg:w-64'}
-            w-64 bg-white border-r border-gray-200 flex-shrink-0
+            w-64 bg-white border-r border-cream-200 flex-shrink-0
             transition-all duration-300 ease-in-out
             fixed lg:relative h-full top-0 left-0 z-50 lg:z-auto
             ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           `}
         >
           <div className="flex flex-col h-full">
-            {/* [Mobile] Close button inside mobile sidebar header. Mirrors
-                the hamburger UX — tap to dismiss. Hidden on lg+. 44px tap. */}
-            <div className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
-              <span className="font-semibold text-gray-700 text-sm">Navigation</span>
+            {/* v11 (2026-06-01): Unified sidebar header.
+                - Logo + "Holo Hive" wordmark + version badge — top of
+                  the sidebar on all viewports (no separate topbar).
+                - Mobile close X — only on mobile, mirrors hamburger UX.
+                - Collapsed-mode (lg:w-16): logo only, hide wordmark + badge. */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-cream-200 flex-shrink-0">
+              <Link href="/dashboard" className="flex items-center gap-2 min-w-0 hover:opacity-80 transition-opacity">
+                <Image src="/images/logo.png" alt="Holo Hive logo" width={32} height={32} priority />
+                {!isSidebarCollapsed && (
+                  <>
+                    <span className="text-base font-semibold text-ink-warm-900 tracking-tight truncate">Holo Hive</span>
+                    {latestVersion && (
+                      <Badge
+                        variant="secondary"
+                        className="cursor-pointer bg-brand/10 text-brand hover:bg-brand/20 transition-colors text-[10px] px-1.5 py-0 shrink-0"
+                        onClick={(e) => { e.preventDefault(); setIsChangelogOpen(true); }}
+                      >
+                        v{latestVersion}
+                      </Badge>
+                    )}
+                  </>
+                )}
+              </Link>
+              {/* Mobile close — hidden on lg+. */}
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-10 w-10 p-0"
+                className="lg:hidden h-9 w-9 p-0 shrink-0"
                 onClick={() => setIsMobileSidebarOpen(false)}
                 aria-label="Close navigation"
               >
@@ -504,10 +532,13 @@ export default function Sidebar({ children }: SidebarProps) {
 
               {/* Priority Dashboard — top of sidebar (above bookmarks
                   even). Company-operating view; anyone with non-guest
-                  access can open it. Added 2026-05-07. */}
+                  access can open it. Added 2026-05-07.
+                  Initiatives admin sits with it — drives the dashboard's
+                  Initiative Tracker card. */}
               {!guestHideAlways && (
                 <div className="space-y-2">
                   <NavItem href="/dashboard" icon={Compass} label="Dashboard" />
+                  <NavItem href="/initiatives" icon={Target} label="Initiatives" />
                 </div>
               )}
 
@@ -651,38 +682,92 @@ export default function Sidebar({ children }: SidebarProps) {
 
               </>}
             </nav>
+            {/* v11 (2026-06-01): User block — moved here from the old
+                top-right of the (now-deleted) topbar. Avatar + name + role
+                + dropdown for Settings / Sign out. Collapsed mode shows
+                just the avatar.
+
+                Sits above the customize/collapse controls, separated by
+                a cream hairline. The whole row is the dropdown trigger
+                so users get a big tap target. */}
+            {userProfile && (
+              <div className="px-3 py-3 border-t border-cream-200">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className={`w-full flex items-center gap-2.5 rounded-md px-1.5 py-1.5 hover:bg-cream-100 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand ${isSidebarCollapsed ? 'justify-center' : ''}`}
+                      title={isSidebarCollapsed ? `${userProfile.name || userProfile.email || 'User'}` : undefined}
+                    >
+                      <Avatar className="h-8 w-8 shrink-0">
+                        {userProfile?.profile_photo_url ? (
+                          <AvatarImage src={userProfile.profile_photo_url} alt={userProfile?.name || userProfile?.email || 'User'} />
+                        ) : null}
+                        <AvatarFallback className="bg-brand text-white text-xs font-semibold">
+                          {getUserInitials()}
+                        </AvatarFallback>
+                      </Avatar>
+                      {!isSidebarCollapsed && (
+                        <>
+                          <div className="min-w-0 flex-1 text-left leading-tight">
+                            <div className="text-[13px] font-semibold text-ink-warm-900 truncate">
+                              {userProfile.name || userProfile.email}
+                            </div>
+                            <div className="text-[10px] text-ink-warm-500 mono uppercase tracking-[0.1em] truncate">
+                              {userProfile.role || 'member'}
+                            </div>
+                          </div>
+                          <ChevronDown className="h-3.5 w-3.5 text-ink-warm-400 shrink-0" />
+                        </>
+                      )}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align={isSidebarCollapsed ? 'start' : 'end'} side="top">
+                    <DropdownMenuItem onClick={() => router.push('/settings')}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Settings
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={signOut}>
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
             {/* Bottom controls: customize + collapse. Side-by-side when
                 expanded, stacked when collapsed (icons-only). Customize
                 hidden for guests since they can't meaningfully use it
                 (their nav is permission-gated to a tiny subset). */}
-            <div className="p-4 border-t border-gray-200">
+            <div className="px-3 py-2 border-t border-cream-200 flex-shrink-0">
               <div className={`flex ${isSidebarCollapsed ? 'flex-col gap-1' : 'justify-center gap-1'}`}>
                 {!guestHideAlways && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setIsCustomizeOpen(true)}
-                    className="hover:bg-gray-100 w-auto px-2"
+                    className="hover:bg-cream-100 w-auto px-2"
                     title="Customize sidebar"
                     aria-label="Customize sidebar"
                   >
                     {/* Icon-only — text label removed at user request 2026-05-05.
                         The title attribute provides hover affordance, aria-label
                         keeps screen readers informed. */}
-                    <SlidersHorizontal className="h-4 w-4 text-gray-600" />
+                    <SlidersHorizontal className="h-4 w-4 text-ink-warm-500" />
                   </Button>
                 )}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleSidebarToggle}
-                  className="hover:bg-gray-100 w-auto px-2"
+                  className="hover:bg-cream-100 w-auto px-2"
                   title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
                   {isSidebarCollapsed ? (
-                    <PanelLeftOpen className="h-4 w-4 text-gray-600" />
+                    <PanelLeftOpen className="h-4 w-4 text-ink-warm-500" />
                   ) : (
-                    <PanelLeftClose className="h-4 w-4 text-gray-600" />
+                    <PanelLeftClose className="h-4 w-4 text-ink-warm-500" />
                   )}
                 </Button>
               </div>

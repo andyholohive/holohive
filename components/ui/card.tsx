@@ -2,19 +2,44 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
+/**
+ * Default card surface — v11 design system (2026-06-01).
+ *
+ * Was: rounded-lg + cool gray border (HSL) + bg-card + shadow-sm.
+ * Now: rounded-[14px] + cream-200 warm hairline + bg-white +
+ *      warm-tinted shadow + 1px inset top highlight that catches light
+ *      (makes the surface feel like cardstock instead of CSS).
+ *
+ * Pages that explicitly override shadow / border / radius still win —
+ * only the DEFAULT changes. The 100+ existing Card usages across the
+ * app inherit the warmth automatically.
+ *
+ * Set `data-feature="true"` on the Card to render the brand-tinted
+ * feature variant instead — used for hero metrics, "action needed"
+ * surfaces, featured engagement cards.
+ */
 const Card = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      'rounded-lg border bg-card text-card-foreground shadow-sm',
-      className
-    )}
-    {...props}
-  />
-));
+  React.HTMLAttributes<HTMLDivElement> & { 'data-feature'?: boolean }
+>(({ className, ...props }, ref) => {
+  const isFeature = (props as any)['data-feature'] === true;
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        // overflow-hidden is part of the default so child elements with
+        // their own bg (like TableRow header rows with bg-cream-50/80,
+        // or borders inside CardHeaderEditorial) clip cleanly to the
+        // rounded corners. Pages no longer need to remember to add it.
+        isFeature
+          ? 'crd-feature overflow-hidden'
+          : 'rounded-[14px] border border-cream-200 bg-white text-card-foreground shadow-card overflow-hidden',
+        className
+      )}
+      {...props}
+    />
+  );
+});
 Card.displayName = 'Card';
 
 const CardHeader = React.forwardRef<

@@ -37,14 +37,35 @@ export type KpiAccent =
   | 'sky'
   | 'purple';
 
-const ACCENTS: Record<KpiAccent, string> = {
-  gray:    'bg-gray-50 text-gray-600',
-  brand:   'bg-brand/10 text-brand',
-  emerald: 'bg-emerald-50 text-emerald-700',
-  amber:   'bg-amber-50 text-amber-700',
-  rose:    'bg-rose-50 text-rose-700',
-  sky:     'bg-sky-50 text-sky-700',
-  purple:  'bg-purple-50 text-purple-700',
+/**
+ * v11 design system (2026-06-01):
+ *   - Default surface uses cream-200 hairline + shadow-card (matches
+ *     the Card primitive treatment).
+ *   - Icon tile gets a same-tone 1px hairline border for definition
+ *     without extra ornament.
+ *   - Optional `topAccent` prop renders a 2px colored top stripe in
+ *     the accent color — used for asymmetric Dashboard hero rows.
+ *   - Value typography refined: font-semibold + tight -0.025em tracking
+ *     + tabular-nums for column alignment.
+ */
+const ACCENT_TILE: Record<KpiAccent, string> = {
+  gray:    'bg-cream-100 text-ink-warm-700 border-cream-200',
+  brand:   'bg-brand-soft text-brand-deep border-brand-light',
+  emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  amber:   'bg-amber-50 text-amber-700 border-amber-100',
+  rose:    'bg-rose-50 text-rose-700 border-rose-100',
+  sky:     'bg-sky-50 text-sky-700 border-sky-100',
+  purple:  'bg-purple-50 text-purple-700 border-purple-100',
+};
+
+const ACCENT_TOP: Record<KpiAccent, string> = {
+  gray:    'bg-ink-warm-300',
+  brand:   'bg-brand',
+  emerald: 'bg-emerald-500',
+  amber:   'bg-amber-500',
+  rose:    'bg-rose-500',
+  sky:     'bg-sky-500',
+  purple:  'bg-purple-500',
 };
 
 interface KpiCardProps {
@@ -53,23 +74,38 @@ interface KpiCardProps {
   value: string | number;
   /** Optional one-line subtext below the value (e.g. trend, count detail). */
   sub?: string;
-  /** Color of the icon square. Default 'gray'. */
+  /** Color of the icon square + top accent stripe. Default 'gray'. */
   accent?: KpiAccent;
+  /** v11: render a 2px colored top stripe in the accent color.
+   *  Off by default (existing pages keep their current look). */
+  topAccent?: boolean;
 }
 
-export function KpiCard({ icon: Icon, label, value, sub, accent = 'gray' }: KpiCardProps) {
+export function KpiCard({ icon: Icon, label, value, sub, accent = 'gray', topAccent = false }: KpiCardProps) {
+  // v11: no hover effect — KPI cards are display-only, not interactive.
+  // The Card-style hover (border + lift) would falsely imply clickability.
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition-colors">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1 tabular-nums">{value}</p>
-          {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
-        </div>
-        <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${ACCENTS[accent]}`}>
-          <Icon className="h-4 w-4" />
+    <div className="relative bg-white rounded-[14px] border border-cream-200 p-5 shadow-card overflow-hidden">
+      {topAccent && (
+        <span className={`absolute top-0 left-4 right-4 h-[2px] rounded-b ${ACCENT_TOP[accent]}`} aria-hidden />
+      )}
+      {/* v11: label + icon on top row, big number below, sub at bottom.
+          This gives the value the full card width to breathe (mockup
+          pattern) and lets labels stay on one line at narrow widths
+          since they no longer share horizontal space with the icon. */}
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <p className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.18em] truncate flex-1">{label}</p>
+        <div className={`h-8 w-8 rounded-md flex items-center justify-center shrink-0 border ${ACCENT_TILE[accent]}`}>
+          <Icon className="h-3.5 w-3.5" />
         </div>
       </div>
+      <p
+        className="text-[28px] font-semibold text-ink-warm-900 tabular-nums leading-none"
+        style={{ letterSpacing: '-0.03em' }}
+      >
+        {value}
+      </p>
+      {sub && <p className="text-xs text-ink-warm-500 mt-2">{sub}</p>}
     </div>
   );
 }

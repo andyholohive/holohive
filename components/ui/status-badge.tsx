@@ -57,6 +57,42 @@ const TONE_CLASSES: Record<BadgeTone, string> = {
   slate:   'bg-slate-100 text-slate-700',
 };
 
+/**
+ * v11 design system (2026-06-01): per-tone hairline border classes for
+ * the optional `bordered` variant. Same-color 1px border that gives the
+ * pill subtle "lifted" definition on warm cream backgrounds without
+ * changing the bg/text. Off by default — the 50+ existing badge usages
+ * stay unchanged.
+ */
+const TONE_BORDER: Record<BadgeTone, string> = {
+  neutral: 'border border-gray-200',
+  brand:   'border border-brand-light',
+  success: 'border border-emerald-200',
+  warning: 'border border-amber-200',
+  danger:  'border border-rose-200',
+  info:    'border border-sky-200',
+  purple:  'border border-purple-200',
+  pink:    'border border-pink-200',
+  slate:   'border border-slate-200',
+};
+
+/**
+ * v11: per-tone dot colors for the optional `withDot` prefix.
+ * The "dot + soft bg + colored text" treatment was a recurring v11
+ * pattern; this lets pages opt in without writing inline span markup.
+ */
+const TONE_DOT: Record<BadgeTone, string> = {
+  neutral: 'bg-gray-500',
+  brand:   'bg-brand',
+  success: 'bg-emerald-500',
+  warning: 'bg-amber-500',
+  danger:  'bg-rose-500',
+  info:    'bg-sky-500',
+  purple:  'bg-purple-500',
+  pink:    'bg-pink-500',
+  slate:   'bg-slate-500',
+};
+
 interface StatusBadgeProps {
   /** Color tone — defaults to 'neutral'. */
   tone?: BadgeTone;
@@ -65,6 +101,13 @@ interface StatusBadgeProps {
   /** 'sm' (text-[10px], px-1.5 py-0.5) or 'md' (text-xs, px-2 py-0.5).
    *  Default 'md'. */
   size?: 'sm' | 'md';
+  /** v11: render a same-tone 1px hairline border for a refined "lifted"
+   *  look. Off by default. */
+  bordered?: boolean;
+  /** v11: render a colored dot prefix in the matching tone.
+   *  `true` = static dot, `'pulse'` = animated dot (use sparingly —
+   *  reserve for onboarding / at-risk / live statuses). */
+  withDot?: boolean | 'pulse';
   /** Extra classes appended to the badge. Use sparingly — most needs
    *  should be served by the tone system. */
   className?: string;
@@ -79,12 +122,20 @@ export function StatusBadge({
   tone = 'neutral',
   children,
   size = 'md',
+  bordered = false,
+  withDot = false,
   className,
 }: StatusBadgeProps) {
   return (
     <span
-      className={`inline-flex items-center rounded-md font-medium ${TONE_CLASSES[tone]} ${SIZE_CLASSES[size]}${className ? ' ' + className : ''}`}
+      className={`inline-flex items-center gap-1.5 rounded-md font-medium ${TONE_CLASSES[tone]} ${SIZE_CLASSES[size]}${bordered ? ' ' + TONE_BORDER[tone] : ''}${className ? ' ' + className : ''}`}
     >
+      {withDot && (
+        <span
+          className={`shrink-0 ${TONE_DOT[tone]} ${withDot === 'pulse' ? 'dot-pulse' : 'dot'}`}
+          aria-hidden
+        />
+      )}
       {children}
     </span>
   );

@@ -74,6 +74,7 @@ export const NAV_REGISTRY: NavItemDef[] = [
   // Priority Dashboard at the very top — company-operating view that
   // anyone in the team can open for visibility (added 2026-05-07).
   { href: '/dashboard', label: 'Dashboard', icon: Compass, section: 'Top', notForGuest: true },
+  { href: '/initiatives', label: 'Initiatives', icon: Target, section: 'Top', notForGuest: true },
 
   { href: '/team', label: 'Team', icon: Shield, section: 'People', notForGuest: true },
   { href: '/clients', label: 'Clients', icon: Users, section: 'People', pageKey: '/clients' },

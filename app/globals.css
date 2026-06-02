@@ -2,6 +2,116 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ──────────────────────────────────────────────────────────────────────
+   v11 design system — common UI layer (2026-06-01)
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Paper-grain texture overlay on the body.
+   The single biggest "this wasn't generated" signal — real designs
+   have texture, AI mockups never do. Invisible per pixel; the effect
+   shows up only when you look at large flat surfaces.
+
+   Opacity tuned to 0.25 (was 0.45) so the underlying cream-50 page bg
+   reads at its intended tone rather than getting visibly darkened by
+   the noise layer. Same texture, lighter perceived bg. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.25;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.45 0 0 0 0 0.35 0 0 0 0.08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* All real content sits above the noise — z-index lifts it out. */
+body > * { position: relative; z-index: 1; }
+
+/* Display utility — Geist medium with tight tracking, used for editorial
+   headlines on hero sections (Dashboard hero, Detail page H1, etc.).
+   Italic variant for the accent flourish. */
+.display-serif        { font-family: 'Geist', Inter, system-ui, sans-serif; font-weight: 500; letter-spacing: -0.038em; }
+.display-serif-italic { font-family: 'Geist', Inter, system-ui, sans-serif; font-weight: 500; font-style: italic; letter-spacing: -0.03em; }
+
+/* Mono utility — Geist Mono with tabular figures. */
+.mono    { font-family: 'Geist Mono', ui-monospace, SFMono-Regular, monospace; font-feature-settings: 'ss01', 'cv01', 'zero'; }
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Primary brand button — layered 4-shadow physics. */
+.btn-brand {
+  background: linear-gradient(180deg, #4a96a2 0%, #3a7d89 100%);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.20) inset,
+    0 -1px 0 rgba(20,40,45,0.12) inset,
+    0 1px 2px rgba(20,40,45,0.20),
+    0 1px 0 rgba(20,40,45,0.06);
+  transition: filter 0.15s ease, transform 0.05s ease;
+}
+.btn-brand:hover  { filter: brightness(1.04); }
+.btn-brand:active { transform: translateY(0.5px); filter: brightness(0.96); }
+
+/* Secondary cream button (refined outline alternative). */
+.btn-cream {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FBF9F4 100%);
+  border: 1px solid #EBE6D8;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 1px 2px rgba(60,40,20,0.04);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.btn-cream:hover { background: #FBF9F4; border-color: #D9D2BD; }
+
+/* Brand-tinted feature card — replaces the v9 dark cards.
+   Differentiation through hue + subtle gradient, not value contrast. */
+.crd-feature {
+  background:
+    radial-gradient(140% 100% at 100% 0%, rgba(62,134,146,0.10) 0%, transparent 55%),
+    linear-gradient(180deg, #F6FAFA 0%, #EFF5F4 100%);
+  border: 1px solid #D4E5E4;
+  border-radius: 14px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.75) inset,
+    0 1px 2px rgba(31,70,81,0.04),
+    0 8px 24px -10px rgba(31,70,81,0.12);
+}
+
+/* Brand accent rail — used by the sidebar active item + contextual
+   "action needed" cards. */
+.accent-l-brand { box-shadow: inset 3px 0 0 #3e8692; }
+
+/* Chapter-style section header — top hairline + bold ink label at wide
+   tracking + mono counter on the right. Used to break Dashboard / Clients
+   pages into 01 / 02 / 03 visual chapters. */
+.section-head {
+  border-top: 1px solid #EBE6D8;
+  padding-top: 18px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+.section-head.first { border-top: 0; padding-top: 0; }
+.section-head .label   { font-size: 11px; font-weight: 600; color: #16140F; text-transform: uppercase; letter-spacing: 0.28em; }
+.section-head .counter { font-family: 'Geist Mono', monospace; font-size: 10px; color: #9A9385; letter-spacing: 0.12em; text-transform: uppercase; }
+
+/* Status dots — used in section labels + pulse variants for live items. */
+.dot { width: 6px; height: 6px; border-radius: 9999px; display: inline-block; }
+.dot-pulse {
+  width: 7px; height: 7px; border-radius: 9999px; display: inline-block; position: relative;
+}
+.dot-pulse::after {
+  content: ''; position: absolute; inset: 0; border-radius: 9999px;
+  background: inherit; opacity: 0.35; animation: hh-pulse 2.5s ease-out infinite;
+}
+@keyframes hh-pulse {
+  0% { transform: scale(1); opacity: 0.4; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* Wider-tracked utilities for editorial-style labels. */
+.track-loose    { letter-spacing: 0.22em; }
+.track-x-loose  { letter-spacing: 0.28em; }
+.track-xx-loose { letter-spacing: 0.34em; }
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;

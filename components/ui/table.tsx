@@ -51,6 +51,17 @@ const TableFooter = React.forwardRef<
 ));
 TableFooter.displayName = 'TableFooter';
 
+/**
+ * v11 design system (2026-06-01): warm default hover.
+ * Was `hover:bg-muted/50` (cool gray HSL) → now `hover:bg-cream-50/80`
+ * so every table across the app picks up the warm chrome automatically.
+ *
+ * Pages that want the v11 "row-accent" treatment (2px brand left rail
+ * on hover, indicating clickability) can opt in with
+ * `className="row-accent cursor-pointer"` on their body TableRows —
+ * the .row-accent CSS in app/globals.css handles the rest. Use it on
+ * tables where clicking a row navigates somewhere.
+ */
 const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
@@ -58,7 +69,7 @@ const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      'border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted',
+      'border-b transition-colors hover:bg-cream-50/80 data-[state=selected]:bg-cream-100',
       className
     )}
     {...props}

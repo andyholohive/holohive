@@ -31,6 +31,34 @@ const config: Config = {
           DEFAULT: '#3e8692',
           hover: '#2d6b75',
           light: '#e8f4f5',
+          // v11 additions (2026-06-01) — used by .crd-feature surface,
+          // chapter section headers, layered btn-brand shadow.
+          // Existing DEFAULT/hover/light stay unchanged so the 51
+          // existing surfaces don't drift.
+          soft: '#EFF5F4',
+          dark: '#2d6470',
+          deep: '#1f4651',
+        },
+        // Warm cream palette — v11 chrome. Page bg + sidebar regions +
+        // warm hairline borders. Sits alongside existing gray-/stone-*
+        // tokens which keep working unchanged.
+        cream: {
+          50:  '#FBF9F4',
+          100: '#F5F2E9',
+          200: '#EBE6D8',
+          300: '#D9D2BD',
+        },
+        // Warm ink — alternative to gray-* for v11 surfaces.
+        'ink-warm': {
+          900: '#16140F',
+          800: '#2A2722',
+          700: '#46423A',
+          500: '#6B6557',
+          400: '#9A9385',
+          300: '#C7C0AF',
+          200: '#E2DDCE',
+          100: '#F1ECDD',
+          50:  '#FBF9F4',
         },
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
@@ -94,6 +122,32 @@ const config: Config = {
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+      },
+      // v11 design system — fonts. Geist replaces Inter as the default
+      // sans on the body element (see app/layout.tsx). Loaded via Google
+      // Fonts CDN since Next 13.5 doesn't ship Geist in next/font/google;
+      // referenced by family name in the fontFamily token below. Inter
+      // remains mounted via next/font as the legacy fallback face — used
+      // by .font-inter where needed and as a layout-shift-free fallback
+      // while Geist fetches.
+      fontFamily: {
+        sans: ['Geist', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['Geist Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        inter: ['Inter', 'system-ui', 'sans-serif'],
+      },
+      // v11 shadow tokens — warm-tinted (brown-ish, not pure black).
+      // - `card`     — default surface lift on white cards
+      // - `card-hover` — interaction lift on .crd-hover surfaces
+      // - `btn-brand`  — layered shadow for primary buttons:
+      //                  inner top highlight + inner bottom shadow +
+      //                  outer drop + hairline edge
+      boxShadow: {
+        // Default Card lift — includes the 1px inset top highlight so
+        // every <Card> automatically gets the "catches the light" effect.
+        card:        '0 1px 0 rgba(255,255,255,0.75) inset, 0 1px 2px rgba(60,40,20,0.04), 0 2px 4px -2px rgba(60,40,20,0.04)',
+        'card-hover':'0 1px 0 rgba(255,255,255,0.75) inset, 0 1px 2px rgba(60,40,20,0.04), 0 10px 24px -8px rgba(60,40,20,0.10)',
+        'btn-brand': '0 1px 0 rgba(255,255,255,0.20) inset, 0 -1px 0 rgba(20,40,45,0.12) inset, 0 1px 2px rgba(20,40,45,0.20), 0 1px 0 rgba(20,40,45,0.06)',
+        'inset-hl':  '0 1px 0 rgba(255,255,255,0.75) inset',
       },
     },
   },

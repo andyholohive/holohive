@@ -24,7 +24,14 @@ const buttonVariants = cva(
         // for primary "Start Client", "Add Project", "Save Campaign"
         // style actions — anywhere the brand color was previously
         // applied via inline style.
-        brand: 'bg-brand text-white hover:bg-brand/90',
+        //
+        // [v11 refinement, 2026-06-01] Now uses the `.btn-brand` utility:
+        // 4-layer shadow (inner top highlight + inner bottom + outer drop +
+        // hairline edge) over a subtle vertical gradient so the button feels
+        // like a real pressable material instead of a flat fill. Keeps
+        // `bg-brand text-white` so any code reading the rendered color
+        // still sees the brand teal as a fallback under the gradient.
+        brand: 'btn-brand bg-brand text-white',
       },
       size: {
         default: 'h-10 px-4 py-2',
