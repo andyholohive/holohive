@@ -44,6 +44,42 @@ export function formatDisplayDate(dateStr: string): string {
   return `${month}/${day}/${year}`;
 }
 
+/** Parse a YYYY-MM-DD / ISO string into a Date, returning undefined
+ *  for empty/invalid input. Used by date-picker components. */
+export function parseDate(dateString: string | undefined | null): Date | undefined {
+  if (!dateString) return undefined;
+  const d = new Date(dateString);
+  return isNaN(d.getTime()) ? undefined : d;
+}
+
+/** Format a Date back to local YYYY-MM-DD for an `<input type="date">`. */
+export function formatDateForInput(date: Date | undefined): string {
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/** Display a region with the canonical casing — `apac` → `APAC`,
+ *  `global` → `Global`, others → Capitalized. */
+export function displayRegion(region: string | null | undefined): string {
+  if (!region) return '-';
+  if (region.toLowerCase() === 'apac') return 'APAC';
+  if (region.toLowerCase() === 'global') return 'Global';
+  return region.charAt(0).toUpperCase() + region.slice(1);
+}
+
+/** Display "TBD" (or any fallback) for null/undefined dates;
+ *  formatted as MMM DD, YYYY for actual dates. Used by editorial
+ *  surfaces (the hero, KV cards). */
+export function formatDateLong(dateString: string | undefined | null, fallback: string = 'TBD'): string {
+  if (!dateString) return fallback;
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return fallback;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 // ───────────────────────────────────────────────────────────────────
 // Region + platform iconography
 // ───────────────────────────────────────────────────────────────────
