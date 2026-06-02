@@ -44,6 +44,10 @@ import { ContentDashboardTableView } from "@/components/campaign/ContentDashboar
 import { MasterKolEditDialog } from "@/components/campaign/MasterKolEditDialog";
 import { EditPaymentDialog } from "@/components/campaign/EditPaymentDialog";
 import { ShareCampaignDialog } from "@/components/campaign/ShareCampaignDialog";
+import { WarningsDialog } from "@/components/campaign/WarningsDialog";
+import { EmailViewsDialog } from "@/components/campaign/EmailViewsDialog";
+import { PaymentNotifyDialog } from "@/components/campaign/PaymentNotifyDialog";
+import { PricingSuggestionDialog } from "@/components/campaign/PricingSuggestionDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserService } from "@/lib/userService";
 import { KOLService, MasterKOL } from "@/lib/kolService";
@@ -3530,252 +3534,36 @@ const CampaignDetailsPage = () => {
           `components/campaign/ShareCampaignDialog.tsx` on 2026-06-02. */}
       <ShareCampaignDialog open={isShareCampaignOpen} onOpenChange={setIsShareCampaignOpen} />
 
-      {/* Warnings Dialog */}
-      <Dialog open={isWarningsOpen} onOpenChange={setIsWarningsOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Campaign Validation Warnings ({missingFields.length})
-            </DialogTitle>
-            <DialogDescription>
-              The following fields are missing or incomplete. Click on any item to navigate to the relevant tab.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-1 space-y-2 py-4">
-            {missingFields.map((item, index) => (
-              <button
-                key={index}
-                onClick={() => {
-                  setActiveTab(item.tab);
-                  setIsWarningsOpen(false);
-                }}
-                className="w-full text-left p-3 rounded-lg border border-cream-200 hover:border-amber-500 hover:bg-amber-50 transition-colors group"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    <div>
-                      <p className="font-medium text-ink-warm-900 group-hover:text-amber-700">{item.label}</p>
-                      <p className="text-sm text-ink-warm-500 capitalize">
-                        {item.tab === 'information' ? 'Information' :
-                         item.tab === 'kols' ? 'KOL Dashboard' :
-                         item.tab === 'contents' ? 'Content Dashboard' :
-                         item.tab === 'payments' ? 'Budget' :
-                         item.tab}
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-ink-warm-400 group-hover:text-amber-500" />
-                </div>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Email Views Dialog */}
-      <Dialog open={isEmailViewsDialogOpen} onOpenChange={setIsEmailViewsDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5" />
-              Email Views: {campaign?.name}
-            </DialogTitle>
-            <DialogDescription>
-              Emails that have accessed this campaign via the public link.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            {loadingEmailViews ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand"></div>
-              </div>
-            ) : emailViews.length === 0 ? (
-              <div className="text-center py-8 text-ink-warm-500">
-                <Eye className="h-12 w-12 mx-auto mb-4 text-ink-warm-300" />
-                <p>No email views recorded yet.</p>
-                <p className="text-sm mt-2">Views will appear here when users access the campaign via the public link.</p>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                <div className="text-sm text-ink-warm-500 mb-3">
-                  {emailViews.length} view{emailViews.length !== 1 ? 's' : ''} recorded
-                </div>
-                {emailViews.map((view) => (
-                  <div
-                    key={view.id}
-                    className="flex items-center justify-between p-3 bg-cream-50 rounded-lg hover:bg-cream-100 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-ink-warm-900 truncate">{view.email}</p>
-                      <p className="text-xs text-ink-warm-500">
-                        {new Date(view.viewed_at).toLocaleString('en-US', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
-            <Button variant="outline" onClick={() => setIsEmailViewsDialogOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Payment Notification Confirmation Dialog */}
-      <Dialog open={paymentNotifyDialogOpen} onOpenChange={setPaymentNotifyDialogOpen}>
-        <DialogContent className="max-w-md overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>Send Payment Notification?</DialogTitle>
-            <DialogDescription>
-              Send a payment notification to {pendingPaymentNotification?.kolName}'s Telegram chat?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <div className="bg-cream-50 rounded-lg p-4 space-y-2 overflow-hidden">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-ink-warm-700">{isEditingPaymentMessage ? 'Edit message:' : 'Message preview:'}</p>
-                {!isEditingPaymentMessage && (
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingPaymentMessage(true)}
-                    className="text-sm text-brand hover:underline flex items-center gap-1"
-                  >
-                    <Edit className="h-3.5 w-3.5" />
-                    Edit
-                  </button>
-                )}
-              </div>
-              {isEditingPaymentMessage ? (
-                <Textarea
-                  value={paymentNotificationMessage}
-                  onChange={(e) => setPaymentNotificationMessage(e.target.value)}
-                  className="focus-brand min-h-[100px] text-sm"
-                  autoFocus
-                />
-              ) : (
-                <p className="font-medium text-ink-warm-900 break-words whitespace-pre-line">
-                  {paymentNotificationMessage}
-                </p>
-              )}
-            </div>
-            {pendingPaymentNotification?.chatTitle && (
-              <p className="text-xs text-ink-warm-500 mt-2 break-words">
-                Will be sent to: {pendingPaymentNotification.chatTitle}
-              </p>
-            )}
-          </div>
-          <DialogFooter className="gap-2 sm:gap-0 border-t border-cream-100 pt-3 mt-0">
-            <Button
-              variant="outline"
-              onClick={skipPaymentNotification}
-              disabled={sendingPaymentNotification}
-            >
-              Skip
-            </Button>
-            {isEditingPaymentMessage && (
-              <Button
-                variant="outline"
-                onClick={() => setIsEditingPaymentMessage(false)}
-                disabled={sendingPaymentNotification}
-              >
-                Done Editing
-              </Button>
-            )}
-            <Button variant="brand" onClick={sendPaymentNotification} disabled={sendingPaymentNotification || !paymentNotificationMessage.trim()}>
-              {sendingPaymentNotification ? 'Sending...' : 'Send Notification'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Pricing Suggestion Dialog */}
-      <Dialog
-        open={pricingSuggestionDialog?.open || false}
-        onOpenChange={(open) => {
-          if (!open) setPricingSuggestionDialog(null);
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Use Latest Pricing?</DialogTitle>
-            <DialogDescription>
-              {pricingSuggestionDialog?.kolName}'s last payment was <strong>${pricingSuggestionDialog?.latestCost?.toLocaleString()}</strong>. Would you like to use this amount?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0 border-t border-cream-100 pt-3 mt-0">
-            <Button
-              variant="outline"
-              onClick={() => setPricingSuggestionDialog(null)}
-            >
-              No, Enter Manually
-            </Button>
-            <Button
-              variant="brand"
-              onClick={async () => {
-                if (pricingSuggestionDialog) {
-                  const { kolId, latestCost, paymentIndex, paymentIds, mode } = pricingSuggestionDialog;
-
-                  if (mode === 'payment-dialog') {
-                    // Push the accepted amount back into the Record
-                    // Payment dialog's internal form via its imperative
-                    // handle. The dialog owns `multiKOLPayments`.
-                    recordPaymentDialogRef.current?.applyPricingSuggestion(kolId, paymentIndex, latestCost);
-                  } else if (mode === 'content-created' && paymentIds && paymentIds.length > 0) {
-                    // Update the payments in the database
-                    try {
-                      for (const paymentId of paymentIds) {
-                        await supabase
-                          .from('payments')
-                          .update({ amount: latestCost })
-                          .eq('id', paymentId);
-                      }
-                      // Also update the campaign_kol's paid amount
-                      const kol = campaignKOLs.find(k => k.id === kolId);
-                      if (kol) {
-                        const currentPaid = kol.paid || 0;
-                        const newPaid = currentPaid + (latestCost * paymentIds.length);
-                        await supabase
-                          .from('campaign_kols')
-                          .update({ paid: newPaid })
-                          .eq('id', kolId);
-                        setCampaignKOLs(prev => prev.map(k =>
-                          k.id === kolId ? { ...k, paid: newPaid } : k
-                        ));
-                      }
-                      fetchPayments();
-                      toast({
-                        title: 'Success',
-                        description: `Updated ${paymentIds.length} payment(s) to $${latestCost.toLocaleString()}`,
-                      });
-                    } catch (error) {
-                      console.error('Error updating payments:', error);
-                      toast({
-                        title: 'Error',
-                        description: 'Failed to update payment amounts',
-                        variant: 'destructive'
-                      });
-                    }
-                  }
-                  setPricingSuggestionDialog(null);
-                }
-              }}
-            >
-              Yes, Use ${pricingSuggestionDialog?.latestCost?.toLocaleString()}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Warnings / Email Views / Payment Notify / Pricing Suggestion
+          dialogs all moved into separate files under
+          `components/campaign/*` on 2026-06-02. */}
+      <WarningsDialog
+        open={isWarningsOpen}
+        onOpenChange={setIsWarningsOpen}
+        missingFields={missingFields}
+      />
+      <EmailViewsDialog
+        open={isEmailViewsDialogOpen}
+        onOpenChange={setIsEmailViewsDialogOpen}
+        emailViews={emailViews}
+        loading={loadingEmailViews}
+      />
+      <PaymentNotifyDialog
+        open={paymentNotifyDialogOpen}
+        onOpenChange={setPaymentNotifyDialogOpen}
+        kolName={pendingPaymentNotification?.kolName}
+        chatTitle={pendingPaymentNotification?.chatTitle}
+        message={paymentNotificationMessage}
+        onMessageChange={setPaymentNotificationMessage}
+        sending={sendingPaymentNotification}
+        onSend={sendPaymentNotification}
+        onSkip={skipPaymentNotification}
+      />
+      <PricingSuggestionDialog
+        state={pricingSuggestionDialog}
+        onClose={() => setPricingSuggestionDialog(null)}
+        recordPaymentDialogRef={recordPaymentDialogRef}
+      />
 
       {/* Payment terms dialog — fires when a KOL is newly onboarded without an agreed rate */}
       {paymentTermsDialog && (
