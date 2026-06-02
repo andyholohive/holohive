@@ -3728,10 +3728,12 @@ const CampaignDetailsPage = () => {
               <Skeleton className="h-3 w-48" />
             </div>
 
-            {/* TabsList skeleton */}
-            <div className="grid w-full grid-cols-5 gap-1 p-1 rounded-md bg-cream-100 border border-cream-200">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-8 rounded" />
+            {/* TabsList skeleton — underline pattern */}
+            <div className="w-full border-b border-cream-200 flex gap-0.5">
+              {[24, 28, 32, 16, 18].map((w, i) => (
+                <div key={i} className="px-3.5 py-2.5">
+                  <Skeleton className={`h-4 w-${w}`} />
+                </div>
               ))}
             </div>
 
@@ -3873,12 +3875,32 @@ const CampaignDetailsPage = () => {
                     </span>
                   )}
                 </div>
-                {/* display-serif title — 32px matching the mockup */}
-                {campaign && (
-                  <h1 className="display-serif text-[32px] text-ink-warm-900 leading-[1.1] tracking-tight">
-                    {campaign.name}
-                  </h1>
-                )}
+                {/* display-serif title — matches the mockup's
+                    italic-span treatment: first word renders as
+                    regular serif, everything after as
+                    display-serif-italic text-brand. Adds a period
+                    after the last word so the title reads as a
+                    declarative sentence ("Venice Korea Expansion.").
+                    Falls back to plain serif when there's only one
+                    word in the name. */}
+                {campaign && (() => {
+                  const words = campaign.name.trim().split(/\s+/);
+                  if (words.length <= 1) {
+                    return (
+                      <h1 className="display-serif text-[32px] text-ink-warm-900 leading-[1.1] tracking-tight">
+                        {campaign.name}.
+                      </h1>
+                    );
+                  }
+                  const first = words[0];
+                  const rest = words.slice(1).join(' ');
+                  return (
+                    <h1 className="display-serif text-[32px] text-ink-warm-900 leading-[1.1] tracking-tight">
+                      {first}{' '}
+                      <span className="display-serif-italic text-brand">{rest}.</span>
+                    </h1>
+                  );
+                })()}
                 {/* Inline status pill + metrics row */}
                 {campaign && (
                   <div className="flex items-center gap-2.5 mt-4 text-xs flex-wrap">
@@ -3968,26 +3990,62 @@ const CampaignDetailsPage = () => {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            {/* v11 tab chrome — cream-100 base + warm hairline +
-                active-state shadow-card so the lift matches every
-                other tabbed surface (KolProfileModal, /clients
-                modals, dashboard tabs). */}
-            <TabsList className="grid w-full grid-cols-5 bg-cream-100 p-1 h-auto border border-cream-200">
-              <TabsTrigger value="information" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Information</TabsTrigger>
-              <TabsTrigger value="kols" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">KOL Dashboard</TabsTrigger>
-              <TabsTrigger value="contents" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Content Dashboard</TabsTrigger>
-              <TabsTrigger value="payments" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Budget</TabsTrigger>
-              <TabsTrigger value="report" className="data-[state=active]:bg-white data-[state=active]:text-brand data-[state=active]:shadow-card text-sm">Report</TabsTrigger>
+            {/* v11 underline tabs — matches the mockup's detail-page
+                tab pattern exactly: border-bottom rail across the
+                whole strip, inactive triggers are text-only ink-warm-500,
+                active trigger goes brand-deep with a 2px brand
+                underline accent (via after:* utilities) that sits
+                flush with the border-bottom rail. Same pattern is
+                used in the mockup's Workspace tabs (Context /
+                Action Board / Weekly Update / Delivery Log / Activity). */}
+            <TabsList className="w-full justify-start gap-0.5 bg-transparent p-0 h-auto rounded-none border-b border-cream-200">
+              <TabsTrigger
+                value="information"
+                className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t"
+              >
+                Information
+              </TabsTrigger>
+              <TabsTrigger
+                value="kols"
+                className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t flex items-center gap-1.5"
+              >
+                KOL Dashboard
+                {campaignKOLs.length > 0 && (
+                  <span className="text-[10px] mono tabular-nums text-ink-warm-500">{campaignKOLs.length}</span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger
+                value="contents"
+                className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t"
+              >
+                Content Dashboard
+              </TabsTrigger>
+              <TabsTrigger
+                value="payments"
+                className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t"
+              >
+                Budget
+              </TabsTrigger>
+              <TabsTrigger
+                value="report"
+                className="relative px-3.5 py-2.5 text-sm font-medium text-ink-warm-500 hover:text-ink-warm-900 data-[state=active]:font-semibold data-[state=active]:text-brand-deep data-[state=active]:shadow-none data-[state=active]:bg-transparent rounded-none data-[state=active]:after:absolute data-[state=active]:after:left-0 data-[state=active]:after:right-0 data-[state=active]:after:-bottom-px data-[state=active]:after:h-[2px] data-[state=active]:after:bg-brand data-[state=active]:after:rounded-t"
+              >
+                Report
+              </TabsTrigger>
             </TabsList>
             
-            <TabsContent value="information" className="mt-4">
-              <div className="w-full bg-white border border-cream-200 shadow-card rounded-[14px] p-6">
+            <TabsContent value="information" className="mt-6">
+              {/* Outer Card wrapper dropped — with underline tabs the
+                  content sits directly under the tab strip (mockup
+                  pattern). Inner sections (Campaign Overview /
+                  Timeline / Client / Team) already have their own
+                  card chrome. */}
               {/* CardHeader simplified — logo + name + status removed
                   because the editorial hero above shows all three.
                   In view mode just an Edit affordance; in edit mode
                   the Name input + Status select live in the form
                   body for direct editing. */}
-              <div className="pb-6 border-b border-cream-100 flex items-center justify-between">
+              <div className="pb-6 border-b border-cream-200 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <h2 className="display-serif text-[19px] text-ink-warm-900 leading-none">Campaign Details</h2>
                   {!editMode && (
@@ -5041,11 +5099,9 @@ const CampaignDetailsPage = () => {
                 )}
                     </div>
               </CardContent>
-            </div>
           </TabsContent>
 
-          <TabsContent value="kols" className="mt-4">
-            <div className="w-full bg-white border border-cream-200 shadow-card rounded-[14px] p-6">
+          <TabsContent value="kols" className="mt-6">
               <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="bg-cream-100 p-2 rounded-lg">
@@ -7233,11 +7289,9 @@ const CampaignDetailsPage = () => {
                   </>
                 )}
               </CardContent>
-            </div>
           </TabsContent>
-          
-          <TabsContent value="contents" className="mt-4">
-            <div className="w-full bg-white border border-cream-200 shadow-card rounded-[14px] p-6">
+
+          <TabsContent value="contents" className="mt-6">
               <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="bg-cream-100 p-2 rounded-lg"><FileText className="h-6 w-6 text-ink-warm-700" /></div>
@@ -9094,12 +9148,10 @@ const CampaignDetailsPage = () => {
                   </>
                 )}
               </CardContent>
-            </div>
           </TabsContent>
 
           {/* Budget Tab */}
-          <TabsContent value="payments" className="mt-4">
-            <div className="w-full bg-white border border-cream-200 shadow-card rounded-[14px] p-6">
+          <TabsContent value="payments" className="mt-6">
               <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="bg-cream-100 p-2 rounded-lg">
@@ -10865,11 +10917,10 @@ const CampaignDetailsPage = () => {
                   </div>
                 )}
               </CardContent>
-            </div>
           </TabsContent>
 
           {/* Report Tab */}
-          <TabsContent value="report" className="mt-4">
+          <TabsContent value="report" className="mt-6">
             <ReportTabContent
               campaignId={id}
               reportFiles={reportFiles}
