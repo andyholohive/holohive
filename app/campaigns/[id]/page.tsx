@@ -527,12 +527,14 @@ const CampaignDetailsPage = () => {
                 .eq('id', selectedCell.rowId);
 
               // Refresh contents
-              const { data, error } = await supabase
-                .from('contents')
-                .select('*')
-                .eq('campaign_id', campaign?.id);
-              if (!error && data) {
-                setContents(data);
+              if (campaign?.id) {
+                const { data, error } = await supabase
+                  .from('contents')
+                  .select('*')
+                  .eq('campaign_id', campaign.id);
+                if (!error && data) {
+                  setContents(data);
+                }
               }
 
               // Clear copied cell styling after paste
@@ -989,13 +991,13 @@ const CampaignDetailsPage = () => {
 
   // Report functions
   const fetchReportFiles = async () => {
-    if (!id) return;
+    if (!id || !campaign?.id) return;
     setLoadingReportFiles(true);
     try {
       const { data, error } = await supabase
         .from('campaign_report_files')
         .select('*')
-        .eq('campaign_id', campaign?.id)
+        .eq('campaign_id', campaign.id)
         .order('display_order', { ascending: true });
 
       if (error) throw error;
@@ -1009,12 +1011,12 @@ const CampaignDetailsPage = () => {
   };
 
   const fetchReportData = async () => {
-    if (!id) return;
+    if (!id || !campaign?.id) return;
     try {
       const { data, error } = await supabase
         .from('campaign_reports')
         .select('*')
-        .eq('campaign_id', campaign?.id)
+        .eq('campaign_id', campaign.id)
         .single();
 
       if (data) {
@@ -1087,13 +1089,13 @@ const CampaignDetailsPage = () => {
   };
 
   const handleSaveCustomMessage = async () => {
-    if (!id) return;
+    if (!id || !campaign?.id) return;
     try {
       // Check if report exists
       const { data: existingReport } = await supabase
         .from('campaign_reports')
         .select('id')
-        .eq('campaign_id', campaign?.id)
+        .eq('campaign_id', campaign.id)
         .single();
 
       if (existingReport) {
@@ -1101,14 +1103,14 @@ const CampaignDetailsPage = () => {
         const { error } = await supabase
           .from('campaign_reports')
           .update({ custom_message: customMessage })
-          .eq('campaign_id', campaign?.id);
+          .eq('campaign_id', campaign.id);
 
         if (error) throw error;
       } else {
         // Create new
         const { error } = await supabase
           .from('campaign_reports')
-          .insert({ campaign_id: campaign?.id, custom_message: customMessage });
+          .insert({ campaign_id: campaign.id, custom_message: customMessage });
 
         if (error) throw error;
       }
@@ -2796,7 +2798,7 @@ const CampaignDetailsPage = () => {
                               className={`focus-brand justify-start text-left font-normal h-9 ${form?.intro_call_date ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
                             >
                               <CalendarIcon className="mr-2 h-4 w-4" />
-                              {form?.intro_call_date ? formatDate(form.intro_call_date) : "Select intro call date"}
+                              {form?.intro_call_date ? formatDate(form?.intro_call_date) : "Select intro call date"}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-50" align="start">
@@ -2811,7 +2813,7 @@ const CampaignDetailsPage = () => {
                           </PopoverContent>
                         </Popover>
                       ) : (
-                        <div className="text-base font-semibold text-ink-warm-900">{campaign?.intro_call_date ? formatDate(campaign.intro_call_date) : '-'}</div>
+                        <div className="text-base font-semibold text-ink-warm-900">{campaign?.intro_call_date ? formatDate(campaign?.intro_call_date) : '-'}</div>
                       )}
                         </div>
                       )}

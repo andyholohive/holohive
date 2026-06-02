@@ -110,13 +110,13 @@ export function BudgetOverview() {
                             };
                             
                             const kolsAllocated = campaignKOLs
-                              .filter(kol => mapRegionToCategory(kol.master_kol.region) === alloc.region && kol.allocated_budget)
+                              .filter(kol => mapRegionToCategory(kol.master_kol.region || '') === alloc.region && kol.allocated_budget)
                               .reduce((sum, kol) => sum + (kol.allocated_budget || 0), 0);
                             
                             const actualPayments = payments
                               .filter(payment => {
                                 const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
-                                return kol && mapRegionToCategory(kol.master_kol.region) === alloc.region;
+                                return kol && mapRegionToCategory(kol.master_kol.region || '') === alloc.region;
                               })
                               .reduce((sum, payment) => sum + (payment.amount || 0), 0);
                             

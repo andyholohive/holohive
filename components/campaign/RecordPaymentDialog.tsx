@@ -271,7 +271,7 @@ export const RecordPaymentDialog = forwardRef<RecordPaymentDialogHandle, RecordP
 
       const { error } = await supabase
         .from('payments')
-        .insert(paymentInserts)
+        .insert(paymentInserts as any)
         .select();
 
       if (error) throw error;
@@ -333,7 +333,7 @@ export const RecordPaymentDialog = forwardRef<RecordPaymentDialogHandle, RecordP
           transaction_id: nonKOLPayment.transaction_id || null,
           wallet: nonKOLPayment.wallet || null,
           notes: nonKOLPayment.notes || null,
-        })
+        } as any)
         .select();
 
       if (error) throw error;

@@ -1466,7 +1466,7 @@ export function KolDashboardTableView({
                                                 }));
                                                 try {
                                                   console.log(`Creating ${count} contents with type:`, type);
-                                                  const { error, data } = await supabase.from('contents').insert(payloads).select();
+                                                  const { error, data } = await supabase.from('contents').insert(payloads as any).select();
                                                   if (error) {
                                                     console.error('Error creating contents:', error);
                                                     toast({
@@ -1503,7 +1503,7 @@ export function KolDashboardTableView({
 
                                                     const { error: paymentError, data: paymentData } = await supabase
                                                       .from('payments')
-                                                      .insert(paymentPayloads)
+                                                      .insert(paymentPayloads as any)
                                                       .select();
 
                                                     if (paymentError) {
