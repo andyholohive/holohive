@@ -4081,76 +4081,47 @@ const CampaignDetailsPage = () => {
                   In view mode just an Edit affordance; in edit mode
                   the Name input + Status select live in the form
                   body for direct editing. */}
-              {/* Tab section header — same chrome as KOL Dashboard,
-                  Content Dashboard, Budget Management for consistency:
-                  brand-soft icon tile + display-serif 22px heading +
-                  border-cream-200 divider. */}
-              <div className="pb-6 border-b border-cream-200 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
-                    <FileText className="h-4 w-4" />
-                  </div>
-                  <h2 className="display-serif text-[22px] text-ink-warm-900 leading-tight">Campaign Details</h2>
-                  {!editMode && (
-                    <span className="text-[10px] mono uppercase tracking-[0.14em] text-ink-warm-500">View only</span>
-                  )}
-                </div>
-                {/* Major "Edit" button removed 2026-06-XX — per-card
-                    Edit affordances now live on the Engagement /
-                    Budget / Approved Access cards. The legacy full
-                    form is still rendered for fields without a
-                    view-mode card yet (Campaign Settings, Intro
-                    call, etc.) — see "More options" toggle below. */}
-                {!editMode ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleEdit}
-                    className="text-xs text-ink-warm-500 hover:text-brand"
-                    title="Edit the full form (Settings, Intro call, etc.)"
+              {/* Tab body header removed 2026-06-XX — the tab strip
+                  above already labels the section. Action affordances
+                  (More options / Status select in edit mode) moved
+                  into a small inline toolbar at the bottom-right of
+                  the content (or per-card for view mode). Cuts ~70px
+                  of header weight from every tab. */}
+              {editMode && (
+                <div className="mb-4 flex items-center justify-end gap-2">
+                  <span className="text-[10px] mono uppercase tracking-[0.14em] text-amber-700">Editing</span>
+                  <Select
+                    value={form?.status || ""}
+                    onValueChange={(value) => {
+                      if (value === "Completed" && hasWarnings) {
+                        toast({
+                          title: "Cannot Mark as Completed",
+                          description: `There are ${missingFields.length} missing field(s). Please review warnings before marking as completed.`,
+                          variant: "destructive",
+                        });
+                        setIsWarningsOpen(true);
+                        return;
+                      }
+                      handleChange("status", value);
+                    }}
                   >
-                    More options
-                    <ChevronDown className="h-3 w-3 ml-1" />
-                  </Button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] mono uppercase tracking-[0.14em] text-amber-700">Editing</span>
-                    {/* Status select moved to a small inline control
-                        so the user can change status without scrolling
-                        the form body. */}
-                    <Select
-                      value={form?.status || ""}
-                      onValueChange={(value) => {
-                        if (value === "Completed" && hasWarnings) {
-                          toast({
-                            title: "Cannot Mark as Completed",
-                            description: `There are ${missingFields.length} missing field(s). Please review warnings before marking as completed.`,
-                            variant: "destructive",
-                          });
-                          setIsWarningsOpen(true);
-                          return;
-                        }
-                        handleChange("status", value);
-                      }}
-                    >
-                      <SelectTrigger className="w-40 h-9 focus-brand text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Planning">Planning</SelectItem>
-                        <SelectItem value="Active">Active</SelectItem>
-                        <SelectItem value="Paused">Paused</SelectItem>
-                        <SelectItem value="Completed">
-                          <div className="flex items-center gap-2">
-                            Completed
-                            {hasWarnings && <AlertTriangle className="h-3 w-3 text-amber-500" />}
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
+                    <SelectTrigger className="w-40 h-9 focus-brand text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Planning">Planning</SelectItem>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Paused">Paused</SelectItem>
+                      <SelectItem value="Completed">
+                        <div className="flex items-center gap-2">
+                          Completed
+                          {hasWarnings && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* ── View-mode layout ────────────────────────────────────
                   Matches the holohive-ui-revamp.html mockup's
@@ -4478,7 +4449,7 @@ const CampaignDetailsPage = () => {
                             value={form?.outline || ""}
                             onChange={e => handleChange("outline", e.target.value)}
                             className="focus-brand focus:ring-2 focus:ring-brand focus:border-brand"
-                            style={{ borderColor: '#e5e7eb' }}
+                           
                             placeholder="Enter campaign outline..."
                             rows={3}
                           />
@@ -4499,7 +4470,7 @@ const CampaignDetailsPage = () => {
                             value={form?.description || ""}
                             onChange={e => handleChange("description", e.target.value)}
                             className="focus-brand focus:ring-2 focus:ring-brand focus:border-brand"
-                            style={{ borderColor: '#e5e7eb' }}
+                           
                             rows={3}
                           />
                         ) : (
@@ -5035,7 +5006,7 @@ const CampaignDetailsPage = () => {
                                 <Input
                                   type="text"
                                   className="pl-6 w-full focus-brand focus:ring-2 focus:ring-brand focus:border-brand"
-                                  style={{ borderColor: '#e5e7eb' }}
+                                 
                                   value={form?.total_budget ? Number(form.total_budget).toLocaleString() : ""}
                                   onChange={e => {
                                     const value = e.target.value.replace(/,/g, '');
@@ -5196,15 +5167,10 @@ const CampaignDetailsPage = () => {
           </TabsContent>
 
           <TabsContent value="kols" className="mt-6">
-              <div className="pb-6 border-b border-cream-200 flex flex-row items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
-                    <Users className="h-4 w-4" />
-                  </div>
-                  <h2 className="display-serif text-[22px] text-ink-warm-900 leading-tight">KOL Dashboard</h2>
-                </div>
-                <div className="flex items-center gap-3">
-                  
+              {/* Tab body header removed — tab strip already labels
+                  the section. Action affordances live in a right-
+                  aligned toolbar row at the top of the content. */}
+              <div className="mb-4 flex flex-row items-center justify-end gap-2">
                   <Dialog open={isAddKOLsDialogOpen} onOpenChange={setIsAddKOLsDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="brand" size="sm">
@@ -5247,7 +5213,7 @@ const CampaignDetailsPage = () => {
                          <div className="border rounded-lg overflow-hidden mt-2">
                            <Table>
                              <TableHeader>
-                               <TableRow className="bg-cream-50">
+                               <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
                                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 w-12">Select</TableHead>
                                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Name</TableHead>
                                  <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Followers</TableHead>
@@ -5501,29 +5467,28 @@ const CampaignDetailsPage = () => {
                      </DialogFooter>
                    </DialogContent>
                   </Dialog>
-                </div>
               </div>
               <CardContent className="pt-6 px-0">
                 {/* View Toggle */}
                 <div className="mb-4">
-                  <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+                  <div className="inline-flex h-9 items-center gap-1 rounded-md bg-cream-100 p-1 border border-cream-200">
                     <div
                       onClick={() => setKolViewMode('overview')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'overview' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'overview' ? 'bg-white shadow-card text-brand' : ''}`}
                     >
                       <BarChart3 className="h-4 w-4 mr-2" />
                       Overview
                     </div>
                     <div
                       onClick={() => setKolViewMode('table')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'table' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'table' ? 'bg-white shadow-card text-brand' : ''}`}
                     >
                       <TableIcon className="h-4 w-4 mr-2" />
                       Table
                     </div>
                     <div
                       onClick={() => setKolViewMode('graph')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'graph' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'graph' ? 'bg-white shadow-card text-brand' : ''}`}
                     >
                       <CreditCard className="h-4 w-4 mr-2" />
                       Cards
@@ -5935,8 +5900,9 @@ const CampaignDetailsPage = () => {
                       <div className="flex flex-col items-end justify-end">
                         <div className="h-5"></div>
                         <Button
+                          variant="brand"
                           size="sm"
-                          className="bg-brand hover:bg-[#2d6b75] text-white border-0 shadow-sm whitespace-nowrap"
+                          className="whitespace-nowrap"
                           disabled={selectedKOLs.length === 0 || !bulkStatus}
                           onClick={async () => {
                             if (!bulkStatus || selectedKOLs.length === 0) return;
@@ -6022,7 +5988,7 @@ const CampaignDetailsPage = () => {
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-cream-50">
+                        <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">KOL</TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Followers</TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500">Region</TableHead>
@@ -7386,12 +7352,8 @@ const CampaignDetailsPage = () => {
           </TabsContent>
 
           <TabsContent value="contents" className="mt-6">
-              <div className="pb-6 border-b border-cream-200 flex flex-row items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0"><FileText className="h-4 w-4" /></div>
-                  <h2 className="display-serif text-[22px] text-ink-warm-900 leading-tight">Content Dashboard</h2>
-                </div>
-                <div className="flex items-center">
+              {/* Tab body header removed — tab strip already labels. */}
+              <div className="mb-4 flex flex-row items-center justify-end gap-2">
                   <Dialog open={false} onOpenChange={setIsAddContentsDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="brand" size="sm" onClick={async (e) => {
@@ -7771,22 +7733,21 @@ const CampaignDetailsPage = () => {
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
-                </div>
-</div>
+              </div>
               <CardContent className="pt-6 px-0">
                 {/* View Toggle */}
                 <div className="mb-4">
-                  <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+                  <div className="inline-flex h-9 items-center gap-1 rounded-md bg-cream-100 p-1 border border-cream-200">
                     <div
                       onClick={() => setContentsViewMode('overview')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${contentsViewMode === 'overview' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${contentsViewMode === 'overview' ? 'bg-white shadow-card text-brand' : ''}`}
                     >
                       <BarChart3 className="h-4 w-4 mr-2" />
                       Overview
                     </div>
                     <div
                       onClick={() => setContentsViewMode('table')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${contentsViewMode === 'table' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${contentsViewMode === 'table' ? 'bg-white shadow-card text-brand' : ''}`}
                     >
                       <TableIcon className="h-4 w-4 mr-2" />
                       Table
@@ -9246,14 +9207,8 @@ const CampaignDetailsPage = () => {
 
           {/* Budget Tab */}
           <TabsContent value="payments" className="mt-6">
-              <div className="pb-6 border-b border-cream-200 flex flex-row items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
-                    <DollarSign className="h-4 w-4" />
-                  </div>
-                  <h2 className="display-serif text-[22px] text-ink-warm-900 leading-tight">Budget Management</h2>
-                </div>
-                <div className="flex items-center gap-3">
+              {/* Tab body header removed — tab strip already labels. */}
+              <div className="mb-4 flex flex-row items-center justify-end gap-2">
                   <Button
                     size="sm"
                     variant="outline"
@@ -9748,22 +9703,21 @@ const CampaignDetailsPage = () => {
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
-                </div>
-</div>
+              </div>
               <CardContent className="pt-6 px-0">
                 {/* View Toggle */}
                 <div className="mb-4">
-                  <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
+                  <div className="inline-flex h-9 items-center gap-1 rounded-md bg-cream-100 p-1 border border-cream-200">
                     <div
                       onClick={() => setPaymentViewMode('table')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${paymentViewMode === 'table' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${paymentViewMode === 'table' ? 'bg-white shadow-card text-brand' : ''}`}
                     >
                       <TableIcon className="h-4 w-4 mr-2" />
                       Table
                     </div>
                     <div
                       onClick={() => setPaymentViewMode('graph')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${paymentViewMode === 'graph' ? 'bg-background text-foreground shadow-sm' : ''}`}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${paymentViewMode === 'graph' ? 'bg-white shadow-card text-brand' : ''}`}
                     >
                       <BarChart3 className="h-4 w-4 mr-2" />
                       Graph
@@ -12355,6 +12309,13 @@ function CampaignDetailViewLayout({
             36px icon tile + label + truncated URL underneath. */}
         <ResourcesCard resources={resources} onChange={onResourcesChange} />
 
+        {/* Budget + Approved Access — paired side-by-side in a 2-col
+            sub-grid so the dense Approved Access chip list sits
+            alongside the Budget summary instead of stacking below
+            (mockup pattern: secondary cards side-by-side under the
+            primary cards). Both cards still stack vertically on
+            screens narrower than md. */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Budget card — total + per-region allocations + progress
             bar showing how much has been paid out. Per-card Edit
             affordance links into the Budget tab where the full
@@ -12502,6 +12463,7 @@ function CampaignDetailViewLayout({
           onStartEdit={() => setEditingCard('approved')}
           onDone={() => setEditingCard(null)}
         />
+        </div>
       </div>
 
       {/* ── Sidebar column ───────────────────────────────────────── */}
