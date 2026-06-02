@@ -11,6 +11,21 @@
 import { Flag, Globe } from 'lucide-react';
 
 // ───────────────────────────────────────────────────────────────────
+// Brand-teal hex constants
+// ───────────────────────────────────────────────────────────────────
+
+/**
+ * Brand-teal hex constants for SVG / inline-CSS surfaces that can't
+ * accept a Tailwind class (recharts `stroke`/`fill`, scrollbar colors,
+ * `react-day-picker` `modifiersStyles`). Mirrors the `brand` tokens in
+ * `tailwind.config.ts` — keep these in sync if the brand palette ever
+ * shifts. Prefer `bg-brand` / `text-brand` over these constants
+ * everywhere a className is acceptable.
+ */
+export const BRAND_HEX = '#3e8692';      // brand.DEFAULT
+export const BRAND_DARK_HEX = '#2d6470'; // brand.dark
+
+// ───────────────────────────────────────────────────────────────────
 // Date helpers
 // ───────────────────────────────────────────────────────────────────
 
