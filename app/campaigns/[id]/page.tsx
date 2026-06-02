@@ -10312,8 +10312,20 @@ const CampaignDetailsPage = () => {
 
                     {/* Regional Budget Summary */}
                     {campaign.budget_allocations && campaign.budget_allocations.length > 0 && (
-                      <div className="bg-white p-6 rounded-[14px] border border-cream-200 shadow-card">
-                        <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight mb-4">Regional Budget Summary</h3>
+                      <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
+                        {/* Section header — same flex-row pattern as
+                            Budget Overview / Regional Budget Allocation /
+                            Payment Methods / Payment Timeline below, so
+                            all 5 Budget-tab sections share one rhythm. */}
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Regional Budget Summary</h3>
+                            <p className="text-sm text-ink-warm-500 mt-1">Allocation, payments, and remaining budget by region</p>
+                          </div>
+                          <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500 tabular-nums">
+                            {campaign.budget_allocations.length} region{campaign.budget_allocations.length === 1 ? '' : 's'}
+                          </span>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {campaign.budget_allocations.map((alloc: any) => {
                             // Helper function to map regions to APAC/Global
@@ -10388,18 +10400,18 @@ const CampaignDetailsPage = () => {
                           <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Budget Overview</h3>
                           <p className="text-sm text-ink-warm-500 mt-1">Comparison of total budget vs actual payments</p>
                         </div>
-                        <div className="flex items-center space-x-4 text-xs">
+                        <div className="flex items-center gap-4">
                           <div className="flex items-center space-x-2">
                             <div className="w-3 h-3 rounded bg-cream-300"></div>
-                            <span className="text-ink-warm-700 font-medium">Total</span>
+                            <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-700">Total</span>
                           </div>
                           <div className="flex items-center space-x-2">
                             <div className="w-3 h-3 rounded bg-brand"></div>
-                            <span className="text-ink-warm-700 font-medium">Payments</span>
+                            <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-700">Payments</span>
                           </div>
                           <div className="flex items-center space-x-2">
                             <div className="w-3 h-3 rounded bg-emerald-500"></div>
-                            <span className="text-ink-warm-700 font-medium">Remaining</span>
+                            <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-700">Remaining</span>
                           </div>
                         </div>
                       </div>
@@ -10460,18 +10472,18 @@ const CampaignDetailsPage = () => {
                             <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Regional Budget Allocation</h3>
                             <p className="text-sm text-ink-warm-500 mt-1">Budget distribution across regions</p>
                           </div>
-                          <div className="flex items-center space-x-4 text-xs">
+                          <div className="flex items-center gap-4">
                             <div className="flex items-center space-x-2">
                               <div className="w-3 h-3 rounded bg-cream-300"></div>
-                              <span className="text-ink-warm-700 font-medium">Regional Budget</span>
+                              <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-700">Regional Budget</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <div className="w-3 h-3 rounded bg-brand"></div>
-                              <span className="text-ink-warm-700 font-medium">Payments Made</span>
+                              <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-700">Payments Made</span>
                             </div>
                             <div className="flex items-center space-x-2">
                               <div className="w-3 h-3 rounded bg-emerald-500"></div>
-                              <span className="text-ink-warm-700 font-medium">Remaining</span>
+                              <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-700">Remaining</span>
                             </div>
                           </div>
                         </div>
@@ -10568,18 +10580,18 @@ const CampaignDetailsPage = () => {
                               <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Payment Methods Distribution</h3>
                               <p className="text-sm text-ink-warm-500 mt-1">Breakdown of payments by method</p>
                             </div>
-                            <div className="flex items-center space-x-4 text-xs">
+                            <div className="flex items-center gap-4">
                               <div className="flex items-center space-x-2">
                                 <div className="w-3 h-3 rounded bg-[#8b5cf6]"></div>
-                                <span className="text-ink-warm-700 font-medium">Token</span>
+                                <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-700">Token</span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <div className="w-3 h-3 rounded bg-[#f59e0b]"></div>
-                                <span className="text-ink-warm-700 font-medium">Fiat</span>
+                                <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-700">Fiat</span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <div className="w-3 h-3 rounded bg-[#10b981]"></div>
-                                <span className="text-ink-warm-700 font-medium">WL</span>
+                                <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-700">WL</span>
                               </div>
                             </div>
                           </div>
@@ -10674,18 +10686,18 @@ const CampaignDetailsPage = () => {
                               <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Payment Timeline</h3>
                               <p className="text-sm text-ink-warm-500 mt-1">Payment amounts over time by method</p>
                             </div>
-                            <div className="flex items-center space-x-4 text-xs">
+                            <div className="flex items-center gap-4">
                               <div className="flex items-center space-x-2">
                                 <div className="w-3 h-3 rounded bg-[#8b5cf6]"></div>
-                                <span className="text-ink-warm-700 font-medium">Token</span>
+                                <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-700">Token</span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <div className="w-3 h-3 rounded bg-[#f59e0b]"></div>
-                                <span className="text-ink-warm-700 font-medium">Fiat</span>
+                                <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-700">Fiat</span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <div className="w-3 h-3 rounded bg-[#10b981]"></div>
-                                <span className="text-ink-warm-700 font-medium">WL</span>
+                                <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-700">WL</span>
                               </div>
                             </div>
                           </div>
