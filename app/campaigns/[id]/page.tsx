@@ -4070,7 +4070,7 @@ const CampaignDetailsPage = () => {
               )}
             </TabsList>
             
-            <TabsContent value="information" className="mt-6">
+            <TabsContent value="information" className="mt-4">
               {/* Outer Card wrapper dropped — with underline tabs the
                   content sits directly under the tab strip (mockup
                   pattern). Inner sections (Campaign Overview /
@@ -5166,11 +5166,36 @@ const CampaignDetailsPage = () => {
               )}
           </TabsContent>
 
-          <TabsContent value="kols" className="mt-6">
-              {/* Tab body header removed — tab strip already labels
-                  the section. Action affordances live in a right-
-                  aligned toolbar row at the top of the content. */}
-              <div className="mb-4 flex flex-row items-center justify-end gap-2">
+          <TabsContent value="kols" className="mt-4">
+              {/* Toolbar row: view-mode toggle on the left, Add
+                  affordance on the right — merged onto one line
+                  to cut vertical chrome. */}
+              <div className="mb-3 flex flex-row items-center justify-between gap-2">
+                  {/* View toggle */}
+                  <div className="inline-flex h-9 items-center gap-1 rounded-md bg-cream-100 p-1 border border-cream-200">
+                    <div
+                      onClick={() => setKolViewMode('overview')}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all cursor-pointer ${kolViewMode === 'overview' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:text-ink-warm-900'}`}
+                    >
+                      <BarChart3 className="h-4 w-4 mr-1.5" />
+                      Overview
+                    </div>
+                    <div
+                      onClick={() => setKolViewMode('table')}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all cursor-pointer ${kolViewMode === 'table' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:text-ink-warm-900'}`}
+                    >
+                      <TableIcon className="h-4 w-4 mr-1.5" />
+                      Table
+                    </div>
+                    <div
+                      onClick={() => setKolViewMode('graph')}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all cursor-pointer ${kolViewMode === 'graph' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:text-ink-warm-900'}`}
+                    >
+                      <CreditCard className="h-4 w-4 mr-1.5" />
+                      Cards
+                    </div>
+                  </div>
+                  {/* Add KOLs action — pushed to the right */}
                   <Dialog open={isAddKOLsDialogOpen} onOpenChange={setIsAddKOLsDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="brand" size="sm">
@@ -5468,33 +5493,8 @@ const CampaignDetailsPage = () => {
                    </DialogContent>
                   </Dialog>
               </div>
-              <CardContent className="pt-6 px-0">
-                {/* View Toggle */}
-                <div className="mb-4">
-                  <div className="inline-flex h-9 items-center gap-1 rounded-md bg-cream-100 p-1 border border-cream-200">
-                    <div
-                      onClick={() => setKolViewMode('overview')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'overview' ? 'bg-white shadow-card text-brand' : ''}`}
-                    >
-                      <BarChart3 className="h-4 w-4 mr-2" />
-                      Overview
-                    </div>
-                    <div
-                      onClick={() => setKolViewMode('table')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'table' ? 'bg-white shadow-card text-brand' : ''}`}
-                    >
-                      <TableIcon className="h-4 w-4 mr-2" />
-                      Table
-                    </div>
-                    <div
-                      onClick={() => setKolViewMode('graph')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${kolViewMode === 'graph' ? 'bg-white shadow-card text-brand' : ''}`}
-                    >
-                      <CreditCard className="h-4 w-4 mr-2" />
-                      Cards
-                    </div>
-                  </div>
-                </div>
+              <CardContent className="pt-0 px-0">
+                {/* View toggle moved to the toolbar row above. */}
                 {/* Overview View */}
                 {kolViewMode === 'overview' && (() => {
                   // Hidden KOLs are excluded from every dashboard count +
@@ -7351,9 +7351,27 @@ const CampaignDetailsPage = () => {
               </CardContent>
           </TabsContent>
 
-          <TabsContent value="contents" className="mt-6">
-              {/* Tab body header removed — tab strip already labels. */}
-              <div className="mb-4 flex flex-row items-center justify-end gap-2">
+          <TabsContent value="contents" className="mt-4">
+              {/* Toolbar row: view-mode toggle on the left, Add
+                  Content on the right — merged onto one line. */}
+              <div className="mb-3 flex flex-row items-center justify-between gap-2">
+                  {/* View toggle */}
+                  <div className="inline-flex h-9 items-center gap-1 rounded-md bg-cream-100 p-1 border border-cream-200">
+                    <div
+                      onClick={() => setContentsViewMode('overview')}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all cursor-pointer ${contentsViewMode === 'overview' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:text-ink-warm-900'}`}
+                    >
+                      <BarChart3 className="h-4 w-4 mr-1.5" />
+                      Overview
+                    </div>
+                    <div
+                      onClick={() => setContentsViewMode('table')}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all cursor-pointer ${contentsViewMode === 'table' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:text-ink-warm-900'}`}
+                    >
+                      <TableIcon className="h-4 w-4 mr-1.5" />
+                      Table
+                    </div>
+                  </div>
                   <Dialog open={false} onOpenChange={setIsAddContentsDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="brand" size="sm" onClick={async (e) => {
@@ -7734,26 +7752,8 @@ const CampaignDetailsPage = () => {
                     </DialogContent>
                   </Dialog>
               </div>
-              <CardContent className="pt-6 px-0">
-                {/* View Toggle */}
-                <div className="mb-4">
-                  <div className="inline-flex h-9 items-center gap-1 rounded-md bg-cream-100 p-1 border border-cream-200">
-                    <div
-                      onClick={() => setContentsViewMode('overview')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${contentsViewMode === 'overview' ? 'bg-white shadow-card text-brand' : ''}`}
-                    >
-                      <BarChart3 className="h-4 w-4 mr-2" />
-                      Overview
-                    </div>
-                    <div
-                      onClick={() => setContentsViewMode('table')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${contentsViewMode === 'table' ? 'bg-white shadow-card text-brand' : ''}`}
-                    >
-                      <TableIcon className="h-4 w-4 mr-2" />
-                      Table
-                    </div>
-                  </div>
-                </div>
+              <CardContent className="pt-0 px-0">
+                {/* View toggle moved to the toolbar row above. */}
                 {/* Overview Tab - Metrics from Information */}
                 {contentsViewMode === 'overview' && (
                   <div className="space-y-6">
@@ -9206,9 +9206,28 @@ const CampaignDetailsPage = () => {
           </TabsContent>
 
           {/* Budget Tab */}
-          <TabsContent value="payments" className="mt-6">
-              {/* Tab body header removed — tab strip already labels. */}
-              <div className="mb-4 flex flex-row items-center justify-end gap-2">
+          <TabsContent value="payments" className="mt-4">
+              {/* Toolbar row: view-mode toggle on the left, Export +
+                  Record Payment on the right — merged onto one line. */}
+              <div className="mb-3 flex flex-row items-center justify-between gap-2">
+                  {/* View toggle */}
+                  <div className="inline-flex h-9 items-center gap-1 rounded-md bg-cream-100 p-1 border border-cream-200">
+                    <div
+                      onClick={() => setPaymentViewMode('table')}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all cursor-pointer ${paymentViewMode === 'table' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:text-ink-warm-900'}`}
+                    >
+                      <TableIcon className="h-4 w-4 mr-1.5" />
+                      Table
+                    </div>
+                    <div
+                      onClick={() => setPaymentViewMode('graph')}
+                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all cursor-pointer ${paymentViewMode === 'graph' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:text-ink-warm-900'}`}
+                    >
+                      <BarChart3 className="h-4 w-4 mr-1.5" />
+                      Graph
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
                   <Button
                     size="sm"
                     variant="outline"
@@ -9703,28 +9722,11 @@ const CampaignDetailsPage = () => {
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
-              </div>
-              <CardContent className="pt-6 px-0">
-                {/* View Toggle */}
-                <div className="mb-4">
-                  <div className="inline-flex h-9 items-center gap-1 rounded-md bg-cream-100 p-1 border border-cream-200">
-                    <div
-                      onClick={() => setPaymentViewMode('table')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${paymentViewMode === 'table' ? 'bg-white shadow-card text-brand' : ''}`}
-                    >
-                      <TableIcon className="h-4 w-4 mr-2" />
-                      Table
-                    </div>
-                    <div
-                      onClick={() => setPaymentViewMode('graph')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer ${paymentViewMode === 'graph' ? 'bg-white shadow-card text-brand' : ''}`}
-                    >
-                      <BarChart3 className="h-4 w-4 mr-2" />
-                      Graph
-                    </div>
                   </div>
-                </div>
-                
+              </div>
+              <CardContent className="pt-0 px-0">
+                {/* View toggle moved to the toolbar row above. */}
+
                 {/* Table View */}
                 {paymentViewMode === 'table' && (
                   <>
@@ -10968,7 +10970,7 @@ const CampaignDetailsPage = () => {
           </TabsContent>
 
           {/* Report Tab */}
-          <TabsContent value="report" className="mt-6">
+          <TabsContent value="report" className="mt-4">
             <ReportTabContent
               campaignId={id}
               reportFiles={reportFiles}
