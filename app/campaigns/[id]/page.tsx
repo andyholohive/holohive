@@ -9654,7 +9654,7 @@ const CampaignDetailsPage = () => {
                         <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                           <TableHeader>
                             <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
-                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap group cursor-pointer hover:bg-cream-100 transition-colors" onClick={handleSelectAllPayments}>
+                              <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap group cursor-pointer hover:bg-cream-100 transition-colors w-14 min-w-[3.5rem]" onClick={handleSelectAllPayments}>
                                 <span className="group-hover:hidden">#</span>
                                 <Checkbox
                                   className="hidden group-hover:inline-flex"
@@ -9983,7 +9983,7 @@ const CampaignDetailsPage = () => {
                           <TableBody className="bg-white">
                             {getFilteredPayments().map((payment, index) => (
                               <TableRow key={payment.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} hover:bg-cream-100 transition-colors border-b border-cream-200`}>
-                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 p-2 overflow-hidden text-center text-ink-warm-700 group`} style={{ verticalAlign: 'middle' }}>
+                                <TableCell className={`${index % 2 === 0 ? 'bg-white' : 'bg-cream-50'} border-r border-cream-200 py-2 px-5 overflow-hidden text-center text-ink-warm-700 group w-14 min-w-[3.5rem]`} style={{ verticalAlign: 'middle' }}>
                                   <div className="flex items-center justify-center w-full h-full">
                                     {selectedPayments.includes(payment.id) ? (
                                       <Checkbox
