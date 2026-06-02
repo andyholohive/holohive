@@ -15,7 +15,7 @@ import { RequiredAsterisk } from "@/components/ui/required-asterisk";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusBadge, type BadgeTone } from "@/components/ui/status-badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity, X } from "lucide-react";
+import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity, X, Heart, MessageSquare, Repeat2, Bookmark } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -7691,11 +7691,16 @@ const CampaignDetailsPage = () => {
                       const fmt = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : n.toLocaleString();
                       return (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-                          <KpiCard icon={BarChart3}   label="Impressions" value={fmt(totalImpressions)} accent="brand"   />
-                          <KpiCard icon={Activity}    label="Comments"    value={fmt(totalComments)}    accent="sky"     />
-                          <KpiCard icon={Share2}      label="Retweets"    value={fmt(totalRetweets)}    accent="purple"  />
-                          <KpiCard icon={CheckCircle} label="Likes"       value={fmt(totalLikes)}       accent="rose"    />
-                          <KpiCard icon={BadgeCheck}  label="Bookmarks"   value={fmt(totalBookmarks)}   accent="emerald" />
+                          {/* Icons swapped to platform-native engagement
+                              metaphors so the strip reads correctly at a
+                              glance: Eye = impressions/views, MessageSquare
+                              = comments, Repeat2 = retweets/reposts, Heart
+                              = likes, Bookmark = bookmarks. */}
+                          <KpiCard icon={Eye}            label="Impressions" value={fmt(totalImpressions)} accent="brand"   />
+                          <KpiCard icon={MessageSquare}  label="Comments"    value={fmt(totalComments)}    accent="sky"     />
+                          <KpiCard icon={Repeat2}        label="Retweets"    value={fmt(totalRetweets)}    accent="purple"  />
+                          <KpiCard icon={Heart}          label="Likes"       value={fmt(totalLikes)}       accent="rose"    />
+                          <KpiCard icon={Bookmark}       label="Bookmarks"   value={fmt(totalBookmarks)}   accent="emerald" />
                         </div>
                       );
                     })()}
@@ -10336,31 +10341,35 @@ const CampaignDetailsPage = () => {
                             const utilization = (actualPayments / alloc.allocated_budget) * 100;
                             
                             return (
-                              <div key={alloc.region} className="bg-cream-50 p-4 rounded-lg border border-cream-200">
-                                <div className="flex items-center justify-between mb-2">
-                                  <div className="text-sm font-semibold text-ink-warm-700">
+                              <div key={alloc.region} className="bg-cream-50 p-4 rounded-[14px] border border-cream-200">
+                                {/* Region header — display-serif title +
+                                    mono uppercase utilization chip, matching
+                                    the rest of the v11 KV mini-card surfaces
+                                    (Record Payment per-KOL block, KOL cards-view). */}
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="display-serif text-[15px] text-ink-warm-900 leading-tight">
                                     {alloc.region === 'apac' ? 'APAC' : alloc.region === 'global' ? 'Global' : alloc.region}
                                   </div>
-                                  <div className="text-xs text-ink-warm-500">{utilization.toFixed(1)}% used</div>
+                                  <div className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500 tabular-nums">{utilization.toFixed(1)}% used</div>
                                 </div>
-                                <div className="space-y-1">
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-ink-warm-700">Regional Budget:</span>
-                                    <span className="font-medium">{CampaignService.formatCurrency(alloc.allocated_budget)}</span>
+                                <div className="space-y-1.5">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500">Regional Budget</span>
+                                    <span className="text-sm font-medium text-ink-warm-900 tabular-nums">{CampaignService.formatCurrency(alloc.allocated_budget)}</span>
                                   </div>
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-ink-warm-700">Actual Payments:</span>
-                                    <span className="font-medium text-brand">{CampaignService.formatCurrency(actualPayments)}</span>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500">Actual Payments</span>
+                                    <span className="text-sm font-medium text-brand tabular-nums">{CampaignService.formatCurrency(actualPayments)}</span>
                                   </div>
-                                  <div className="flex justify-between text-xs">
-                                    <span className="text-ink-warm-700">Remaining:</span>
-                                    <span className="font-medium text-emerald-600">{CampaignService.formatCurrency(remaining)}</span>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[10px] mono uppercase tracking-[0.2em] text-ink-warm-500">Remaining</span>
+                                    <span className="text-sm font-medium text-emerald-600 tabular-nums">{CampaignService.formatCurrency(remaining)}</span>
                                   </div>
                                 </div>
                                 <div className="mt-3">
                                   <div className="w-full bg-cream-200 rounded-full h-2">
-                                    <div 
-                                      className="bg-brand h-2 rounded-full transition-all duration-300" 
+                                    <div
+                                      className="bg-brand h-2 rounded-full transition-all duration-300"
                                       style={{ width: `${Math.min(utilization, 100)}%` }}
                                     ></div>
                                   </div>
