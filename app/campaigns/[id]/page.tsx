@@ -5178,11 +5178,11 @@ const CampaignDetailsPage = () => {
                         Add KOLs
                       </Button>
                     </DialogTrigger>
-                  <DialogContent className="max-w-[95vw] max-h-[90vh] overflow-hidden">
+                  <DialogContent className="max-w-[95vw] max-h-[85vh] flex flex-col">
                      <DialogHeader>
                        <DialogTitle>Add KOLs to Campaign</DialogTitle>
                      </DialogHeader>
-                     <div className="grid gap-4 py-4 max-h-[75vh] overflow-y-auto px-3 pb-6">
+                     <div className="grid gap-4 py-4 flex-1 overflow-y-auto px-1">
                        <div className="grid gap-2">
                          <Label>Select KOLs ({newKOLData.selectedKOLs.length} selected)</Label>
                          <div className="flex items-center max-w-sm w-full mb-2">
@@ -5628,7 +5628,7 @@ const CampaignDetailsPage = () => {
                       <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-xl font-bold text-ink-warm-900">Distribution of KOLs by Platform</h3>
+                            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Distribution of KOLs by Platform</h3>
                             <p className="text-sm text-ink-warm-500 mt-1">Breakdown of KOLs by social platform</p>
                           </div>
                         </div>
@@ -5726,7 +5726,7 @@ const CampaignDetailsPage = () => {
                       <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-xl font-bold text-ink-warm-900">KOLs by Region</h3>
+                            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">KOLs by Region</h3>
                             <p className="text-sm text-ink-warm-500 mt-1">Geographic distribution of KOLs</p>
                           </div>
                         </div>
@@ -5813,12 +5813,12 @@ const CampaignDetailsPage = () => {
                   <>
                 {/* Active/Hidden Tab Switcher */}
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="inline-flex items-center rounded-lg border border-cream-200 p-1 bg-cream-50">
+                  <div className="inline-flex items-center rounded-md bg-cream-100 p-1 border border-cream-200">
                     <button
                       onClick={() => setKolVisibilityTab('active')}
                       className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                         kolVisibilityTab === 'active'
-                          ? 'bg-white text-ink-warm-900 shadow-sm'
+                          ? 'bg-white text-brand shadow-card'
                           : 'text-ink-warm-700 hover:text-ink-warm-900'
                       }`}
                     >
@@ -5828,7 +5828,7 @@ const CampaignDetailsPage = () => {
                       onClick={() => setKolVisibilityTab('hidden')}
                       className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
                         kolVisibilityTab === 'hidden'
-                          ? 'bg-white text-ink-warm-900 shadow-sm'
+                          ? 'bg-white text-brand shadow-card'
                           : 'text-ink-warm-700 hover:text-ink-warm-900'
                       }`}
                     >
@@ -5850,7 +5850,7 @@ const CampaignDetailsPage = () => {
                 </div>
                 {selectedKOLs.length > 0 && (
                 <div className="mb-6 mt-6">
-                  <div className="bg-white border border-cream-200 rounded-lg p-6 shadow-sm">
+                  <div className="bg-white border border-cream-200 rounded-[14px] p-6 shadow-card">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-cream-500 rounded-full"></div>
@@ -5965,7 +5965,7 @@ const CampaignDetailsPage = () => {
                         <div className="h-5"></div>
                         <Button
                           size="sm"
-                          className="bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm whitespace-nowrap"
+                          variant="destructive" className="whitespace-nowrap"
                           disabled={selectedKOLs.length === 0}
                           onClick={() => {
                             setKolsToDelete(selectedKOLs);
@@ -6044,7 +6044,7 @@ const CampaignDetailsPage = () => {
                       whiteSpace: 'nowrap'
                     }} suppressHydrationWarning>
                       <TableHeader>
-                        <TableRow className="bg-cream-50 border-b border-cream-200">
+                        <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 sticky left-0 z-20 bg-cream-50 text-center whitespace-nowrap group cursor-pointer hover:bg-cream-100 transition-colors px-4" style={{ minWidth: '60px', width: '60px', boxShadow: 'inset -1px 0 0 0 #d1d5db' }} onClick={() => {
                             const allIds = filteredKOLs.map(kol => kol.id);
                             if (allIds.every(id => selectedKOLs.includes(id))) {
@@ -6965,7 +6965,7 @@ const CampaignDetailsPage = () => {
                   <>
                     {/* Filters Section */}
                     <div className="mb-4">
-                      <div className="bg-white border border-cream-200 rounded-lg p-6 shadow-sm">
+                      <div className="bg-white border border-cream-200 rounded-[14px] p-6 shadow-card">
                         <div className="flex flex-wrap items-end gap-2">
                           {/* Platform Filter */}
                           <div className="min-w-[120px] flex flex-col items-end justify-end">
@@ -7937,7 +7937,7 @@ const CampaignDetailsPage = () => {
                       <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-xl font-bold text-ink-warm-900">Total Impressions</h3>
+                            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Total Impressions</h3>
                           </div>
                         </div>
                         <div className="h-96">
@@ -8012,7 +8012,7 @@ const CampaignDetailsPage = () => {
                       <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-xl font-bold text-ink-warm-900">Impressions by Platform</h3>
+                            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Impressions by Platform</h3>
                           </div>
                         </div>
                         <div className="h-96">
@@ -8162,7 +8162,7 @@ const CampaignDetailsPage = () => {
                 </div>
                 {selectedContents.length > 0 && (
                 <div className="mb-6 mt-6">
-                  <div className="bg-white border border-cream-200 rounded-lg p-6 shadow-sm">
+                  <div className="bg-white border border-cream-200 rounded-[14px] p-6 shadow-card">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 bg-cream-500 rounded-full"></div>
@@ -8265,7 +8265,7 @@ const CampaignDetailsPage = () => {
                           <div className="h-5"></div>
                           <Button
                             size="sm"
-                            className="bg-brand hover:bg-[#2d6b75] text-white border-0 shadow-sm whitespace-nowrap"
+                            variant="brand" className="whitespace-nowrap"
                             disabled={selectedContents.length === 0 || (!bulkContentStatus && !bulkContentPlatform && !bulkContentType && !bulkContentActivationDate)}
                             onClick={handleBulkStatusChange}
                           >
@@ -8276,7 +8276,7 @@ const CampaignDetailsPage = () => {
                           <div className="h-5"></div>
                           <Button
                             size="sm"
-                            className="bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm whitespace-nowrap"
+                            variant="destructive" className="whitespace-nowrap"
                             disabled={selectedContents.length === 0}
                             onClick={() => setShowBulkDeleteDialog(true)}
                           >
@@ -8295,7 +8295,7 @@ const CampaignDetailsPage = () => {
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-cream-50 border-b border-cream-200">
+                        <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap">#</TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-left select-none">KOL</TableHead>
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 select-none">Platform</TableHead>
@@ -8598,7 +8598,7 @@ const CampaignDetailsPage = () => {
                   <div ref={contentTableRef} className="border rounded-lg" style={{ overflow: 'auto', overflowX: 'auto', overflowY: 'auto' }}>
                     <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                       <TableHeader>
-                        <TableRow className="bg-cream-50 border-b border-cream-200">
+                        <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
                           <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap group cursor-pointer hover:bg-cream-100 transition-colors px-4" style={{ minWidth: '60px', width: '60px' }} onClick={handleSelectAllContents}>
                             <span className="group-hover:hidden">#</span>
                             <Checkbox
@@ -9740,10 +9740,10 @@ const CampaignDetailsPage = () => {
                       </div>
                       {/* Overdue quick filter — content is posted but payment isn't recorded */}
                       <Button
-                        variant={showOverdueOnly ? 'default' : 'outline'}
+                        variant={showOverdueOnly ? 'destructive' : 'outline'}
                         size="sm"
                         onClick={() => setShowOverdueOnly(v => !v)}
-                        className={showOverdueOnly ? 'bg-rose-600 hover:bg-rose-700 text-white border-0' : 'text-rose-600 border-rose-200 hover:bg-rose-50'}
+                        className={showOverdueOnly ? '' : 'text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700'}
                         title={showOverdueOnly ? 'Showing overdue only — click to clear' : 'Show only payments where content is posted but payment is missing'}
                       >
                         <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
@@ -9755,7 +9755,7 @@ const CampaignDetailsPage = () => {
                     </div>
                 {selectedPayments.length > 0 && (
                 <div className="mb-6 mt-6">
-                  <div className="bg-white border border-cream-200 rounded-lg p-6 shadow-sm">
+                  <div className="bg-white border border-cream-200 rounded-[14px] p-6 shadow-card">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-cream-500 rounded-full"></div>
@@ -9812,7 +9812,7 @@ const CampaignDetailsPage = () => {
                         <div className="h-5"></div>
                         <Button
                           size="sm"
-                          className="bg-brand hover:bg-[#2d6b75] text-white border-0 shadow-sm whitespace-nowrap"
+                          variant="brand" className="whitespace-nowrap"
                           disabled={selectedPayments.length === 0 || !bulkPaymentMethod}
                           onClick={handleBulkPaymentMethodChange}
                         >
@@ -9823,7 +9823,7 @@ const CampaignDetailsPage = () => {
                         <div className="h-5"></div>
                         <Button
                           size="sm"
-                          className="bg-rose-600 hover:bg-rose-700 text-white border-0 shadow-sm whitespace-nowrap"
+                          variant="destructive" className="whitespace-nowrap"
                           disabled={selectedPayments.length === 0}
                           onClick={() => setShowBulkDeletePaymentsDialog(true)}
                         >
@@ -9862,7 +9862,7 @@ const CampaignDetailsPage = () => {
                       <div ref={paymentTableRef} className="border rounded-lg" style={{ overflow: 'auto', overflowX: 'auto', overflowY: 'auto' }}>
                         <Table className="min-w-full" style={{ tableLayout: 'auto', width: 'auto', borderCollapse: 'collapse', whiteSpace: 'nowrap' }}>
                           <TableHeader>
-                            <TableRow className="bg-cream-50 border-b border-cream-200">
+                            <TableRow className="bg-cream-50/80 hover:bg-cream-50/80 border-b border-cream-200">
                               <TableHead className="py-2.5 px-5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-warm-500 relative bg-cream-50 border-r border-cream-200 text-center whitespace-nowrap group cursor-pointer hover:bg-cream-100 transition-colors" onClick={handleSelectAllPayments}>
                                 <span className="group-hover:hidden">#</span>
                                 <Checkbox
@@ -10590,7 +10590,7 @@ const CampaignDetailsPage = () => {
                     <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                       <div className="flex items-center justify-between mb-6">
                         <div>
-                          <h3 className="text-xl font-bold text-ink-warm-900">Budget Overview</h3>
+                          <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Budget Overview</h3>
                           <p className="text-sm text-ink-warm-500 mt-1">Comparison of total budget vs actual payments</p>
                         </div>
                         <div className="flex items-center space-x-4 text-xs">
@@ -10662,7 +10662,7 @@ const CampaignDetailsPage = () => {
                       <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h3 className="text-xl font-bold text-ink-warm-900">Regional Budget Allocation</h3>
+                            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Regional Budget Allocation</h3>
                             <p className="text-sm text-ink-warm-500 mt-1">Budget distribution across regions</p>
                           </div>
                           <div className="flex items-center space-x-4 text-xs">
@@ -10770,7 +10770,7 @@ const CampaignDetailsPage = () => {
                         <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                           <div className="flex items-center justify-between mb-6">
                             <div>
-                              <h3 className="text-xl font-bold text-ink-warm-900">Payment Methods Distribution</h3>
+                              <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Payment Methods Distribution</h3>
                               <p className="text-sm text-ink-warm-500 mt-1">Breakdown of payments by method</p>
                             </div>
                             <div className="flex items-center space-x-4 text-xs">
@@ -10876,7 +10876,7 @@ const CampaignDetailsPage = () => {
                         <div className="bg-white p-8 rounded-[14px] border border-cream-200 shadow-card">
                           <div className="flex items-center justify-between mb-6">
                             <div>
-                              <h3 className="text-xl font-bold text-ink-warm-900">Payment Timeline</h3>
+                              <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Payment Timeline</h3>
                               <p className="text-sm text-ink-warm-500 mt-1">Payment amounts over time by method</p>
                             </div>
                             <div className="flex items-center space-x-4 text-xs">
@@ -11600,7 +11600,7 @@ const CampaignDetailsPage = () => {
 
       {/* Warnings Dialog */}
       <Dialog open={isWarningsOpen} onOpenChange={setIsWarningsOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
@@ -11610,7 +11610,7 @@ const CampaignDetailsPage = () => {
               The following fields are missing or incomplete. Click on any item to navigate to the relevant tab.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-4">
+          <div className="flex-1 overflow-y-auto px-1 space-y-2 py-4">
             {missingFields.map((item, index) => (
               <button
                 key={index}
@@ -11743,7 +11743,7 @@ const CampaignDetailsPage = () => {
               </p>
             )}
           </div>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-2 sm:gap-0 border-t border-cream-100 pt-3 mt-0">
             <Button
               variant="outline"
               onClick={skipPaymentNotification}
@@ -11781,7 +11781,7 @@ const CampaignDetailsPage = () => {
               {pricingSuggestionDialog?.kolName}'s last payment was <strong>${pricingSuggestionDialog?.latestCost?.toLocaleString()}</strong>. Would you like to use this amount?
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-2 sm:gap-0 border-t border-cream-100 pt-3 mt-0">
             <Button
               variant="outline"
               onClick={() => setPricingSuggestionDialog(null)}
@@ -11899,7 +11899,7 @@ const CampaignDetailsPage = () => {
           which is the same data shown on /kols. Mirrors the dialog
           layout used elsewhere in the app for consistency. */}
       <Dialog open={!!editingMasterKol} onOpenChange={(open) => { if (!open) { setEditingMasterKol(null); setMasterKolForm({}); } }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Edit KOL</DialogTitle>
             <DialogDescription>
@@ -11907,7 +11907,7 @@ const CampaignDetailsPage = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-2">
+          <div className="flex-1 overflow-y-auto px-1 grid gap-4 py-2">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5 col-span-2">
                 <Label htmlFor="mk-name">Name <RequiredAsterisk /></Label>
