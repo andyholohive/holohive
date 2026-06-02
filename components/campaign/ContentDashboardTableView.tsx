@@ -52,6 +52,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase';
 import { CampaignService } from '@/lib/campaignService';
 import { KOLService } from '@/lib/kolService';
@@ -1628,6 +1635,46 @@ export function ContentDashboardTableView() {
                     </Table>
                   </div>
                 )}
+
+      {/* Bulk Delete confirmation — moved from the page's trailing
+          dialog cluster into the component on 2026-06-02 so the
+          delete flow is fully Table-view-internal. */}
+      <Dialog open={showBulkDeleteDialog} onOpenChange={setShowBulkDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Bulk Delete</DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const linkedPayments = payments.filter((p: any) => {
+              const ids = Array.isArray(p.content_id) ? p.content_id : (p.content_id ? [p.content_id] : []);
+              return ids.some((id: string) => selectedContents.includes(id));
+            });
+            return (
+              <>
+                <div className="text-sm text-ink-warm-700 mt-2 mb-2">
+                  Are you sure you want to delete {selectedContents.length} content item{selectedContents.length !== 1 ? 's' : ''}?
+                </div>
+                {linkedPayments.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+                    <p className="font-medium text-amber-800">
+                      {linkedPayments.length} linked payment{linkedPayments.length !== 1 ? 's' : ''} will also be deleted
+                    </p>
+                    <p className="text-amber-700 mt-1">
+                      Total: ${linkedPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0).toLocaleString()}
+                    </p>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+          <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
+            <Button variant="outline" onClick={() => setShowBulkDeleteDialog(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleBulkDeleteContents}>
+              Delete Content
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
