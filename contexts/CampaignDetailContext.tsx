@@ -80,6 +80,9 @@ interface CampaignDetailContextType {
   campaignKOLs: CampaignKOLWithDetails[];
   /** Untyped on the page (any[]); keep loose until contents has a model. */
   contents: any[];
+  /** Loading flag for the initial contents fetch. Used by the Content
+   *  Dashboard Table view's skeleton-row block. */
+  loadingContents: boolean;
   /** Untyped on the page (any[]); keep loose until payments has a model. */
   payments: any[];
   /** Loading flag for the initial payments fetch. Used by the Budget
