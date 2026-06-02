@@ -5171,30 +5171,26 @@ const CampaignDetailsPage = () => {
                   affordance on the right — merged onto one line
                   to cut vertical chrome. */}
               <div className="mb-3 flex flex-row items-center justify-between gap-2">
-                  {/* View toggle */}
-                  <div className="inline-flex h-9 items-center gap-1 rounded-md bg-cream-100 p-1 border border-cream-200">
-                    <div
-                      onClick={() => setKolViewMode('overview')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all cursor-pointer ${kolViewMode === 'overview' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:text-ink-warm-900'}`}
-                    >
-                      <BarChart3 className="h-4 w-4 mr-1.5" />
-                      Overview
-                    </div>
-                    <div
-                      onClick={() => setKolViewMode('table')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all cursor-pointer ${kolViewMode === 'table' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:text-ink-warm-900'}`}
-                    >
-                      <TableIcon className="h-4 w-4 mr-1.5" />
-                      Table
-                    </div>
-                    <div
-                      onClick={() => setKolViewMode('graph')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all cursor-pointer ${kolViewMode === 'graph' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:text-ink-warm-900'}`}
-                    >
-                      <CreditCard className="h-4 w-4 mr-1.5" />
-                      Cards
-                    </div>
-                  </div>
+                  {/* View toggle — uses the proper Tabs primitive
+                      (same as the main page tab strip and every
+                      other v11 tabbed surface) so keyboard nav +
+                      ARIA + state management are consistent. */}
+                  <Tabs value={kolViewMode} onValueChange={(v) => setKolViewMode(v as 'overview' | 'table' | 'graph')}>
+                    <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+                      <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm">
+                        <BarChart3 className="h-4 w-4 mr-1.5" />
+                        Overview
+                      </TabsTrigger>
+                      <TabsTrigger value="table" className="data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm">
+                        <TableIcon className="h-4 w-4 mr-1.5" />
+                        Table
+                      </TabsTrigger>
+                      <TabsTrigger value="graph" className="data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm">
+                        <CreditCard className="h-4 w-4 mr-1.5" />
+                        Cards
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                   {/* Add KOLs action — pushed to the right */}
                   <Dialog open={isAddKOLsDialogOpen} onOpenChange={setIsAddKOLsDialogOpen}>
                     <DialogTrigger asChild>
@@ -5508,120 +5504,41 @@ const CampaignDetailsPage = () => {
                   const dashboardKOLs = campaignKOLs.filter(k => !k.hidden);
                   return (
                   <div className="space-y-6">
-                    {/* Overview Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      {/* Total KOLs in Campaign */}
-                      <Card className="crd-hover">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                              <Users className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="text-sm text-ink-warm-700">Total KOLs in Campaign</p>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-ink-warm-900">
-                            {dashboardKOLs.length}
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Average Followers per KOL */}
-                      <Card className="crd-hover">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                              <BarChart3 className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="text-sm text-ink-warm-700">Average Followers per KOL</p>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-ink-warm-900">
-                            {(() => {
-                              if (dashboardKOLs.length > 0) {
-                                const totalFollowers = dashboardKOLs.reduce((sum, kol) => sum + (kol.master_kol.followers || 0), 0);
-                                const average = Math.round(totalFollowers / dashboardKOLs.length);
-                                return KOLService.formatFollowers(average);
-                              }
-                              return '0';
-                            })()}
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Distribution of KOLs by Platform */}
-                      <Card className="crd-hover">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                              <Globe className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="text-sm text-ink-warm-700">
-                              {(() => {
-                                const platforms = new Set();
-                                dashboardKOLs.forEach(kol => {
-                                  if (kol.master_kol.platform) {
-                                    kol.master_kol.platform.forEach((p: string) => platforms.add(p));
-                                  }
-                                });
-                                return platforms.size === 1 ? 'Unique Platform' : 'Unique Platforms';
-                              })()}
-                            </p>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-ink-warm-900">
-                            {(() => {
-                              const platforms = new Set();
-                              dashboardKOLs.forEach(kol => {
-                                if (kol.master_kol.platform) {
-                                  kol.master_kol.platform.forEach((p: string) => platforms.add(p));
-                                }
-                              });
-                              return platforms.size;
-                            })()}
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* KOLs by Region */}
-                      <Card className="crd-hover">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-brand to-[#2d6470] p-3 rounded-lg">
-                              <Flag className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="text-sm text-ink-warm-700">
-                              {(() => {
-                                const regions = new Set();
-                                dashboardKOLs.forEach(kol => {
-                                  if (kol.master_kol.region) {
-                                    regions.add(kol.master_kol.region);
-                                  }
-                                });
-                                return regions.size === 1 ? 'Region Represented' : 'Regions Represented';
-                              })()}
-                            </p>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-2xl font-bold text-ink-warm-900">
-                            {(() => {
-                              const regions = new Set();
-                              dashboardKOLs.forEach(kol => {
-                                if (kol.master_kol.region) {
-                                  regions.add(kol.master_kol.region);
-                                }
-                              });
-                              return regions.size;
-                            })()}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-
+                    {/* Overview KPIs — shared KpiCard primitive
+                        (same as /dashboard, /lists Access & Visits,
+                        /analytics) so this hero strip reads with
+                        the same rhythm as every other KPI strip
+                        in the app. */}
+                    {(() => {
+                      const totalKols = dashboardKOLs.length;
+                      const avgFollowers = (() => {
+                        if (dashboardKOLs.length === 0) return '0';
+                        const total = dashboardKOLs.reduce((sum, kol) => sum + (kol.master_kol.followers || 0), 0);
+                        return KOLService.formatFollowers(Math.round(total / dashboardKOLs.length));
+                      })();
+                      const platformSet = (() => {
+                        const s = new Set<string>();
+                        dashboardKOLs.forEach((kol) => {
+                          (kol.master_kol.platform || []).forEach((p: string) => s.add(p));
+                        });
+                        return s;
+                      })();
+                      const regionSet = (() => {
+                        const s = new Set<string>();
+                        dashboardKOLs.forEach((kol) => {
+                          if (kol.master_kol.region) s.add(kol.master_kol.region);
+                        });
+                        return s;
+                      })();
+                      return (
+                        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                          <KpiCard icon={Users}     label="Total KOLs"          value={totalKols}                                                       accent="brand"   />
+                          <KpiCard icon={BarChart3} label="Avg Followers"       value={avgFollowers}                                                    accent="sky"     />
+                          <KpiCard icon={Globe}     label={platformSet.size === 1 ? 'Unique Platform' : 'Unique Platforms'}  value={platformSet.size}    accent="emerald" />
+                          <KpiCard icon={Flag}      label={regionSet.size === 1 ? 'Region' : 'Regions'}                       value={regionSet.size}      accent="purple"  />
+                        </div>
+                      );
+                    })()}
                     {/* Charts Section */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {/* Platform Distribution Chart */}
@@ -7355,23 +7272,21 @@ const CampaignDetailsPage = () => {
               {/* Toolbar row: view-mode toggle on the left, Add
                   Content on the right — merged onto one line. */}
               <div className="mb-3 flex flex-row items-center justify-between gap-2">
-                  {/* View toggle */}
-                  <div className="inline-flex h-9 items-center gap-1 rounded-md bg-cream-100 p-1 border border-cream-200">
-                    <div
-                      onClick={() => setContentsViewMode('overview')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all cursor-pointer ${contentsViewMode === 'overview' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:text-ink-warm-900'}`}
-                    >
-                      <BarChart3 className="h-4 w-4 mr-1.5" />
-                      Overview
-                    </div>
-                    <div
-                      onClick={() => setContentsViewMode('table')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all cursor-pointer ${contentsViewMode === 'table' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:text-ink-warm-900'}`}
-                    >
-                      <TableIcon className="h-4 w-4 mr-1.5" />
-                      Table
-                    </div>
-                  </div>
+                  {/* View toggle — uses the Tabs primitive for
+                      consistency with the main tab strip + other
+                      v11 tabbed surfaces. */}
+                  <Tabs value={contentsViewMode} onValueChange={(v) => setContentsViewMode(v as 'overview' | 'table')}>
+                    <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+                      <TabsTrigger value="overview" className="data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm">
+                        <BarChart3 className="h-4 w-4 mr-1.5" />
+                        Overview
+                      </TabsTrigger>
+                      <TabsTrigger value="table" className="data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm">
+                        <TableIcon className="h-4 w-4 mr-1.5" />
+                        Table
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                   <Dialog open={false} onOpenChange={setIsAddContentsDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="brand" size="sm" onClick={async (e) => {
@@ -7757,7 +7672,32 @@ const CampaignDetailsPage = () => {
                 {/* Overview Tab - Metrics from Information */}
                 {contentsViewMode === 'overview' && (
                   <div className="space-y-6">
-                    {/* Metrics Cards */}
+                    {/* Hero KPI strip — Total Impressions / Comments /
+                        Retweets / Likes / Bookmarks. Uses the shared
+                        KpiCard primitive so this strip reads with the
+                        same rhythm as /dashboard, /lists Access &
+                        Visits, /analytics. Accent palette differentiates
+                        the five engagement metrics. */}
+                    {(() => {
+                      const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                      const totalComments    = contents.reduce((sum, content) => sum + (content.comments    || 0), 0);
+                      const totalRetweets    = contents.reduce((sum, content) => sum + (content.retweets    || 0), 0);
+                      const totalLikes       = contents.reduce((sum, content) => sum + (content.likes       || 0), 0);
+                      const totalBookmarks   = contents.reduce((sum, content) => sum + (content.bookmarks   || 0), 0);
+                      const fmt = (n: number) => n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : n.toLocaleString();
+                      return (
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                          <KpiCard icon={BarChart3}   label="Impressions" value={fmt(totalImpressions)} accent="brand"   />
+                          <KpiCard icon={Activity}    label="Comments"    value={fmt(totalComments)}    accent="sky"     />
+                          <KpiCard icon={Share2}      label="Retweets"    value={fmt(totalRetweets)}    accent="purple"  />
+                          <KpiCard icon={CheckCircle} label="Likes"       value={fmt(totalLikes)}       accent="rose"    />
+                          <KpiCard icon={BadgeCheck}  label="Bookmarks"   value={fmt(totalBookmarks)}   accent="emerald" />
+                        </div>
+                      );
+                    })()}
+                    {/* Legacy metrics cards retained behind a flag.
+                        The KpiCard strip above carries the same data. */}
+                    {false && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {/* Total Impressions */}
                       <Card className="crd-hover">
@@ -7911,25 +7851,31 @@ const CampaignDetailsPage = () => {
                         </CardContent>
                       </Card>
                     </div>
+                    )}
 
-                    {/* Average Engagement Rate */}
-                    <Card className="crd-hover">
-                      <CardHeader>
-                        <CardTitle className="text-lg font-semibold text-ink-warm-900">Average Engagement Rate</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-3xl font-bold text-ink-warm-900">
-                          {(() => {
-                            const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
-                            const totalEngagements = contents.reduce((sum, content) =>
-                              sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
-                            const engagementRate = totalImpressions > 0 ? (totalEngagements / totalImpressions) * 100 : 0;
-                            return `${engagementRate.toFixed(2)}%`;
-                          })()}
-                        </div>
-                        <p className="text-sm text-ink-warm-700 mt-1">Engagement Rate = (Likes + Comments + Retweets + Bookmarks) / Impressions</p>
-                      </CardContent>
-                    </Card>
+                    {/* Average Engagement Rate — single-stat panel
+                        styled the same way as the inner Card primitives
+                        used across the page (display-serif title +
+                        cream-200 hairline + shadow-card). */}
+                    <div className="bg-white p-6 rounded-[14px] border border-cream-200 shadow-card">
+                      <div className="flex items-baseline justify-between mb-2">
+                        <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Average Engagement Rate</h3>
+                      </div>
+                      {(() => {
+                        const totalImpressions = contents.reduce((sum, content) => sum + (content.impressions || 0), 0);
+                        const totalEngagements = contents.reduce((sum, content) =>
+                          sum + (content.likes || 0) + (content.comments || 0) + (content.retweets || 0) + (content.bookmarks || 0), 0);
+                        const engagementRate = totalImpressions > 0 ? (totalEngagements / totalImpressions) * 100 : 0;
+                        return (
+                          <p className="text-[28px] font-semibold text-ink-warm-900 tabular-nums leading-none" style={{ letterSpacing: '-0.03em' }}>
+                            {engagementRate.toFixed(2)}%
+                          </p>
+                        );
+                      })()}
+                      <p className="text-xs text-ink-warm-500 mt-3">
+                        ER = <span className="mono">(Likes + Comments + Retweets + Bookmarks) / Impressions</span>
+                      </p>
+                    </div>
 
                     {/* Charts Section */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -9210,23 +9156,21 @@ const CampaignDetailsPage = () => {
               {/* Toolbar row: view-mode toggle on the left, Export +
                   Record Payment on the right — merged onto one line. */}
               <div className="mb-3 flex flex-row items-center justify-between gap-2">
-                  {/* View toggle */}
-                  <div className="inline-flex h-9 items-center gap-1 rounded-md bg-cream-100 p-1 border border-cream-200">
-                    <div
-                      onClick={() => setPaymentViewMode('table')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all cursor-pointer ${paymentViewMode === 'table' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:text-ink-warm-900'}`}
-                    >
-                      <TableIcon className="h-4 w-4 mr-1.5" />
-                      Table
-                    </div>
-                    <div
-                      onClick={() => setPaymentViewMode('graph')}
-                      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all cursor-pointer ${paymentViewMode === 'graph' ? 'bg-white shadow-card text-brand' : 'text-ink-warm-500 hover:text-ink-warm-900'}`}
-                    >
-                      <BarChart3 className="h-4 w-4 mr-1.5" />
-                      Graph
-                    </div>
-                  </div>
+                  {/* View toggle — uses the Tabs primitive for
+                      consistency with the main tab strip + other
+                      v11 tabbed surfaces. */}
+                  <Tabs value={paymentViewMode} onValueChange={(v) => setPaymentViewMode(v as 'table' | 'graph')}>
+                    <TabsList className="bg-cream-100 p-1 h-auto border border-cream-200">
+                      <TabsTrigger value="graph" className="data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm">
+                        <BarChart3 className="h-4 w-4 mr-1.5" />
+                        Overview
+                      </TabsTrigger>
+                      <TabsTrigger value="table" className="data-[state=active]:bg-white data-[state=active]:shadow-card data-[state=active]:text-brand text-sm">
+                        <TableIcon className="h-4 w-4 mr-1.5" />
+                        Table
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                   <div className="flex items-center gap-2">
                   <Button
                     size="sm"
@@ -13102,24 +13046,50 @@ function BudgetEditForm({
   onDone: () => void;
 }) {
   const [total, setTotal] = useState<string>(String(campaign.total_budget || 0));
+  // Budget types — multi-select of Token / Fiat / WL. Stored as a
+  // string[] in campaigns.budget_type; rendered in the view as the
+  // chip row beside the per-region allocation list.
+  const [budgetTypes, setBudgetTypes] = useState<string[]>(((campaign as any).budget_type as string[]) || []);
   const [saving, setSaving] = useState(false);
+
+  const toggleBudgetType = (t: string) => {
+    setBudgetTypes((prev) => prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]);
+  };
 
   const save = async () => {
     const parsed = parseFloat(total);
     if (!Number.isFinite(parsed) || parsed < 0) return;
     setSaving(true);
-    const previous = campaign.total_budget;
-    setCampaign({ ...campaign, total_budget: parsed } as any);
+    const previous = {
+      total_budget: campaign.total_budget,
+      budget_type: (campaign as any).budget_type,
+    };
+    const next = {
+      total_budget: parsed,
+      budget_type: budgetTypes.length > 0 ? budgetTypes : null,
+    };
+    setCampaign({ ...campaign, ...next } as any);
     try {
-      const { error } = await (supabase as any).from('campaigns').update({ total_budget: parsed }).eq('id', campaign.id);
+      const { error } = await (supabase as any)
+        .from('campaigns')
+        .update(next)
+        .eq('id', campaign.id);
       if (error) throw error;
       onDone();
     } catch (err: any) {
-      setCampaign({ ...campaign, total_budget: previous } as any);
+      setCampaign({ ...campaign, ...previous } as any);
       console.error('Failed to save budget:', err);
     } finally {
       setSaving(false);
     }
+  };
+
+  // Tone palette mirrors the view-mode chip row so the user sees
+  // the same color encoding while picking ↔ as displayed.
+  const TYPE_CLS: Record<string, string> = {
+    Token: 'bg-brand-soft text-brand-deep border-brand-light',
+    Fiat: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    WL: 'bg-purple-50 text-purple-700 border-purple-100',
   };
 
   return (
@@ -13134,6 +13104,31 @@ function BudgetEditForm({
           onChange={(e) => setTotal(e.target.value)}
           className="h-9 text-sm focus-brand"
         />
+      </div>
+      <div>
+        <Label className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2 block">Budget types</Label>
+        <div className="flex flex-wrap gap-1.5">
+          {(['Token', 'Fiat', 'WL'] as const).map((t) => {
+            const active = budgetTypes.includes(t);
+            const activeCls = TYPE_CLS[t];
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => toggleBudgetType(t)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors ${
+                  active
+                    ? activeCls
+                    : 'bg-white text-ink-warm-500 border-cream-200 hover:bg-cream-50 hover:text-ink-warm-700'
+                }`}
+              >
+                {active && <CheckCircle className="h-3 w-3" />}
+                {t}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-ink-warm-500 mt-1.5">Toggle the types this campaign uses. WL = whitelist allocation.</p>
       </div>
       <p className="text-xs text-ink-warm-500">
         Per-region allocations stay in the <strong>Budget</strong> tab — that editor includes regions, budget types, and per-allocation breakdowns.
