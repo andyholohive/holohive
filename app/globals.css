@@ -93,6 +93,20 @@ body > * { position: relative; z-index: 1; }
 .section-head .label   { font-size: 11px; font-weight: 600; color: #16140F; text-transform: uppercase; letter-spacing: 0.28em; }
 .section-head .counter { font-family: 'Geist Mono', monospace; font-size: 10px; color: #9A9385; letter-spacing: 0.12em; text-transform: uppercase; }
 
+/* Table header inheritance fix — browsers' user-agent stylesheet sets
+   `button { text-transform: none; letter-spacing: normal }` which means
+   the `uppercase tracking-[…]` on a `<TableHead>` does NOT propagate
+   into a sort-button child. Visible symptom (caught 2026-06-02 on the
+   campaigns Budget table): non-sortable columns like "Actions" render
+   uppercase, sortable columns ("KOL", "Wallet", "Amount", …) render
+   sentence-case. Forcing inherit on any button or span inside a thead
+   fixes every table across the app in one place. */
+thead button,
+thead span {
+  text-transform: inherit;
+  letter-spacing: inherit;
+}
+
 /* Status dots — used in section labels + pulse variants for live items. */
 .dot { width: 6px; height: 6px; border-radius: 9999px; display: inline-block; }
 .dot-pulse {
