@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { RequiredAsterisk } from "@/components/ui/required-asterisk";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity } from "lucide-react";
+import { Calendar as CalendarIcon, Megaphone, Building2, DollarSign, ArrowLeft, CheckCircle, FileText, PauseCircle, BadgeCheck, Phone, Users, Trash2, Plus, Search, Flag, Globe, Loader, Calendar as CalendarIconImport, ChevronLeft, ChevronRight, ChevronDown, BarChart3, Table as TableIcon, Edit, CreditCard, CheckCircle2, XCircle, MapPin, Share2, Copy, ExternalLink, Image as ImageIcon, Video, File, Download, Eye, EyeOff, AlertTriangle, ArrowUp, ArrowDown, ArrowUpDown, Activity, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { CampaignService, CampaignWithDetails } from "@/lib/campaignService";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -225,6 +225,12 @@ const CampaignDetailsPage = () => {
   });
 
   const [editMode, setEditMode] = useState(false);
+  // Per-card inline edit mode for the view-mode layout — replaces
+  // the page-level "Edit" button with smaller per-card affordances.
+  // null = nothing being edited; otherwise the slug of the card
+  // that's open for inline edits (engagement | budget | approved).
+  // Resources has its own internal add/edit flow (see ResourcesCard).
+  const [editingCard, setEditingCard] = useState<null | 'engagement' | 'budget' | 'approved'>(null);
   const [form, setForm] = useState<CampaignDetails | null>(null);
   const [saving, setSaving] = useState(false);
   // KOL Dashboard is the default landing tab — that's what users open
@@ -4089,10 +4095,22 @@ const CampaignDetailsPage = () => {
                     <span className="text-[10px] mono uppercase tracking-[0.14em] text-ink-warm-500">View only</span>
                   )}
                 </div>
+                {/* Major "Edit" button removed 2026-06-XX — per-card
+                    Edit affordances now live on the Engagement /
+                    Budget / Approved Access cards. The legacy full
+                    form is still rendered for fields without a
+                    view-mode card yet (Campaign Settings, Intro
+                    call, etc.) — see "More options" toggle below. */}
                 {!editMode ? (
-                  <Button variant="outline" size="sm" onClick={handleEdit}>
-                    <Edit className="h-3.5 w-3.5 mr-1.5" />
-                    Edit
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleEdit}
+                    className="text-xs text-ink-warm-500 hover:text-brand"
+                    title="Edit the full form (Settings, Intro call, etc.)"
+                  >
+                    More options
+                    <ChevronDown className="h-3 w-3 ml-1" />
                   </Button>
                 ) : (
                   <div className="flex items-center gap-2">
@@ -4145,11 +4163,14 @@ const CampaignDetailsPage = () => {
               {!editMode && campaign && (
                 <CampaignDetailViewLayout
                   campaign={campaign}
+                  setCampaign={setCampaign}
                   campaignKOLs={campaignKOLs}
                   payments={payments}
                   contents={contents}
                   allUsers={allUsers}
                   allocations={allocations}
+                  editingCard={editingCard}
+                  setEditingCard={setEditingCard}
                   onResourcesChange={async (next) => {
                     // Persist immediately — resources is a side-edit
                     // even in view mode; we don't want users to have
@@ -5175,7 +5196,7 @@ const CampaignDetailsPage = () => {
           </TabsContent>
 
           <TabsContent value="kols" className="mt-6">
-              <CardHeader className="pb-6 border-b border-cream-200 flex flex-row items-center justify-between">
+              <div className="pb-6 border-b border-cream-200 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
                     <Users className="h-4 w-4" />
@@ -5481,8 +5502,8 @@ const CampaignDetailsPage = () => {
                    </DialogContent>
                   </Dialog>
                 </div>
-              </CardHeader>
-              <CardContent className="pt-6">
+              </div>
+              <CardContent className="pt-6 px-0">
                 {/* View Toggle */}
                 <div className="mb-4">
                   <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
@@ -7365,7 +7386,7 @@ const CampaignDetailsPage = () => {
           </TabsContent>
 
           <TabsContent value="contents" className="mt-6">
-              <CardHeader className="pb-6 border-b border-cream-200 flex flex-row items-center justify-between">
+              <div className="pb-6 border-b border-cream-200 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0"><FileText className="h-4 w-4" /></div>
                   <h2 className="display-serif text-[22px] text-ink-warm-900 leading-tight">Content Dashboard</h2>
@@ -7751,8 +7772,8 @@ const CampaignDetailsPage = () => {
                     </DialogContent>
                   </Dialog>
                 </div>
-              </CardHeader>
-              <CardContent className="pt-6">
+</div>
+              <CardContent className="pt-6 px-0">
                 {/* View Toggle */}
                 <div className="mb-4">
                   <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
@@ -9225,7 +9246,7 @@ const CampaignDetailsPage = () => {
 
           {/* Budget Tab */}
           <TabsContent value="payments" className="mt-6">
-              <CardHeader className="pb-6 border-b border-cream-200 flex flex-row items-center justify-between">
+              <div className="pb-6 border-b border-cream-200 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
                     <DollarSign className="h-4 w-4" />
@@ -9728,8 +9749,8 @@ const CampaignDetailsPage = () => {
                     </DialogContent>
                   </Dialog>
                 </div>
-              </CardHeader>
-              <CardContent className="pt-6">
+</div>
+              <CardContent className="pt-6 px-0">
                 {/* View Toggle */}
                 <div className="mb-4">
                   <div className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
@@ -12152,19 +12173,25 @@ const RESOURCE_ICON_TILES: Record<ResourceIcon, { bg: string; text: string; bord
 
 function CampaignDetailViewLayout({
   campaign,
+  setCampaign,
   campaignKOLs,
   payments,
   contents,
   allUsers,
   allocations,
+  editingCard,
+  setEditingCard,
   onResourcesChange,
 }: {
   campaign: CampaignWithDetails;
+  setCampaign: (c: CampaignWithDetails) => void;
   campaignKOLs: any[];
   payments: any[];
   contents: any[];
   allUsers: any[];
   allocations: any[];
+  editingCard: null | 'engagement' | 'budget' | 'approved';
+  setEditingCard: (next: null | 'engagement' | 'budget' | 'approved') => void;
   onResourcesChange: (next: CampaignResource[]) => void;
 }) {
   // Derived metrics — single source of truth for the sidebar Quick
@@ -12225,60 +12252,82 @@ function CampaignDetailViewLayout({
       <div className="lg:col-span-2 space-y-5">
 
         {/* Engagement card — consolidates Start / End / Type / Lead
-            with a progress bar at the bottom showing Week X of Y. */}
+            with a progress bar at the bottom showing Week X of Y.
+            Per-card inline Edit affordance on the header. */}
         <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
           <div className="flex items-center justify-between mb-5">
             <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Engagement</h3>
+            {editingCard !== 'engagement' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditingCard('engagement')}
+                className="h-7 px-2 text-xs font-medium text-brand-deep hover:text-brand hover:bg-cream-50"
+              >
+                <Edit className="w-3 h-3 mr-1" />
+                Edit
+              </Button>
+            )}
           </div>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-5">
-            <KV label="Start date"><span className="mono tabular-nums">{formatDate(campaign.start_date)}</span></KV>
-            <KV label="End date"><span className="mono tabular-nums">{formatDate(campaign.end_date)}</span></KV>
-            <KV label="Engagement type">
-              {(() => {
-                // Mirrors the inline `displayRegion` helper used in
-                // edit mode — APAC/Global stay all-caps, others get
-                // title case. Multi-Activation takes precedence as
-                // a campaign-shape signal.
-                const region = (campaign as any).region as string | null;
-                if ((campaign as any).multi_activation) return 'Multi-Activation';
-                if (!region) return 'Activation';
-                const lower = region.toLowerCase();
-                if (lower === 'apac') return 'APAC';
-                if (lower === 'emea') return 'EMEA';
-                if (lower === 'mena') return 'MENA';
-                if (lower === 'global') return 'Global';
-                return region.charAt(0).toUpperCase() + region.slice(1).toLowerCase();
-              })()}
-            </KV>
-            <KV label="Account lead">
-              {manager ? (
-                <div className="flex items-center gap-2">
-                  {/* Profile photo when available, falls back to a
-                      brand-tinted initial tile (same chrome as /team
-                      and /dashboard NameWithAvatar pattern). */}
-                  {manager.profile_photo_url ? (
-                    <div className="w-6 h-6 rounded-full overflow-hidden border border-cream-200 shrink-0 bg-white">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={manager.profile_photo_url}
-                        alt={manager.name || manager.email || 'Account lead'}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-6 h-6 rounded-full bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center text-[10px] font-semibold shrink-0">
-                      {(manager.name || manager.email || '?').charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <span className="truncate">{manager.name || manager.email}</span>
-                </div>
-              ) : (
-                <span className="text-ink-warm-400 italic">Unassigned</span>
-              )}
-            </KV>
-          </div>
-          {/* Progress bar */}
-          {startDate && endDate && (
+          {editingCard === 'engagement' ? (
+            <EngagementEditForm
+              campaign={campaign}
+              setCampaign={setCampaign}
+              allUsers={allUsers}
+              onDone={() => setEditingCard(null)}
+            />
+          ) : (
+            <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+              <KV label="Start date"><span className="mono tabular-nums">{formatDate(campaign.start_date)}</span></KV>
+              <KV label="End date"><span className="mono tabular-nums">{formatDate(campaign.end_date)}</span></KV>
+              <KV label="Engagement type">
+                {(() => {
+                  // Mirrors the inline `displayRegion` helper used in
+                  // edit mode — APAC/Global stay all-caps, others get
+                  // title case. Multi-Activation takes precedence as
+                  // a campaign-shape signal.
+                  const region = (campaign as any).region as string | null;
+                  if ((campaign as any).multi_activation) return 'Multi-Activation';
+                  if (!region) return 'Activation';
+                  const lower = region.toLowerCase();
+                  if (lower === 'apac') return 'APAC';
+                  if (lower === 'emea') return 'EMEA';
+                  if (lower === 'mena') return 'MENA';
+                  if (lower === 'global') return 'Global';
+                  return region.charAt(0).toUpperCase() + region.slice(1).toLowerCase();
+                })()}
+              </KV>
+              <KV label="Account lead">
+                {manager ? (
+                  <div className="flex items-center gap-2">
+                    {/* Profile photo when available, falls back to a
+                        brand-tinted initial tile (same chrome as /team
+                        and /dashboard NameWithAvatar pattern). */}
+                    {manager.profile_photo_url ? (
+                      <div className="w-6 h-6 rounded-full overflow-hidden border border-cream-200 shrink-0 bg-white">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={manager.profile_photo_url}
+                          alt={manager.name || manager.email || 'Account lead'}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center text-[10px] font-semibold shrink-0">
+                        {(manager.name || manager.email || '?').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="truncate">{manager.name || manager.email}</span>
+                  </div>
+                ) : (
+                  <span className="text-ink-warm-400 italic">Unassigned</span>
+                )}
+              </KV>
+            </div>
+          )}
+          {/* Progress bar + description — only in view mode (edit
+              form handles dates + description with inputs). */}
+          {editingCard !== 'engagement' && startDate && endDate && (
             <div className="mt-6 pt-5 border-t border-cream-200">
               <div className="flex items-baseline justify-between mb-2.5">
                 <span className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em]">Campaign progress</span>
@@ -12295,7 +12344,7 @@ function CampaignDetailViewLayout({
               </div>
             </div>
           )}
-          {campaign.description && (
+          {editingCard !== 'engagement' && campaign.description && (
             <div className="mt-6 pt-5 border-t border-cream-200">
               <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Description</div>
               <p className="text-sm text-ink-warm-700 leading-relaxed whitespace-pre-line">{campaign.description}</p>
@@ -12309,22 +12358,45 @@ function CampaignDetailViewLayout({
         <ResourcesCard resources={resources} onChange={onResourcesChange} />
 
         {/* Budget card — total + per-region allocations + progress
-            bar showing how much has been paid out. Read-only view;
-            full edit lives in the Budget tab and in edit mode below. */}
+            bar showing how much has been paid out. Per-card Edit
+            affordance links into the Budget tab where the full
+            editor lives (we don't duplicate the allocation editor
+            inline — it's complex and lives elsewhere). */}
         <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
           <div className="flex items-center justify-between mb-5">
             <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Budget</h3>
-            <span className="text-[11px] mono uppercase tracking-[0.14em] text-ink-warm-500">
-              {campaign.total_budget > 0
-                ? `${Math.round((totalPaid / campaign.total_budget) * 100)}% paid`
-                : 'Not set'}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] mono uppercase tracking-[0.14em] text-ink-warm-500">
+                {campaign.total_budget > 0
+                  ? `${Math.round((totalPaid / campaign.total_budget) * 100)}% paid`
+                  : 'Not set'}
+              </span>
+              {editingCard === 'budget' ? null : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditingCard('budget')}
+                  className="h-7 px-2 text-xs font-medium text-brand-deep hover:text-brand hover:bg-cream-50"
+                >
+                  <Edit className="w-3 h-3 mr-1" />
+                  Edit
+                </Button>
+              )}
+            </div>
           </div>
-          <div className="grid grid-cols-3 gap-x-6 gap-y-5">
-            <KV label="Total"><span className="mono tabular-nums">{formatCurrency(campaign.total_budget || 0)}</span></KV>
-            <KV label="Paid"><span className="mono tabular-nums text-emerald-700">{formatCurrency(totalPaid)}</span></KV>
-            <KV label="Remaining"><span className="mono tabular-nums">{formatCurrency(Math.max(0, (campaign.total_budget || 0) - totalPaid))}</span></KV>
-          </div>
+          {editingCard === 'budget' ? (
+            <BudgetEditForm
+              campaign={campaign}
+              setCampaign={setCampaign}
+              onDone={() => setEditingCard(null)}
+            />
+          ) : (
+            <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+              <KV label="Total"><span className="mono tabular-nums">{formatCurrency(campaign.total_budget || 0)}</span></KV>
+              <KV label="Paid"><span className="mono tabular-nums text-emerald-700">{formatCurrency(totalPaid)}</span></KV>
+              <KV label="Remaining"><span className="mono tabular-nums">{formatCurrency(Math.max(0, (campaign.total_budget || 0) - totalPaid))}</span></KV>
+            </div>
+          )}
           {/* Paid progress bar — emerald to read as "good news" */}
           {campaign.total_budget > 0 && (
             <div className="mt-5 pt-5 border-t border-cream-200">
@@ -12371,9 +12443,15 @@ function CampaignDetailViewLayout({
 
         {/* Approved Access card — emails + domains allowed to access
             the public campaign view (in addition to the client email
-            and same-domain users). Read-only display; edit lives in
-            the form below. */}
-        <ApprovedAccessCard campaign={campaign} />
+            and same-domain users). Inline Add affordances for both
+            email and domain entries; per-chip Remove on hover. */}
+        <ApprovedAccessCard
+          campaign={campaign}
+          setCampaign={setCampaign}
+          isEditing={editingCard === 'approved'}
+          onStartEdit={() => setEditingCard('approved')}
+          onDone={() => setEditingCard(null)}
+        />
       </div>
 
       {/* ── Sidebar column ───────────────────────────────────────── */}
@@ -12624,10 +12702,62 @@ function ResourcesCard({
    Edit happens in the form body (edit mode) — this card is just a
    surface to confirm "who has access" at a glance from the view-mode
    layout. Mockup pattern: KV-style display with chip rows. */
-function ApprovedAccessCard({ campaign }: { campaign: CampaignWithDetails }) {
+function ApprovedAccessCard({
+  campaign,
+  setCampaign,
+  isEditing,
+  onStartEdit,
+  onDone,
+}: {
+  campaign: CampaignWithDetails;
+  setCampaign: (c: CampaignWithDetails) => void;
+  isEditing: boolean;
+  onStartEdit: () => void;
+  onDone: () => void;
+}) {
   const emails: string[] = ((campaign as any).approved_emails || []) as string[];
   const domains: string[] = ((campaign as any).approved_domains || []) as string[];
   const hasAny = emails.length > 0 || domains.length > 0;
+
+  const [draftEmail, setDraftEmail] = useState('');
+  const [draftDomain, setDraftDomain] = useState('');
+
+  const persist = async (nextEmails: string[], nextDomains: string[]) => {
+    const previous = { emails, domains };
+    setCampaign({ ...campaign, approved_emails: nextEmails, approved_domains: nextDomains } as any);
+    try {
+      const { error } = await (supabase as any)
+        .from('campaigns')
+        .update({
+          approved_emails: nextEmails.length > 0 ? nextEmails : null,
+          approved_domains: nextDomains.length > 0 ? nextDomains : null,
+        })
+        .eq('id', campaign.id);
+      if (error) throw error;
+    } catch (err: any) {
+      setCampaign({ ...campaign, approved_emails: previous.emails, approved_domains: previous.domains } as any);
+      console.error('Failed to update approved access:', err);
+    }
+  };
+
+  const addEmail = async () => {
+    const e = draftEmail.trim().toLowerCase();
+    if (!e || !e.includes('@') || emails.includes(e)) return;
+    setDraftEmail('');
+    await persist([...emails, e], domains);
+  };
+  const addDomain = async () => {
+    const d = draftDomain.trim().toLowerCase().replace(/^@/, '');
+    if (!d || domains.includes(d)) return;
+    setDraftDomain('');
+    await persist(emails, [...domains, d]);
+  };
+  const removeEmail = async (email: string) => {
+    await persist(emails.filter((e) => e !== email), domains);
+  };
+  const removeDomain = async (domain: string) => {
+    await persist(emails, domains.filter((d) => d !== domain));
+  };
 
   return (
     <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
@@ -12640,11 +12770,61 @@ function ApprovedAccessCard({ campaign }: { campaign: CampaignWithDetails }) {
             </span>
           )}
         </div>
-        <span className="text-[10px] mono uppercase tracking-[0.14em] text-ink-warm-500">
-          Public portal allowlist
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] mono uppercase tracking-[0.14em] text-ink-warm-500 hidden sm:inline">
+            Public portal allowlist
+          </span>
+          {isEditing ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDone}
+              className="h-7 px-2 text-xs font-medium text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
+            >
+              Done
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onStartEdit}
+              className="h-7 px-2 text-xs font-medium text-brand-deep hover:text-brand hover:bg-cream-50"
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Add
+            </Button>
+          )}
+        </div>
       </div>
-      {!hasAny ? (
+      {isEditing && (
+        <div className="mb-4 rounded-md border border-cream-200 bg-cream-50 p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="email@example.com"
+              value={draftEmail}
+              onChange={(e) => setDraftEmail(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') addEmail(); }}
+              className="h-9 text-sm focus-brand bg-white"
+            />
+            <Button variant="outline" size="sm" className="h-9 text-xs shrink-0" onClick={addEmail} disabled={!draftEmail.trim()}>
+              Add email
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="@example.com"
+              value={draftDomain}
+              onChange={(e) => setDraftDomain(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') addDomain(); }}
+              className="h-9 text-sm focus-brand bg-white"
+            />
+            <Button variant="outline" size="sm" className="h-9 text-xs shrink-0" onClick={addDomain} disabled={!draftDomain.trim()}>
+              Add domain
+            </Button>
+          </div>
+        </div>
+      )}
+      {!hasAny && !isEditing ? (
         <p className="text-sm text-ink-warm-500 italic">
           No additional emails or domains approved. Only the client email
           and same-domain addresses can access the public campaign view.
@@ -12661,9 +12841,19 @@ function ApprovedAccessCard({ campaign }: { campaign: CampaignWithDetails }) {
                 {emails.map((email) => (
                   <span
                     key={email}
-                    className="inline-flex items-center px-2 py-0.5 rounded-md text-xs bg-brand-soft text-brand-deep border border-brand-light mono"
+                    className="group inline-flex items-center px-2 py-0.5 rounded-md text-xs bg-brand-soft text-brand-deep border border-brand-light mono"
                   >
                     {email}
+                    {isEditing && (
+                      <button
+                        type="button"
+                        onClick={() => removeEmail(email)}
+                        className="ml-1.5 text-brand-deep hover:text-rose-600"
+                        title="Remove"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
                   </span>
                 ))}
               </div>
@@ -12679,9 +12869,19 @@ function ApprovedAccessCard({ campaign }: { campaign: CampaignWithDetails }) {
                 {domains.map((domain) => (
                   <span
                     key={domain}
-                    className="inline-flex items-center px-2 py-0.5 rounded-md text-xs bg-sky-50 text-sky-700 border border-sky-100 mono"
+                    className="group inline-flex items-center px-2 py-0.5 rounded-md text-xs bg-sky-50 text-sky-700 border border-sky-100 mono"
                   >
                     @{domain}
+                    {isEditing && (
+                      <button
+                        type="button"
+                        onClick={() => removeDomain(domain)}
+                        className="ml-1.5 text-sky-700 hover:text-rose-600"
+                        title="Remove"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
                   </span>
                 ))}
               </div>
@@ -12689,6 +12889,179 @@ function ApprovedAccessCard({ campaign }: { campaign: CampaignWithDetails }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── EngagementEditForm ───────────────────────────────────────────────
+   Inline form for editing the Engagement card's fields directly from
+   the view-mode layout. Persists immediately on Save; no full-form
+   round-trip required. */
+function EngagementEditForm({
+  campaign,
+  setCampaign,
+  allUsers,
+  onDone,
+}: {
+  campaign: CampaignWithDetails;
+  setCampaign: (c: CampaignWithDetails) => void;
+  allUsers: any[];
+  onDone: () => void;
+}) {
+  const [startDate, setStartDate] = useState<string>(campaign.start_date || '');
+  const [endDate, setEndDate] = useState<string>(campaign.end_date || '');
+  const [region, setRegion] = useState<string>((campaign as any).region || '');
+  const [manager, setManager] = useState<string>(campaign.manager || '');
+  const [description, setDescription] = useState<string>(campaign.description || '');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    const previous = {
+      start_date: campaign.start_date,
+      end_date: campaign.end_date,
+      region: (campaign as any).region,
+      manager: campaign.manager,
+      description: campaign.description,
+    };
+    const patch: any = {
+      start_date: startDate || null,
+      end_date: endDate || null,
+      region: region || null,
+      manager: manager || null,
+      description: description || null,
+    };
+    // Optimistic
+    setCampaign({ ...campaign, ...patch } as any);
+    try {
+      const { error } = await (supabase as any).from('campaigns').update(patch).eq('id', campaign.id);
+      if (error) throw error;
+      onDone();
+    } catch (err: any) {
+      setCampaign({ ...campaign, ...previous } as any);
+      console.error('Failed to save engagement:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+        <div>
+          <Label htmlFor="engagement-start" className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5 block">Start date</Label>
+          {/* lint-conventions: disable-next-line no-input-type-date */}
+          <Input id="engagement-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 text-sm focus-brand" />
+        </div>
+        <div>
+          <Label htmlFor="engagement-end" className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5 block">End date</Label>
+          {/* lint-conventions: disable-next-line no-input-type-date */}
+          <Input id="engagement-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9 text-sm focus-brand" />
+        </div>
+        <div>
+          <Label className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5 block">Engagement type</Label>
+          <Select value={region} onValueChange={setRegion}>
+            <SelectTrigger className="h-9 text-sm focus-brand">
+              <SelectValue placeholder="Select region…" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="apac">APAC</SelectItem>
+              <SelectItem value="emea">EMEA</SelectItem>
+              <SelectItem value="mena">MENA</SelectItem>
+              <SelectItem value="global">Global</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5 block">Account lead</Label>
+          <Select value={manager} onValueChange={setManager}>
+            <SelectTrigger className="h-9 text-sm focus-brand">
+              <SelectValue placeholder="Select…" />
+            </SelectTrigger>
+            <SelectContent>
+              {allUsers.map((u) => (
+                <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div>
+        <Label htmlFor="engagement-desc" className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5 block">Description</Label>
+        <Textarea
+          id="engagement-desc"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="focus-brand min-h-[80px] text-sm"
+          placeholder="Campaign description…"
+        />
+      </div>
+      <div className="flex justify-end gap-2 pt-2 border-t border-cream-200">
+        <Button variant="ghost" size="sm" onClick={onDone} disabled={saving}>Cancel</Button>
+        <Button variant="brand" size="sm" onClick={save} disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ── BudgetEditForm ───────────────────────────────────────────────────
+   Inline form for editing the campaign's total budget directly from
+   the view-mode layout. Region allocations stay in the Budget tab —
+   that editor is too complex to inline here. */
+function BudgetEditForm({
+  campaign,
+  setCampaign,
+  onDone,
+}: {
+  campaign: CampaignWithDetails;
+  setCampaign: (c: CampaignWithDetails) => void;
+  onDone: () => void;
+}) {
+  const [total, setTotal] = useState<string>(String(campaign.total_budget || 0));
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    const parsed = parseFloat(total);
+    if (!Number.isFinite(parsed) || parsed < 0) return;
+    setSaving(true);
+    const previous = campaign.total_budget;
+    setCampaign({ ...campaign, total_budget: parsed } as any);
+    try {
+      const { error } = await (supabase as any).from('campaigns').update({ total_budget: parsed }).eq('id', campaign.id);
+      if (error) throw error;
+      onDone();
+    } catch (err: any) {
+      setCampaign({ ...campaign, total_budget: previous } as any);
+      console.error('Failed to save budget:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label htmlFor="budget-total" className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5 block">Total budget (USD)</Label>
+        <Input
+          id="budget-total"
+          type="number"
+          min={0}
+          value={total}
+          onChange={(e) => setTotal(e.target.value)}
+          className="h-9 text-sm focus-brand"
+        />
+      </div>
+      <p className="text-xs text-ink-warm-500">
+        Per-region allocations stay in the <strong>Budget</strong> tab — that editor includes regions, budget types, and per-allocation breakdowns.
+      </p>
+      <div className="flex justify-end gap-2 pt-2 border-t border-cream-200">
+        <Button variant="ghost" size="sm" onClick={onDone} disabled={saving}>Cancel</Button>
+        <Button variant="brand" size="sm" onClick={save} disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
     </div>
   );
 }
