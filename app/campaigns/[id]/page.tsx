@@ -2668,7 +2668,9 @@ const CampaignDetailsPage = () => {
   // `kolSearchTerm` + `filteredAvailableKOLs` removed 2026-06-02 — both
   // are now internal to <AddKOLsDialog>.
   const [isAddKOLsDialogOpen, setIsAddKOLsDialogOpen] = useState(false);
-  const [isAddContentsDialogOpen, setIsAddContentsDialogOpen] = useState(false);
+  // `isAddContentsDialogOpen` removed 2026-06-02 — the modal it
+  // controlled was dead code (`<Dialog open={false}>`). The Add
+  // Content button kicks off an inline-row creation flow instead.
   const [quickAddContentKolId, setQuickAddContentKolId] = useState<string | null>(null);
   const [quickAddContentCount, setQuickAddContentCount] = useState(1);
   const [isShareCampaignOpen, setIsShareCampaignOpen] = useState(false);
@@ -2684,20 +2686,8 @@ const CampaignDetailsPage = () => {
   const [currentUpdateIndex, setCurrentUpdateIndex] = useState(0);
   const [isDeleteUpdateDialogOpen, setIsDeleteUpdateDialogOpen] = useState(false);
 
-  // 1. Add state for Add Content form
-  const [addContentData, setAddContentData] = useState({
-    campaign_kols_id: '',
-    activation_date: '',
-    content_link: '',
-    platform: '',
-    type: '',
-    status: '',
-    impressions: '',
-    likes: '',
-    retweets: '',
-    comments: '',
-    bookmarks: '',
-  });
+  // `addContentData` removed 2026-06-02 — was only consumed by the
+  // dead `<Dialog open={false}>` content block.
 
   const contentStatusOptions = [
     { value: 'scheduled', label: 'Scheduled' },
@@ -2805,8 +2795,7 @@ const CampaignDetailsPage = () => {
     setSelectedCell({ table, rowId, field, value });
   };
 
-  const [isAddingContent, setIsAddingContent] = useState(false);
-
+  // `isAddingContent` removed 2026-06-02 — same dead-modal cleanup.
   // Note: contents / loadingContents state is declared near the top of
   // the component alongside contentsViewMode. Don't redeclare here.
 
@@ -6873,8 +6862,13 @@ const CampaignDetailsPage = () => {
                       </TabsTrigger>
                     </TabsList>
                   </Tabs>
-                  <Dialog open={false} onOpenChange={setIsAddContentsDialogOpen}>
-                    <DialogTrigger asChild>
+                  {/* Add Content — kicks off an inline-row creation
+                      flow on the Content table, not a modal. The button
+                      used to be wrapped in `<Dialog open={false}>` +
+                      `<DialogTrigger asChild>` with ~340 lines of
+                      unreachable modal markup beneath; both were removed
+                      on 2026-06-02 since the modal was never rendered.
+                      The inline flow lives in the onClick below. */}
                       <Button variant="brand" size="sm" onClick={async (e) => {
                           e.preventDefault();
                           const newId = `new-${Date.now()}`;
@@ -6902,351 +6896,6 @@ const CampaignDetailsPage = () => {
                         <Plus className="h-4 w-4 mr-2" />
                         Add Content
                       </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-                      <DialogHeader>
-                        <DialogTitle>Add Content</DialogTitle>
-                      </DialogHeader>
-                      <div className="grid gap-4 py-4 flex-1 overflow-y-auto px-1">
-                        <div className="grid gap-2">
-                          <Label className="mb-1 block">KOL</Label>
-                          <Select
-                            value={addContentData.campaign_kols_id}
-                            onValueChange={v => {
-                              const selectedKol = campaignKOLs.find(k => k.id === v);
-                              const platforms = selectedKol?.master_kol?.platform || [];
-                              // Auto-set platform if KOL has exactly one platform
-                              const autoplatform = platforms.length === 1 ? platforms[0] : '';
-                              setAddContentData(d => ({ ...d, campaign_kols_id: v, platform: autoplatform }));
-                            }}
-                          >
-                            <SelectTrigger className="focus-brand">
-                              <SelectValue placeholder="Select KOL" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {campaignKOLs.map(kol => (
-                                <SelectItem key={kol.id} value={kol.id}>{kol.master_kol.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="grid gap-2">
-                          <Label className="mb-1 block">Activation Date</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={`focus-brand justify-start text-left font-normal h-9 ${addContentData.activation_date ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {addContentData.activation_date ? formatDisplayDate(addContentData.activation_date) : "Select activation date"}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="!bg-white border shadow-md w-auto p-0 z-50" align="start">
-                              <CalendarComponent
-                                mode="single"
-                                selected={addContentData.activation_date ? new Date(addContentData.activation_date) : undefined}
-                                onSelect={date => setAddContentData(d => ({
-                                  ...d,
-                                  activation_date: date ? formatDateLocal(date) : ''
-                                }))}
-                                initialFocus
-                                classNames={{
-                                  day_selected: "text-white hover:text-white focus:text-white",
-                                }}
-                                modifiersStyles={{
-                                  selected: { backgroundColor: "#3e8692" }
-                                }}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                        <div className="grid gap-2">
-                          <Label>Content Link</Label>
-                          <Input
-                            type="url"
-                            placeholder="https://..."
-                            value={addContentData.content_link}
-                            onChange={e => setAddContentData(d => ({ ...d, content_link: e.target.value }))}
-                            className="focus-brand"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="grid gap-2">
-                            <Label>Platform</Label>
-                            <Select
-                              value={addContentData.platform}
-                              onValueChange={v => setAddContentData(d => ({ ...d, platform: v }))}
-                            >
-                              <SelectTrigger className="focus-brand">
-                                <SelectValue placeholder="Select Platform" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {fieldOptions.platforms.map(platform => (
-                                  <SelectItem key={platform} value={platform}>{platform}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="grid gap-2">
-                            <Label>Type</Label>
-                            <Select
-                              value={addContentData.type}
-                              onValueChange={v => setAddContentData(d => ({ ...d, type: v }))}
-                            >
-                              <SelectTrigger className="focus-brand">
-                                <SelectValue placeholder="Select Type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {fieldOptions.deliverables.map(type => (
-                                  <SelectItem key={type} value={type}>{type}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="grid gap-2">
-                            <Label>Status</Label>
-                            <Select
-                              value={addContentData.status}
-                              onValueChange={v => setAddContentData(d => ({ ...d, status: v }))}
-                            >
-                              <SelectTrigger className="focus-brand">
-                                <SelectValue placeholder="Select Status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {contentStatusOptions.map(option => (
-                                  <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="grid gap-2">
-                            <Label>Impressions</Label>
-                            <Input
-                              type="number"
-                              min={0}
-                              value={addContentData.impressions}
-                              onChange={e => setAddContentData(d => ({ ...d, impressions: e.target.value }))}
-                              className="focus-brand"
-                            />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="grid gap-2">
-                            <Label>Likes</Label>
-                            <Input
-                              type="number"
-                              min={0}
-                              value={addContentData.likes}
-                              onChange={e => setAddContentData(d => ({ ...d, likes: e.target.value }))}
-                              className="focus-brand"
-                            />
-                          </div>
-                          <div className="grid gap-2">
-                            <Label>Retweets</Label>
-                            <Input
-                              type="number"
-                              min={0}
-                              value={addContentData.retweets}
-                              onChange={e => setAddContentData(d => ({ ...d, retweets: e.target.value }))}
-                              className="focus-brand"
-                            />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-2">
-                          <Label>Comments</Label>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={addContentData.comments}
-                            onChange={e => setAddContentData(d => ({ ...d, comments: e.target.value }))}
-                            className="focus-brand"
-                          />
-                          </div>
-                          <div className="grid gap-2">
-                            <Label>Bookmarks</Label>
-                            <Input
-                              type="number"
-                              min={0}
-                              value={addContentData.bookmarks}
-                              onChange={e => setAddContentData(d => ({ ...d, bookmarks: e.target.value }))}
-                              className="focus-brand"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <DialogFooter className="border-t border-cream-100 pt-3 mt-0">
-                        <Button variant="outline" onClick={() => setIsAddContentsDialogOpen(false)}>Cancel</Button>
-                        <Button variant="brand" disabled={ !addContentData.campaign_kols_id || !addContentData.activation_date || !addContentData.content_link || !addContentData.platform || !addContentData.type || !addContentData.status || isAddingContent } onClick={async () => {
-                            setIsAddingContent(true);
-                            const payload = {
-                              campaign_id: campaign?.id,
-                              campaign_kols_id: addContentData.campaign_kols_id,
-                              activation_date: addContentData.activation_date || null,
-                              content_link: addContentData.content_link || null,
-                              platform: addContentData.platform || null,
-                              type: addContentData.type || null,
-                              status: addContentData.status || null,
-                              impressions: addContentData.impressions ? Number(addContentData.impressions) : null,
-                              likes: addContentData.likes ? Number(addContentData.likes) : null,
-                              retweets: addContentData.retweets ? Number(addContentData.retweets) : null,
-                              comments: addContentData.comments ? Number(addContentData.comments) : null,
-                              bookmarks: addContentData.bookmarks ? Number(addContentData.bookmarks) : null,
-                            };
-                            console.log('Add Content payload:', payload);
-                            try {
-                              const { error, data } = await supabase.from('contents').insert(payload).select();
-                              if (error) {
-                                console.error('Supabase error:', error.message, error.details, error.hint);
-                                toast({
-                                  title: 'Error',
-                                  description: `Failed to create content: ${error.message}`,
-                                  variant: 'destructive'
-                                });
-                                setIsAddingContent(false);
-                                return;
-                              }
-
-                              // Update campaign status to Active when content is added
-                              if (campaign?.id && campaign?.status !== 'Active') {
-                                const { error: statusError } = await supabase
-                                  .from('campaigns')
-                                  .update({ status: 'Active' })
-                                  .eq('id', campaign.id);
-
-                                if (statusError) {
-                                  console.error('Error updating campaign status:', statusError);
-                                } else {
-                                  // Update local campaign state
-                                  setCampaign(prev => prev ? { ...prev, status: 'Active' } : prev);
-                                }
-                              }
-
-                              // Auto-create payment for this content
-                              if (data && data.length > 0) {
-                                const newContent = data[0];
-                                const kol = campaignKOLs.find(k => k.id === newContent.campaign_kols_id);
-
-                                if (kol) {
-                                  // Amount priority: agreed_rate → standard_rate → latest payment → 0
-                                  const defaultAmount =
-                                    (kol.agreed_rate ?? null) !== null
-                                      ? Number(kol.agreed_rate)
-                                      : (kol.master_kol?.standard_rate ?? null) !== null
-                                      ? Number(kol.master_kol?.standard_rate)
-                                      : (kol.master_kol?.id && latestCostMap.get(kol.master_kol.id)) || 0;
-
-                                  const paymentPayload = {
-                                    campaign_id: campaign?.id,
-                                    campaign_kol_id: kol.id,
-                                    content_id: [newContent.id],
-                                    amount: defaultAmount,
-                                    payment_date: null,
-                                    payment_method: 'Fiat',
-                                    notes: null
-                                  };
-
-                                  const { error: paymentError, data: paymentData } = await supabase
-                                    .from('payments')
-                                    .insert(paymentPayload)
-                                    .select();
-
-                                  if (paymentError) {
-                                    console.error('Error creating payment:', paymentError);
-                                    toast({
-                                      title: 'Warning',
-                                      description: 'Content created but failed to create payment record',
-                                      variant: 'destructive'
-                                    });
-                                  } else {
-                                    // Refetch payments to update the table
-                                    fetchPayments();
-
-                                    // Only show the "use latest pricing?" suggestion if we couldn't
-                                    // auto-fill — i.e. no agreed_rate and no master standard_rate.
-                                    const hasStoredRate = (kol.agreed_rate ?? null) !== null
-                                      || (kol.master_kol?.standard_rate ?? null) !== null;
-                                    const masterKolId = kol.master_kol?.id;
-                                    const latestCost = masterKolId ? latestCostMap.get(masterKolId) : undefined;
-                                    if (!hasStoredRate && latestCost && latestCost > 0 && paymentData && paymentData.length > 0) {
-                                      setPricingSuggestionDialog({
-                                        open: true,
-                                        kolId: kol.id,
-                                        kolName: kol.master_kol?.name || 'Unknown',
-                                        masterKolId: masterKolId,
-                                        latestCost: latestCost,
-                                        paymentIndex: 0,
-                                        paymentIds: [paymentData[0].id],
-                                        mode: 'content-created'
-                                      });
-                                    }
-                                  }
-                                }
-                              }
-                              setIsAddContentsDialogOpen(false);
-                              setAddContentData({
-                                campaign_kols_id: '',
-                                activation_date: '',
-                                content_link: '',
-                                platform: '',
-                                type: '',
-                                status: '',
-                                impressions: '',
-                                likes: '',
-                                retweets: '',
-                                comments: '',
-                                bookmarks: '',
-                              });
-                              // Immediately update the table with the new content
-                              const arr: any[] = (data ?? []) as any[];
-                              if (arr.length > 0 && typeof arr[0] === 'object' && arr[0] !== null) {
-                                let newContent: any = { ...arr[0] };
-                                const kolsArr: any[] = Array.isArray(campaignKOLs) ? campaignKOLs : [];
-                                let kol = kolsArr.find((k: any) => k.id === newContent.campaign_kols_id);
-                                if (!newContent.master_kol && kol) {
-                                  newContent.master_kol = kol.master_kol;
-                                }
-                                if (!newContent.master_kol) {
-                                  newContent.master_kol = { name: 'Unknown', link: '' };
-                                }
-                                setContents((prev: any[]) => [newContent, ...prev]);
-                              }
-                              // Refetch contents to ensure table is properly updated
-                              const fetchContentsAgain = async () => {
-                                setLoadingContents(true);
-                                try {
-                                  const { data, error } = await supabase
-                                    .from('contents')
-                                    .select('*')
-                                    .eq('campaign_id', campaign?.id);
-                                  if (error) throw error;
-                                  setContents(data || []);
-                                } catch (error) {
-                                  console.error('Error refetching contents:', error);
-                                } finally {
-                                  setLoadingContents(false);
-                                }
-                              };
-                              await fetchContentsAgain();
-                            } catch (err) {
-                              console.error('Unexpected error:', err);
-                            } finally {
-                              setIsAddingContent(false);
-                            }
-                          }}
-                        >
-                          {isAddingContent ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                          ) : (
-                            'Add Content'
-                          )}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
               </div>
               <CardContent className="pt-0 px-0">
                 {/* View toggle moved to the toolbar row above. */}
