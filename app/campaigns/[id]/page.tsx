@@ -4135,6 +4135,7 @@ const CampaignDetailsPage = () => {
                   payments={payments}
                   contents={contents}
                   allUsers={allUsers}
+                  allocations={allocations}
                   onResourcesChange={async (next) => {
                     // Persist immediately — resources is a side-edit
                     // even in view mode; we don't want users to have
@@ -4551,8 +4552,15 @@ const CampaignDetailsPage = () => {
                         <SelectTrigger className="w-full focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand">
                           <SelectValue />
                         </SelectTrigger>
+                        {/* Region options match the view-mode
+                            display-formatting rules (APAC / EMEA /
+                            MENA / Global stay all-caps); aligned
+                            across both modes so the user picks the
+                            same label they read. */}
                         <SelectContent>
                           <SelectItem value="apac">APAC</SelectItem>
+                          <SelectItem value="emea">EMEA</SelectItem>
+                          <SelectItem value="mena">MENA</SelectItem>
                           <SelectItem value="global">Global</SelectItem>
                         </SelectContent>
                       </Select>
@@ -12134,6 +12142,7 @@ function CampaignDetailViewLayout({
   payments,
   contents,
   allUsers,
+  allocations,
   onResourcesChange,
 }: {
   campaign: CampaignWithDetails;
@@ -12141,6 +12150,7 @@ function CampaignDetailViewLayout({
   payments: any[];
   contents: any[];
   allUsers: any[];
+  allocations: any[];
   onResourcesChange: (next: CampaignResource[]) => void;
 }) {
   // Derived metrics — single source of truth for the sidebar Quick
@@ -12209,14 +12219,44 @@ function CampaignDetailViewLayout({
           <div className="grid grid-cols-2 gap-x-6 gap-y-5">
             <KV label="Start date"><span className="mono tabular-nums">{formatDate(campaign.start_date)}</span></KV>
             <KV label="End date"><span className="mono tabular-nums">{formatDate(campaign.end_date)}</span></KV>
-            <KV label="Engagement type">{(campaign as any).region || 'Activation'}</KV>
+            <KV label="Engagement type">
+              {(() => {
+                // Mirrors the inline `displayRegion` helper used in
+                // edit mode — APAC/Global stay all-caps, others get
+                // title case. Multi-Activation takes precedence as
+                // a campaign-shape signal.
+                const region = (campaign as any).region as string | null;
+                if ((campaign as any).multi_activation) return 'Multi-Activation';
+                if (!region) return 'Activation';
+                const lower = region.toLowerCase();
+                if (lower === 'apac') return 'APAC';
+                if (lower === 'emea') return 'EMEA';
+                if (lower === 'mena') return 'MENA';
+                if (lower === 'global') return 'Global';
+                return region.charAt(0).toUpperCase() + region.slice(1).toLowerCase();
+              })()}
+            </KV>
             <KV label="Account lead">
               {manager ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded bg-amber-100 text-amber-800 flex items-center justify-center text-[9px] font-semibold shrink-0">
-                    {(manager.name || manager.email || '?').charAt(0).toUpperCase()}
-                  </div>
-                  <span>{manager.name || manager.email}</span>
+                  {/* Profile photo when available, falls back to a
+                      brand-tinted initial tile (same chrome as /team
+                      and /dashboard NameWithAvatar pattern). */}
+                  {manager.profile_photo_url ? (
+                    <div className="w-6 h-6 rounded-full overflow-hidden border border-cream-200 shrink-0 bg-white">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={manager.profile_photo_url}
+                        alt={manager.name || manager.email || 'Account lead'}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center text-[10px] font-semibold shrink-0">
+                      {(manager.name || manager.email || '?').charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <span className="truncate">{manager.name || manager.email}</span>
                 </div>
               ) : (
                 <span className="text-ink-warm-400 italic">Unassigned</span>
@@ -12253,6 +12293,73 @@ function CampaignDetailViewLayout({
             in place. Mockup pattern: 2-column grid of link rows with
             36px icon tile + label + truncated URL underneath. */}
         <ResourcesCard resources={resources} onChange={onResourcesChange} />
+
+        {/* Budget card — total + per-region allocations + progress
+            bar showing how much has been paid out. Read-only view;
+            full edit lives in the Budget tab and in edit mode below. */}
+        <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Budget</h3>
+            <span className="text-[11px] mono uppercase tracking-[0.14em] text-ink-warm-500">
+              {campaign.total_budget > 0
+                ? `${Math.round((totalPaid / campaign.total_budget) * 100)}% paid`
+                : 'Not set'}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-x-6 gap-y-5">
+            <KV label="Total"><span className="mono tabular-nums">{formatCurrency(campaign.total_budget || 0)}</span></KV>
+            <KV label="Paid"><span className="mono tabular-nums text-emerald-700">{formatCurrency(totalPaid)}</span></KV>
+            <KV label="Remaining"><span className="mono tabular-nums">{formatCurrency(Math.max(0, (campaign.total_budget || 0) - totalPaid))}</span></KV>
+          </div>
+          {/* Paid progress bar — emerald to read as "good news" */}
+          {campaign.total_budget > 0 && (
+            <div className="mt-5 pt-5 border-t border-cream-200">
+              <div className="h-[3px] bg-cream-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min(100, (totalPaid / campaign.total_budget) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+          {/* Per-region allocations (if any) */}
+          {allocations && allocations.length > 0 && (
+            <div className="mt-5 pt-5 border-t border-cream-200">
+              <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-3">By region</div>
+              <div className="space-y-2">
+                {allocations.map((alloc, idx) => {
+                  // Same region-formatting rules as the Engagement
+                  // type cell above: APAC/EMEA/MENA all-caps,
+                  // Global title-case, others title-case.
+                  const r = (alloc.region || 'Unknown') as string;
+                  const lower = r.toLowerCase();
+                  const display = lower === 'apac' ? 'APAC'
+                    : lower === 'emea' ? 'EMEA'
+                    : lower === 'mena' ? 'MENA'
+                    : lower === 'global' ? 'Global'
+                    : r.charAt(0).toUpperCase() + r.slice(1).toLowerCase();
+                  return (
+                    <div key={idx} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <Globe className="h-3.5 w-3.5 text-ink-warm-400 shrink-0" />
+                        <span className="text-ink-warm-700">{display}</span>
+                      </div>
+                      <span className="mono tabular-nums text-ink-warm-900 font-medium">
+                        {formatCurrency(parseFloat(alloc.allocated_budget || '0') || 0)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Approved Access card — emails + domains allowed to access
+            the public campaign view (in addition to the client email
+            and same-domain users). Read-only display; edit lives in
+            the form below. */}
+        <ApprovedAccessCard campaign={campaign} />
       </div>
 
       {/* ── Sidebar column ───────────────────────────────────────── */}
@@ -12496,4 +12603,78 @@ function ResourcesCard({
       )}
     </div>
   );
-} 
+}
+
+/* ── ApprovedAccessCard ───────────────────────────────────────────────
+   Read-only view of campaigns.approved_emails + approved_domains.
+   Edit happens in the form body (edit mode) — this card is just a
+   surface to confirm "who has access" at a glance from the view-mode
+   layout. Mockup pattern: KV-style display with chip rows. */
+function ApprovedAccessCard({ campaign }: { campaign: CampaignWithDetails }) {
+  const emails: string[] = ((campaign as any).approved_emails || []) as string[];
+  const domains: string[] = ((campaign as any).approved_domains || []) as string[];
+  const hasAny = emails.length > 0 || domains.length > 0;
+
+  return (
+    <div className="bg-white rounded-[14px] border border-cream-200 shadow-card p-6">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-baseline gap-2.5">
+          <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Approved Access</h3>
+          {hasAny && (
+            <span className="text-[11px] text-ink-warm-400 mono tabular-nums">
+              {emails.length + domains.length}
+            </span>
+          )}
+        </div>
+        <span className="text-[10px] mono uppercase tracking-[0.14em] text-ink-warm-500">
+          Public portal allowlist
+        </span>
+      </div>
+      {!hasAny ? (
+        <p className="text-sm text-ink-warm-500 italic">
+          No additional emails or domains approved. Only the client email
+          and same-domain addresses can access the public campaign view.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {emails.length > 0 && (
+            <div>
+              <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2 flex items-center gap-1.5">
+                <Eye className="h-3 w-3" />
+                Emails <span className="text-ink-warm-400 mono tabular-nums">{emails.length}</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {emails.map((email) => (
+                  <span
+                    key={email}
+                    className="inline-flex items-center px-2 py-0.5 rounded-md text-xs bg-brand-soft text-brand-deep border border-brand-light mono"
+                  >
+                    {email}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {domains.length > 0 && (
+            <div>
+              <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2 flex items-center gap-1.5">
+                <Globe className="h-3 w-3" />
+                Domains <span className="text-ink-warm-400 mono tabular-nums">{domains.length}</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {domains.map((domain) => (
+                  <span
+                    key={domain}
+                    className="inline-flex items-center px-2 py-0.5 rounded-md text-xs bg-sky-50 text-sky-700 border border-sky-100 mono"
+                  >
+                    @{domain}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
