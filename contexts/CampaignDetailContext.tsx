@@ -71,6 +71,7 @@ type ToastFn = (opts: {
   title: string;
   description?: string;
   variant?: 'default' | 'destructive';
+  duration?: number;
 }) => void;
 
 interface CampaignDetailContextType {
