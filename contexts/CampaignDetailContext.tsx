@@ -82,10 +82,18 @@ interface CampaignDetailContextType {
   contents: any[];
   /** Untyped on the page (any[]); keep loose until payments has a model. */
   payments: any[];
+  /** Loading flag for the initial payments fetch. Used by the Budget
+   *  Table view's skeleton-row block. */
+  loadingPayments: boolean;
   /** Available master KOLs not yet on this campaign. */
   availableKOLs: any[];
   /** Map of master_kol.id → latest cost from past payments. */
   latestCostMap: Map<string, number>;
+  /** Map of campaign_kol.id → { name, removed } for the Budget tab
+   *  payment-name lookup. Includes soft-deleted KOLs so historical
+   *  payments to since-removed KOLs render with the original name +
+   *  "(removed)" suffix instead of "Unknown KOL". */
+  paymentKolNameLookup: Map<string, { name: string; removed: boolean }>;
 
   // ─── Setters (state lives on the page) ─────────────────────────
   setCampaign: React.Dispatch<React.SetStateAction<CampaignWithDetails | null>>;
@@ -126,6 +134,11 @@ interface CampaignDetailContextType {
    *  lives in the page's trailing dialog cluster — this is the
    *  side-effect trigger the Table view uses to open it. */
   openMasterKolEditDialog: (kol: any) => void;
+
+  // ─── Edit Payment dialog (rendered on the page) ───────────────
+  /** Open the Edit Payment dialog. Used by the Budget Table's row
+   *  edit pencil. */
+  handleEditPayment: (payment: any) => void;
 
   // ─── Cross-tab navigation primitives ──────────────────────────
   /** Switch the main tab strip's selected tab. Used by the Table
