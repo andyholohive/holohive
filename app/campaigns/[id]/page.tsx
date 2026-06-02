@@ -3270,120 +3270,168 @@ const CampaignDetailsPage = () => {
   const hasWarnings = missingFields.length > 0;
 
   if (loading) {
+    // Skeleton mirrors the live page structure so the title +
+    // tab strip + Information-tab 3-column layout don't shift
+    // when data lands. Updated 2026-06-02 to drop the legacy
+    // `min-h-[calc(100vh-64px)] bg-cream-50` wrapper (the live
+    // page no longer has it; the sidebar layout provides the
+    // background) and to match the actual CampaignDetailViewLayout
+    // 3-col grid that the Information tab renders.
     return (
-      // /campaigns/[id] is the 11k-line behemoth — structural refactor
-      // is its own tracked follow-up (see FOLLOW-UP in CLAUDE.md).
-      // lint-conventions: disable-next-line no-card-shell
-      <div className="min-h-[calc(100vh-64px)] w-full bg-cream-50">
-        <div className="w-full px-4">
-          <div className="space-y-4">
-            {/* Breadcrumb skeleton */}
-            <div className="flex items-center gap-1.5">
-              <Skeleton className="h-4 w-20" />
-              <span className="text-ink-warm-300">/</span>
-              <Skeleton className="h-3 w-40" />
-            </div>
+      <div className="space-y-4">
+        {/* Breadcrumb */}
+        <div className="flex items-center gap-1.5">
+          <Skeleton className="h-3 w-20" />
+          <span className="text-ink-warm-300">/</span>
+          <Skeleton className="h-3 w-40" />
+        </div>
 
-            {/* Editorial hero skeleton — logo tile + kicker + serif
-                title + status pill row + action cluster */}
-            <div className="flex items-start justify-between gap-6 flex-wrap">
-              <div className="flex items-start gap-5 max-w-3xl min-w-0 flex-1">
-                <Skeleton className="w-14 h-14 rounded-xl shrink-0" />
-                <div className="min-w-0 flex-1 space-y-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-sky-500/40" />
-                    <Skeleton className="h-3 w-44" />
+        {/* Editorial hero — brand-gradient logo tile + kicker dot
+            + serif title + status pill row + right-aligned action
+            cluster. Shapes match the live hero exactly so the title
+            doesn't reflow when data arrives. */}
+        <div className="flex items-start justify-between gap-6 flex-wrap">
+          <div className="flex items-start gap-5 max-w-3xl min-w-0 flex-1">
+            <Skeleton className="w-14 h-14 rounded-xl shrink-0" />
+            <div className="min-w-0 flex-1 space-y-2.5">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-sky-500/40" />
+                <Skeleton className="h-3 w-44" />
+              </div>
+              <Skeleton className="h-8 w-72" />
+              <div className="flex items-center gap-2.5 mt-3">
+                <Skeleton className="h-5 w-16 rounded-md" />
+                <span className="text-ink-warm-300">·</span>
+                <Skeleton className="h-3 w-28" />
+                <span className="text-ink-warm-300">·</span>
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Skeleton className="h-9 w-36 rounded-md" />
+            <Skeleton className="h-9 w-20 rounded-md" />
+          </div>
+        </div>
+
+        {/* SectionHeader — "WORKSPACE" sticker */}
+        <div className="section-head first flex items-center gap-3">
+          <span className="dot bg-brand/30" aria-hidden />
+          <Skeleton className="h-3 w-20" />
+          <span className="flex-1 h-px bg-cream-200" aria-hidden />
+          <Skeleton className="h-3 w-48" />
+        </div>
+
+        {/* TabsList — underline pattern with 4 tabs (Information,
+            KOL Dashboard, Content Dashboard, Budget). Report is
+            hidden per 2026-06-XX product decision. The first tab
+            gets a brand underline since it's the default. */}
+        <div className="w-full border-b border-cream-200 flex gap-1">
+          <div className="px-3.5 py-2.5 border-b-2 border-brand">
+            <Skeleton className="h-4 w-24" />
+          </div>
+          <div className="px-3.5 py-2.5">
+            <Skeleton className="h-4 w-28" />
+          </div>
+          <div className="px-3.5 py-2.5">
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <div className="px-3.5 py-2.5">
+            <Skeleton className="h-4 w-16" />
+          </div>
+        </div>
+
+        {/* Information tab — 3-column layout from
+            CampaignDetailViewLayout (`pt-6 grid grid-cols-1
+            lg:grid-cols-3 gap-5`). Left 2 cols = Engagement card
+            (8-cell KV grid) + a Budget / Approved Access row.
+            Right col = Resources + Renewal + Recent Activity stack. */}
+        <div className="pt-6 grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Left column: Engagement + Budget + Approved Access. */}
+          <div className="lg:col-span-2 space-y-5">
+            {/* Engagement card */}
+            <div className="bg-white border border-cream-200 shadow-card rounded-[14px] p-6">
+              <div className="flex items-center justify-between mb-5">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-7 w-16 rounded-md" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i}>
+                    <Skeleton className="h-2.5 w-20 mb-2" />
+                    <Skeleton className="h-5 w-32" />
                   </div>
-                  <Skeleton className="h-8 w-72" />
-                  <div className="flex items-center gap-2.5 mt-3">
-                    <Skeleton className="h-5 w-16 rounded-md" />
-                    <span className="text-ink-warm-300">·</span>
-                    <Skeleton className="h-3 w-28" />
-                  </div>
+                ))}
+              </div>
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Skeleton className="h-2.5 w-24" />
+                  <Skeleton className="h-2.5 w-10" />
                 </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Skeleton className="h-9 w-32 rounded-md" />
-                <Skeleton className="h-9 w-20 rounded-md" />
+                <Skeleton className="h-2 w-full rounded-full" />
               </div>
             </div>
 
-            {/* SectionHeader skeleton */}
-            <div className="section-head first flex items-center gap-3">
-              <span className="dot bg-brand/30" aria-hidden />
-              <Skeleton className="h-3 w-20" />
-              <span className="flex-1 h-px bg-cream-200" aria-hidden />
-              <Skeleton className="h-3 w-48" />
-            </div>
-
-            {/* TabsList skeleton — underline pattern (4 tabs; Report
-                hidden per 2026-06-XX product decision). */}
-            <div className="w-full border-b border-cream-200 flex gap-0.5">
-              {[24, 28, 32, 16].map((w, i) => (
-                <div key={i} className="px-3.5 py-2.5">
-                  <Skeleton className={`h-4 w-${w}`} />
+            {/* Budget + Approved Access row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-white border border-cream-200 shadow-card rounded-[14px] p-6"
+                >
+                  <div className="flex items-center justify-between mb-5">
+                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="h-7 w-12 rounded-md" />
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <Skeleton className="h-2.5 w-20 mb-2" />
+                      <Skeleton className="h-7 w-28" />
+                    </div>
+                    <div>
+                      <Skeleton className="h-2.5 w-20 mb-2" />
+                      <Skeleton className="h-5 w-32" />
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
+          </div>
 
-            {/* Information panel skeleton — Card-shape, KV grid */}
-            <div className="w-full bg-white border border-cream-200 shadow-card rounded-[14px] p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <Skeleton className="h-10 w-10 rounded-md" />
-                <Skeleton className="h-7 w-64" />
+          {/* Right column: Resources + Renewal + Recent Activity. */}
+          <div className="space-y-5">
+            {/* Resources card */}
+            <div className="bg-white border border-cream-200 shadow-card rounded-[14px] p-6">
+              <div className="flex items-center justify-between mb-4">
+                <Skeleton className="h-5 w-24" />
+                <Skeleton className="h-7 w-7 rounded-md" />
               </div>
+              <div className="space-y-2.5">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-2.5">
+                    <Skeleton className="h-7 w-7 rounded-md" />
+                    <div className="flex-1 space-y-1">
+                      <Skeleton className="h-3 w-32" />
+                      <Skeleton className="h-2.5 w-20" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-              <div className="grid grid-cols-2 gap-6 text-sm">
-                <div className="space-y-4">
-                  <div>
-                    <Skeleton className="h-4 w-20 mb-2" />
-                    <Skeleton className="h-6 w-32" />
+            {/* Recent Activity card */}
+            <div className="bg-white border border-cream-200 shadow-card rounded-[14px] p-6">
+              <Skeleton className="h-5 w-32 mb-4" />
+              <div className="space-y-3.5">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-start gap-2.5">
+                    <Skeleton className="h-2 w-2 rounded-full mt-1.5 shrink-0" />
+                    <div className="flex-1 space-y-1">
+                      <Skeleton className="h-3 w-full" />
+                      <Skeleton className="h-2.5 w-16" />
+                    </div>
                   </div>
-                  <div>
-                    <Skeleton className="h-4 w-20 mb-2" />
-                    <Skeleton className="h-6 w-32" />
-                  </div>
-                  <div>
-                    <Skeleton className="h-4 w-20 mb-2" />
-                    <Skeleton className="h-6 w-24" />
-                  </div>
-                  <div>
-                    <Skeleton className="h-4 w-20 mb-2" />
-                    <Skeleton className="h-6 w-20" />
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <Skeleton className="h-4 w-20 mb-2" />
-                    <Skeleton className="h-6 w-32" />
-                  </div>
-                  <div>
-                    <Skeleton className="h-4 w-20 mb-2" />
-                    <Skeleton className="h-6 w-24" />
-                  </div>
-                  <div>
-                    <Skeleton className="h-4 w-20 mb-2" />
-                    <Skeleton className="h-6 w-20" />
-                  </div>
-                  <div>
-                    <Skeleton className="h-4 w-20 mb-2" />
-                    <Skeleton className="h-6 w-24" />
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-6">
-                <Skeleton className="h-4 w-32 mb-2" />
-                <div className="flex gap-2">
-                  <Skeleton className="h-6 w-20" />
-                  <Skeleton className="h-6 w-24" />
-                  <Skeleton className="h-6 w-16" />
-                </div>
-              </div>
-              
-              <div className="mt-6">
-                <Skeleton className="h-4 w-24 mb-2" />
-                <Skeleton className="h-20 w-full" />
+                ))}
               </div>
             </div>
           </div>
