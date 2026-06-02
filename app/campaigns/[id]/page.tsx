@@ -12280,15 +12280,13 @@ function CampaignDetailViewLayout({
             <div className="grid grid-cols-2 gap-x-6 gap-y-5">
               <KV label="Start date"><span className="mono tabular-nums">{formatDate(campaign.start_date)}</span></KV>
               <KV label="End date"><span className="mono tabular-nums">{formatDate(campaign.end_date)}</span></KV>
-              <KV label="Engagement type">
+              <KV label="Region">
                 {(() => {
                   // Mirrors the inline `displayRegion` helper used in
-                  // edit mode — APAC/Global stay all-caps, others get
-                  // title case. Multi-Activation takes precedence as
-                  // a campaign-shape signal.
+                  // edit mode — APAC/EMEA/MENA stay all-caps, Global
+                  // title-case, others title-case.
                   const region = (campaign as any).region as string | null;
-                  if ((campaign as any).multi_activation) return 'Multi-Activation';
-                  if (!region) return 'Activation';
+                  if (!region) return <span className="text-ink-warm-400 italic">Unset</span>;
                   const lower = region.toLowerCase();
                   if (lower === 'apac') return 'APAC';
                   if (lower === 'emea') return 'EMEA';
@@ -12408,35 +12406,87 @@ function CampaignDetailViewLayout({
               </div>
             </div>
           )}
-          {/* Per-region allocations (if any) */}
-          {allocations && allocations.length > 0 && (
-            <div className="mt-5 pt-5 border-t border-cream-200">
-              <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-3">By region</div>
-              <div className="space-y-2">
-                {allocations.map((alloc, idx) => {
-                  // Same region-formatting rules as the Engagement
-                  // type cell above: APAC/EMEA/MENA all-caps,
-                  // Global title-case, others title-case.
-                  const r = (alloc.region || 'Unknown') as string;
-                  const lower = r.toLowerCase();
-                  const display = lower === 'apac' ? 'APAC'
-                    : lower === 'emea' ? 'EMEA'
-                    : lower === 'mena' ? 'MENA'
-                    : lower === 'global' ? 'Global'
-                    : r.charAt(0).toUpperCase() + r.slice(1).toLowerCase();
-                  return (
-                    <div key={idx} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <Globe className="h-3.5 w-3.5 text-ink-warm-400 shrink-0" />
-                        <span className="text-ink-warm-700">{display}</span>
-                      </div>
-                      <span className="mono tabular-nums text-ink-warm-900 font-medium">
-                        {formatCurrency(parseFloat(alloc.allocated_budget || '0') || 0)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+          {/* Budget types + per-region allocations. Budget types
+              are campaign-level (Token / Fiat / WL chips); region
+              allocations are per-row with currency-formatted amounts.
+              Tone palette by budget type:
+                Token → brand-soft (default)
+                Fiat → emerald (real money)
+                WL → purple (whitelist allocation) */}
+          {(((campaign as any).budget_type && (campaign as any).budget_type.length > 0) || (allocations && allocations.length > 0)) && (
+            <div className="mt-5 pt-5 border-t border-cream-200 space-y-4">
+              {(campaign as any).budget_type && (campaign as any).budget_type.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-2">Budget types</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {((campaign as any).budget_type as string[]).map((bt) => {
+                      const lower = bt.toLowerCase();
+                      const cls = lower === 'fiat'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                        : lower === 'wl' || lower === 'whitelist'
+                          ? 'bg-purple-50 text-purple-700 border-purple-100'
+                          : 'bg-brand-soft text-brand-deep border-brand-light';
+                      return (
+                        <span
+                          key={bt}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs border ${cls}`}
+                        >
+                          {bt}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {allocations && allocations.length > 0 && (
+                <div>
+                  <div className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-3">By region</div>
+                  <div className="space-y-2">
+                    {allocations.map((alloc, idx) => {
+                      // Same region-formatting rules as the Region
+                      // cell above: APAC/EMEA/MENA all-caps, Global
+                      // title-case, others title-case.
+                      const r = (alloc.region || 'Unknown') as string;
+                      const lower = r.toLowerCase();
+                      const display = lower === 'apac' ? 'APAC'
+                        : lower === 'emea' ? 'EMEA'
+                        : lower === 'mena' ? 'MENA'
+                        : lower === 'global' ? 'Global'
+                        : r.charAt(0).toUpperCase() + r.slice(1).toLowerCase();
+                      const amt = parseFloat(alloc.allocated_budget || '0') || 0;
+                      const pct = (campaign.total_budget || 0) > 0
+                        ? Math.round((amt / campaign.total_budget) * 100)
+                        : null;
+                      return (
+                        <div key={idx} className="text-sm">
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                              <Globe className="h-3.5 w-3.5 text-ink-warm-400 shrink-0" />
+                              <span className="text-ink-warm-700 font-medium">{display}</span>
+                              {pct != null && (
+                                <span className="text-[10px] text-ink-warm-400 mono tabular-nums">{pct}%</span>
+                              )}
+                            </div>
+                            <span className="mono tabular-nums text-ink-warm-900 font-medium">
+                              {formatCurrency(amt)}
+                            </span>
+                          </div>
+                          {/* Per-region progress bar — same brand
+                              hue as the campaign progress bar above. */}
+                          {pct != null && (
+                            <div className="h-[2px] bg-cream-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-brand rounded-full transition-all duration-300"
+                                style={{ width: `${Math.min(100, pct)}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -12945,21 +12995,89 @@ function EngagementEditForm({
     }
   };
 
+  // Local date helpers — mirror the page-level parseDate +
+  // formatDateForInput so we don't have to thread them through props.
+  // YYYY-MM-DD storage format; midday parse so a UTC-vs-local
+  // off-by-one doesn't shift the displayed day.
+  const parseDateLocal = (s: string): Date | undefined => {
+    if (!s) return undefined;
+    const d = new Date(s + 'T12:00:00');
+    return Number.isNaN(d.getTime()) ? undefined : d;
+  };
+  const formatDateForStorage = (d: Date | undefined): string => {
+    if (!d) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  const displayDate = (s: string) => {
+    if (!s) return '';
+    try {
+      return new Date(s + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+      return s;
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+        {/* Start date — Popover + Calendar (v11 DateField pattern,
+            shared with the legacy edit-mode form so the user sees
+            the same chrome regardless of how they enter edit mode). */}
         <div>
-          <Label htmlFor="engagement-start" className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5 block">Start date</Label>
-          {/* lint-conventions: disable-next-line no-input-type-date */}
-          <Input id="engagement-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 text-sm focus-brand" />
+          <Label className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5 block">Start date</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-9 w-full justify-start text-left font-normal focus-brand text-sm"
+                style={{ color: startDate ? '#111827' : '#9ca3af' }}
+              >
+                <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                {startDate ? displayDate(startDate) : 'Select start date'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-50" align="start">
+              <CalendarComponent
+                mode="single"
+                selected={parseDateLocal(startDate)}
+                onSelect={(date) => setStartDate(formatDateForStorage(date))}
+                initialFocus
+                classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
         <div>
-          <Label htmlFor="engagement-end" className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5 block">End date</Label>
-          {/* lint-conventions: disable-next-line no-input-type-date */}
-          <Input id="engagement-end" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="h-9 text-sm focus-brand" />
+          <Label className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5 block">End date</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-9 w-full justify-start text-left font-normal focus-brand text-sm"
+                style={{ color: endDate ? '#111827' : '#9ca3af' }}
+              >
+                <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                {endDate ? displayDate(endDate) : 'Select end date'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-50" align="start">
+              <CalendarComponent
+                mode="single"
+                selected={parseDateLocal(endDate)}
+                onSelect={(date) => setEndDate(formatDateForStorage(date))}
+                initialFocus
+                classNames={{ day_selected: 'text-white hover:text-white focus:text-white' }}
+                modifiersStyles={{ selected: { backgroundColor: '#3e8692' } }}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
         <div>
-          <Label className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5 block">Engagement type</Label>
+          <Label className="text-[10px] font-semibold text-ink-warm-500 uppercase tracking-[0.2em] mb-1.5 block">Region</Label>
           <Select value={region} onValueChange={setRegion}>
             <SelectTrigger className="h-9 text-sm focus-brand">
               <SelectValue placeholder="Select region…" />
