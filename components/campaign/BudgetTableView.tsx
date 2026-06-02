@@ -554,6 +554,19 @@ export function BudgetTableView() {
                           onChange={e => setPaymentsSearchTerm(e.target.value)}
                         />
                       </div>
+                      {/* Export CSV moved into the Table-view toolbar
+                          (was on the page toolbar but the filter state
+                          lives here, so exporting from outside would
+                          dump stale filters). */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={exportPaymentsToCSV}
+                        title="Export filtered payments to CSV"
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1.5" />
+                        Export CSV
+                      </Button>
                       {/* Overdue quick filter — content is posted but payment isn't recorded */}
                       <Button
                         variant={showOverdueOnly ? 'destructive' : 'outline'}

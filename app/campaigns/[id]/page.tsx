@@ -333,9 +333,8 @@ const CampaignDetailsPage = () => {
   const recordPaymentDialogRef = useRef<RecordPaymentDialogHandle>(null);
   const [isEditingPayment, setIsEditingPayment] = useState(false);
   const [editingPayment, setEditingPayment] = useState<any>(null);
-  const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
-  const [bulkPaymentMethod, setBulkPaymentMethod] = useState('');
-  const [paymentsSearchTerm, setPaymentsSearchTerm] = useState('');
+  // `selectedPayments` / `bulkPaymentMethod` / `paymentsSearchTerm`
+  // moved into <BudgetTableView> on 2026-06-02.
 
   // Report state
   const [reportFiles, setReportFiles] = useState<any[]>([]);
@@ -358,18 +357,8 @@ const CampaignDetailsPage = () => {
   // The dialog owns its own form state internally; the page only
   // owns `isAddingPayment` (the open/close flag).
 
-  // Payment filters state
-  const [paymentFilters, setPaymentFilters] = useState({
-    kol_ids: [] as string[],
-    payment_methods: [] as string[],
-    has_content: '' as '' | 'yes' | 'no',
-    amount_operator: '' as string,
-    amount_value: '' as string,
-  });
-
-  // Payment inline editing state
-  const [editingPaymentCell, setEditingPaymentCell] = useState<{ paymentId: string, field: string } | null>(null);
-  const [editingPaymentValue, setEditingPaymentValue] = useState<any>(null);
+  // `paymentFilters` / `editingPaymentCell` / `editingPaymentValue`
+  // moved into <BudgetTableView> on 2026-06-02.
 
   // Email views state
   const [isEmailViewsDialogOpen, setIsEmailViewsDialogOpen] = useState(false);
@@ -431,166 +420,6 @@ const CampaignDetailsPage = () => {
   // Queue of KOLs waiting to have payment terms set (used for bulk onboarding).
   // After the current dialog closes, the next item in the queue opens.
   const [paymentTermsQueue, setPaymentTermsQueue] = useState<string[]>([]);
-
-  // Budget tab: "Show overdue only" quick filter toggle
-  const [showOverdueOnly, setShowOverdueOnly] = useState(false);
-
-  // Budget tab: column sort state. Click a sortable header to cycle
-  // through: none → asc → desc → none.
-  // [2026-05-28] Extended from 3 columns (kol/amount/date) to all 7
-  // data columns to match the click-to-sort behaviour on the KOLs
-  // tab. Wallet/Method/Notes are string compares; Content sorts by
-  // linked-content count so "has content" rises with desc, "no
-  // content" with asc — matches the existing has_content filter.
-  type PaymentSortField = 'kol' | 'wallet' | 'amount' | 'date' | 'method' | 'content' | 'notes' | null;
-  const [paymentSort, setPaymentSort] = useState<{
-    field: PaymentSortField;
-    direction: 'asc' | 'desc';
-  }>({ field: null, direction: 'asc' });
-
-  const togglePaymentSort = (field: Exclude<PaymentSortField, null>) => {
-    setPaymentSort(prev => {
-      if (prev.field !== field) return { field, direction: 'asc' };
-      if (prev.direction === 'asc') return { field, direction: 'desc' };
-      return { field: null, direction: 'asc' }; // clear
-    });
-  };
-
-  // Payment status classification. Mirrors the payment_reminder rule's intent:
-  //   paid    → payment_date is set
-  //   overdue → unpaid AND any linked content is already posted (= reminder would fire)
-  //   pending → unpaid but content not yet live (= nothing to chase yet)
-  const getPaymentStatus = (payment: any): 'paid' | 'overdue' | 'pending' => {
-    if (payment.payment_date) return 'paid';
-    const contentIds: string[] = Array.isArray(payment.content_id)
-      ? payment.content_id
-      : (payment.content_id ? [payment.content_id] : []);
-    if (contentIds.length === 0) return 'pending';
-    const hasPostedLinkedContent = contentIds.some(cid => {
-      const c = contents.find((co: any) => co.id === cid);
-      return c && typeof c.status === 'string' && c.status.toLowerCase() === 'posted';
-    });
-    return hasPostedLinkedContent ? 'overdue' : 'pending';
-  };
-
-  // Helper function to filter (and optionally sort) payments
-  const getFilteredPayments = () => {
-    const filtered = payments.filter(payment => {
-      const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
-      const search = paymentsSearchTerm.toLowerCase();
-
-      // Search term filter
-      const matchesSearch = (
-        !search ||
-        (kol?.master_kol?.name?.toLowerCase().includes(search)) ||
-        (payment.payment_method?.toLowerCase().includes(search)) ||
-        (payment.notes?.toLowerCase().includes(search))
-      );
-
-      // KOL filter
-      const matchesKOL = paymentFilters.kol_ids.length === 0 ||
-        paymentFilters.kol_ids.includes(payment.campaign_kol_id);
-
-      // Payment method filter
-      const matchesMethod = paymentFilters.payment_methods.length === 0 ||
-        paymentFilters.payment_methods.includes(payment.payment_method);
-
-      // Has content filter
-      const matchesContent = !paymentFilters.has_content ||
-        (paymentFilters.has_content === 'yes' && payment.content_id) ||
-        (paymentFilters.has_content === 'no' && !payment.content_id);
-
-      // Amount filter
-      const matchesAmount = !paymentFilters.amount_operator || !paymentFilters.amount_value || (() => {
-        const amount = payment.amount || 0;
-        const value = parseFloat(paymentFilters.amount_value);
-        if (isNaN(value)) return true;
-        switch (paymentFilters.amount_operator) {
-          case '>': return amount > value;
-          case '<': return amount < value;
-          case '=': return amount === value;
-          default: return true;
-        }
-      })();
-
-      // Overdue-only quick filter (applied on top of everything else)
-      const matchesOverdue = !showOverdueOnly || getPaymentStatus(payment) === 'overdue';
-
-      return matchesSearch && matchesKOL && matchesMethod && matchesContent && matchesAmount && matchesOverdue;
-    });
-
-    if (!paymentSort.field) return filtered;
-
-    // Apply sort. We sort a copy so the underlying `payments` array stays
-    // in insert order (needed for the consistent row-index rendering).
-    const sorted = [...filtered];
-    const dir = paymentSort.direction === 'asc' ? 1 : -1;
-    sorted.sort((a, b) => {
-      let av: any, bv: any;
-      switch (paymentSort.field) {
-        case 'kol': {
-          const aKol = a.campaign_kol_id
-            ? campaignKOLs.find(k => k.id === a.campaign_kol_id)?.master_kol?.name || ''
-            : a.recipient_name || '';
-          const bKol = b.campaign_kol_id
-            ? campaignKOLs.find(k => k.id === b.campaign_kol_id)?.master_kol?.name || ''
-            : b.recipient_name || '';
-          return aKol.localeCompare(bKol) * dir;
-        }
-        case 'amount':
-          av = a.amount ?? 0;
-          bv = b.amount ?? 0;
-          return (av - bv) * dir;
-        case 'date':
-          // Null dates sort to the end regardless of direction
-          if (!a.payment_date && !b.payment_date) return 0;
-          if (!a.payment_date) return 1;
-          if (!b.payment_date) return -1;
-          return (new Date(a.payment_date).getTime() - new Date(b.payment_date).getTime()) * dir;
-        case 'wallet':
-          // String compare; empty/null wallets sort to the end
-          av = (a.wallet || '').trim();
-          bv = (b.wallet || '').trim();
-          if (!av && !bv) return 0;
-          if (!av) return 1;
-          if (!bv) return -1;
-          return av.localeCompare(bv) * dir;
-        case 'method':
-          // String compare; null methods sort to the end
-          av = (a.payment_method || '').trim();
-          bv = (b.payment_method || '').trim();
-          if (!av && !bv) return 0;
-          if (!av) return 1;
-          if (!bv) return -1;
-          return av.localeCompare(bv) * dir;
-        case 'content': {
-          // Sort by linked-content count (desc shows "most linked"
-          // first, asc shows unlinked first). Matches the existing
-          // has_content filter's mental model.
-          const aCount = Array.isArray(a.content_id)
-            ? a.content_id.length
-            : (a.content_id ? 1 : 0);
-          const bCount = Array.isArray(b.content_id)
-            ? b.content_id.length
-            : (b.content_id ? 1 : 0);
-          return (aCount - bCount) * dir;
-        }
-        case 'notes':
-          // String compare; empty/null notes sort to the end
-          av = (a.notes || '').trim();
-          bv = (b.notes || '').trim();
-          if (!av && !bv) return 0;
-          if (!av) return 1;
-          if (!bv) return -1;
-          return av.localeCompare(bv) * dir;
-      }
-      return 0;
-    });
-    return sorted;
-  };
-
-  // Count of overdue payments (for the toggle button badge)
-  const overdueCount = payments.filter(p => getPaymentStatus(p) === 'overdue').length;
 
   // Column resize state for KOLs table
   // Remove columnWidths, isResizing, resizingColumn
@@ -1535,93 +1364,10 @@ const CampaignDetailsPage = () => {
 
   // `editingNotesId`/`editingNotes`/`editingBudgetId`/`editingBudget`
   // moved into <KolDashboardTableView> on 2026-06-02.
-  const [editingWalletId, setEditingWalletId] = useState<string | null>(null);
-  const [editingWallet, setEditingWallet] = useState<{ [key: string]: string }>({});
-  // [Wallet edit fix] Tracks when each wallet cell was opened, so we
-  // can distinguish a spurious blur (React mount/render side-effect)
-  // from a genuine user click-away. Without this, an empty wallet
-  // cell becomes un-editable because the autoFocus-triggered blur
-  // closes the input before the user can type.
-  const walletOpenedAtRef = useRef<Record<string, number>>({});
-  // Ref to the currently-mounted wallet input — used to refocus when
-  // we detect a spurious blur.
-  const walletInputRef = useRef<HTMLInputElement | null>(null);
-  const [editingPaidId, setEditingPaidId] = useState<string | null>(null);
-  const [editingPaid, setEditingPaid] = useState<{ [key: string]: string | number | null }>({});
-
-  // `handleNotesChange`/`handleNotesSave`/`handleBudgetChange`/
-  // `handleBudgetSave` moved into <KolDashboardTableView>. The
-  // `handleWalletChange` stays here because the Budget tab's payment
-  // table still uses it for wallet-cell editing.
-
-  const handleWalletChange = (kolId: string, value: string) => {
-    setEditingWallet(prev => ({ ...prev, [kolId]: value }));
-  };
-
-  const handleWalletSave = async (kolId: string) => {
-    const wallet = editingWallet[kolId] ?? '';
-    try {
-      // Find the campaign KOL to get the master_kol_id
-      const campaignKOL = campaignKOLs.find(kol => kol.id === kolId);
-      if (!campaignKOL?.master_kol?.id) {
-        console.error('Could not find master KOL ID');
-        return;
-      }
-
-      const currentWallet = campaignKOL.master_kol.wallet ?? '';
-
-      // [Wallet edit fix] Three cases when the value is unchanged:
-      //   1. Spurious blur right after the input mounted (React's
-      //      autoFocus interacting with the render cycle / StrictMode
-      //      double-mount). Detect via timestamp (<300ms since open)
-      //      and refocus — DON'T close, so the user can still type.
-      //   2. User genuinely opened the cell and clicked away without
-      //      typing — close silently, no DB write, no toast.
-      //   3. User typed and then reverted to original — close silently.
-      //
-      // Cases 2 + 3 collapse into the same behavior (no save, close).
-      // Case 1 is the new branch that fixes the un-editable empty cell.
-      if (wallet === currentWallet) {
-        const openedAt = walletOpenedAtRef.current[kolId] || 0;
-        const elapsed = Date.now() - openedAt;
-        if (elapsed < 300 && walletInputRef.current) {
-          // Spurious blur — keep the input mounted and refocus.
-          walletInputRef.current.focus();
-          return;
-        }
-        setEditingWalletId(null);
-        return;
-      }
-
-      // Update master_kols table instead of campaign_kols
-      const { error } = await supabase
-        .from('master_kols')
-        .update({ wallet })
-        .eq('id', campaignKOL.master_kol.id);
-
-      if (error) throw error;
-
-      // Update local state - update the master_kol.wallet
-      setCampaignKOLs(prev => prev.map(kol =>
-        kol.id === kolId
-          ? { ...kol, master_kol: { ...kol.master_kol, wallet } }
-          : kol
-      ));
-      setEditingWalletId(null);
-
-      toast({
-        title: 'Wallet updated',
-        description: `Wallet address for ${campaignKOL.master_kol?.name || 'KOL'} has been updated`,
-      });
-    } catch (err) {
-      console.error('Error updating wallet:', err);
-      toast({
-        title: 'Error',
-        description: 'Failed to update wallet address',
-        variant: 'destructive',
-      });
-    }
-  };
+  // Wallet edit state + handlers (`editingWalletId`, `editingWallet`,
+  // `walletOpenedAtRef`, `walletInputRef`, `handleWalletChange`,
+  // `handleWalletSave`) moved into <BudgetTableView> on 2026-06-02.
+  // `editingPaidId`/`editingPaid` also removed (Budget-table-only).
 
   const handleUpdateKOLBudgetType = async (kolId: string, budgetType: string) => {
     try {
@@ -1865,39 +1611,7 @@ const CampaignDetailsPage = () => {
   // component, which calls `fetchPayments` + `setCampaignKOLs`
   // (KOL-payment paid-total update) via the campaign-detail context.
 
-  const handleDeletePayment = async (paymentId: string) => {
-    try {
-      const paymentToDelete = payments.find(p => p.id === paymentId);
-      if (!paymentToDelete) return;
-
-      const { error } = await supabase
-        .from('payments')
-        .delete()
-        .eq('id', paymentId);
-
-      if (error) throw error;
-
-      // Update the KOL's paid amount in the campaign_kols table
-      const currentKol = campaignKOLs.find(kol => kol.id === paymentToDelete.campaign_kol_id);
-      const currentPaid = currentKol?.paid || 0;
-      const newPaid = Math.max(0, currentPaid - paymentToDelete.amount);
-      
-      await supabase
-        .from('campaign_kols')
-        .update({ paid: newPaid })
-        .eq('id', paymentToDelete.campaign_kol_id);
-
-      setCampaignKOLs(prev => prev.map(kol => 
-        kol.id === paymentToDelete.campaign_kol_id ? { ...kol, paid: newPaid } : kol
-      ));
-
-      setPayments(prev => prev.filter(p => p.id !== paymentId));
-      toast({ title: "Success", description: "Payment deleted successfully." });
-    } catch (err) {
-      console.error('Error deleting payment:', err);
-      toast({ title: "Error", description: "Failed to delete payment.", variant: "destructive" });
-    }
-  };
+  // `handleDeletePayment` moved into <BudgetTableView> on 2026-06-02.
 
   const handleEditPayment = (payment: any) => {
     setEditingPayment(payment);
@@ -1990,290 +1704,6 @@ const CampaignDetailsPage = () => {
     }
   };
 
-  // Payment inline editing functions
-  const handlePaymentCellSave = async (payment: any, field: string, newValue: any) => {
-    try {
-      // Coerce amount to number before saving
-      const saveValue = field === 'amount' ? (Number(newValue) || 0) : newValue;
-
-      // Update database
-      await supabase.from('payments').update({ [field]: saveValue }).eq('id', payment.id);
-
-      // Update local state
-      setPayments(prev => prev.map(p => p.id === payment.id ? { ...p, [field]: saveValue } : p));
-
-      setEditingPaymentCell(null);
-      setEditingPaymentValue(null);
-
-      // Check for telegram notification when payment_date is set
-      if (field === 'payment_date' && newValue) {
-        const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
-        const masterKolId = kol?.master_kol?.id;
-        const telegramChat = masterKolId ? kolTelegramChats[masterKolId] : null;
-        const wallet = kol?.master_kol?.wallet;
-        const amount = payment.amount;
-
-        console.log('[Payment Date Save] KOL:', kol?.master_kol?.name, 'masterKolId:', masterKolId, 'telegramChat:', telegramChat, 'wallet:', wallet, 'amount:', amount);
-        console.log('[Payment Date Save] All telegram chats:', kolTelegramChats);
-
-        if (!telegramChat) {
-          toast({
-            title: 'No Telegram chat linked',
-            description: `${kol?.master_kol?.name || 'This KOL'} doesn't have a linked Telegram chat`,
-          });
-        } else if (!wallet) {
-          toast({
-            title: 'No wallet address',
-            description: `${kol?.master_kol?.name || 'This KOL'} doesn't have a wallet address set`,
-          });
-        } else if (!amount || amount <= 0) {
-          toast({
-            title: 'No payment amount',
-            description: 'Payment has no amount set',
-          });
-        } else {
-          // Show confirmation dialog
-          setPendingPaymentNotification({
-            kolId: payment.campaign_kol_id,
-            kolName: kol?.master_kol?.name || 'Unknown KOL',
-            paymentIndex: -1, // Not used for existing payments
-            amount,
-            wallet,
-            chatId: telegramChat.chat_id,
-            chatTitle: telegramChat.title,
-            date: new Date(newValue)
-          });
-          setPaymentNotificationMessage(`$${amount.toLocaleString()} has been deposited to ${wallet}!\n\nThanks for being part of the Holo Hive network 🙌`);
-          setIsEditingPaymentMessage(false);
-          setPaymentNotifyDialogOpen(true);
-          return; // Don't show success toast yet
-        }
-      }
-
-      toast({ title: 'Success', description: 'Payment updated successfully' });
-    } catch (error) {
-      console.error('Error updating payment:', error);
-      toast({ title: 'Error', description: 'Failed to update payment', variant: 'destructive' });
-    }
-  };
-
-  // Export payments to CSV
-  const exportPaymentsToCSV = () => {
-    const filteredPayments = getFilteredPayments();
-
-    if (filteredPayments.length === 0) {
-      toast({ title: 'No data', description: 'No payments to export', variant: 'destructive' });
-      return;
-    }
-
-    // CSV headers
-    const headers = ['Name', 'Wallet', 'Amount (USD)', 'Payment Date', 'Payment Method', 'Transaction ID', 'Content', 'Notes'];
-
-    // Build CSV rows. Use the soft-delete-aware lookup so historical
-    // payments to since-removed KOLs export with the real name +
-    // "(removed)" suffix instead of "Unknown KOL".
-    const rows = filteredPayments.map(payment => {
-      const kol = campaignKOLs.find(k => k.id === payment.campaign_kol_id);
-      const lookupEntry = payment.campaign_kol_id ? paymentKolNameLookup.get(payment.campaign_kol_id) : undefined;
-      const name = payment.campaign_kol_id
-        ? (lookupEntry ? (lookupEntry.removed ? `${lookupEntry.name} (removed)` : lookupEntry.name) : 'Unknown KOL')
-        : (payment.recipient_name || 'Unknown');
-      const wallet = payment.campaign_kol_id
-        ? (kol?.master_kol?.wallet || '')
-        : (payment.wallet || '');
-      const contentIds = Array.isArray(payment.content_id) ? payment.content_id : (payment.content_id ? [payment.content_id] : []);
-      const contentNames = contentIds.map(id => {
-        const content = contents.find(c => c.id === id);
-        return content ? `${content.platform || ''} - ${content.content_type || ''}` : id;
-      }).join('; ');
-
-      return [
-        name,
-        wallet,
-        payment.amount || 0,
-        payment.payment_date || '',
-        payment.payment_method || '',
-        payment.transaction_id || '',
-        contentNames,
-        payment.notes || ''
-      ];
-    });
-
-    // Create CSV content
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => {
-        // Escape quotes and wrap in quotes if contains comma, quote, or newline
-        const cellStr = String(cell);
-        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
-          return `"${cellStr.replace(/"/g, '""')}"`;
-        }
-        return cellStr;
-      }).join(','))
-    ].join('\n');
-
-    // Download file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${campaign?.name || 'campaign'}_budget_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    toast({ title: 'Exported', description: `${filteredPayments.length} payment(s) exported to CSV` });
-  };
-
-  const renderEditablePaymentCell = (value: any, field: string, payment: any) => {
-    const isEditing = editingPaymentCell?.paymentId === payment.id && editingPaymentCell?.field === field;
-    const numberFields = ["amount"];
-    const textFields = ["notes", "transaction_id"];
-    const selectFields = ["payment_method"];
-    const dateFields = ["payment_date"];
-
-    // Always-editable select fields (payment_method)
-    if (selectFields.includes(field)) {
-      return (
-        <Select
-          value={value || ''}
-          onValueChange={async (v) => {
-            await handlePaymentCellSave(payment, field, v);
-          }}
-        >
-          <SelectTrigger
-            className="border-none shadow-none bg-transparent w-auto h-auto px-2 py-1 rounded-md text-xs font-medium inline-flex items-center focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
-            style={{ outline: 'none', boxShadow: 'none', minWidth: 90 }}
-          >
-            <SelectValue>{value || 'Select'}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Token">Token</SelectItem>
-            <SelectItem value="Fiat">Fiat</SelectItem>
-            <SelectItem value="WL">WL</SelectItem>
-          </SelectContent>
-        </Select>
-      );
-    }
-
-    // Date field - show as date picker (matching activation date style)
-    if (dateFields.includes(field)) {
-      return (
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={`focus-brand justify-start text-left font-normal h-9 w-full ${value ? 'text-ink-warm-900' : 'text-ink-warm-400'}`}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {value ? formatDisplayDate(value) : "Select payment date"}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="!bg-white border shadow-md p-0 w-auto z-50" align="start">
-            <CalendarComponent
-              mode="single"
-              selected={value ? new Date(value) : undefined}
-              onSelect={date => handlePaymentCellSave(payment, field, date ? formatDateLocal(date) : '')}
-              initialFocus
-              classNames={{ day_selected: "text-white hover:text-white focus:text-white" }}
-              modifiersStyles={{ selected: { backgroundColor: "#3e8692" } }}
-            />
-          </PopoverContent>
-        </Popover>
-      );
-    }
-
-    // For text/number fields: double-click to edit
-    if (isEditing && (textFields.includes(field) || numberFields.includes(field))) {
-      return (
-        <Input
-          type={numberFields.includes(field) ? 'number' : 'text'}
-          value={editingPaymentValue ?? ''}
-          onChange={e => setEditingPaymentValue(e.target.value)}
-          onBlur={(e) => {
-            // Only save on blur if we haven't already saved (e.g. via Enter key)
-            // Check if editing state is still active for this cell
-            if (editingPaymentCell?.paymentId === payment.id && editingPaymentCell?.field === field) {
-              handlePaymentCellSave(payment, field, editingPaymentValue);
-            }
-          }}
-          onKeyDown={e => {
-            if (e.key === 'Enter') handlePaymentCellSave(payment, field, editingPaymentValue);
-            if (e.key === 'Escape') { setEditingPaymentCell(null); setEditingPaymentValue(null); }
-          }}
-          className="w-full border-none shadow-none p-0 h-auto bg-transparent focus:outline-none focus:ring-0 focus:border-none focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none"
-          style={{ outline: 'none', boxShadow: 'none', userSelect: 'text' }}
-          autoFocus
-        />
-      );
-    }
-
-    // Default display for text/number fields
-    return (
-      <div
-        className="cursor-pointer w-full h-full flex items-center px-1 py-1"
-        onDoubleClick={() => {
-          if (textFields.includes(field) || numberFields.includes(field)) {
-            setEditingPaymentCell({ paymentId: payment.id, field });
-            setEditingPaymentValue(value);
-          }
-        }}
-        title={textFields.includes(field) || numberFields.includes(field) ? "Double-click to edit" : undefined}
-      >
-        {numberFields.includes(field) && value != null ? `$${Number(value).toLocaleString()}` : (value || '-')}
-      </div>
-    );
-  };
-
-  // Bulk payment functions
-  const handleSelectAllPayments = () => {
-    const filteredPayments = getFilteredPayments();
-    
-    if (filteredPayments.every(payment => selectedPayments.includes(payment.id))) {
-      setSelectedPayments(prev => prev.filter(id => !filteredPayments.some(p => p.id === id)));
-    } else {
-      setSelectedPayments(prev => Array.from(new Set([...prev, ...filteredPayments.map(p => p.id)])));
-    }
-  };
-
-  const handleBulkPaymentMethodChange = async () => {
-    if (selectedPayments.length === 0 || !bulkPaymentMethod) return;
-    
-    try {
-      // Update all selected payments with the new payment method
-      await Promise.all(selectedPayments.map(paymentId => 
-        supabase.from('payments').update({ payment_method: bulkPaymentMethod }).eq('id', paymentId)
-      ));
-
-      // Update local state
-      setPayments(prev => prev.map(payment => 
-        selectedPayments.includes(payment.id) ? { ...payment, payment_method: bulkPaymentMethod } : payment
-      ));
-
-      setSelectedPayments([]);
-      setBulkPaymentMethod('');
-      toast({ title: "Success", description: "Payment methods updated successfully." });
-    } catch (err) {
-      console.error('Error updating payment methods:', err);
-      toast({ title: "Error", description: "Failed to update payment methods.", variant: "destructive" });
-    }
-  };
-
-  const handleBulkDeletePayments = async () => {
-    if (selectedPayments.length === 0) return;
-    
-    try {
-      // Delete all selected payments
-      await Promise.all(selectedPayments.map(paymentId => handleDeletePayment(paymentId)));
-      
-      setSelectedPayments([]);
-      toast({ title: "Success", description: `${selectedPayments.length} payment(s) deleted successfully.` });
-    } catch (err) {
-      console.error('Error deleting payments:', err);
-      toast({ title: "Error", description: "Failed to delete some payments.", variant: "destructive" });
-    }
-  };
 
   // Add a getStatusColor helper:
   const getStatusColor = (status: string) => {
@@ -2989,10 +2419,9 @@ const CampaignDetailsPage = () => {
 
   // Add at the top of the component, after other useState declarations:
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
-  const [showBulkDeletePaymentsDialog, setShowBulkDeletePaymentsDialog] = useState(false);
+  // `showBulkDeletePaymentsDialog` / `showPaymentDeleteDialog` /
+  // `paymentToDelete` moved into <BudgetTableView>.
   const [contentToDelete, setContentToDelete] = useState<any | null>(null);
-  const [showPaymentDeleteDialog, setShowPaymentDeleteDialog] = useState(false);
-  const [paymentToDelete, setPaymentToDelete] = useState<any | null>(null);
 
   // Validation function to check for missing fields
   const getMissingFields = () => {
@@ -6080,14 +5509,9 @@ const CampaignDetailsPage = () => {
                     </TabsList>
                   </Tabs>
                   <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={exportPaymentsToCSV}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Export CSV
-                  </Button>
+                  {/* Export CSV button lives inside the BudgetTableView
+                      component since the 2026-06-02 cleanup — only
+                      shows in Table view (Overview can't be exported). */}
                   {/* Record Payment trigger — dialog body lives in
                       `components/campaign/RecordPaymentDialog.tsx`
                       since the 2026-06-02 structural pass. The button
