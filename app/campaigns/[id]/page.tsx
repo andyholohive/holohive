@@ -3689,22 +3689,43 @@ const CampaignDetailsPage = () => {
       <div className="min-h-[calc(100vh-64px)] w-full bg-cream-50">
         <div className="w-full px-4">
           <div className="space-y-4">
-            {/* Back link skeleton */}
-            <Skeleton className="h-7 w-32" />
+            {/* Breadcrumb skeleton */}
+            <div className="flex items-center gap-1.5">
+              <Skeleton className="h-4 w-20" />
+              <span className="text-ink-warm-300">/</span>
+              <Skeleton className="h-3 w-40" />
+            </div>
 
-            {/* Header skeleton — kicker + serif title + action cluster */}
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div className="min-w-0 flex-1 space-y-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500/40" />
-                  <Skeleton className="h-3 w-40" />
+            {/* Editorial hero skeleton — logo tile + kicker + serif
+                title + status pill row + action cluster */}
+            <div className="flex items-start justify-between gap-6 flex-wrap">
+              <div className="flex items-start gap-5 max-w-3xl min-w-0 flex-1">
+                <Skeleton className="w-14 h-14 rounded-xl shrink-0" />
+                <div className="min-w-0 flex-1 space-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-sky-500/40" />
+                    <Skeleton className="h-3 w-44" />
+                  </div>
+                  <Skeleton className="h-8 w-72" />
+                  <div className="flex items-center gap-2.5 mt-3">
+                    <Skeleton className="h-5 w-16 rounded-md" />
+                    <span className="text-ink-warm-300">·</span>
+                    <Skeleton className="h-3 w-28" />
+                  </div>
                 </div>
-                <Skeleton className="h-7 w-72" />
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <Skeleton className="h-9 w-32 rounded-md" />
                 <Skeleton className="h-9 w-20 rounded-md" />
               </div>
+            </div>
+
+            {/* SectionHeader skeleton */}
+            <div className="section-head first flex items-center gap-3">
+              <span className="dot bg-brand/30" aria-hidden />
+              <Skeleton className="h-3 w-20" />
+              <span className="flex-1 h-px bg-cream-200" aria-hidden />
+              <Skeleton className="h-3 w-48" />
             </div>
 
             {/* TabsList skeleton */}
@@ -3790,39 +3811,120 @@ const CampaignDetailsPage = () => {
     <div className="min-h-[calc(100vh-64px)] w-full bg-cream-50">
       <div className="w-full">
         <div className="space-y-4">
-          {/* v11 page header — back link above (per sub-route
-              convention), editorial display-serif title with kicker
-              chip, action cluster on the right. The previous layout
-              centered the title via absolute positioning; the new
-              flex layout keeps the back link left + actions right
-              and lets the title sit naturally in the middle with
-              the kicker line above it for chapter context. */}
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="-ml-2 h-7 w-fit text-xs text-ink-warm-500 hover:text-brand"
-          >
-            <button onClick={() => router.back()}>
-              <ArrowLeft className="h-3 w-3 mr-1" />
-              Back to Campaigns
+          {/* v11 page header — matches the revamp mockup's detail
+              hero pattern exactly: breadcrumb-style back link above,
+              left-aligned 56px brand-gradient logo tile, kicker with
+              sky dot + chapter labels + mono client identifier,
+              `display-serif text-[32px]` title with optional italic
+              span on the second half, inline status pill row below
+              with `·` separators for week + KOL count metrics, and
+              right-aligned action cluster (btn-cream Edit + btn-brand
+              View). */}
+          <div className="flex items-center gap-1.5 text-xs">
+            <button
+              onClick={() => router.back()}
+              className="text-ink-warm-500 hover:text-brand font-medium inline-flex items-center gap-1.5 transition"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Campaigns
             </button>
-          </Button>
+            <span className="text-ink-warm-300">/</span>
+            <span className="text-ink-warm-700 font-medium uppercase text-[10px] tracking-[0.2em] truncate">
+              {campaign?.name ?? '…'}
+            </span>
+          </div>
 
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="min-w-0 flex-1">
-              {/* Kicker line — chapter context */}
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500" />
-                <span className="text-[10px] mono uppercase tracking-[0.18em] text-ink-warm-500 truncate">
-                  Talent · Campaign{campaign?.client_name ? ` · ${campaign.client_name}` : ''}
-                </span>
-              </div>
-              {campaign && (
-                <h1 className="display-serif text-[28px] text-ink-warm-900 leading-tight truncate">
-                  {campaign.name}
-                </h1>
+          {/* Editorial hero */}
+          <div className="flex items-start justify-between gap-6 flex-wrap">
+            <div className="flex items-start gap-5 max-w-3xl min-w-0 flex-1">
+              {/* Brand-gradient logo tile — matches the mockup's hero
+                  initials block. Uses client logo when available,
+                  else first letter of the campaign name on a
+                  brand-gradient background. */}
+              {campaign?.client_logo_url ? (
+                <div className="w-14 h-14 rounded-xl overflow-hidden bg-white border border-cream-200 shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={campaign.client_logo_url}
+                    alt={campaign.client_name || 'Client'}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div
+                  className="w-14 h-14 rounded-xl text-white flex items-center justify-center text-xl font-semibold shrink-0"
+                  style={{
+                    background: 'linear-gradient(135deg, #3e8692 0%, #2d6470 100%)',
+                    boxShadow: '0 1px 0 rgba(255,255,255,0.20) inset, 0 -1px 0 rgba(20,40,45,0.12) inset, 0 1px 2px rgba(20,40,45,0.20)',
+                  }}
+                  aria-hidden
+                >
+                  {(campaign?.name || campaign?.client_name || 'C').charAt(0).toUpperCase()}
+                </div>
               )}
+              <div className="min-w-0">
+                {/* Kicker — sky dot + chapter labels + mono identifier */}
+                <div className="flex items-center gap-2 mb-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-ink-warm-500 flex-wrap">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-sky-500 shrink-0" aria-hidden />
+                  <span>Talent · Campaign</span>
+                  {campaign?.client_name && (
+                    <span className="text-ink-warm-300 normal-case mono tracking-normal text-[11px] truncate">
+                      {campaign.client_name}
+                    </span>
+                  )}
+                </div>
+                {/* display-serif title — 32px matching the mockup */}
+                {campaign && (
+                  <h1 className="display-serif text-[32px] text-ink-warm-900 leading-[1.1] tracking-tight">
+                    {campaign.name}
+                  </h1>
+                )}
+                {/* Inline status pill + metrics row */}
+                {campaign && (
+                  <div className="flex items-center gap-2.5 mt-4 text-xs flex-wrap">
+                    <span className={`inline-flex items-center gap-1.5 font-medium px-2 py-0.5 rounded-md ${
+                      campaign.status === 'Active' ? 'bg-brand-soft text-brand-deep'
+                      : campaign.status === 'Planning' ? 'bg-sky-50 text-sky-700'
+                      : campaign.status === 'Paused' ? 'bg-amber-50 text-amber-700'
+                      : campaign.status === 'Completed' ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-cream-100 text-ink-warm-700'
+                    }`}>
+                      <span className={`inline-block w-1.5 h-1.5 rounded-full ${
+                        campaign.status === 'Active' ? 'bg-brand'
+                        : campaign.status === 'Planning' ? 'bg-sky-500'
+                        : campaign.status === 'Paused' ? 'bg-amber-500'
+                        : campaign.status === 'Completed' ? 'bg-emerald-500'
+                        : 'bg-ink-warm-400'
+                      }`} aria-hidden />
+                      {campaign.status}
+                    </span>
+                    {campaign.current_phase && (
+                      <>
+                        <span className="text-ink-warm-300">·</span>
+                        <span className="text-ink-warm-700">{campaign.current_phase}</span>
+                      </>
+                    )}
+                    {campaign.start_date && campaign.end_date && (() => {
+                      const start = new Date(campaign.start_date + 'T00:00:00');
+                      const end = new Date(campaign.end_date + 'T00:00:00');
+                      const totalDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86_400_000));
+                      const elapsedDays = Math.max(0, Math.floor((Date.now() - start.getTime()) / 86_400_000));
+                      const totalWeeks = Math.max(1, Math.ceil(totalDays / 7));
+                      const currentWeek = Math.min(totalWeeks, Math.max(1, Math.ceil((elapsedDays + 1) / 7)));
+                      return (
+                        <>
+                          <span className="text-ink-warm-300">·</span>
+                          <span className="text-ink-warm-700">
+                            Week <span className="mono tabular-nums font-medium text-ink-warm-900">{currentWeek}</span>
+                            {' of '}
+                            <span className="mono tabular-nums">{totalWeeks}</span>
+                          </span>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {hasWarnings && (
@@ -3856,6 +3958,15 @@ const CampaignDetailsPage = () => {
             </div>
           </div>
 
+          {/* Section-head — chapter divider between hero and tabs.
+              Matches the mockup's "01 — …" counter format. */}
+          <div className="section-head first flex items-center gap-3">
+            <span className="dot bg-brand" aria-hidden />
+            <span className="label">Workspace</span>
+            <span className="flex-1" />
+            <span className="counter">01 — Info · KOLs · Content · Budget · Report</span>
+          </div>
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             {/* v11 tab chrome — cream-100 base + warm hairline +
                 active-state shadow-card so the lift matches every
@@ -3871,24 +3982,29 @@ const CampaignDetailsPage = () => {
             
             <TabsContent value="information" className="mt-4">
               <div className="w-full bg-white border border-cream-200 shadow-card rounded-[14px] p-6">
-              <CardHeader className="pb-6 border-b border-cream-100 flex flex-row items-center justify-between">
+              {/* CardHeader simplified — logo + name + status removed
+                  because the editorial hero above shows all three.
+                  In view mode just an Edit affordance; in edit mode
+                  the Name input + Status select live in the form
+                  body for direct editing. */}
+              <div className="pb-6 border-b border-cream-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {campaign.client_logo_url ? (
-                    <img src={campaign.client_logo_url} alt={campaign.client_name || 'Client'} className="h-10 w-10 rounded-lg object-cover" />
-                  ) : (
-                    <div className="bg-cream-100 p-2 rounded-lg"><Megaphone className="h-6 w-6 text-ink-warm-700" /></div>
+                  <h2 className="display-serif text-[19px] text-ink-warm-900 leading-none">Campaign Details</h2>
+                  {!editMode && (
+                    <span className="text-[10px] mono uppercase tracking-[0.14em] text-ink-warm-500">View only</span>
                   )}
-                  {editMode ? (
-                      <Input
-                        className="text-2xl font-bold text-ink-warm-900 focus-brand focus:ring-2 focus:ring-brand focus:border-brand"
-                        style={{ borderColor: '#e5e7eb' }}
-                        value={form?.name || ""}
-                        onChange={e => handleChange("name", e.target.value)}
-                      />
-                  ) : (
-                    <h2 className="text-2xl font-bold text-ink-warm-900">{campaign.name}</h2>
-                  )}
-                  {editMode ? (
+                </div>
+                {!editMode ? (
+                  <Button variant="outline" size="sm" onClick={handleEdit}>
+                    <Edit className="h-3.5 w-3.5 mr-1.5" />
+                    Edit
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] mono uppercase tracking-[0.14em] text-amber-700">Editing</span>
+                    {/* Status select moved to a small inline control
+                        so the user can change status without scrolling
+                        the form body. */}
                     <Select
                       value={form?.status || ""}
                       onValueChange={(value) => {
@@ -3904,7 +4020,7 @@ const CampaignDetailsPage = () => {
                         handleChange("status", value);
                       }}
                     >
-                      <SelectTrigger className="w-40 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand focus-brand">
+                      <SelectTrigger className="w-40 h-9 focus-brand text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -3919,14 +4035,9 @@ const CampaignDetailsPage = () => {
                         </SelectItem>
                       </SelectContent>
                     </Select>
-                  ) : (
-                    <div className="font-bold">{getStatusBadge(campaign.status)}</div>
-                  )}
-                </div>
-                {!editMode && (
-                  <Button variant="outline" size="sm" onClick={handleEdit}>Edit</Button>
+                  </div>
                 )}
-              </CardHeader>
+              </div>
                 <CardContent className="pt-6">
                     <div className="grid grid-cols-2 gap-x-8 gap-y-8">
                                 {/* [May 2026 audit] Recent Updates carousel
@@ -4180,13 +4291,30 @@ const CampaignDetailsPage = () => {
                     </div>
                   </div>
                 )}
+                  {/* Campaign Name — only editable in edit mode; the
+                      hero above shows it as the page title in view
+                      mode so we don't duplicate. */}
+                  {editMode && (
+                    <div className="col-span-2 bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
+                      <Label htmlFor="campaign-name" className="text-[10px] mono uppercase tracking-[0.14em] text-ink-warm-500 mb-2 block">
+                        Campaign Name <RequiredAsterisk />
+                      </Label>
+                      <Input
+                        id="campaign-name"
+                        value={form?.name || ""}
+                        onChange={e => handleChange("name", e.target.value)}
+                        className="focus-brand display-serif text-[19px] text-ink-warm-900 h-auto py-2"
+                        placeholder="Enter campaign name"
+                      />
+                    </div>
+                  )}
                   {/* Campaign Overview Section */}
-                  <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
+                  <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-brand p-2.5 rounded-lg">
-                        <FileText className="h-5 w-5 text-white" />
+                      <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
+                        <FileText className="h-4 w-4" />
                       </div>
-                      <h3 className="text-lg font-semibold text-ink-warm-900">Campaign Overview</h3>
+                      <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Campaign Overview</h3>
                     </div>
                     <div className="space-y-5">
                       {/* [May 2026 audit] Outline field hidden — Description
@@ -4238,12 +4366,12 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Timeline Section */}
-                  <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
+                  <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-brand p-2.5 rounded-lg">
-                        <CalendarIcon className="h-5 w-5 text-white" />
+                      <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
+                        <CalendarIcon className="h-4 w-4" />
                       </div>
-                      <h3 className="text-lg font-semibold text-ink-warm-900">Timeline</h3>
+                      <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Timeline</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
@@ -4373,12 +4501,12 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Client Information Section */}
-                  <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
+                  <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-brand p-2.5 rounded-lg">
-                        <Building2 className="h-5 w-5 text-white" />
+                      <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
+                        <Building2 className="h-4 w-4" />
                       </div>
-                      <h3 className="text-lg font-semibold text-ink-warm-900">Client Information</h3>
+                      <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Client Information</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
@@ -4421,12 +4549,12 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Client Communication Section - Hidden */}
-                  {false && <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
+                  {false && <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-brand p-2.5 rounded-lg">
-                        <Phone className="h-5 w-5 text-white" />
+                      <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
+                        <Phone className="h-4 w-4" />
                       </div>
-                      <h3 className="text-lg font-semibold text-ink-warm-900">Client Communication</h3>
+                      <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Client Communication</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
@@ -4531,12 +4659,12 @@ const CampaignDetailsPage = () => {
                   </div>}
 
                   {/* Team & Management Section */}
-                  <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
+                  <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-brand p-2.5 rounded-lg">
-                        <Users className="h-5 w-5 text-white" />
+                      <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
+                        <Users className="h-4 w-4" />
                       </div>
-                      <h3 className="text-lg font-semibold text-ink-warm-900">Team & Management</h3>
+                      <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Team & Management</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
@@ -4605,12 +4733,12 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Campaign Settings Section */}
-                  <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
+                  <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-brand p-2.5 rounded-lg">
-                        <BadgeCheck className="h-5 w-5 text-white" />
+                      <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
+                        <BadgeCheck className="h-4 w-4" />
                       </div>
-                      <h3 className="text-lg font-semibold text-ink-warm-900">Campaign Settings</h3>
+                      <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Campaign Settings</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
@@ -4657,12 +4785,12 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Approved Access Section */}
-                  <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
+                  <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-brand p-2.5 rounded-lg">
-                        <Users className="h-5 w-5 text-white" />
+                      <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
+                        <Users className="h-4 w-4" />
                       </div>
-                      <h3 className="text-lg font-semibold text-ink-warm-900">Approved Access</h3>
+                      <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Approved Access</h3>
                     </div>
                     <div className="bg-white p-4 rounded-[14px] border border-cream-200 shadow-card">
                       <p className="text-sm text-ink-warm-700 mb-3">
@@ -4737,12 +4865,12 @@ const CampaignDetailsPage = () => {
                   </div>
 
                   {/* Budget Section */}
-                  <div className="bg-cream-50 p-6 rounded-lg border border-cream-200">
+                  <div className="bg-cream-50 p-6 rounded-[14px] border border-cream-200">
                     <div className="flex items-center gap-3 mb-5">
-                      <div className="bg-brand p-2.5 rounded-lg">
-                        <DollarSign className="h-5 w-5 text-white" />
+                      <div className="w-9 h-9 rounded-md bg-brand-soft text-brand-deep border border-brand-light flex items-center justify-center shrink-0">
+                        <DollarSign className="h-4 w-4" />
                       </div>
-                      <h3 className="text-lg font-semibold text-ink-warm-900">Budget</h3>
+                      <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight">Budget</h3>
                     </div>
                     <div className="space-y-4">
                       {/* Budget Overview Card */}
@@ -4923,7 +5051,7 @@ const CampaignDetailsPage = () => {
                   <div className="bg-cream-100 p-2 rounded-lg">
                     <Users className="h-6 w-6 text-ink-warm-700" />
                   </div>
-                  <h2 className="text-2xl font-bold text-ink-warm-900">KOL Dashboard</h2>
+                  <h2 className="display-serif text-[22px] text-ink-warm-900 leading-tight">KOL Dashboard</h2>
                 </div>
                 <div className="flex items-center gap-3">
                   
@@ -10294,7 +10422,7 @@ const CampaignDetailsPage = () => {
                     {/* Regional Budget Summary */}
                     {campaign.budget_allocations && campaign.budget_allocations.length > 0 && (
                       <div className="bg-white p-6 rounded-[14px] border border-cream-200 shadow-card">
-                        <h3 className="text-lg font-semibold text-ink-warm-900 mb-4">Regional Budget Summary</h3>
+                        <h3 className="display-serif text-[17px] text-ink-warm-900 leading-tight mb-4">Regional Budget Summary</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {campaign.budget_allocations.map((alloc: any) => {
                             // Helper function to map regions to APAC/Global
