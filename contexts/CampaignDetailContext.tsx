@@ -25,6 +25,13 @@ import { createContext, useContext } from 'react';
 import type { CampaignWithDetails } from '@/lib/campaignService';
 import type { CampaignKOLWithDetails } from '@/lib/campaignKolService';
 
+// ───────────────────────────────────────────────────────────────────
+// Cell-selection helpers — shared selection state across the page's
+// big tables (KOL Dashboard + Budget payments). One table+rowId+field
+// triple is "selected" at a time across the whole page.
+// ───────────────────────────────────────────────────────────────────
+export type SelectedCell = { table: string; rowId: string; field: string; value: any } | null;
+
 /** Shape of the pricing-suggestion dialog state (lives on the page). */
 export type PricingSuggestionDialogState = {
   open: boolean;
@@ -104,6 +111,37 @@ interface CampaignDetailContextType {
   //     Payment dialog after a date is picked, when the KOL has a
   //     linked Telegram chat + wallet + non-zero amount. ─────────
   triggerPaymentNotification: (opts: PaymentNotificationTriggerOpts) => void;
+
+  // ─── Payment-terms dialog (rendered on the page) ──────────────
+  /** Open the Payment Terms dialog for one KOL. Returns true if the
+   *  dialog actually opened (KOL exists and has no agreed_rate yet). */
+  openPaymentTermsForKol: (kolId: string, list?: CampaignKOLWithDetails[]) => boolean;
+  /** Enqueue follow-up KOLs so the page fires the terms dialog for
+   *  each in sequence as the previous one closes. Used by the
+   *  bulk-onboarding flow + the in-dialog "Next" button. */
+  setPaymentTermsQueue: React.Dispatch<React.SetStateAction<string[]>>;
+
+  // ─── Master KOL edit dialog (rendered on the page) ────────────
+  /** Open the Master KOL edit dialog for a KOL. The dialog itself
+   *  lives in the page's trailing dialog cluster — this is the
+   *  side-effect trigger the Table view uses to open it. */
+  openMasterKolEditDialog: (kol: any) => void;
+
+  // ─── Cross-tab navigation primitives ──────────────────────────
+  /** Switch the main tab strip's selected tab. Used by the Table
+   *  view's "View contents for this KOL" jump. */
+  setActiveTab: React.Dispatch<React.SetStateAction<string>>;
+  /** Pre-fill the Content Dashboard's search box. Used by the same
+   *  cross-tab jump so the contents tab opens already filtered. */
+  setContentsSearchTerm: React.Dispatch<React.SetStateAction<string>>;
+  /** Refetch contents after the Table view's quick-add-content
+   *  flow inserts new rows. */
+  fetchContents: () => Promise<void>;
+
+  // ─── Cell-selection helpers (shared by KOL Table + Budget table)
+  isCellSelected: (table: string, rowId: string, field: string) => boolean;
+  getCellClassName: (baseClass: string, table: string, rowId: string, field: string) => string;
+  handleCellSelect: (table: string, rowId: string, field: string, value: any) => void;
 
   // ─── Notifications ─────────────────────────────────────────────
   toast: ToastFn;
